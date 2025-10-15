@@ -1,3 +1,5 @@
+const nodemailer = require("nodemailer");
+
 export default async function handler(req, res) {
   // ✅ Cabeçalhos CORS
   res.setHeader("Access-Control-Allow-Origin", "*");
@@ -9,9 +11,6 @@ export default async function handler(req, res) {
     return res.status(200).end();
   }
 
-const nodemailer = require("nodemailer");
-
-module.exports = async (req, res) => {
   const { nome, email, mensagemHtml } = req.body;
 
   const transporter = nodemailer.createTransport({
@@ -39,4 +38,4 @@ module.exports = async (req, res) => {
     console.error("❌ Erro ao enviar:", error);
     res.status(500).send("Erro ao enviar e-mail.");
   }
-};
+}
