@@ -2,6 +2,11 @@
   "name": "radarsiope-vercel",
   "version": "1.0.0",
   "dependencies": {
+    "express": "^4.18.2",
     "nodemailer": "^6.9.8"
+  },
+  "scripts": {
+    "start": "node index.js"
   }
 }
+
