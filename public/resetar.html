@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Resetar Senha</title>
+  <link rel="stylesheet" href="style.css">
+  <style>
+    body {
+      font-family: sans-serif;
+      background: #f4f4f4;
+      padding: 40px;
+    }
+    .container {
+      max-width: 400px;
+      margin: auto;
+      background: white;
+      padding: 30px;
+      border-radius: 8px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+    }
+    h2 {
+      color: #007acc;
+      margin-bottom: 20px;
+    }
+    input, button {
+      width: 100%;
+      padding: 10px;
+      margin-bottom: 12px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+    }
+    button {
+      background: #007acc;
+      color: white;
+      border: none;
+      cursor: pointer;
+    }
+    #mensagem-resetar {
+      margin-top: 10px;
+      font-size: 0.9em;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2>🔁 Redefinir Senha</h2>
+    <input type="password" id="nova-senha" placeholder="Nova senha">
+    <button onclick="resetarSenha()">Salvar nova senha</button>
+    <div id="mensagem-resetar"></div>
+  </div>
+
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+  <script src="js/firebase-init.js"></script>
+  <script src="js/resetar.js"></script>
+</body>
+</html>

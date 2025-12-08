@@ -13,19 +13,18 @@ export default async function handler(req, res) {
 
   const { nome, email, mensagemHtml } = req.body;
 
-  // 🔹 Configuração do transporte usando variáveis de ambiente
   const transporter = nodemailer.createTransport({
     host: "smtp.zoho.com",
     port: 465,
     secure: true,
     auth: {
-      user: process.env.ZOHO_USER,   // definido no Vercel
-      pass: process.env.ZOHO_PASS    // definido no Vercel
+      user: "contato@radarsiope.com.br",
+      pass: "BJLPjYxtpD8A"
     }
   });
 
   const mailOptions = {
-    from: `Radar SIOPE <${process.env.ZOHO_USER}>`,
+    from: "Radar SIOPE <contato@radarsiope.com.br>",
     to: email,
     subject: "Obrigado pelo seu interesse!",
     html: mensagemHtml
@@ -33,7 +32,6 @@ export default async function handler(req, res) {
 
   try {
     await transporter.sendMail(mailOptions);
-    console.log("✅ E-mail enviado para:", email);
     res.status(200).send("E-mail enviado com sucesso!");
   } catch (error) {
     console.error("❌ Erro ao enviar:", error);
