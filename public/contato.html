@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+  <meta charset="UTF-8" />
+  <title>Contato Radar SIOPE</title>
+</head>
+
+<body>
+  <h2>Formulário de Contato</h2>
+  <form id="formContato">
+    <label>Nome:</label><br />
+    <input type="text" name="nome" required /><br /><br />
+
+    <label>Email:</label><br />
+    <input type="email" name="email" required /><br /><br />
+
+    <label>Mensagem:</label><br />
+    <textarea name="mensagem" rows="5" required></textarea><br /><br />
+
+    <button type="submit">Enviar</button>
+  </form>
+
+  <p id="resposta"></p>
+
+  <script>
+    const form = document.getElementById("formContato");
+    const resposta = document.getElementById("resposta");
+
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+
+      const dados = new FormData(form);
+      const nome = dados.get("nome");
+      const email = dados.get("email");
+      const mensagem = dados.get("mensagem");
+
+      const mensagemHtml = `<h1>Nova mensagem de ${nome}</h1><p>${mensagem}</p>`;
+
+      try {
+        const res = await fetch("https://radarsiope-vercel.vercel.app/api/enviarEmail", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ nome, email, mensagemHtml })
+        });
+
+        const texto = await res.text();
+        resposta.textContent = texto;
+        resposta.style.color = "green";
+      } catch (err) {
+        resposta.textContent = "Erro ao enviar e-mail.";
+        resposta.style.color = "red";
+      }
+    });
+  </script>
+</body>
+
+</html>

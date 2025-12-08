@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Biblioteca de Newsletters</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #f5f8ff;
+      margin: 0;
+      padding: 20px;
+    }
+
+    .container {
+      max-width: 900px;
+      margin: auto;
+      background-color: #fff;
+      padding: 30px;
+      border-radius: 10px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+    }
+
+    h2 {
+      color: #1a73e8;
+      font-size: 28px;
+      margin-bottom: 20px;
+    }
+
+    .login-area {
+      text-align: center;
+      margin-bottom: 30px;
+    }
+
+    .login-area button {
+      padding: 10px 20px;
+      background-color: #1a73e8;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      font-size: 16px;
+      cursor: pointer;
+    }
+
+    .cardNews {
+      background: #f9f9f9;
+      border-left: 5px solid #1a73e8;
+      padding: 20px;
+      margin-bottom: 20px;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    }
+
+    .cardNews h3 {
+      margin-top: 0;
+      color: #333;
+    }
+
+    .cardNews p {
+      font-size: 14px;
+      color: #555;
+    }
+
+    .cardNews button {
+      margin-top: 10px;
+      padding: 8px 16px;
+      background-color: #1a73e8;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+
+    .cardNews button:hover {
+      background-color: #0c5dc0;
+    }
+    .carousel-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+  margin-bottom: 30px;
+}
+
+.carousel {
+  display: flex;
+  gap: 20px;
+  overflow-x: auto;
+  scroll-behavior: smooth;
+  padding: 10px;
+}
+
+.carousel::-webkit-scrollbar {
+  display: none;
+}
+
+.carousel-btn {
+  background-color: #1a73e8;
+  color: white;
+  border: none;
+  border-radius: 50%;
+  width: 40px;
+  height: 40px;
+  font-size: 20px;
+  cursor: pointer;
+}
+
+  </style>
+</head>
+<body>
+
+  <div class="container">
+  <h2>📚 Biblioteca de Newsletters</h2>
+
+  <div class="login-area" id="loginArea">
+    <p>Para acessar as newsletters premium, faça login com sua conta Google:</p>
+    <button onclick="loginGoogle()">🔐 Login com Google</button>
+  </div>
+
+  <div class="carousel-wrapper">
+    <button class="carousel-btn left" onclick="scrollCarousel(-1)">⬅️</button>
+
+    <div class="carousel" id="carouselNews">
+      <!-- Os cards serão inseridos aqui via JavaScript -->
+    </div>
+
+    <button class="carousel-btn right" onclick="scrollCarousel(1)">➡️</button>
+  </div>
+</div>
+
+
+  <!-- Firebase SDKs -->
+<script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore-compat.js"></script>
+
+  <!-- Seu script principal -->
+  <script src="main.js"></script>
+</body>
+</html>

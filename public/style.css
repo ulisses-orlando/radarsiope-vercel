@@ -1,0 +1,322 @@
+/* Layout geral */
+body {
+  font-family: 'Segoe UI', sans-serif;
+  background-color: #f0f2f5;
+  color: #333;
+  margin: 0;
+  padding: 0;
+}
+
+#conteudo {
+  max-width: 700px;
+  margin: 40px auto;
+  padding: 20px;
+  background-color: white;
+  border-radius: 10px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+}
+
+/* Título */
+h3 {
+  font-size: 24px;
+  color: #007bff;
+  margin-bottom: 20px;
+}
+
+/* Painel de dados */
+#perfilPainel {
+  background-color: #f9f9f9;
+  border-left: 5px solid #007bff;
+  border-radius: 8px;
+  padding: 20px;
+  margin-bottom: 30px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+#perfilPainel p {
+  margin: 10px 0;
+  font-size: 16px;
+}
+
+/* Formulário */
+#formPerfil label {
+  font-weight: bold;
+  display: block;
+  margin-top: 10px;
+  margin-bottom: 2px; /* reduzido para compactar */
+  color: #555;
+}
+
+#formPerfil input {
+  width: 100%;
+  padding: 5px 10px; /* menor altura */
+  margin-bottom: 6px; /* menos espaço entre campos */
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  font-size: 15px;
+  box-sizing: border-box;
+}
+
+/* Botão */
+#formPerfil button {
+  margin-top: 20px;
+  padding: 12px 24px;
+  background-color: #007bff;
+  color: white;
+  font-weight: bold;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.3s ease;
+}
+
+#formPerfil button:hover {
+  background-color: #0056b3;
+}
+
+#painelAssinatura {
+  background-color: #fff8e1;
+  border-left: 5px solid #ff9800;
+  border-radius: 8px;
+  padding: 20px;
+  margin-bottom: 30px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+#painelAssinatura p {
+  margin: 10px 0;
+  font-size: 16px;
+}
+
+#painelRelatorios {
+  background-color: #e3f2fd;
+  border-left: 5px solid #2196f3;
+  border-radius: 8px;
+  padding: 20px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+#painelRelatorios ul {
+  list-style: none;
+  padding-left: 0;
+}
+
+#painelRelatorios li {
+  margin: 10px 0;
+  font-size: 16px;
+}
+
+#painelRelatorios a {
+  text-decoration: none;
+  color: #0d47a1;
+  font-weight: bold;
+}
+
+#painelRelatorios a:hover {
+  text-decoration: underline;
+}
+
+#painelConteudo {
+  background-color: #f3e5f5;
+  border-left: 5px solid #9c27b0;
+  border-radius: 8px;
+  padding: 20px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+#painelConteudo ul {
+  list-style: none;
+  padding-left: 0;
+}
+
+#painelConteudo li {
+  margin: 12px 0;
+  font-size: 16px;
+}
+
+#painelConteudo a {
+  text-decoration: none;
+  color: #6a1b9a;
+  font-weight: bold;
+}
+
+#painelConteudo a:hover {
+  text-decoration: underline;
+}
+
+#bloqueioConteudo {
+  background-color: #fff3e0;
+  border-left: 5px solid #ff9800;
+  border-radius: 8px;
+  padding: 20px;
+  margin-top: 20px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  text-align: center;
+}
+
+#bloqueioConteudo p {
+  font-size: 16px;
+  margin: 10px 0;
+}
+
+#btnUpgrade {
+  margin-top: 15px;
+  padding: 10px 20px;
+  background-color: #ff9800;
+  color: white;
+  font-weight: bold;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.3s ease;
+}
+
+#btnUpgrade:hover {
+  background-color: #f57c00;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 20px;
+}
+
+table th, table td {
+  border: 1px solid #ddd;
+  padding: 10px;
+  text-align: left;
+}
+
+table th {
+  background-color: #007bff;
+  color: white;
+}
+
+table input {
+  width: 100%;
+  padding: 6px;
+  box-sizing: border-box;
+}
+
+.btnSalvar {
+  padding: 6px 12px;
+  background-color: #28a745;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.btnSalvar:hover {
+  background-color: #218838;
+}
+
+#painelSuporte {
+  background-color: #e8f5e9;
+  border-left: 5px solid #4caf50;
+  border-radius: 8px;
+  padding: 20px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+#painelSuporte ul {
+  list-style: none;
+  padding-left: 0;
+  margin-bottom: 20px;
+}
+
+#painelSuporte li {
+  margin: 10px 0;
+  font-size: 16px;
+}
+
+#formSuporte textarea {
+  width: 100%;
+  padding: 10px;
+  border-radius: 6px;
+  border: 1px solid #ccc;
+  resize: vertical;
+  font-size: 15px;
+  box-sizing: border-box;
+}
+
+#formSuporte button {
+  margin-top: 10px;
+  padding: 10px 20px;
+  background-color: #4caf50;
+  color: white;
+  font-weight: bold;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+#formSuporte button:hover {
+  background-color: #388e3c;
+}
+
+#historicoSuporte {
+  background-color: #fff;
+  border-left: 5px solid #2196f3;
+  border-radius: 8px;
+  padding: 20px;
+  margin-top: 20px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.mensagemSuporte {
+  margin-bottom: 20px;
+}
+
+.mensagemSuporte p {
+  margin: 5px 0;
+}
+table select {
+  width: 100%;
+  padding: 6px;
+  border-radius: 4px;
+  border: 1px solid #ccc;
+  font-size: 14px;
+  box-sizing: border-box;
+}
+
+#formSolicitacao select {
+  width: 100%;
+  padding: 8px;
+  border-radius: 6px;
+  border: 1px solid #ccc;
+  font-size: 15px;
+  box-sizing: border-box;
+}
+
+#formSolicitacao button {
+  margin-top: 10px;
+  padding: 10px 20px;
+  background-color: #2196f3;
+  color: white;
+  font-weight: bold;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+#formSolicitacao button:hover {
+  background-color: #1976d2;
+}
+
+#painelSolicitacoes {
+  background-color: #fff;
+  border-left: 5px solid #2196f3;
+  border-radius: 8px;
+  padding: 20px;
+  margin-top: 20px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.solicitacaoItem {
+  margin-bottom: 20px;
+}
+
+.solicitacaoItem p {
+  margin: 5px 0;
+}

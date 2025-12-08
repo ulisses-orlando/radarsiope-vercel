@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RadarSiope - Login</title>
+
+  <style>
+    body {
+      font-family: sans-serif;
+      margin: 0;
+      padding: 0;
+      background: #f4f4f4;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+    }
+
+    .login-container {
+      background: #fff;
+      padding: 40px;
+      border-radius: 12px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+      max-width: 400px;
+      width: 90%;
+      text-align: center;
+    }
+
+    .login-container h2 {
+      margin-bottom: 24px;
+      color: #2c3e50;
+    }
+
+    .login-container input {
+      width: 100%;
+      padding: 12px;
+      margin-bottom: 16px;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      font-size: 1em;
+    }
+
+    .login-container button {
+      width: 100%;
+      padding: 12px;
+      background: #007acc;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      font-size: 1em;
+      cursor: pointer;
+    }
+
+    .login-container button:hover {
+      background: #005fa3;
+    }
+
+    .login-container .link {
+      margin-top: 12px;
+      display: block;
+      font-size: 0.9em;
+      color: #007acc;
+      text-decoration: none;
+    }
+
+    #mensagem-login {
+      margin-top: 16px;
+      font-weight: bold;
+      color: red;
+    }
+
+    /* 🔹 Modal styles */
+    .modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.6);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 999;
+    }
+
+    .modal-content {
+      background: #fff;
+      padding: 30px;
+      border-radius: 12px;
+      max-width: 600px;
+      width: 90%;
+      position: relative;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    }
+
+    .modal-close {
+      position: absolute;
+      top: 12px;
+      right: 16px;
+      font-size: 24px;
+      font-weight: bold;
+      color: #333;
+      cursor: pointer;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="login-container">
+    <h2>🔐 Acesso ao RadarSiope</h2>
+    <input type="email" id="email-login" placeholder="Seu e-mail">
+    <input type="password" id="senha-login" placeholder="Sua senha">
+    <button onclick="loginUsuario()">Entrar</button>
+    <p id="mensagem-login" class="status-msg" style="margin-top:10px;font-weight:bold;text-align:center;color:red"></p>
+
+    <div style="margin-top:10px">
+      <a href="#" onclick="abrirPrimeiroAcesso()">🔑 Primeiro acesso? Cadastre sua senha</a>
+    </div>
+    <div style="margin-top:10px">
+      <a href="#" onclick="abrirRecuperacaoSenha()">🔁 Esqueci minha senha</a>
+    </div>
+  </div>
+
+  <!-- 🔹 Modal para primeiro acesso e recuperação -->
+  <div id="modal-interesse" class="modal-overlay" style="display:none">
+    <div class="modal-content">
+      <span class="modal-close" onclick="fecharModal()">×</span>
+      <div id="modal-body"></div>
+    </div>
+  </div>
+
+  <!-- Firebase SDKs -->
+  <script src="https://www.gstatic.com/firebasejs/10.0.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.0.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.0.0/firebase-firestore-compat.js"></script>
+
+  <!-- Inicialização do Firebase -->
+  <script src="js/firebase-init.js"></script>
+
+  <!-- Lógica de login -->
+  <script src="js/site.js"></script>
+</body>
+
+</html>

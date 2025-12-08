@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Área do Assinante</title>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+  <script src="main.js" defer></script>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header>
+    <h2>🎯 Bem-vindo à Área do Assinante</h2>
+    <div id="userInfo"></div>
+  </header>
+
+  <nav>
+    <button onclick="mostrar('perfil')">👤 Meu Perfil</button>
+    <button onclick="mostrar('assinatura')">📄 Minha Assinatura</button>
+    <button onclick="mostrar('relatorios')">📊 Relatórios</button>
+    <button onclick="mostrar('conteudo')">🔒 Conteúdo Exclusivo</button>
+    <button id="btnAdmin" style="display:none;" onclick="mostrarAdmin()">🛠️ Painel de Administração</button>
+    <button onclick="mostrar('suporte')">📞 Suporte</button>
+    <button onclick="logout()">🚪 Logout</button>
+  </nav>
+
+  <div id="conteudo">
+    <p>Selecione uma opção acima para começar.</p>
+  </div>
+</body>
+</html>
