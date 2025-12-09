@@ -1,12 +1,20 @@
 {
-  "name": "radarsiope-vercel",
+  "name": "radarsiope",
   "version": "1.0.0",
-  "dependencies": {
-    "express": "^4.18.2",
-    "nodemailer": "^6.9.8"
-  },
+  "description": "Servidor para envio de emails via AWS SES",
+  "main": "server.js",
+  "type": "module",
   "scripts": {
-    "start": "node index.js"
+    "dev": "node server.js",
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "aws-sdk": "^2.1692.0",
+    "body-parser": "^1.20.2",
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.3",
+    "express": "^4.18.2",
+    "firebase-admin": "^13.6.0",
+    "nodemailer": "^7.0.9"
   }
 }
-
