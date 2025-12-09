@@ -463,19 +463,78 @@ async function abrirModalNewsletter(docId = null, isEdit = false) {
   // Insere o botão no DOM
   htmlWrap.appendChild(btnCopiar);
 
+  // Botão: Pixel
+  const btnPixel = document.createElement('button');
+  btnPixel.innerText = '➕ Pixel';
+  btnPixel.className = 'botao-newsletter';
+  btnPixel.id = 'btn-inserir-pixel';
+  btnPixel.style.marginLeft = '10px';
+  btnPixel.onclick = () => {
+    const texto = `
+    <!-- Código de Pixel -->
+    <img src="https://api.radarsiope.com.br/api/pixel?newsletter={{newsletterId}}&email={{email}}" 
+         width="1" height="1" style="display:none" alt="pixel" />
+  `;
+    if (!ta.value.includes("api/pixel")) {
+      ta.value += "\n" + texto;
+    } else {
+      alert("O código de Pixel já está incluído.");
+    }
+  };
+  htmlWrap.appendChild(btnPixel);
+
+  // Botão: Click
+  const btnClick = document.createElement('button');
+  btnClick.innerText = '➕ Click';
+  btnClick.className = 'botao-newsletter';
+  btnClick.style.marginLeft = '10px';
+  btnClick.style.marginTop = '10px';
+  btnClick.id = 'btn-inserir-click';
+  btnClick.onclick = () => {
+    // Solicita o link ao usuário
+    let destino = prompt("Informe o link de destino:", "https://radarsiope.com.br/");
+
+    // Se o usuário cancelar ou deixar vazio, usa o padrão
+    if (!destino) {
+      destino = "https://radarsiope.com.br/";
+    }
+
+    // Validação: se não começar com http:// ou https://, adiciona https://
+    if (!destino.startsWith("http://") && !destino.startsWith("https://")) {
+      destino = "https://" + destino;
+    }
+
+    // Monta o código de rastreamento
+    const texto = `
+    <a href="https://api.radarsiope.com.br/api/click?newsletter={{newsletterId}}&email={{email}}&url=${encodeURIComponent(destino)}">
+      Clique aqui para acessar o conteúdo
+    </a>
+  `;
+
+    // Evita duplicação
+    if (!ta.value.includes("api/click")) {
+      ta.value += "\n" + texto;
+    } else {
+      alert("O link de Click já está incluído.");
+    }
+  };
+  htmlWrap.appendChild(btnClick);
+
+  // Botão: Descadastramento
   const btnDescadastramento = document.createElement('button');
-  btnDescadastramento.innerText = '➕ Inserir link de descadastramento (somente newsletter básica ?)';
-  btnDescadastramento.style.marginTop = '10px';
+  btnDescadastramento.innerText = '➕ Descadastramento';
+  btnDescadastramento.className = 'botao-newsletter';
   btnDescadastramento.id = 'btn-inserir-descadastramento';
+  btnDescadastramento.style.marginTop = '10px';
   btnDescadastramento.onclick = () => {
     const texto = `
-      <p style="font-size:12px; color:#888; margin-top:30px">
-        Não deseja mais receber nossas newsletters?
-        <a href="https://radarsiope.com.br/descadastramento.html?email={{email}}&newsletter={{newsletterId}}">
-          Clique aqui para se descadastrar
-        </a>.
-      </p>
-      `;
+    <p style="font-size:12px; color:#888; margin-top:30px">
+      Não deseja mais receber nossas newsletters?
+      <a href="https://radarsiope.com.br/descadastramento.html?email={{email}}&newsletter={{newsletterId}}">
+        Clique aqui para se descadastrar
+      </a>.
+    </p>
+  `;
     if (!ta.value.includes("Clique aqui para se descadastrar")) {
       ta.value += "\n" + texto;
     } else {
@@ -498,6 +557,15 @@ async function abrirModalNewsletter(docId = null, isEdit = false) {
       }
     });
 
+    // Conteúdo da newsletter (HTML)
+    const htmlNewsletter = payload['html_conteudo'] || "";
+    const tipoNewsletter = payload['classificacao'] || "Básica";
+
+    // Validação antes de gravar
+    if (!validarNewsletter(htmlNewsletter, tipoNewsletter)) {
+      return; // bloqueia gravação se faltarem parâmetros
+    }
+
     const ref = db.collection('newsletters');
     if (isEdit && docId) {
       await ref.doc(docId).set(payload, { merge: true });
@@ -512,6 +580,53 @@ async function abrirModalNewsletter(docId = null, isEdit = false) {
   openModal('modal-edit-overlay');
 }
 
+// Funções auxiliares de validação e modal
+function mostrarErros(erros) {
+  const modal = document.getElementById("alert-modal");
+  const lista = document.getElementById("alert-list");
+
+  // Limpa lista
+  lista.innerHTML = "";
+
+  // Adiciona cada erro
+  erros.forEach(err => {
+    const li = document.createElement("li");
+    li.textContent = err;
+    lista.appendChild(li);
+  });
+
+  // Mostra modal
+  modal.style.display = "flex";
+}
+
+function fecharModal() {
+  document.getElementById("alert-modal").style.display = "none";
+}
+
+function validarNewsletter(html, tipoNewsletter) {
+  const erros = [];
+
+  // Pixel obrigatório
+  if (!html.includes("api/pixel")) {
+    erros.push("Pixel não encontrado");
+  }
+
+  // Click obrigatório
+  if (!html.includes("api/click")) {
+    erros.push("Link de Click não encontrado");
+  }
+
+  // Descadastramento obrigatório apenas se não for básica
+  if (tipoNewsletter !== "basica" && !html.includes("descadastramento.html")) {
+    erros.push("Link de Descadastramento não encontrado");
+  }
+
+  if (erros.length > 0) {
+    mostrarErros(erros);
+    return false;
+  }
+  return true;
+}
 
 async function gerarRelatorioPreferencias() {
   const select = document.getElementById("filtro-cad-tipo-newsletter");
