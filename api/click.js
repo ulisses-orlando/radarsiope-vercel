@@ -5,7 +5,7 @@ if (!admin.apps.length) {
         credential: admin.credential.cert({
             projectId: process.env.FIREBASE_PROJECT_ID,
             clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-            privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\\\n/g, '\n')
+            privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n')
         })
     });
 }
@@ -18,7 +18,12 @@ export default async function handler(req, res) {
         return res.status(400).send("URL destino ausente");
     }
 
-    const destino = decodeURIComponent(url);
+    let destino = decodeURIComponent(url);
+
+    // 🔹 Validação extra: garantir que tenha http/https
+    if (!destino.startsWith("http://") && !destino.startsWith("https://")) {
+        destino = "https://" + destino;
+    }
 
     try {
         await db.collection("newsletters")
@@ -37,5 +42,6 @@ export default async function handler(req, res) {
         console.error("Erro ao registrar clique:", e);
     }
 
-    res.redirect(destino);
+    // 🔹 Redireciona para o destino final
+    return res.redirect(destino);
 }
