@@ -1288,7 +1288,8 @@ async function enviarLoteIndividual(newsletterId, envioId, loteId) {
                 edicao: newsletter.edicao,
                 tipo: newsletter.tipo,
                 titulo: newsletter.titulo,
-                data_publicacao: newsletter.data_publicacao
+                data_publicacao: newsletter.data_publicacao,
+                newsletterId
             });
 
             // 🔹 aplica rastreamento (pixel + links)
@@ -1412,20 +1413,20 @@ async function enviarLoteIndividual(newsletterId, envioId, loteId) {
 }
 
 function aplicarRastreamento(htmlBase, envioId, destinatarioId, newsletterId) {
-  // 1) Inserir pixel de abertura
-  const pixelTag = `
+    // 1) Inserir pixel de abertura
+    const pixelTag = `
     <img src="https://api.radarsiope.com.br/api/pixel?envioId=${encodeURIComponent(envioId)}&destinatarioId=${encodeURIComponent(destinatarioId)}&newsletterId=${encodeURIComponent(newsletterId)}"
          width="1" height="1" style="display:none;" alt="" />
   `;
-  let htmlComPixel = htmlBase + pixelTag;
+    let htmlComPixel = htmlBase + pixelTag;
 
-  // 2) Reescrever links para passar pelo redirecionador
-  htmlComPixel = htmlComPixel.replace(/href="([^"]+)"/g, (match, urlDestino) => {
-    const urlTrack = `https://api.radarsiope.com.br/api/click?envioId=${encodeURIComponent(envioId)}&destinatarioId=${encodeURIComponent(destinatarioId)}&newsletterId=${encodeURIComponent(newsletterId)}&url=${encodeURIComponent(urlDestino)}`;
-    return `href="${urlTrack}"`;
-  });
+    // 2) Reescrever links para passar pelo redirecionador
+    htmlComPixel = htmlComPixel.replace(/href="([^"]+)"/g, (match, urlDestino) => {
+        const urlTrack = `https://api.radarsiope.com.br/api/click?envioId=${encodeURIComponent(envioId)}&destinatarioId=${encodeURIComponent(destinatarioId)}&newsletterId=${encodeURIComponent(newsletterId)}&url=${encodeURIComponent(urlDestino)}`;
+        return `href="${urlTrack}"`;
+    });
 
-  return htmlComPixel;
+    return htmlComPixel;
 }
 
 
