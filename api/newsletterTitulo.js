@@ -21,6 +21,7 @@ export default async function handler(req, res) {
 
   try {
     const doc = await db.collection("newsletters").doc(id).get();
+
     if (!doc.exists) {
       return res.status(404).json({ error: "Newsletter não encontrada" });
     }
@@ -29,6 +30,6 @@ export default async function handler(req, res) {
     return res.status(200).json({ titulo: data.titulo || "(sem título)" });
   } catch (err) {
     console.error("Erro ao buscar título da newsletter:", err);
-    return res.status(500).json({ error: "Erro interno no servidor" });
+    return res.status(500).json({ error: "Erro interno no servidor", detalhe: err.message });
   }
 }
