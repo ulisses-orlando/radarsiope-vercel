@@ -15,6 +15,10 @@ const db = admin.firestore();
 export default async function handler(req, res) {
   const { id } = req.query;
 
+  if (!id) {
+    return res.status(400).json({ error: "ID da newsletter não informado" });
+  }
+
   try {
     const doc = await db.collection("newsletters").doc(id).get();
     if (!doc.exists) {
@@ -22,10 +26,17 @@ export default async function handler(req, res) {
     }
 
     const data = doc.data();
-    console.log("Newsletter data:", data); // 🔹 log no Vercel
-    return res.status(200).json(data); // 🔹 retorna tudo para inspecionar
+
+    // 🔹 Converte para JSON seguro (stringify + parse)
+    const safeData = JSON.parse(JSON.stringify(data));
+
+    // 🔹 Log nos deployments do Vercel
+    console.log("Newsletter data:", safeData);
+
+    // 🔹 Retorna todos os campos para inspeção
+    return res.status(200).json(safeData);
   } catch (err) {
-    console.error("Erro:", err);
+    console.error("Erro ao buscar newsletter:", err);
     return res.status(500).json({ error: "Erro interno", detalhe: err.message });
   }
 }
