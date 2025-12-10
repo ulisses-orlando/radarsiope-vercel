@@ -64,7 +64,7 @@
     const params = new URLSearchParams(window.location.search);
     const email = params.get("email") || "";
     const newsletterId = params.get("newsletter") || "";
-    const titulo = params.get("titulo") || "";
+    const titulo = params.get("titulo") || "(sem título)";
 
     // Preenche os campos ocultos
     document.getElementById("email").value = email;
@@ -73,19 +73,7 @@
 
     // Mostra na tela o valor da URL
     document.getElementById("nl-email").innerText = email || "(sem e-mail)";
-    document.getElementById("nl-titulo").innerText = titulo ? decodeURIComponent(titulo) : "(sem título)";
-
-    // Fallback: se não veio título na URL, tenta buscar no backend
-    if (!titulo) {
-      fetch(`/api/newsletterTitulo?id=${newsletterId}`)
-        .then(res => res.json())
-        .then(data => {
-          document.getElementById("nl-titulo").innerText = data.titulo || "(sem título)";
-        })
-        .catch(() => {
-          document.getElementById("nl-titulo").innerText = "(sem título)";
-        });
-    }
+    document.getElementById("nl-titulo").innerText = decodeURIComponent(titulo);
 
     const form = document.getElementById("unsubscribeForm");
     form.addEventListener("submit", async (e) => {
