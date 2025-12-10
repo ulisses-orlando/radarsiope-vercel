@@ -74,7 +74,7 @@
     document.getElementById("email").value = email;
     document.getElementById("newsletterId").value = newsletterId;
     document.getElementById("nl-email").innerText = email || "(sem e-mail)";
-    document.getElementById("nl-titulo").innerText = titulo;
+    document.getElementById("nl-titulo").innerText = decodeURIComponent(titulo);
 
     fetch(`/api/newsletterTitulo?id=${newsletterId}`)
       .then(res => res.json())
