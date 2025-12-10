@@ -1,18 +1,25 @@
+import admin from "firebase-admin";
+
+if (!admin.apps.length) {
+  admin.initializeApp({
+    credential: admin.credential.cert({
+      projectId: process.env.FIREBASE_PROJECT_ID,
+      clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+      privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\\\n/g, '\n')
+    })
+  });
+}
+const db = admin.firestore();
+
 export default async function handler(req, res) {
   const { envioId, destinatarioId, newsletterId } = req.query;
 
+  // 🔹 Validação de parâmetros obrigatórios
   if (!envioId || !destinatarioId || !newsletterId) {
     return res.status(400).send("Parâmetros inválidos");
   }
 
   const ua = req.headers["user-agent"] || "";
-
-  // 🔹 Ignora chamadas vindas de servidor/backend
-  if (ua.toLowerCase().includes("node") || ua.toLowerCase().includes("axios") || ua.toLowerCase().includes("fetch")) {
-    console.log("Ignorando abertura disparada por backend:", ua);
-    res.setHeader("Content-Type", "image/gif");
-    return res.send(Buffer.from("R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==", "base64"));
-  }
 
   try {
     const aberturasRef = db.collection("newsletters")
@@ -27,6 +34,7 @@ export default async function handler(req, res) {
       .get();
 
     if (existente.empty) {
+      // Primeiro registro de abertura
       await aberturasRef.add({
         destinatarioId,
         abertoEm: new Date(),
@@ -34,7 +42,9 @@ export default async function handler(req, res) {
         userAgent: ua,
         ip: req.socket.remoteAddress || null
       });
+      console.log("✅ Abertura registrada para", destinatarioId);
     } else {
+      // Já existe: incrementa contador
       const docRef = existente.docs[0].ref;
       const dados = existente.docs[0].data();
       const vezesAtual = dados.vezes || 1;
@@ -45,11 +55,13 @@ export default async function handler(req, res) {
         userAgent: ua,
         ip: req.socket.remoteAddress || null
       });
+      console.log("ℹ️ Abertura incrementada para", destinatarioId);
     }
   } catch (e) {
     console.error("Erro ao registrar abertura:", e);
   }
 
+  // 🔹 Retorna pixel transparente (GIF 1x1)
   res.setHeader("Content-Type", "image/gif");
   res.send(Buffer.from("R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==", "base64"));
 }
