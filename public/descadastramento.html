@@ -15,7 +15,11 @@
 <body>
   <div class="card">
     <h2>Descadastramento de Newsletter</h2>
-    <p>Você está prestes a se descadastrar da newsletter <strong id="nl-titulo">...</strong>.</p>
+    <p>
+      Você está prestes a se descadastrar da newsletter 
+      <strong id="nl-titulo">...</strong> 
+      com o e‑mail <strong id="nl-email">...</strong>.
+    </p>
     <p>Se quiser, você pode nos contar o motivo:</p>
 
     <form id="unsubscribeForm">
@@ -35,6 +39,7 @@
 
     document.getElementById("email").value = email;
     document.getElementById("newsletterId").value = newsletterId;
+    document.getElementById("nl-email").innerText = email || "(sem e-mail)";
 
     fetch(`/api/newsletterTitulo?id=${newsletterId}`)
       .then(res => res.json())
