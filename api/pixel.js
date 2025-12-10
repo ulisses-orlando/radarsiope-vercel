@@ -14,7 +14,6 @@ const db = admin.firestore();
 export default async function handler(req, res) {
   const { envioId, destinatarioId, newsletterId } = req.query;
 
-  // 🔹 Validação de parâmetros obrigatórios
   if (!envioId || !destinatarioId || !newsletterId) {
     return res.status(400).send("Parâmetros inválidos");
   }
@@ -22,11 +21,12 @@ export default async function handler(req, res) {
   const ua = req.headers["user-agent"] || "";
 
   try {
-    const aberturasRef = db.collection("newsletters")
+    const envioRef = db.collection("newsletters")
       .doc(newsletterId)
       .collection("envios")
-      .doc(envioId)
-      .collection("aberturas");
+      .doc(envioId);
+
+    const aberturasRef = envioRef.collection("aberturas");
 
     const existente = await aberturasRef
       .where("destinatarioId", "==", destinatarioId)
@@ -34,17 +34,15 @@ export default async function handler(req, res) {
       .get();
 
     if (existente.empty) {
-      // Primeiro registro de abertura
       await aberturasRef.add({
         destinatarioId,
         abertoEm: new Date(),
         vezes: 1,
         userAgent: ua,
-        ip: req.socket.remoteAddress || null
+        ip: req.socket.remoteAddress || null,
+        tipoEvento: "abertura"
       });
-      console.log("✅ Abertura registrada para", destinatarioId);
     } else {
-      // Já existe: incrementa contador
       const docRef = existente.docs[0].ref;
       const dados = existente.docs[0].data();
       const vezesAtual = dados.vezes || 1;
@@ -55,8 +53,14 @@ export default async function handler(req, res) {
         userAgent: ua,
         ip: req.socket.remoteAddress || null
       });
-      console.log("ℹ️ Abertura incrementada para", destinatarioId);
     }
+
+    // 🔹 Incrementar contador agregado no documento de envio
+    await envioRef.set({
+      totalAberturas: admin.firestore.FieldValue.increment(1),
+      ultimaAberturaEm: new Date()
+    }, { merge: true });
+
   } catch (e) {
     console.error("Erro ao registrar abertura:", e);
   }
