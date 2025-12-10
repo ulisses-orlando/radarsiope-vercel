@@ -1,42 +1,55 @@
-import admin from "firebase-admin";
-
-if (!admin.apps.length) {
-    admin.initializeApp({
-        credential: admin.credential.cert({
-            projectId: process.env.FIREBASE_PROJECT_ID,
-            clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-            privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\\\n/g, '\n')
-        })
-    });
-}
-const db = admin.firestore();
-
 export default async function handler(req, res) {
-    const { envioId, destinatarioId, newsletterId } = req.query;
+  const { envioId, destinatarioId, newsletterId } = req.query;
 
-    const imgBuffer = Buffer.from(
-        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/wIAAgMBAp9nXQAAAABJRU5ErkJggg==",
-        "base64"
-    );
+  if (!envioId || !destinatarioId || !newsletterId) {
+    return res.status(400).send("Parâmetros inválidos");
+  }
 
-    res.setHeader("Content-Type", "image/png");
-    res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0");
+  const ua = req.headers["user-agent"] || "";
 
-    try {
-        await db.collection("newsletters")
-            .doc(newsletterId)
-            .collection("envios")
-            .doc(envioId)
-            .collection("aberturas")
-            .add({
-                destinatarioId,
-                abertoEm: new Date(),
-                userAgent: req.headers["user-agent"] || null,
-                ip: req.socket.remoteAddress || null
-            });
-    } catch (e) {
-        console.error("Erro ao registrar abertura:", e);
+  // 🔹 Ignora chamadas vindas de servidor/backend
+  if (ua.toLowerCase().includes("node") || ua.toLowerCase().includes("axios") || ua.toLowerCase().includes("fetch")) {
+    console.log("Ignorando abertura disparada por backend:", ua);
+    res.setHeader("Content-Type", "image/gif");
+    return res.send(Buffer.from("R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==", "base64"));
+  }
+
+  try {
+    const aberturasRef = db.collection("newsletters")
+      .doc(newsletterId)
+      .collection("envios")
+      .doc(envioId)
+      .collection("aberturas");
+
+    const existente = await aberturasRef
+      .where("destinatarioId", "==", destinatarioId)
+      .limit(1)
+      .get();
+
+    if (existente.empty) {
+      await aberturasRef.add({
+        destinatarioId,
+        abertoEm: new Date(),
+        vezes: 1,
+        userAgent: ua,
+        ip: req.socket.remoteAddress || null
+      });
+    } else {
+      const docRef = existente.docs[0].ref;
+      const dados = existente.docs[0].data();
+      const vezesAtual = dados.vezes || 1;
+
+      await docRef.update({
+        vezes: vezesAtual + 1,
+        ultimoAcesso: new Date(),
+        userAgent: ua,
+        ip: req.socket.remoteAddress || null
+      });
     }
+  } catch (e) {
+    console.error("Erro ao registrar abertura:", e);
+  }
 
-    res.status(200).send(imgBuffer);
+  res.setHeader("Content-Type", "image/gif");
+  res.send(Buffer.from("R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==", "base64"));
 }
