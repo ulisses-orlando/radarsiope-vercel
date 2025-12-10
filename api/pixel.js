@@ -69,3 +69,4 @@ export default async function handler(req, res) {
   res.setHeader("Content-Type", "image/gif");
   res.send(Buffer.from("R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==", "base64"));
 }
+
