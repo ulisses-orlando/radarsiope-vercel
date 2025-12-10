@@ -18,7 +18,15 @@ export default async function handler(req, res) {
         return res.status(400).send("URL destino ausente");
     }
 
-    const destino = decodeURIComponent(url);
+    // 🔹 Decodificação dupla para lidar com links reescritos pelo SES
+    let destino = decodeURIComponent(url);
+    try {
+        destino = decodeURIComponent(destino);
+    } catch (e) {
+        // se não precisar, ignora
+    }
+
+    console.log("Destino final do clique:", destino);
 
     try {
         await db.collection("newsletters")
@@ -37,5 +45,5 @@ export default async function handler(req, res) {
         console.error("Erro ao registrar clique:", e);
     }
 
-    res.redirect(destino);
+    return res.redirect(destino);
 }
