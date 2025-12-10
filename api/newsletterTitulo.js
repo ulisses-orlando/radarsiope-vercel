@@ -27,16 +27,10 @@ export default async function handler(req, res) {
 
     const data = doc.data();
 
-    // 🔹 Converte para JSON seguro (stringify + parse)
-    const safeData = JSON.parse(JSON.stringify(data));
-
-    // 🔹 Log nos deployments do Vercel
-    console.log("Newsletter data:", safeData);
-
-    // 🔹 Retorna todos os campos para inspeção
-    return res.status(200).json(safeData);
+    // 🔹 Usa o campo correto "titulo"
+    return res.status(200).json({ titulo: data.titulo || "(sem título)" });
   } catch (err) {
-    console.error("Erro ao buscar newsletter:", err);
+    console.error("Erro ao buscar título da newsletter:", err);
     return res.status(500).json({ error: "Erro interno", detalhe: err.message });
   }
 }
