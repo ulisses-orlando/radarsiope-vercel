@@ -26,7 +26,12 @@ export default async function handler(req, res) {
         // se não precisar, ignora
     }
 
-    console.log("Destino final do clique:", destino);
+    // 🔹 Normalização: garantir que tenha http/https
+    if (!destino.startsWith("http://") && !destino.startsWith("https://")) {
+        destino = "https://" + destino;
+    }
+
+    console.log("Redirecionando para:", destino);
 
     try {
         await db.collection("newsletters")
@@ -45,5 +50,6 @@ export default async function handler(req, res) {
         console.error("Erro ao registrar clique:", e);
     }
 
+    // 🔹 Redireciona para o destino final
     return res.redirect(destino);
 }
