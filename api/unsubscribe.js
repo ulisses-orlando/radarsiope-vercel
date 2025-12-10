@@ -58,5 +58,3 @@ export default async function handler(req, res) {
     return res.status(500).send("❌ Erro interno no servidor.");
   }
 }
-
-
