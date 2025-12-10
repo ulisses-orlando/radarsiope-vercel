@@ -506,7 +506,7 @@ async function abrirModalNewsletter(docId = null, isEdit = false) {
 
     // Monta o código de rastreamento
     const texto = `
-    <a href="https://api.radarsiope.com.br/api/click?newsletter={{newsletterId}}&email={{email}}&url=${encodeURIComponent(destino)}">
+    <a href="https://api.radarsiope.com.br/api/click?newsletterId={{newsletterId}}&email={{email}}&url=${encodeURIComponent(destino)}">
       Clique aqui para acessar o conteúdo
     </a>
   `;
