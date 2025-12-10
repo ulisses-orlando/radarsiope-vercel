@@ -832,6 +832,7 @@ function aplicarPlaceholders(template, dados) {
   const edicao = dados.edicao || "(sem edição)";
   const tipo = dados.tipo || "(sem tipo)";
   const titulo = dados.titulo || "(sem título)";
+  const newsletterId = dados.newsletterId || "(sem newsletterId)";
   let dataFormatada = "";
 
   if (dados.data_publicacao) {
@@ -845,8 +846,10 @@ function aplicarPlaceholders(template, dados) {
     .replace(/{{edicao}}/gi, edicao)
     .replace(/{{tipo}}/gi, tipo)
     .replace(/{{titulo}}/gi, titulo)
-    .replace(/{{data_publicacao}}/gi, dataFormatada);
+    .replace(/{{data_publicacao}}/gi, dataFormatada)
+    .replace(/{{newsletterId}}/gi, newsletterId); // 🔹 novo
 }
+
 
 async function abrirModalEnvioNewsletterManual(usuarioId, assinaturaId) {
   const modal = document.getElementById("modal-edit-overlay");
