@@ -833,6 +833,8 @@ function aplicarPlaceholders(template, dados) {
   const tipo = dados.tipo || "(sem tipo)";
   const titulo = dados.titulo || "(sem título)";
   const newsletterId = dados.newsletterId || "(sem newsletterId)";
+  const envioId = dados.envioId || "(sem envioId)";
+  const destinatarioId = dados.destinatarioId || "(sem destinatarioId)";
   let dataFormatada = "";
 
   if (dados.data_publicacao) {
@@ -847,7 +849,9 @@ function aplicarPlaceholders(template, dados) {
     .replace(/{{tipo}}/gi, tipo)
     .replace(/{{titulo}}/gi, titulo)
     .replace(/{{data_publicacao}}/gi, dataFormatada)
-    .replace(/{{newsletterId}}/gi, newsletterId); // 🔹 novo
+    .replace(/{{newsletterId}}/gi, newsletterId)
+    .replace(/{{envioId}}/gi, envioId)              
+    .replace(/{{destinatarioId}}/gi, destinatarioId); 
 }
 
 
