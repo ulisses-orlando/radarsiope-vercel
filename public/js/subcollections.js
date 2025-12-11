@@ -766,7 +766,7 @@ async function abrirModalEnvioManual(usuarioId, solicitacaoId, dadosSolicitacao)
     }
 
     try {
-      await fetch("https://radarsiope-vercel.vercel.app/api/enviarEmail", {
+      await fetch("/api/enviarEmail", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ nome, email, mensagemHtml })
@@ -1005,7 +1005,7 @@ async function abrirModalEnvioNewsletterManual(usuarioId, assinaturaId) {
     }
 
     try {
-      await fetch("https://radarsiope-vercel.vercel.app/api/enviarEmail", {
+      await fetch("/api/enviarEmail", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ nome, email, mensagemHtml })
