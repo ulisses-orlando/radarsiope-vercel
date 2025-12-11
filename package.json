@@ -5,8 +5,8 @@
   "main": "server.js",
   "type": "module",
   "scripts": {
-    "dev": "node server.js",
-    "start": "node server.js"
+    "dev": "next dev",
+    "start": "next start"
   },
   "dependencies": {
     "aws-sdk": "^2.1692.0",
