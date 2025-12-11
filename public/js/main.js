@@ -492,11 +492,11 @@ async function abrirModalNewsletter(docId = null, isEdit = false) {
   btnClick.id = 'btn-inserir-click';
   btnClick.onclick = () => {
     // Solicita o link ao usuário
-    let destino = prompt("Informe o link de destino:", "https://radarsiope.com.br/");
+    let destino = prompt("Informe o link de destino:", "https://www.radarsiope.com.br/");
 
     // Se o usuário cancelar ou deixar vazio, usa o padrão
     if (!destino) {
-      destino = "https://radarsiope.com.br/";
+      destino = "https://www.radarsiope.com.br/";
     }
 
     // Validação: se não começar com http:// ou https://, adiciona https://
