@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Descadastramento</title>
+
   <style>
     body {
       font-family: sans-serif;
@@ -36,48 +37,88 @@
       margin-top: 20px;
       font-weight: bold;
     }
+
+    /* ✅ Modal */
+    #successModal {
+      display: none;
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      background: rgba(0,0,0,0.5);
+      justify-content: center;
+      align-items: center;
+      z-index: 9999;
+    }
+    #successModal .box {
+      background: white;
+      padding: 25px;
+      border-radius: 8px;
+      max-width: 400px;
+      text-align: center;
+      box-shadow: 0 0 10px rgba(0,0,0,0.3);
+    }
+    #successModal button {
+      background: #007bff;
+      margin-top: 15px;
+    }
   </style>
 </head>
+
 <body>
-  <div class="card">
+  <div class="card" id="formCard">
     <h2>Descadastramento de Newsletter</h2>
+
     <p>
       Você está prestes a se descadastrar da newsletter
       <strong id="nl-titulo">...</strong>
       com o e‑mail <strong id="nl-email">...</strong>.
     </p>
+
     <p>Se quiser, você pode nos contar o motivo:</p>
 
     <form id="unsubscribeForm">
       <input type="hidden" name="email" id="email" />
       <input type="hidden" name="newsletterId" id="newsletterId" />
       <input type="hidden" name="titulo" id="titulo" />
+
       <textarea name="motivo" id="motivo"
         placeholder="Ex: Recebo muitos e-mails, conteúdo não relevante, etc."></textarea>
+
       <button type="submit">Sim, descadastrar</button>
     </form>
 
     <div id="mensagem" class="msg"></div>
   </div>
 
+  <!-- ✅ Modal de Sucesso -->
+  <div id="successModal">
+    <div class="box">
+      <p id="successMessage">✅ Você foi descadastrado com sucesso.</p>
+      <button onclick="closeModal()">Fechar</button>
+    </div>
+  </div>
+
   <script>
+    // ✅ Captura parâmetros da URL
     const params = new URLSearchParams(window.location.search);
     const email = params.get("email") || "";
     const newsletterId = params.get("newsletter") || "";
     const titulo = params.get("titulo") || "(sem título)";
 
-    // Preenche os campos ocultos
+    // ✅ Preenche campos ocultos
     document.getElementById("email").value = email;
     document.getElementById("newsletterId").value = newsletterId;
     document.getElementById("titulo").value = titulo;
 
-    // Mostra na tela o valor da URL
+    // ✅ Mostra dados na tela
     document.getElementById("nl-email").innerText = email || "(sem e-mail)";
     document.getElementById("nl-titulo").innerText = decodeURIComponent(titulo);
 
+    // ✅ Envio do formulário
     const form = document.getElementById("unsubscribeForm");
     form.addEventListener("submit", async (e) => {
       e.preventDefault();
+
       const motivo = document.getElementById("motivo").value;
 
       try {
@@ -88,11 +129,28 @@
         });
 
         const text = await res.text();
-        document.getElementById("mensagem").innerText = text;
+
+        if (res.ok) {
+          // ✅ Exibe modal
+          document.getElementById("successMessage").innerText = text;
+          document.getElementById("successModal").style.display = "flex";
+
+          // ✅ Esconde o formulário
+          document.getElementById("formCard").style.display = "none";
+        } else {
+          document.getElementById("mensagem").innerText = text;
+        }
+
       } catch (err) {
-        document.getElementById("mensagem").innerText = "❌ Erro ao processar descadastramento.";
+        document.getElementById("mensagem").innerText =
+          "❌ Erro ao processar descadastramento.";
       }
     });
+
+    // ✅ Fecha modal
+    function closeModal() {
+      document.getElementById("successModal").style.display = "none";
+    }
   </script>
 </body>
 </html>
