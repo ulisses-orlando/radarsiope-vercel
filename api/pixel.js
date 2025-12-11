@@ -1,3 +1,4 @@
+// pages/api/pixel.js
 import admin from "firebase-admin";
 
 if (!admin.apps.length) {
@@ -26,15 +27,13 @@ export default async function handler(req, res) {
       .collection("envios")
       .doc(envioId);
 
-    const aberturasRef = envioRef.collection("aberturas");
+    // 🔹 Documento fixo por destinatário
+    const aberturaRef = envioRef.collection("aberturas").doc(destinatarioId);
+    const snap = await aberturaRef.get();
 
-    const existente = await aberturasRef
-      .where("destinatarioId", "==", destinatarioId)
-      .limit(1)
-      .get();
-
-    if (existente.empty) {
-      await aberturasRef.add({
+    if (!snap.exists) {
+      // Primeira abertura → vezes = 1
+      await aberturaRef.set({
         destinatarioId,
         abertoEm: new Date(),
         vezes: 1,
@@ -43,11 +42,11 @@ export default async function handler(req, res) {
         tipoEvento: "abertura"
       });
     } else {
-      const docRef = existente.docs[0].ref;
-      const dados = existente.docs[0].data();
+      // Atualização → incrementa +1
+      const dados = snap.data();
       const vezesAtual = dados.vezes || 1;
 
-      await docRef.update({
+      await aberturaRef.update({
         vezes: vezesAtual + 1,
         ultimoAcesso: new Date(),
         userAgent: ua,
@@ -69,4 +68,3 @@ export default async function handler(req, res) {
   res.setHeader("Content-Type", "image/gif");
   res.send(Buffer.from("R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==", "base64"));
 }
-
