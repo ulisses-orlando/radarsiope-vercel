@@ -4,10 +4,10 @@
   "description": "Servidor para envio de emails via AWS SES",
   "main": "server.js",
   "type": "module",
-  "scripts": {
-    "dev": "node server.js",
-    "start": "node server.js"
-  },
+ "scripts": {
+  "dev": "next dev",
+  "start": "next start"
+},
   "dependencies": {
     "aws-sdk": "^2.1692.0",
     "body-parser": "^1.20.2",
