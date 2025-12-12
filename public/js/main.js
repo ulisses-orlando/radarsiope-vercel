@@ -668,14 +668,15 @@ async function abrirModalNewsletter(docId = null, isEdit = false) {
     // ✅ Coleta blocos da edição
     payload.blocos = coletarBlocosEdicao();
 
-    // ✅ Validação
+    // ✅ Validação universal
     const htmlNewsletter = payload['html_conteudo'] || "";
-    const tipoNewsletter = payload['classificacao'] || "Básica";
+    const blocos = payload.blocos || [];
 
-    if (!validarNewsletter(htmlNewsletter, tipoNewsletter)) {
+    if (!validarNewsletter(htmlNewsletter, blocos)) {
       return;
     }
 
+    // ✅ Salva normalmente
     const ref = db.collection('newsletters');
     if (isEdit && docId) {
       await ref.doc(docId).set(payload, { merge: true });
@@ -690,6 +691,108 @@ async function abrirModalNewsletter(docId = null, isEdit = false) {
   openModal('modal-edit-overlay');
 }
 
+function validarNewsletter(html, blocos) {
+  const erros = validarHtmlEmail(html, blocos);
+
+  if (erros.length > 0) {
+    alert("⚠️ Problemas encontrados no HTML:\n\n" + erros.map(e => "• " + e).join("\n"));
+    return false;
+  }
+
+  return true;
+}
+
+
+function validarHtmlEmail(html, blocos = []) {
+  const erros = [];
+
+  const htmlLower = html.toLowerCase().trim();
+
+  // -----------------------------
+  // 1. HTML vazio
+  // -----------------------------
+  if (!htmlLower) {
+    erros.push("O HTML está vazio.");
+    return erros;
+  }
+
+  // -----------------------------
+  // 2. Verifica se há blocos mas não há {{blocos}}
+  // -----------------------------
+  if (blocos.length > 0 && !html.includes("{{blocos}}")) {
+    erros.push("Existem blocos cadastrados, mas o HTML não contém o marcador {{blocos}}.");
+  }
+
+  // -----------------------------
+  // 3. Verifica tabela principal
+  // -----------------------------
+  const idxTableOpen = htmlLower.indexOf("<table");
+  const idxTableClose = htmlLower.lastIndexOf("</table>");
+
+  if (idxTableOpen === -1 || idxTableClose === -1) {
+    erros.push("O HTML precisa conter uma tabela principal (<table>...</table>).");
+  }
+
+  // -----------------------------
+  // 4. Conteúdo fora da tabela principal
+  // -----------------------------
+  if (idxTableClose !== -1) {
+    const afterTable = htmlLower.substring(idxTableClose + 8).trim();
+    if (afterTable.length > 0) {
+      erros.push("Há conteúdo fora da tabela principal. Todo o HTML deve estar dentro de <table>...</table>.");
+    }
+  }
+
+  // -----------------------------
+  // 5. Pixel dentro da tabela
+  // -----------------------------
+  if (html.includes("api.radarsiope.com.br/api/pixel") && idxTableClose !== -1) {
+    const pixelPos = html.indexOf("api.radarsiope.com.br/api/pixel");
+    if (pixelPos > idxTableClose) {
+      erros.push("O pixel de rastreamento está fora da tabela principal.");
+    }
+  }
+
+  // -----------------------------
+  // 6. Link de click dentro da tabela
+  // -----------------------------
+  if (html.includes("api.radarsiope.com.br/api/click") && idxTableClose !== -1) {
+    const clickPos = html.indexOf("api.radarsiope.com.br/api/click");
+    if (clickPos > idxTableClose) {
+      erros.push("O link de rastreamento de clique está fora da tabela principal.");
+    }
+  }
+
+  // -----------------------------
+  // 7. Descadastramento dentro da tabela
+  // -----------------------------
+  if (html.includes("descadastramento") && idxTableClose !== -1) {
+    const descPos = html.indexOf("descadastramento");
+    if (descPos > idxTableClose) {
+      erros.push("O link de descadastramento está fora da tabela principal.");
+    }
+  }
+
+  // -----------------------------
+  // 8. Verifica tags <tr> mal fechadas
+  // -----------------------------
+  const qtdTrAbertas = (htmlLower.match(/<tr/g) || []).length;
+  const qtdTrFechadas = (htmlLower.match(/<\/tr>/g) || []).length;
+  if (qtdTrAbertas !== qtdTrFechadas) {
+    erros.push(`Quantidade de <tr> abertas (${qtdTrAbertas}) e fechadas (${qtdTrFechadas}) não confere.`);
+  }
+
+  // -----------------------------
+  // 9. Verifica tags <td> mal fechadas
+  // -----------------------------
+  const qtdTdAbertas = (htmlLower.match(/<td/g) || []).length;
+  const qtdTdFechadas = (htmlLower.match(/<\/td>/g) || []).length;
+  if (qtdTdAbertas !== qtdTdFechadas) {
+    erros.push(`Quantidade de <td> abertas (${qtdTdAbertas}) e fechadas (${qtdTdFechadas}) não confere.`);
+  }
+
+  return erros;
+}
 
 function adicionarBlocoEdicao(bloco = {}) {
   const container = document.getElementById("container-blocos-edicao");
@@ -3172,6 +3275,12 @@ async function abrirModalTemplateNewsletter(docId = null, isEdit = false, dadosP
 
     if (!isEdit || !data.criado_em) {
       payload.criado_em = new Date();
+    }
+
+    const erros = validarHtmlEmail(htmlFinal, []);
+    if (erros.length > 0) {
+      alert("Erros:\n" + erros.join("\n"));
+      return;
     }
 
     if (isEdit && docId) {
