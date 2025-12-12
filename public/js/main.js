@@ -3252,12 +3252,6 @@ async function abrirModalTemplateNewsletter(docId = null, isEdit = false, dadosP
       payload.criado_em = new Date();
     }
 
-    const erros = validarHtmlEmail(htmlFinal, []);
-    if (erros.length > 0) {
-      alert("Erros:\n" + erros.join("\n"));
-      return;
-    }
-
     const htmlTemplate = payload['html_base'] || "";
     const blocos = coletarBlocosEdicao(); // templates também têm blocos
 
