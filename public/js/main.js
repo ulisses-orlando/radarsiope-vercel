@@ -418,16 +418,12 @@ async function abrirModalNewsletter(docId = null, isEdit = false) {
   htmlWrap.appendChild(ta);
 
   // -----------------------------
-  // ✅ Botões auxiliares (preview, copiar, pixel, click, descadastramento)
+  // ✅ Botões auxiliares (preview avançado, copiar, pixel, click, descadastramento)
   // -----------------------------
-  const btnPreview = document.createElement('button');
-  btnPreview.innerText = '👁️ Visualizar HTML';
-  btnPreview.style.marginTop = '10px';
-  btnPreview.onclick = () => {
-    const modal = document.getElementById('modal-html-preview');
-    const iframe = document.getElementById('iframe-html-preview');
 
-    const dados = {
+  // Dados de exemplo para placeholders
+  function montarDadosPreviewNewsletter() {
+    return {
       nome: "Fulano de Teste",
       email: "fulano@exemplo.com",
       edicao: document.querySelector('[data-field-name="edicao"]')?.value || "",
@@ -437,11 +433,125 @@ async function abrirModalNewsletter(docId = null, isEdit = false) {
         ? new Date(document.querySelector('[data-field-name="data_publicacao"]').value + "T00:00:00")
         : null
     };
+  }
 
-    iframe.srcdoc = aplicarPlaceholders(ta.value, dados);
+  // ✅ Função principal de montagem do HTML da edição
+  function montarHtmlNewsletterPreview(modo = "completo", segmento = null, comBordas = false) {
+    const dados = montarDadosPreviewNewsletter();
+
+    // HTML base vindo do campo da edição
+    let htmlBase = document.getElementById('campo-html-newsletter').value || "";
+    const blocos = coletarBlocosEdicao() || [];
+
+    let htmlBlocos = "";
+
+    if (blocos.length > 0 && modo !== "puro") {
+      blocos.forEach((b, i) => {
+        // Filtragem por segmento (lead / assinante)
+        if (segmento && b.acesso !== "todos" && b.acesso !== segmento) {
+          return; // pula bloco que não pertence a esse segmento
+        }
+
+        if (comBordas) {
+          const cor =
+            b.acesso === "assinantes" ? "#2e7d32" :
+              b.acesso === "leads" ? "#ff9800" :
+                "#1976d2";
+
+          htmlBlocos += `
+            <div style="border:2px dashed ${cor}; padding:10px; margin:15px 0; border-radius:6px;">
+              <div style="font-size:12px; color:${cor}; margin-bottom:5px;">
+                <strong>Bloco ${i + 1}</strong> — acesso: ${b.acesso}
+              </div>
+              ${b.html || ""}
+            </div>
+          `;
+        } else {
+          htmlBlocos += b.html || "";
+        }
+      });
+    } else if (blocos.length > 0 && modo === "puro") {
+      // modo "puro" com blocos: só concatena blocos filtrados por segmento
+      blocos.forEach(b => {
+        if (segmento && b.acesso !== "todos" && b.acesso !== segmento) {
+          return;
+        }
+        htmlBlocos += b.html || "";
+      });
+    }
+
+    let htmlFinal = "";
+
+    if (blocos.length === 0) {
+      // ✅ Sem blocos: usa só o HTML da edição
+      htmlFinal = htmlBase;
+    } else {
+      // ✅ Com blocos: insere no {{blocos}} se existir, senão no final
+      if (htmlBase.includes("{{blocos}}")) {
+        htmlFinal = htmlBase.replace("{{blocos}}", htmlBlocos);
+      } else {
+        htmlFinal = htmlBase + "\n" + htmlBlocos;
+      }
+    }
+
+    // Aplica placeholders APENAS se não for "puro"
+    if (modo !== "puro") {
+      htmlFinal = aplicarPlaceholders(htmlFinal, dados);
+    }
+
+    return htmlFinal;
+  }
+
+  // ✅ Preview completo (com todos os blocos, numerados e com bordas)
+  const btnPreview = document.createElement('button');
+  btnPreview.innerText = '👁️ Visualizar HTML (com blocos)';
+  btnPreview.style.marginTop = '10px';
+  btnPreview.type = "button";
+  btnPreview.onclick = () => {
+    const iframe = document.getElementById('iframe-html-preview');
+    iframe.srcdoc = montarHtmlNewsletterPreview("completo", null, true);
     openModal('modal-html-preview');
   };
   htmlWrap.appendChild(btnPreview);
+
+  // ✅ Preview como Lead
+  const btnPreviewLead = document.createElement('button');
+  btnPreviewLead.innerText = '👤 Visualizar como Lead';
+  btnPreviewLead.style.marginLeft = '10px';
+  btnPreviewLead.style.marginTop = '10px';
+  btnPreviewLead.type = "button";
+  btnPreviewLead.onclick = () => {
+    const iframe = document.getElementById('iframe-html-preview');
+    iframe.srcdoc = montarHtmlNewsletterPreview("segmentado", "leads", false);
+    openModal('modal-html-preview');
+  };
+  htmlWrap.appendChild(btnPreviewLead);
+
+  // ✅ Preview como Assinante
+  const btnPreviewAssinante = document.createElement('button');
+  btnPreviewAssinante.innerText = '⭐ Visualizar como Assinante';
+  btnPreviewAssinante.style.marginLeft = '10px';
+  btnPreviewAssinante.style.marginTop = '10px';
+  btnPreviewAssinante.type = "button";
+  btnPreviewAssinante.onclick = () => {
+    const iframe = document.getElementById('iframe-html-preview');
+    iframe.srcdoc = montarHtmlNewsletterPreview("segmentado", "assinantes", false);
+    openModal('modal-html-preview');
+  };
+  htmlWrap.appendChild(btnPreviewAssinante);
+
+  // ✅ Preview HTML puro (sem placeholders, sem bordas, só resultado final com blocos)
+  const btnPreviewPuro = document.createElement('button');
+  btnPreviewPuro.innerText = '🧪 Visualizar HTML puro';
+  btnPreviewPuro.style.marginLeft = '10px';
+  btnPreviewPuro.style.marginTop = '10px';
+  btnPreviewPuro.type = "button";
+  btnPreviewPuro.onclick = () => {
+    const iframe = document.getElementById('iframe-html-preview');
+    iframe.srcdoc = montarHtmlNewsletterPreview("puro", null, false);
+    openModal('modal-html-preview');
+  };
+  htmlWrap.appendChild(btnPreviewPuro);
 
   // ✅ Copiar HTML
   const btnCopiar = document.createElement('button');
