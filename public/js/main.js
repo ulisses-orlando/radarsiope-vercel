@@ -314,7 +314,8 @@ async function abrirModalNewsletter(docId = null, isEdit = false) {
         <li><code>{{edicao}}</code> → Número da edição</li>
         <li><code>{{tipo}}</code> → Tipo Newsletter</li>
         <li><code>{{titulo}}</code> → Título da edição</li>
-        <li><code>{{data_publicacao}}</code> → Data da edição (DD/MM/AAAA)</li>
+        <li><code>{{data_publicacao}}</code> → Data da edição (formato DD/MM/AAAA)</li>
+        <li><code>{{blocos}}</code> → Local de inserção dos blocos</li>
       </ul>
       <p>Esses campos serão substituídos automaticamente no momento do envio.</p>
     </div>`;
@@ -3020,6 +3021,10 @@ async function abrirModalTemplateNewsletter(docId = null, isEdit = false, dadosP
       <p>Esses campos serão substituídos automaticamente no momento do envio.</p>
     </div>`;
   body.appendChild(explicacao);
+
+  const lbl = document.createElement('label');
+  lbl.innerText = 'Conteudo do HTML';
+  body.appendChild(lbl);
 
   // Campo HTML base (compatibilidade com o que já existe)
   const ta = document.createElement('textarea');
