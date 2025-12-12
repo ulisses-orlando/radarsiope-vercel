@@ -135,52 +135,52 @@ function mostrarDadosNewsletterSelecionada() {
 }
 
 async function visualizarNewsletterHtml(newsletterId) {
-  const snap = await db.collection("newsletters").doc(newsletterId).get();
-  if (!snap.exists) return alert("Newsletter não encontrada.");
+    const snap = await db.collection("newsletters").doc(newsletterId).get();
+    if (!snap.exists) return alert("Newsletter não encontrada.");
 
-  const dados = snap.data();
+    const dados = snap.data();
 
-  // ✅ Determina o segmento com base no seletor
-  let segmento = null;
-  if (tipoDestinatarioSelecionado === "leads") segmento = "leads";
-  if (tipoDestinatarioSelecionado === "usuarios") segmento = "assinantes";
+    // ✅ Determina o segmento com base no seletor
+    let segmento = null;
+    if (tipoDestinatarioSelecionado === "leads") segmento = "leads";
+    if (tipoDestinatarioSelecionado === "usuarios") segmento = "assinantes";
 
-  // ✅ HTML base da edição
-  let htmlBase = dados.html_conteudo || "";
+    // ✅ HTML base da edição
+    let htmlBase = dados.html_conteudo || "";
 
-  // ✅ Blocos da edição
-  const blocos = dados.blocos || [];
+    // ✅ Blocos da edição
+    const blocos = dados.blocos || [];
 
-  let htmlBlocos = "";
+    let htmlBlocos = "";
 
-  // ✅ Monta blocos filtrados pelo segmento
-  blocos.forEach(b => {
-    if (segmento && b.acesso !== "todos" && b.acesso !== segmento) return;
-    htmlBlocos += b.html || "";
-  });
+    // ✅ Monta blocos filtrados pelo segmento
+    blocos.forEach(b => {
+        if (segmento && b.acesso !== "todos" && b.acesso !== segmento) return;
+        htmlBlocos += b.html || "";
+    });
 
-  let htmlFinal = "";
+    let htmlFinal = "";
 
-  if (blocos.length === 0) {
-    // ✅ Sem blocos → usa só o HTML base
-    htmlFinal = htmlBase;
-  } else {
-    // ✅ Com blocos → insere no {{blocos}} ou no final
-    if (htmlBase.includes("{{blocos}}")) {
-      htmlFinal = htmlBase.replace("{{blocos}}", htmlBlocos);
+    if (blocos.length === 0) {
+        // ✅ Sem blocos → usa só o HTML base
+        htmlFinal = htmlBase;
     } else {
-      htmlFinal = htmlBase + "\n" + htmlBlocos;
+        // ✅ Com blocos → insere no {{blocos}} ou no final
+        if (htmlBase.includes("{{blocos}}")) {
+            htmlFinal = htmlBase.replace("{{blocos}}", htmlBlocos);
+        } else {
+            htmlFinal = htmlBase + "\n" + htmlBlocos;
+        }
     }
-  }
 
-  // ✅ Aplica placeholders usando os dados da newsletter
-  htmlFinal = aplicarPlaceholders(htmlFinal, dados);
+    // ✅ Aplica placeholders usando os dados da newsletter
+    htmlFinal = aplicarPlaceholders(htmlFinal, dados);
 
-  // ✅ Exibe no modal
-  const modal = document.getElementById("modal-preview-html");
-  const content = document.getElementById("preview-html-content");
-  content.innerHTML = htmlFinal;
-  modal.style.display = "flex";
+    // ✅ Exibe no modal
+    const modal = document.getElementById("modal-preview-html");
+    const content = document.getElementById("preview-html-content");
+    content.innerHTML = htmlFinal;
+    modal.style.display = "flex";
 }
 
 
@@ -1316,23 +1316,32 @@ async function enviarLoteIndividual(newsletterId, envioId, loteId) {
             const idDest = dest.id || "-";
             const identificador = emailDest || `ID:${idDest}`;
 
-            const html = aplicarPlaceholders(newsletter.html_conteudo || "", {
-                nome: dest.nome,
-                email: emailDest,
-                edicao: newsletter.edicao,
-                tipo: newsletter.tipo,
-                titulo: newsletter.titulo,
-                data_publicacao: newsletter.data_publicacao,
-                newsletterId
-            });
+            // Determina segmento
+            const segmento = tipo === "leads" ? "leads" : "assinantes";
 
-            // 🔹 aplica rastreamento (pixel + links)
+            // Monta HTML final com blocos + segmentação + placeholders
+            const htmlMontado = montarHtmlNewsletterParaEnvio(
+                newsletter,
+                {
+                    nome: dest.nome,
+                    email: emailDest,
+                    edicao: newsletter.edicao,
+                    tipo: newsletter.tipo,
+                    titulo: newsletter.titulo,
+                    data_publicacao: newsletter.data_publicacao,
+                    newsletterId
+                },
+                segmento
+            );
+
+            // Aplica rastreamento
             const htmlFinal = aplicarRastreamento(
-                html,
+                htmlMontado,
                 envioId,
                 idDest,
                 newsletterId
             );
+
 
             try {
                 console.log("Destinatário:", dest);
@@ -1444,6 +1453,43 @@ async function enviarLoteIndividual(newsletterId, envioId, loteId) {
         console.error("Erro ao enviar lote:", err);
         alert("❌ Erro ao enviar lote.");
     }
+}
+
+function montarHtmlNewsletterParaEnvio(newsletter, dados, segmento = null) {
+    // ✅ HTML base da edição
+    let htmlBase = newsletter.html_conteudo || "";
+    const blocos = newsletter.blocos || [];
+
+    let htmlBlocos = "";
+
+    // ✅ Monta blocos filtrados por segmento
+    if (blocos.length > 0) {
+        blocos.forEach(b => {
+            // Filtra por segmento (lead/assinante)
+            if (segmento && b.acesso !== "todos" && b.acesso !== segmento) return;
+
+            htmlBlocos += b.html || "";
+        });
+    }
+
+    let htmlFinal = "";
+
+    if (blocos.length === 0) {
+        // ✅ Sem blocos → usa apenas o HTML base
+        htmlFinal = htmlBase;
+    } else {
+        // ✅ Com blocos → insere no {{blocos}} ou no final
+        if (htmlBase.includes("{{blocos}}")) {
+            htmlFinal = htmlBase.replace("{{blocos}}", htmlBlocos);
+        } else {
+            htmlFinal = htmlBase + "\n" + htmlBlocos;
+        }
+    }
+
+    // ✅ Aplica placeholders reais do destinatário
+    htmlFinal = aplicarPlaceholders(htmlFinal, dados);
+
+    return htmlFinal;
 }
 
 function aplicarRastreamento(htmlBase, envioId, destinatarioId, newsletterId) {
