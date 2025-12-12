@@ -2905,6 +2905,7 @@ async function abrirModalTemplateNewsletter(docId = null, isEdit = false, dadosP
         <li><code>{{tipo}}</code> → Tipo Newsletter</li>
         <li><code>{{titulo}}</code> → Título da edição</li>
         <li><code>{{data_publicacao}}</code> → Data da edição (formato DD/MM/AAAA)</li>
+        li><code>{{blocos}}</code> → Local de inserção dos blocos</li>
       </ul>
       <p>Esses campos serão substituídos automaticamente no momento do envio.</p>
     </div>`;
@@ -2982,31 +2983,36 @@ async function abrirModalTemplateNewsletter(docId = null, isEdit = false, dadosP
 
     let htmlFinal = "";
 
-    if (Array.isArray(blocos) && blocos.length > 0) {
-      // ✅ Monta HTML com blocos numerados e bordas coloridas
-      blocos.forEach((b, i) => {
-        const cor =
-          b.acesso === "assinantes" ? "#2e7d32" :
-            b.acesso === "leads" ? "#ff9800" :
-              "#1976d2";
+    let htmlBase = document.getElementById('campo-html-template').value || "";
+    let htmlBlocos = "";
 
-        htmlFinal += `
-        <div style="border:2px dashed ${cor}; padding:10px; margin:15px 0; border-radius:6px;">
-          <div style="font-size:12px; color:${cor}; margin-bottom:5px;">
-            <strong>Bloco ${i + 1}</strong> — acesso: ${b.acesso}
-          </div>
-          ${b.html || ""}
-        </div>
-      `;
-      });
+    // ✅ Monta blocos com bordas e numeração
+    blocos.forEach((b, i) => {
+      const cor =
+        b.acesso === "assinantes" ? "#2e7d32" :
+          b.acesso === "leads" ? "#ff9800" :
+            "#1976d2";
 
-      htmlFinal = aplicarPlaceholders(htmlFinal, dados);
+      htmlBlocos += `
+    <div style="border:2px dashed ${cor}; padding:10px; margin:15px 0; border-radius:6px;">
+      <div style="font-size:12px; color:${cor}; margin-bottom:5px;">
+        <strong>Bloco ${i + 1}</strong> — acesso: ${b.acesso}
+      </div>
+      ${b.html || ""}
+    </div>
+  `;
+    });
 
+    // ✅ Se o template tiver {{blocos}}, substitui
+    if (htmlBase.includes("{{blocos}}")) {
+      htmlFinal = htmlBase.replace("{{blocos}}", htmlBlocos);
     } else {
-      // ✅ Fallback: usa html_base
-      const htmlBase = document.getElementById('campo-html-template').value;
-      htmlFinal = aplicarPlaceholders(htmlBase, dados);
+      // ✅ Caso contrário, adiciona no final
+      htmlFinal = htmlBase + "\n" + htmlBlocos;
     }
+
+    // ✅ Aplica placeholders
+    htmlFinal = aplicarPlaceholders(htmlFinal, dados);
 
     // ✅ Exibe no modal
     const iframe = document.getElementById('iframe-html-preview');
@@ -3067,18 +3073,21 @@ async function abrirModalTemplateNewsletter(docId = null, isEdit = false, dadosP
 
 function previewSegmentado(tipo) {
   const blocos = coletarBlocosNewsletter();
+  let htmlBase = document.getElementById('campo-html-template').value || "";
+  let htmlBlocos = "";
+
+  blocos.forEach(b => {
+    if (tipo === "puro" || b.acesso === "todos" || b.acesso === tipo) {
+      htmlBlocos += b.html || "";
+    }
+  });
+
   let htmlFinal = "";
 
-  if (tipo === "puro") {
-    // ✅ Apenas concatena blocos sem estilos
-    blocos.forEach(b => htmlFinal += b.html || "");
+  if (htmlBase.includes("{{blocos}}")) {
+    htmlFinal = htmlBase.replace("{{blocos}}", htmlBlocos);
   } else {
-    // ✅ Filtra blocos por acesso
-    blocos.forEach(b => {
-      if (b.acesso === "todos" || b.acesso === tipo) {
-        htmlFinal += b.html || "";
-      }
-    });
+    htmlFinal = htmlBase + "\n" + htmlBlocos;
   }
 
   const iframe = document.getElementById('iframe-html-preview');
@@ -3086,6 +3095,7 @@ function previewSegmentado(tipo) {
 
   openModal('modal-html-preview');
 }
+
 
 function adicionarBlocoNewsletter(bloco = {}, index = null) {
   const container = document.getElementById("container-blocos-newsletter");
