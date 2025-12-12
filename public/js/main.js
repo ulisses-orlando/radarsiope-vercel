@@ -2905,7 +2905,7 @@ async function abrirModalTemplateNewsletter(docId = null, isEdit = false, dadosP
         <li><code>{{tipo}}</code> → Tipo Newsletter</li>
         <li><code>{{titulo}}</code> → Título da edição</li>
         <li><code>{{data_publicacao}}</code> → Data da edição (formato DD/MM/AAAA)</li>
-        li><code>{{blocos}}</code> → Local de inserção dos blocos</li>
+        <li><code>{{blocos}}</code> → Local de inserção dos blocos</li>
       </ul>
       <p>Esses campos serão substituídos automaticamente no momento do envio.</p>
     </div>`;
