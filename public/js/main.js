@@ -921,31 +921,6 @@ function fecharModal() {
   document.getElementById("alert-modal").style.display = "none";
 }
 
-function validarNewsletter(html, tipoNewsletter) {
-  const erros = [];
-
-  // Pixel obrigatório
-  if (!html.includes("api/pixel")) {
-    erros.push("Pixel não encontrado");
-  }
-
-  // Click obrigatório
-  if (!html.includes("api/click")) {
-    erros.push("Link de Click não encontrado");
-  }
-
-  // Descadastramento obrigatório apenas se não for básica
-  if (tipoNewsletter !== "basica" && !html.includes("descadastramento.html")) {
-    erros.push("Link de Descadastramento não encontrado");
-  }
-
-  if (erros.length > 0) {
-    mostrarErros(erros);
-    return false;
-  }
-  return true;
-}
-
 async function gerarRelatorioPreferencias() {
   const select = document.getElementById("filtro-cad-tipo-newsletter");
   const filtroSelecionado = select.value;
