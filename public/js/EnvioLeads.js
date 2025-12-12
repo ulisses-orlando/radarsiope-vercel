@@ -134,21 +134,55 @@ function mostrarDadosNewsletterSelecionada() {
     });
 }
 
-
 async function visualizarNewsletterHtml(newsletterId) {
-    const snap = await db.collection("newsletters").doc(newsletterId).get();
-    if (!snap.exists) return alert("Newsletter não encontrada.");
+  const snap = await db.collection("newsletters").doc(newsletterId).get();
+  if (!snap.exists) return alert("Newsletter não encontrada.");
 
-    const dados = snap.data();
-    const htmlOriginal = dados.html_conteudo || "";
+  const dados = snap.data();
 
-    // Aplica os placeholders usando os dados da própria newsletter
-    const htmlFinal = aplicarPlaceholders(htmlOriginal, dados);
-    const modal = document.getElementById("modal-preview-html");
-    const content = document.getElementById("preview-html-content");
-    content.innerHTML = htmlFinal;
-    modal.style.display = "flex";
+  // ✅ Determina o segmento com base no seletor
+  let segmento = null;
+  if (tipoDestinatarioSelecionado === "leads") segmento = "leads";
+  if (tipoDestinatarioSelecionado === "usuarios") segmento = "assinantes";
+
+  // ✅ HTML base da edição
+  let htmlBase = dados.html_conteudo || "";
+
+  // ✅ Blocos da edição
+  const blocos = dados.blocos || [];
+
+  let htmlBlocos = "";
+
+  // ✅ Monta blocos filtrados pelo segmento
+  blocos.forEach(b => {
+    if (segmento && b.acesso !== "todos" && b.acesso !== segmento) return;
+    htmlBlocos += b.html || "";
+  });
+
+  let htmlFinal = "";
+
+  if (blocos.length === 0) {
+    // ✅ Sem blocos → usa só o HTML base
+    htmlFinal = htmlBase;
+  } else {
+    // ✅ Com blocos → insere no {{blocos}} ou no final
+    if (htmlBase.includes("{{blocos}}")) {
+      htmlFinal = htmlBase.replace("{{blocos}}", htmlBlocos);
+    } else {
+      htmlFinal = htmlBase + "\n" + htmlBlocos;
+    }
+  }
+
+  // ✅ Aplica placeholders usando os dados da newsletter
+  htmlFinal = aplicarPlaceholders(htmlFinal, dados);
+
+  // ✅ Exibe no modal
+  const modal = document.getElementById("modal-preview-html");
+  const content = document.getElementById("preview-html-content");
+  content.innerHTML = htmlFinal;
+  modal.style.display = "flex";
 }
+
 
 function selecionarTodosEnvios(chk) {
     const todos = document.querySelectorAll(".chk-envio-final");
