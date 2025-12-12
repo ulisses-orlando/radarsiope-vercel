@@ -2958,11 +2958,12 @@ async function abrirModalTemplateNewsletter(docId = null, isEdit = false, dadosP
     });
   }
 
-  // Botão de visualização com dados reais (continua igual)
+  // ✅ BOTÃO DE PREVIEW COMPLETO
   const btnPreview = document.createElement('button');
-  btnPreview.innerText = '👁️ Visualizar HTML com dados reais';
+  btnPreview.innerText = '👁️ Visualizar HTML (com blocos)';
   btnPreview.style.marginTop = '10px';
   btnPreview.type = "button";
+
   btnPreview.onclick = async () => {
     const leadId = document.getElementById('seletor-lead-preview')?.value;
     if (!leadId) return alert("Selecione um usuário para visualizar.");
@@ -2973,18 +2974,69 @@ async function abrirModalTemplateNewsletter(docId = null, isEdit = false, dadosP
     const dados = leadSnap.data();
     dados.edicao = "001";
     dados.tipo = document.querySelector('[data-field-name="tipo"]')?.value || "Institucional";
-    dados.titulo = "Bem-vindo à nossa plataforma";
+    dados.titulo = "Pré-visualização do Template";
     dados.data_publicacao = new Date();
 
-    const htmlBase = document.getElementById('campo-html-template').value;
-    const htmlFinal = aplicarPlaceholders(htmlBase, dados);
+    // ✅ Coleta blocos do template
+    const blocos = coletarBlocosNewsletter();
 
-    const modal = document.getElementById('modal-html-preview');
+    let htmlFinal = "";
+
+    if (Array.isArray(blocos) && blocos.length > 0) {
+      // ✅ Monta HTML com blocos numerados e bordas coloridas
+      blocos.forEach((b, i) => {
+        const cor =
+          b.acesso === "assinantes" ? "#2e7d32" :
+            b.acesso === "leads" ? "#ff9800" :
+              "#1976d2";
+
+        htmlFinal += `
+        <div style="border:2px dashed ${cor}; padding:10px; margin:15px 0; border-radius:6px;">
+          <div style="font-size:12px; color:${cor}; margin-bottom:5px;">
+            <strong>Bloco ${i + 1}</strong> — acesso: ${b.acesso}
+          </div>
+          ${b.html || ""}
+        </div>
+      `;
+      });
+
+      htmlFinal = aplicarPlaceholders(htmlFinal, dados);
+
+    } else {
+      // ✅ Fallback: usa html_base
+      const htmlBase = document.getElementById('campo-html-template').value;
+      htmlFinal = aplicarPlaceholders(htmlBase, dados);
+    }
+
+    // ✅ Exibe no modal
     const iframe = document.getElementById('iframe-html-preview');
     iframe.srcdoc = htmlFinal;
+
     openModal('modal-html-preview');
   };
+
   body.appendChild(btnPreview);
+
+  // ✅ Preview como Lead
+  const btnPreviewLead = document.createElement('button');
+  btnPreviewLead.innerText = '👤 Visualizar como Lead';
+  btnPreviewLead.style.marginLeft = '10px';
+  btnPreviewLead.onclick = () => previewSegmentado("leads");
+  htmlWrap.appendChild(btnPreviewLead);
+
+  // ✅ Preview como Assinante
+  const btnPreviewAssinante = document.createElement('button');
+  btnPreviewAssinante.innerText = '⭐ Visualizar como Assinante';
+  btnPreviewAssinante.style.marginLeft = '10px';
+  btnPreviewAssinante.onclick = () => previewSegmentado("assinantes");
+  htmlWrap.appendChild(btnPreviewAssinante);
+
+  // ✅ Preview HTML puro
+  const btnPreviewPuro = document.createElement('button');
+  btnPreviewPuro.innerText = '🧪 Visualizar HTML puro';
+  btnPreviewPuro.style.marginLeft = '10px';
+  btnPreviewPuro.onclick = () => previewSegmentado("puro");
+  htmlWrap.appendChild(btnPreviewPuro);
 
   // Botão de salvar
   document.getElementById('modal-edit-save').onclick = async () => {
@@ -3011,6 +3063,28 @@ async function abrirModalTemplateNewsletter(docId = null, isEdit = false, dadosP
   };
 
   openModal('modal-edit-overlay');
+}
+
+function previewSegmentado(tipo) {
+  const blocos = coletarBlocosNewsletter();
+  let htmlFinal = "";
+
+  if (tipo === "puro") {
+    // ✅ Apenas concatena blocos sem estilos
+    blocos.forEach(b => htmlFinal += b.html || "");
+  } else {
+    // ✅ Filtra blocos por acesso
+    blocos.forEach(b => {
+      if (b.acesso === "todos" || b.acesso === tipo) {
+        htmlFinal += b.html || "";
+      }
+    });
+  }
+
+  const iframe = document.getElementById('iframe-html-preview');
+  iframe.srcdoc = htmlFinal;
+
+  openModal('modal-html-preview');
 }
 
 function adicionarBlocoNewsletter(bloco = {}, index = null) {
