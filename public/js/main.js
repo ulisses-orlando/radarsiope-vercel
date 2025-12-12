@@ -300,10 +300,6 @@ async function abrirModalNewsletter(docId = null, isEdit = false) {
   const htmlWrap = document.createElement('div');
   htmlWrap.className = 'field';
 
-  const lbl = document.createElement('label');
-  lbl.innerText = 'html_conteudo';
-  htmlWrap.appendChild(lbl);
-
   const explicacao = document.createElement('div');
   explicacao.innerHTML = `
     <div class="info-box" style="background:#eef; padding:10px; border-left:4px solid #88f; margin-bottom:10px;">
@@ -410,6 +406,10 @@ async function abrirModalNewsletter(docId = null, isEdit = false) {
   // -----------------------------
   // ✅ Campo HTML principal
   // -----------------------------
+  const lbl = document.createElement('label');
+  lbl.innerText = 'Conteudo do HTML';
+  lbl.style.marginTop = "15px";
+  htmlWrap.appendChild(lbl);
   const ta = document.createElement('textarea');
   ta.rows = 8;
   ta.style.width = '100%';
@@ -3024,6 +3024,7 @@ async function abrirModalTemplateNewsletter(docId = null, isEdit = false, dadosP
 
   const lbl = document.createElement('label');
   lbl.innerText = 'Conteudo do HTML';
+  lbl.style.marginTop = "15px";
   body.appendChild(lbl);
 
   // Campo HTML base (compatibilidade com o que já existe)
