@@ -406,6 +406,9 @@
       border-radius: 4px;
       cursor: pointer;
     }
+    .bloco-newsletter textarea {
+      font-family: monospace;
+    }
   </style>
 </head>
 
@@ -770,7 +773,7 @@
           document.getElementById("alert-modal").style.display = "none";
           dadosCampanha = null;
         }
-        
+
         async function prosseguirGeracao() {
           document.getElementById("modal-confirmacao").style.display = "none";
           if (dadosCampanha) {
