@@ -3253,12 +3253,13 @@ async function abrirModalTemplateNewsletter(docId = null, isEdit = false, dadosP
     }
 
     const htmlTemplate = payload['html_base'] || "";
-    const blocos = coletarBlocosEdicao(); // templates também têm blocos
+    const blocos = payload.blocos || [];
 
-    if (!validarNewsletter(htmlTemplate, blocos)) {
+    // ✅ Validação correta para TEMPLATE
+    if (!validarTemplate(htmlTemplate, blocos)) {
       return;
     }
-
+    
     if (isEdit && docId) {
       await db.collection('templates_newsletter').doc(docId).set(payload, { merge: true });
     } else {
@@ -3270,6 +3271,26 @@ async function abrirModalTemplateNewsletter(docId = null, isEdit = false, dadosP
   };
 
   openModal('modal-edit-overlay');
+}
+
+function validarTemplate(html, blocos) {
+  let erros = validarHtmlEmail(html, blocos);
+
+  // Templates NÃO podem ter pixel
+  erros = erros.filter(e => !e.includes("pixel"));
+
+  // Templates NÃO podem ter click
+  erros = erros.filter(e => !e.includes("clique"));
+
+  // Templates NÃO podem ter descadastramento
+  erros = erros.filter(e => !e.includes("descadastramento"));
+
+  if (erros.length > 0) {
+    alert("⚠️ Problemas encontrados no template:\n\n" + erros.map(e => "• " + e).join("\n"));
+    return false;
+  }
+
+  return true;
 }
 
 function previewSegmentado(tipo) {
