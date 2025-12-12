@@ -3258,6 +3258,13 @@ async function abrirModalTemplateNewsletter(docId = null, isEdit = false, dadosP
       return;
     }
 
+    const htmlTemplate = payload['html_base'] || "";
+    const blocos = coletarBlocosEdicao(); // templates também têm blocos
+
+    if (!validarNewsletter(htmlTemplate, blocos)) {
+      return;
+    }
+
     if (isEdit && docId) {
       await db.collection('templates_newsletter').doc(docId).set(payload, { merge: true });
     } else {
