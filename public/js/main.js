@@ -3022,21 +3022,21 @@ async function abrirModalTemplateNewsletter(docId = null, isEdit = false, dadosP
   btnPreviewLead.innerText = '👤 Visualizar como Lead';
   btnPreviewLead.style.marginLeft = '10px';
   btnPreviewLead.onclick = () => previewSegmentado("leads");
-  htmlWrap.appendChild(btnPreviewLead);
+  body.appendChild(btnPreviewLead);
 
   // ✅ Preview como Assinante
   const btnPreviewAssinante = document.createElement('button');
   btnPreviewAssinante.innerText = '⭐ Visualizar como Assinante';
   btnPreviewAssinante.style.marginLeft = '10px';
   btnPreviewAssinante.onclick = () => previewSegmentado("assinantes");
-  htmlWrap.appendChild(btnPreviewAssinante);
+  body.appendChild(btnPreviewAssinante);
 
   // ✅ Preview HTML puro
   const btnPreviewPuro = document.createElement('button');
   btnPreviewPuro.innerText = '🧪 Visualizar HTML puro';
   btnPreviewPuro.style.marginLeft = '10px';
   btnPreviewPuro.onclick = () => previewSegmentado("puro");
-  htmlWrap.appendChild(btnPreviewPuro);
+  body.appendChild(btnPreviewPuro);
 
   // Botão de salvar
   document.getElementById('modal-edit-save').onclick = async () => {
