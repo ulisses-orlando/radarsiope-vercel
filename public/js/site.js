@@ -272,6 +272,15 @@ function mostrarModalAgradecimento(nome) {
 
 function fecharModalAgradecimento() {
   document.getElementById("modalAgradecimento").style.display = "none";
+
+  // Garante que o modal de interesse também esteja fechado
+  const modalInteresse = document.getElementById("modal-interesse");
+  if (modalInteresse) {
+    modalInteresse.style.display = "none";
+  }
+
+  // 🔥 Reativa o scroll da página
+  document.body.style.overflow = "auto";
 }
 
 function fecharModal() {
