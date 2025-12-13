@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
+
 <head>
   <meta charset="UTF-8">
   <title>Visualizar Newsletter</title>
@@ -11,11 +12,13 @@
       padding: 0;
       background: #f4f4f4;
     }
+
     .top-bar {
       text-align: center;
       padding: 20px;
       background: #007acc;
     }
+
     .top-bar a {
       display: inline-block;
       padding: 10px 20px;
@@ -24,30 +27,35 @@
       font-weight: bold;
       text-decoration: none;
       border-radius: 6px;
-      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
       transition: background 0.3s;
     }
+
     .top-bar a:hover {
       background: #e6f0ff;
     }
+
     .container {
       max-width: 960px;
       margin: 30px auto;
       background: #fff;
       padding: 30px;
       border-radius: 12px;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
     }
+
     h1 {
       font-size: 1.8em;
       color: #2c3e50;
       margin-bottom: 20px;
     }
+
     #conteudo-newsletter {
       font-size: 1rem;
       line-height: 1.6;
       color: #333;
     }
+
     .mensagem {
       background: #ffe9e9;
       border: 1px solid #e74c3c;
@@ -59,6 +67,7 @@
     }
   </style>
 </head>
+
 <body>
 
   <div class="top-bar">
@@ -70,54 +79,83 @@
     <div id="conteudo-newsletter">Aguarde enquanto buscamos o conteúdo.</div>
   </div>
 
-<!-- Firebase SDKs -->
-<script src="https://www.gstatic.com/firebasejs/10.0.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.0.0/firebase-firestore-compat.js"></script>
+  <!-- Firebase SDKs -->
+  <script src="https://www.gstatic.com/firebasejs/10.0.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.0.0/firebase-firestore-compat.js"></script>
 
-<!-- Inicialização do Firebase -->
-<script src="js/firebase-init.js"></script>
+  <!-- Inicialização do Firebase -->
+  <script src="js/firebase-init.js"></script>
 
-<!-- Script principal (deve vir depois) -->
-<script>
-  window.addEventListener("DOMContentLoaded", () => {
-    if (!window.db) {
-      console.error("Firebase não foi inicializado corretamente.");
-      return;
-    }
+  <!-- Script principal (deve vir depois) -->
+  <script>
+    window.addEventListener("DOMContentLoaded", () => {
+      if (!window.db) {
+        console.error("Firebase não foi inicializado corretamente.");
+        return;
+      }
 
-    const urlParams = new URLSearchParams(window.location.search);
-    const id = urlParams.get("id");
+      const urlParams = new URLSearchParams(window.location.search);
+      const id = urlParams.get("id");
 
-    if (!id) {
-      document.getElementById("titulo-newsletter").innerText = "ID não informado";
-      document.getElementById("conteudo-newsletter").innerHTML = `
+      const tituloEl = document.getElementById("titulo-newsletter");
+      const conteudoEl = document.getElementById("conteudo-newsletter");
+
+      if (!id) {
+        tituloEl.innerText = "ID não informado";
+        conteudoEl.innerHTML = `
         <div class="mensagem">
           Nenhum ID de newsletter foi fornecido na URL.
         </div>`;
-      return;
-    }
+        return;
+      }
 
-    window.db.collection("newsletters").doc(id).get().then(doc => {
-      if (doc.exists) {
-        const d = doc.data();
-        document.getElementById("titulo-newsletter").innerText = d.titulo || "Newsletter";
-        document.getElementById("conteudo-newsletter").innerHTML = d.html_conteudo || "<p>Conteúdo não disponível.</p>";
-      } else {
-        document.getElementById("titulo-newsletter").innerText = "Newsletter não encontrada";
-        document.getElementById("conteudo-newsletter").innerHTML = `
+      window.db.collection("newsletters").doc(id).get().then(doc => {
+        if (!doc.exists) {
+          tituloEl.innerText = "Newsletter não encontrada";
+          conteudoEl.innerHTML = `
           <div class="mensagem">
             Não foi possível localizar esta newsletter.<br>
             Verifique o link ou tente novamente mais tarde.
           </div>`;
-      }
-    }).catch(err => {
-      document.getElementById("titulo-newsletter").innerText = "Erro ao carregar";
-      document.getElementById("conteudo-newsletter").innerHTML = `
+          return;
+        }
+
+        const d = doc.data();
+
+        // 🔹 Remove o título duplicado
+        tituloEl.style.display = "none";
+
+        // 🔹 Carrega o HTML
+        let html = d.html_conteudo || "<p>Conteúdo não disponível.</p>";
+
+        // 🔹 Substitui placeholders básicos
+        html = html.replace(/{{data_publicacao}}/g, d.data_publicacao || "");
+        html = html.replace(/{{edicao}}/g, d.edicao || "");
+        html = html.replace(/{{titulo}}/g, d.titulo || "");
+
+        // 🔹 Remove placeholders pessoais no acesso público
+        html = html.replace(/{{nome}}/g, "");
+        html = html.replace(/{{email}}/g, "");
+
+        // 🔹 Remove "Olá ," se ficar vazio
+        html = html.replace(/Olá\s*,/g, "Olá");
+
+        // 🔹 Remove "Olá ()" se existir
+        html = html.replace(/Olá\s*\(\s*\)/g, "Olá");
+
+        // 🔹 Renderiza
+        conteudoEl.innerHTML = html;
+
+      }).catch(err => {
+        tituloEl.innerText = "Erro ao carregar";
+        conteudoEl.innerHTML = `
         <div class="mensagem">
           Ocorreu um erro ao buscar a newsletter: ${err.message}
         </div>`;
+      });
     });
-  });
-</script>
+  </script>
+
 </body>
+
 </html>
