@@ -231,6 +231,59 @@
         width: 100%;
       }
     }
+
+    /* Modal de interesse: overlay em tela cheia */
+    #modal-interesse {
+      position: fixed !important;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      background: rgba(0, 0, 0, 0.65);
+      display: none;
+      /* escondido por padrão */
+      justify-content: center;
+      align-items: flex-start;
+      /* topo da tela */
+      padding-top: 40px;
+      z-index: 99999 !important;
+    }
+
+    /* Conteúdo do modal (formulário) */
+    #modal-body {
+      background: #ffffff;
+      padding: 20px;
+      width: 95%;
+      max-width: 600px;
+      border-radius: 10px;
+      max-height: 90vh;
+      overflow-y: auto;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+    }
+
+    /* Modal de agradecimento */
+    .modal-agradecimento {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      background: rgba(0, 0, 0, 0.65);
+      display: none;
+      justify-content: center;
+      align-items: center;
+      z-index: 100000;
+    }
+
+    .modal-agradecimento-conteudo {
+      background: #fff;
+      padding: 24px 28px;
+      border-radius: 10px;
+      max-width: 400px;
+      width: 90%;
+      text-align: center;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+    }
   </style>
 </head>
 
@@ -240,7 +293,7 @@
   </div>
 
   <main class="container-central">
-    <h1>📚 Newsletters xxxxxx Radar Siope</h1>
+    <h1>📚 Newsletters Radar Siope</h1>
 
     <section id="carrossel-basicas">
       <h2>🟢 Acesso Livre</h2>
@@ -278,7 +331,23 @@
       <button onclick="fecharModalAgradecimento()">Fechar</button>
     </div>
   </div>
+  <!-- Lista de newsletters -->
+  <div id="lista-basicas"></div>
+  <div id="lista-premium"></div>
 
+  <!-- Modal de interesse -->
+  <div id="modal-interesse">
+    <div id="modal-body"></div>
+  </div>
+
+  <!-- Modal de agradecimento -->
+  <div id="modalAgradecimento" class="modal-agradecimento">
+    <div class="modal-agradecimento-conteudo">
+      <h2>Obrigado, <span id="nomeModal"></span>!</h2>
+      <p>Seu interesse foi registrado. Em breve entraremos em contato.</p>
+      <button onclick="fecharModalAgradecimento()">Fechar</button>
+    </div>
+  </div>
   <script src="https://www.gstatic.com/firebasejs/10.0.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.0.0/firebase-firestore-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.0.0/firebase-auth-compat.js"></script>
@@ -286,6 +355,5 @@
   <script src="js/functions.js"></script>
   <script src="js/site.js"></script>
 </body>
-
 
 </html>
