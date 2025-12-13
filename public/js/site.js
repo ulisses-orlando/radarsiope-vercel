@@ -20,289 +20,270 @@ async function carregarNewslettersPublicas() {
   });
 }
 
+
+// 🔹 Executa ao carregar, somente se estiver na página pública
+if (document.getElementById("lista-basicas") && document.getElementById("lista-premium")) {
+  carregarNewslettersPublicas();
+}
+
+
 // 🔹 Controle de acesso ao visualizar
 async function abrirNewsletter(id, classificacao) {
+  // Se for básica, abre normalmente
   if (classificacao === "Básica") {
     window.location.href = `visualizar.html?id=${id}`;
     return;
   }
 
+  // Se for premium, verifica usuário logado (se quiser manter essa lógica)
   const user = firebase.auth().currentUser;
 
-  if (!user) {
-    const modal = document.getElementById("modal-interesse");
-    const modalBody = document.getElementById("modal-body");
-
-    if (!modal || !modalBody) {
-      alert("Erro ao exibir o formulário. Elementos do modal não encontrados.");
-      return;
-    }
-
-    modal.style.display = "flex";
-
-    const tiposSnap = await db.collection("tipo_newsletters").get();
-    const tipos = tiposSnap.docs.map(doc => doc.data().nome).filter(Boolean);
-
-    // Renderiza o formulário no modal
-    modalBody.innerHTML = `
-  <h2>🔒 Esta newsletter é exclusiva para assinantes</h2>
-  <p>Preencha o formulário abaixo para receber informações sobre planos, capacitação ou consultoria.</p>
-  <form id="form-interesse" style="margin-top:20px">
-    <label for="nome">Nome:</label>
-    <input type="text" id="nome" required style="width:100%;padding:8px;margin-bottom:10px;border:1px solid #ccc">
-
-    <label for="email">E-mail:</label>
-    <input type="email" id="email" required style="width:100%;padding:8px;margin-bottom:10px;border:1px solid #ccc">
-    <input type="email" name="confirmar_email" placeholder="Confirme seu e-mail" required style="width:100%;padding:8px;margin-bottom:10px;border:1px solid #ccc">
-
-    <label for="telefone">Telefone:</label>
-    <input type="tel" id="telefone" required style="width:100%;padding:8px;margin-bottom:10px;border:1px solid #ccc">
-
-    <label for="preferencia-contato">Como prefere ser contatado?</label>
-    <select id="preferencia-contato" required style="width:100%;padding:8px;margin-bottom:10px;border:1px solid #ccc">
-      <option value="">Selecione...</option>
-      <option value="E-mail">📧 E-mail</option>
-      <option value="WhatsApp">🟢 WhatsApp</option>
-      <option value="Ligação">📞 Ligação</option>
-    </select>
-
-    <input type="hidden" name="origem" value="newsletter_publica">
-
-    <label for="perfil">Qual o seu Perfil?</label>
-    <select id="perfil" name="perfil" required style="width:100%;margin-bottom:10px">
-      <option value="">Selecione...</option>
-      <option value="secretario">Secretário</option>
-      <option value="tecnico">Técnico</option>
-      <option value="contador">Contador</option>
-      <option value="pesquisador">Pesquisador</option>
-      <option value="cacs">CACS</option>
-      <option value="cidadao">Cidadão</option>
-    </select>
-
-    <label for="mensagem">Deixe sua mensagem aqui (Queremos te ouvir):</label>
-    <textarea id="mensagem" name="mensagem" rows="4" style="width:100%;margin-bottom:10px" placeholder="Escreva aqui se quiser deixar uma observação ou dúvida..."></textarea>
-
-    <button type="submit" style="padding:10px 20px;background:#007acc;color:#fff;border:none;border-radius:6px">Quero saber mais</button>
-    <p id="status-envio" class="status-msg" style="margin-top:10px;font-weight:bold"></p>
-  </form>
-`;
-
-    const form = document.getElementById("form-interesse");
-
-    // ✅ Local onde os campos devem ser inseridos
-    const referencia = form.querySelector('label[for="preferencia-contato"]');
-
-    // ✅ Cria um contêiner temporário para os campos
-    const grupoLocalizacao = document.createElement("div");
-
-    // ✅ Insere os campos UF e Município dentro do contêiner
-    const validarLocalizacao = await inserirCamposUfMunicipio(grupoLocalizacao);
-
-    // ✅ Insere o contêiner antes do campo de preferência de contato
-    form.insertBefore(grupoLocalizacao, referencia);
-
-    // Insere os checkboxes de tipo de newsletter antes do botão de envio
-    (async () => {
-      try {
-        const tiposSnap = await db.collection("tipo_newsletters").get();
-        const tipos = tiposSnap.docs.map(doc => {
-          const data = doc.data();
-          return data.nome;
-        }).filter(Boolean);
-
-        if (tipos.length === 0) {
-          console.warn("Nenhum tipo de newsletter encontrado.");
-          return;
-        }
-
-        const grupoInteresse = document.querySelector("#form-interesse");
-        if (!grupoInteresse) {
-          console.warn("Formulário #form-interesse não encontrado.");
-          return;
-        }
-
-        const campoExistente = document.getElementById("campo-newsletters");
-        if (campoExistente) return;
-
-        const grupo = document.createElement("div");
-        grupo.id = "campo-newsletters";
-        grupo.style.marginBottom = "10px";
-        grupo.innerHTML = `
-          <label>Selecione o(s) seu(s) interesse(s)</label>
-          <div class="checkbox-group" id="grupo-newsletters" style="margin-bottom:10px">
-            ${tipos.map(tipo => `
-              <label style="display:block;margin-bottom:6px">
-                <input type="checkbox" value="${tipo}"> ${tipo}
-              </label>
-            `).join("")}
-          </div>
-        `;
-
-        const botaoEnvio = grupoInteresse.querySelector('button[type="submit"]');
-        grupoInteresse.insertBefore(grupo, botaoEnvio);
-      } catch (error) {
-        console.error("Erro ao buscar tipos de newsletter:", error);
-      }
-    })();
-
-    // Máscara de telefone
-    const telefoneInput = document.getElementById("telefone");
-    telefoneInput.addEventListener("input", () => {
-      let v = telefoneInput.value.replace(/\D/g, "");
-      if (v.length > 11) v = v.slice(0, 11);
-      if (v.length > 10) {
-        telefoneInput.value = `(${v.slice(0, 2)}) ${v.slice(2, 7)}-${v.slice(7)}`;
-      } else if (v.length > 6) {
-        telefoneInput.value = `(${v.slice(0, 2)}) ${v.slice(2, 6)}-${v.slice(6)}`;
-      } else if (v.length > 2) {
-        telefoneInput.value = `(${v.slice(0, 2)}) ${v.slice(2)}`;
-      } else {
-        telefoneInput.value = v;
-      }
-    });
-
-
-    document.getElementById("form-interesse").addEventListener("submit", async (e) => {
-      e.preventDefault();
-
-      const botao = e.submitter || document.querySelector('#form-interesse button[type="submit"]');
-      const nome = document.getElementById("nome").value.trim();
-      const email = document.getElementById("email").value.trim();
-      const telefone = document.getElementById("telefone").value.trim();
-      const perfil = document.getElementById("perfil").value;
-      const mensagem = document.getElementById("mensagem").value.trim();
-      const preferencia = document.getElementById("preferencia-contato").value;
-      const checks = document.querySelectorAll('#grupo-newsletters input[type="checkbox"]:checked');
-      const interesses = Array.from(checks).map(cb => cb.value).filter(Boolean);
-      const status = document.getElementById("status-envio");
-      const origem = document.querySelector('input[name="origem"]')?.value || null;
-
-      const localizacao = validarLocalizacao();
-      if (!localizacao) return;
-
-      const cod_uf = localizacao.cod_uf;
-      const cod_municipio = localizacao.cod_municipio;
-      const nome_municipio = localizacao.nome_municipio;
-
-      // Limpa estilos
-      ["nome", "email", "telefone", "confirmar_email", "perfil", "preferencia-contato"].forEach(id => {
-        const el = document.getElementById(id) || document.getElementsByName(id)[0];
-        if (el) el.style.border = "1px solid #ccc";
-      });
-
-      status.innerText = "";
-      status.style.color = "black";
-
-      // Validações
-      let erro = false;
-
-      if (nome.length < 3) {
-        erro = true;
-        status.innerText = "⚠️ Nome deve ter pelo menos 3 caracteres.";
-        document.getElementById("nome").style.border = "2px solid red";
-      }
-
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      if (!emailRegex.test(email)) {
-        erro = true;
-        status.innerText = "⚠️ E-mail inválido.";
-        document.getElementById("email").style.border = "2px solid red";
-      }
-
-      const emailtela = document.getElementById("email").value.trim();
-      const confirmar = document.getElementsByName("confirmar_email")[0].value.trim();
-
-      if (emailtela !== confirmar) {
-        status.innerText = "⚠️ Os e-mails não coincidem.";
-        document.getElementsByName("confirmar_email")[0].style.border = "2px solid red";
-        return;
-      }
-
-      const telefoneNumerico = telefone.replace(/\D/g, "");
-      const telefoneRegex = /^\(\d{2}\)\s?\d{4,5}-\d{4}$/;
-      if (telefoneNumerico.length < 10 || !telefoneRegex.test(telefone)) {
-        erro = true;
-        status.innerText = "⚠️ Telefone incompleto. Digite o número com DDD e 9 dígitos: (XX) XXXXX-XXXX.";
-        document.getElementById("telefone").style.border = "2px solid red";
-      }
-
-      if (!perfil) {
-        erro = true;
-        status.innerText = "⚠️ Selecione o perfil";
-        document.getElementById("perfil").style.border = "2px solid red";
-      }
-
-      if (interesses.length === 0) {
-        erro = true;
-        status.innerText = "⚠️ Selecione pelo menos um tipo de interesse.";
-        status.style.color = "red";
-      }
-
-      document.getElementById("preferencia-contato").style.border = "1px solid #ccc";
-
-      if (!preferencia) {
-        erro = true;
-        status.innerText = "⚠️ Selecione uma preferência de contato.";
-        document.getElementById("preferencia-contato").style.border = "2px solid red";
-      }
-
-      if (erro) return;
-
-      // Gravação
-      status.innerText = "Enviando...";
-      status.style.color = "black";
-      botao.disabled = true;
-      botao.textContent = "Enviando...";
-
-      try {
-        await db.collection("leads").add({
-          nome,
-          nome_lowercase: nome ? nome.toLowerCase() : "",
-          email,
-          telefone,
-          perfil,
-          mensagem: mensagem || null,
-          interesses,
-          preferencia_contato: preferencia,
-          origem,
-          cod_uf,
-          cod_municipio,
-          nome_municipio,
-          status: "Novo",
-          data_criacao: firebase.firestore.Timestamp.now()
-        });
-
-        status.innerText = "✅ Interesse registrado com sucesso!";
-        status.style.color = "green";
-        e.target.reset();
-        setTimeout(() => {
-          mostrarModalAgradecimento(nome);
-        }, 100);
-      } catch (err) {
-        console.error("Erro ao enviar:", err);
-        status.innerText = "Erro ao enviar. Tente novamente.";
-        status.style.color = "red";
-      } finally {
-        botao.disabled = false;
-        botao.textContent = "Quero saber mais";
-      }
-    });
-
+  if (user) {
+    // Usuário logado → abre direto
+    window.location.href = `visualizar.html?id=${id}`;
     return;
   }
 
-  window.location.href = `visualizar.html?id=${id}`;
+  // Não logado → exibe formulário de interesse
+  const modal = document.getElementById("modal-interesse");
+  const modalBody = document.getElementById("modal-body");
+
+  if (!modal || !modalBody) {
+    alert("Erro ao exibir o formulário. Elementos do modal não encontrados.");
+    return;
+  }
+
+  // Mostra modal e bloqueia scroll de fundo
+  modal.style.display = "flex";
+  document.body.style.overflow = "hidden";
+
+  // Carrega tipos de newsletter
+  const tiposSnap = await db.collection("tipo_newsletters").get();
+  const tipos = tiposSnap.docs.map(doc => doc.data().nome).filter(Boolean);
+
+  modalBody.innerHTML = `
+    <h2>🔒 Esta newsletter é exclusiva para assinantes</h2>
+    <p>Preencha o formulário abaixo para receber informações sobre planos, capacitação ou consultoria.</p>
+    <form id="form-interesse" style="margin-top:20px">
+      <label for="nome">Nome:</label>
+      <input type="text" id="nome" required style="width:100%;padding:8px;margin-bottom:10px;border:1px solid #ccc">
+
+      <label for="email">E-mail:</label>
+      <input type="email" id="email" required style="width:100%;padding:8px;margin-bottom:10px;border:1px solid #ccc">
+      <input type="email" name="confirmar_email" placeholder="Confirme seu e-mail" required style="width:100%;padding:8px;margin-bottom:10px;border:1px solid #ccc">
+
+      <label for="telefone">Telefone:</label>
+      <input type="tel" id="telefone" required style="width:100%;padding:8px;margin-bottom:10px;border:1px solid #ccc">
+
+      <label for="preferencia-contato">Como prefere ser contatado?</label>
+      <select id="preferencia-contato" required style="width:100%;padding:8px;margin-bottom:10px;border:1px solid #ccc">
+        <option value="">Selecione...</option>
+        <option value="E-mail">📧 E-mail</option>
+        <option value="WhatsApp">🟢 WhatsApp</option>
+        <option value="Ligação">📞 Ligação</option>
+      </select>
+
+      <input type="hidden" name="origem" value="newsletter_publica_premium">
+      <input type="hidden" name="newsletter_id" value="${id}">
+
+      <label for="perfil">Qual o seu Perfil?</label>
+      <select id="perfil" name="perfil" required style="width:100%;margin-bottom:10px">
+        <option value="">Selecione...</option>
+        <option value="secretario">Secretário</option>
+        <option value="tecnico">Técnico</option>
+        <option value="contador">Contador</option>
+        <option value="pesquisador">Pesquisador</option>
+        <option value="cacs">CACS</option>
+        <option value="cidadao">Cidadão</option>
+      </select>
+
+      <label for="mensagem">Deixe sua mensagem aqui (Queremos te ouvir):</label>
+      <textarea id="mensagem" name="mensagem" rows="4" style="width:100%;margin-bottom:10px" placeholder="Escreva aqui se quiser deixar uma observação ou dúvida..."></textarea>
+
+      <div id="campo-newsletters"></div>
+
+      <button type="submit" style="padding:10px 20px;background:#007acc;color:#fff;border:none;border-radius:6px">Quero saber mais</button>
+      <p id="status-envio" class="status-msg" style="margin-top:10px;font-weight:bold"></p>
+    </form>
+  `;
+
+  // Aplica máscara de telefone
+  const telefoneInput = document.getElementById("telefone");
+  aplicarMascaraTelefone(telefoneInput);
+
+  // Monta checkboxes de tipos de newsletter (interesses)
+  montarCheckboxTiposNewsletter(tipos);
+
+  // Scroll para o topo do modal (em telas menores)
+  modalBody.scrollTop = 0;
+
+  // Listener de submit
+  const form = document.getElementById("form-interesse");
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    await processarEnvioInteresse(e);
+  });
+}
+
+function montarCheckboxTiposNewsletter(tipos) {
+  const container = document.getElementById("campo-newsletters");
+  if (!container) return;
+
+  if (!tipos || tipos.length === 0) {
+    container.innerHTML = "<p style='color:#999'>Nenhum tipo de newsletter configurado.</p>";
+    return;
+  }
+
+  container.innerHTML = `
+    <label>Selecione o(s) seu(s) interesse(s)</label>
+    <div class="checkbox-group" id="grupo-newsletters" style="margin-bottom:10px">
+      ${tipos.map(tipo => `
+        <label style="display:block;margin-bottom:6px">
+          <input type="checkbox" value="${tipo}"> ${tipo}
+        </label>
+      `).join("")}
+    </div>
+  `;
+}
+
+async function processarEnvioInteresse(e) {
+  const form = e.target;
+  const status = document.getElementById("status-envio");
+  const botao = form.querySelector('button[type="submit"]');
+
+  const nome = document.getElementById("nome").value.trim();
+  const email = document.getElementById("email").value.trim();
+  const telefone = document.getElementById("telefone").value.trim();
+  const perfil = document.getElementById("perfil").value;
+  const mensagem = document.getElementById("mensagem").value.trim();
+  const preferencia = document.getElementById("preferencia-contato").value;
+  const origem = document.querySelector('input[name="origem"]')?.value || null;
+  const newsletterId = document.querySelector('input[name="newsletter_id"]')?.value || null;
+  const confirmar = document.getElementsByName("confirmar_email")[0].value.trim();
+
+  const checks = document.querySelectorAll('#grupo-newsletters input[type="checkbox"]:checked');
+  const interesses = Array.from(checks).map(cb => cb.value).filter(Boolean);
+
+  // Limpa estilos
+  ["nome", "email", "telefone", "perfil", "preferencia-contato"].forEach(id => {
+    const el = document.getElementById(id) || document.getElementsByName(id)[0];
+    if (el) el.style.border = "1px solid #ccc";
+  });
+
+  status.innerText = "";
+  status.style.color = "black";
+
+  // Validações
+  let erro = false;
+
+  if (nome.length < 3) {
+    erro = true;
+    status.innerText = "⚠️ Nome deve ter pelo menos 3 caracteres.";
+    document.getElementById("nome").style.border = "2px solid red";
+  }
+
+  if (!validarEmail(email)) {
+    erro = true;
+    status.innerText = "⚠️ E-mail inválido.";
+    document.getElementById("email").style.border = "2px solid red";
+  }
+
+  if (email !== confirmar) {
+    erro = true;
+    status.innerText = "⚠️ Os e-mails não coincidem.";
+    document.getElementsByName("confirmar_email")[0].style.border = "2px solid red";
+  }
+
+  const telefoneNumerico = telefone.replace(/\D/g, "");
+  if (telefoneNumerico.length < 10 || !validarTelefoneFormato(telefone)) {
+    erro = true;
+    status.innerText = "⚠️ Telefone incompleto. Digite o número com DDD e 9 dígitos: (XX) XXXXX-XXXX.";
+    document.getElementById("telefone").style.border = "2px solid red";
+  }
+
+  if (!perfil) {
+    erro = true;
+    status.innerText = "⚠️ Selecione o perfil.";
+    document.getElementById("perfil").style.border = "2px solid red";
+  }
+
+  if (interesses.length === 0) {
+    erro = true;
+    status.innerText = "⚠️ Selecione pelo menos um tipo de interesse.";
+    status.style.color = "red";
+  }
+
+  if (!preferencia) {
+    erro = true;
+    status.innerText = "⚠️ Selecione uma preferência de contato.";
+    document.getElementById("preferencia-contato").style.border = "2px solid red";
+  }
+
+  if (erro) return;
+
+  // Gravação no Firestore
+  status.innerText = "Enviando...";
+  status.style.color = "black";
+  botao.disabled = true;
+  botao.textContent = "Enviando...";
+
+  try {
+    const leadRef = await db.collection("leads").add({
+      nome,
+      nome_lowercase: nome ? nome.toLowerCase() : "",
+      email,
+      telefone,
+      perfil,
+      mensagem: mensagem || null,
+      interesses,
+      preferencia_contato: preferencia,
+      origem,
+      newsletter_id: newsletterId,
+      status: "Novo",
+      data_criacao: firebase.firestore.Timestamp.now()
+    });
+
+    status.innerText = "✅ Interesse registrado com sucesso!";
+    status.style.color = "green";
+
+    // Mostra modal de agradecimento
+    mostrarModalAgradecimento(nome);
+
+    // Fecha modal de interesse depois de um pequeno delay
+    setTimeout(() => {
+      fecharModal();
+    }, 300);
+
+    form.reset();
+  } catch (err) {
+    console.error("Erro ao enviar:", err);
+    status.innerText = "Erro ao enviar. Tente novamente.";
+    status.style.color = "red";
+  } finally {
+    botao.disabled = false;
+    botao.textContent = "Quero saber mais";
+  }
 }
 
 function mostrarModalAgradecimento(nome) {
   document.getElementById("nomeModal").textContent = nome;
-  document.getElementById("modalAgradecimento").style.display = "block";
+  document.getElementById("modalAgradecimento").style.display = "flex";
 }
 
 function fecharModalAgradecimento() {
   document.getElementById("modalAgradecimento").style.display = "none";
-  fecharModal(); // Fecha a tela de captura
 }
+
+function fecharModal() {
+  const modal = document.getElementById("modal-interesse");
+  if (modal) {
+    modal.style.display = "none";
+    const modalBody = document.getElementById("modal-body");
+    if (modalBody) modalBody.innerHTML = ""; // limpa conteúdo
+  }
+  document.body.style.overflow = "auto";
+}
+
 
 function abrirRecuperacaoSenha() {
   const modal = document.getElementById("modal-interesse");
@@ -369,12 +350,6 @@ function fecharModal() {
     const modalBody = document.getElementById("modal-body");
     if (modalBody) modalBody.innerHTML = ""; // limpa o conteúdo
   }
-}
-
-
-// 🔹 Executa ao carregar, somente se estiver na página pública
-if (document.getElementById("lista-basicas") && document.getElementById("lista-premium")) {
-  carregarNewslettersPublicas();
 }
 
 function abrirPrimeiroAcesso() {

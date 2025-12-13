@@ -11,6 +11,32 @@ const transporter = nodemailer.createTransport({
   }
 });
 
+function validarEmail(email) {
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return emailRegex.test(email);
+}
+
+function validarTelefoneFormato(telefone) {
+  const telefoneRegex = /^\(\d{2}\)\s?\d{4,5}-\d{4}$/;
+  return telefoneRegex.test(telefone);
+}
+
+function aplicarMascaraTelefone(input) {
+  input.addEventListener("input", () => {
+    let v = input.value.replace(/\D/g, "");
+    if (v.length > 11) v = v.slice(0, 11);
+    if (v.length > 10) {
+      input.value = `(${v.slice(0, 2)}) ${v.slice(2, 7)}-${v.slice(7)}`;
+    } else if (v.length > 6) {
+      input.value = `(${v.slice(0, 2)}) ${v.slice(2, 6)}-${v.slice(6)}`;
+    } else if (v.length > 2) {
+      input.value = `(${v.slice(0, 2)}) ${v.slice(2)}`;
+    } else {
+      input.value = v;
+    }
+  });
+}
+
 /**
  * Função para enviar e-mail de resposta automática
  * @param {Object} data - Dados do lead
