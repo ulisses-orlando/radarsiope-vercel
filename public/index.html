@@ -272,17 +272,29 @@
       display: none;
       justify-content: center;
       align-items: center;
+      /* centraliza verticalmente */
       z-index: 100000;
     }
 
+    /* Conteúdo compacto */
     .modal-agradecimento-conteudo {
       background: #fff;
       padding: 24px 28px;
       border-radius: 10px;
-      max-width: 400px;
+      max-width: 380px;
       width: 90%;
       text-align: center;
       box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+
+      /* 🔹 Limita a altura e evita esticar demais */
+      max-height: 260px;
+      overflow: hidden;
+
+      /* 🔹 Deixa mais elegante */
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      gap: 12px;
     }
   </style>
 </head>
