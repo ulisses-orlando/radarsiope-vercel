@@ -268,14 +268,18 @@ async function abrirModalNewsletter(docId = null, isEdit = false) {
   const body = document.getElementById('modal-edit-body');
   body.innerHTML = '';
 
+  // -----------------------------
   // Carrega dados da edição
+  // -----------------------------
   let data = {};
   if (isEdit && docId) {
     const snap = await db.collection('newsletters').doc(docId).get();
     data = snap.exists ? snap.data() : {};
   }
 
-  // Criar grid principal
+  // -----------------------------
+  // GRID PRINCIPAL (2 colunas)
+  // -----------------------------
   const grid = document.createElement('div');
   grid.className = "editor-grid";
 
@@ -299,7 +303,7 @@ async function abrirModalNewsletter(docId = null, isEdit = false) {
   colEsq.appendChild(generateDomainSelect('classificacao', ['Básica', 'Premium'], data.classificacao || 'Básica'));
 
   // -----------------------------
-  // HTML principal (coluna direita)
+  // EDITOR HTML (coluna direita)
   // -----------------------------
   const htmlWrap = document.createElement('div');
   htmlWrap.className = 'field';
@@ -320,16 +324,64 @@ async function abrirModalNewsletter(docId = null, isEdit = false) {
   ta.value = data.html_conteudo || '';
   htmlWrap.appendChild(ta);
 
-  // Botão tela cheia
+  // -----------------------------
+  // BOTÃO TELA CHEIA
+  // -----------------------------
   const btnFull = document.createElement('button');
   btnFull.innerText = "🖥️ Tela cheia";
   btnFull.style.marginTop = "8px";
-  btnFull.onclick = () => ta.classList.toggle("fullscreen");
+
+  btnFull.onclick = () => {
+    ta.classList.toggle("fullscreen");
+
+    if (ta.classList.contains("fullscreen")) {
+      btnFull.innerText = "🗗 Sair da tela cheia";
+    } else {
+      btnFull.innerText = "🖥️ Tela cheia";
+    }
+  };
+
+  // ESC para sair
+  document.addEventListener("keydown", function(e) {
+    if (e.key === "Escape" && ta.classList.contains("fullscreen")) {
+      ta.classList.remove("fullscreen");
+      btnFull.innerText = "🖥️ Tela cheia";
+    }
+  });
+
   htmlWrap.appendChild(btnFull);
 
-  colDir.appendChild(htmlWrap);
   // -----------------------------
-  // SEÇÃO DE BLOCOS (coluna direita)
+  // BOTÕES DE PREVIEW
+  // -----------------------------
+  const previewWrap = document.createElement('div');
+  previewWrap.style.marginTop = "10px";
+  previewWrap.style.display = "flex";
+  previewWrap.style.flexWrap = "wrap";
+  previewWrap.style.gap = "10px";
+
+  function addPreviewButton(label, modo, segmento, bordas) {
+    const btn = document.createElement('button');
+    btn.innerText = label;
+    btn.onclick = () => {
+      const iframe = document.getElementById('iframe-html-preview');
+      iframe.srcdoc = montarHtmlNewsletterPreview(modo, segmento, bordas);
+      openModal('modal-html-preview');
+    };
+    previewWrap.appendChild(btn);
+  }
+
+  addPreviewButton('👁️ Visualizar HTML (com blocos)', "completo", null, true);
+  addPreviewButton('👤 Visualizar como Lead', "segmentado", "leads", false);
+  addPreviewButton('⭐ Visualizar como Assinante', "segmentado", "assinantes", false);
+  addPreviewButton('🧪 Visualizar HTML puro', "puro", null, false);
+
+  htmlWrap.appendChild(previewWrap);
+
+  colDir.appendChild(htmlWrap);
+
+  // -----------------------------
+  // SEÇÃO DE BLOCOS
   // -----------------------------
   const tituloBlocos = document.createElement('h3');
   tituloBlocos.innerText = "Blocos da Newsletter";
@@ -398,15 +450,8 @@ async function abrirModalNewsletter(docId = null, isEdit = false) {
   if (isEdit && data.blocos) {
     setTimeout(() => carregarBlocosDaEdicao(data), 50);
   }
-
-  document.addEventListener("keydown", function escListener(e) {
-    if (e.key === "Escape" && ta.classList.contains("fullscreen")) {
-      ta.classList.remove("fullscreen");
-      btnFull.innerText = "🖥️ Tela cheia";
-    }
-  });
-
 }
+
 
 async function abrirModalNewsletterxxxxx(docId = null, isEdit = false) {
   const title = document.getElementById('modal-edit-title');
