@@ -269,7 +269,7 @@ async function abrirModalNewsletter(docId = null, isEdit = false) {
   body.innerHTML = '';
 
   // -----------------------------
-  // ✅ Carrega dados da edição
+  // Carrega dados da edição
   // -----------------------------
   let data = {};
   if (isEdit && docId) {
@@ -277,9 +277,8 @@ async function abrirModalNewsletter(docId = null, isEdit = false) {
     data = snap.exists ? snap.data() : {};
   }
 
-
   // -----------------------------
-  // ✅ Campos principais
+  // Campos principais
   // -----------------------------
   body.appendChild(generateDateInput('data_publicacao', data.data_publicacao ? data.data_publicacao.toDate() : null));
   body.appendChild(generateTextField('edicao', data.edicao));
@@ -291,7 +290,7 @@ async function abrirModalNewsletter(docId = null, isEdit = false) {
   body.appendChild(generateDomainSelect('classificacao', ['Básica', 'Premium'], data.classificacao || 'Básica'));
 
   // -----------------------------
-  // ✅ HTML principal
+  // HTML principal
   // -----------------------------
   const htmlWrap = document.createElement('div');
   htmlWrap.className = 'field';
@@ -301,20 +300,19 @@ async function abrirModalNewsletter(docId = null, isEdit = false) {
     <div class="info-box" style="background:#eef; padding:10px; border-left:4px solid #88f; margin-bottom:10px;">
       <strong>📌 Placeholders disponíveis:</strong>
       <ul style="margin-top:5px; font-size:14px;">
-        <li><code>{{nome}}</code> → Nome do usuário</li>
-        <li><code>{{email}}</code> → E-mail do usuário</li>
-        <li><code>{{edicao}}</code> → Número da edição</li>
-        <li><code>{{tipo}}</code> → Tipo Newsletter</li>
-        <li><code>{{titulo}}</code> → Título da edição</li>
-        <li><code>{{data_publicacao}}</code> → Data da edição (formato DD/MM/AAAA)</li>
-        <li><code>{{blocos}}</code> → Local de inserção dos blocos</li>
+        <li><code>{{nome}}</code></li>
+        <li><code>{{email}}</code></li>
+        <li><code>{{edicao}}</code></li>
+        <li><code>{{tipo}}</code></li>
+        <li><code>{{titulo}}</code></li>
+        <li><code>{{data_publicacao}}</code></li>
+        <li><code>{{blocos}}</code></li>
       </ul>
-      <p>Esses campos serão substituídos automaticamente no momento do envio.</p>
     </div>`;
   htmlWrap.appendChild(explicacao);
 
   // -----------------------------
-  // ✅ Filtros de template
+  // Filtros de template
   // -----------------------------
   const filtroWrap = document.createElement('div');
   filtroWrap.style.marginTop = '10px';
@@ -342,7 +340,7 @@ async function abrirModalNewsletter(docId = null, isEdit = false) {
   htmlWrap.appendChild(filtroWrap);
 
   // -----------------------------
-  // ✅ Seletor de template
+  // Seletor de template
   // -----------------------------
   const seletorTemplate = document.createElement('select');
   seletorTemplate.id = 'seletor-template-newsletter';
@@ -376,7 +374,7 @@ async function abrirModalNewsletter(docId = null, isEdit = false) {
   atualizarListaTemplates();
 
   // -----------------------------
-  // ✅ Botão: carregar template
+  // Botão: carregar template
   // -----------------------------
   const btnCarregarTemplate = document.createElement('button');
   btnCarregarTemplate.innerText = '📥 Carregar HTML do Template';
@@ -392,7 +390,6 @@ async function abrirModalNewsletter(docId = null, isEdit = false) {
     const campoHTML = document.getElementById('campo-html-newsletter');
     campoHTML.value = template.html_base || '';
 
-    // ✅ Carrega blocos do template
     if (template.blocos) {
       carregarBlocosDoTemplateNaEdicao(templateId);
     }
@@ -400,12 +397,13 @@ async function abrirModalNewsletter(docId = null, isEdit = false) {
   htmlWrap.appendChild(btnCarregarTemplate);
 
   // -----------------------------
-  // ✅ Campo HTML principal
+  // Campo HTML principal
   // -----------------------------
   const lbl = document.createElement('label');
-  lbl.innerText = 'Conteudo do HTML';
+  lbl.innerText = 'Conteúdo do HTML';
   lbl.style.marginTop = "15px";
   htmlWrap.appendChild(lbl);
+
   const ta = document.createElement('textarea');
   ta.rows = 8;
   ta.style.width = '100%';
@@ -414,206 +412,10 @@ async function abrirModalNewsletter(docId = null, isEdit = false) {
   ta.value = data.html_conteudo || '';
   htmlWrap.appendChild(ta);
 
-  // -----------------------------
-  // ✅ Botões auxiliares (preview avançado, copiar, pixel, click, descadastramento)
-  // -----------------------------
-
-  // Dados de exemplo para placeholders
-  function montarDadosPreviewNewsletter() {
-    return {
-      nome: "Fulano de Teste",
-      email: "fulano@exemplo.com",
-      edicao: document.querySelector('[data-field-name="edicao"]')?.value || "",
-      tipo: document.querySelector('[data-field-name="tipo"]')?.value || "",
-      titulo: document.querySelector('[data-field-name="titulo"]')?.value || "",
-      data_publicacao: document.querySelector('[data-field-name="data_publicacao"]')?.value
-        ? new Date(document.querySelector('[data-field-name="data_publicacao"]').value + "T00:00:00")
-        : null
-    };
-  }
-
-  // ✅ Função principal de montagem do HTML da edição
-  function montarHtmlNewsletterPreview(modo = "completo", segmento = null, comBordas = false) {
-    const dados = montarDadosPreviewNewsletter();
-
-    // HTML base vindo do campo da edição
-    let htmlBase = document.getElementById('campo-html-newsletter').value || "";
-    const blocos = coletarBlocosEdicao() || [];
-
-    let htmlBlocos = "";
-
-    if (blocos.length > 0 && modo !== "puro") {
-      blocos.forEach((b, i) => {
-        // Filtragem por segmento (lead / assinante)
-        if (segmento && b.acesso !== "todos" && b.acesso !== segmento) {
-          return; // pula bloco que não pertence a esse segmento
-        }
-
-        if (comBordas) {
-          const cor =
-            b.acesso === "assinantes" ? "#2e7d32" :
-              b.acesso === "leads" ? "#ff9800" :
-                "#1976d2";
-
-          htmlBlocos += `
-            <div style="border:2px dashed ${cor}; padding:10px; margin:15px 0; border-radius:6px;">
-              <div style="font-size:12px; color:${cor}; margin-bottom:5px;">
-                <strong>Bloco ${i + 1}</strong> — acesso: ${b.acesso}
-              </div>
-              ${b.html || ""}
-            </div>
-          `;
-        } else {
-          htmlBlocos += b.html || "";
-        }
-      });
-    } else if (blocos.length > 0 && modo === "puro") {
-      // modo "puro" com blocos: só concatena blocos filtrados por segmento
-      blocos.forEach(b => {
-        if (segmento && b.acesso !== "todos" && b.acesso !== segmento) {
-          return;
-        }
-        htmlBlocos += b.html || "";
-      });
-    }
-
-    let htmlFinal = "";
-
-    if (blocos.length === 0) {
-      // ✅ Sem blocos: usa só o HTML da edição
-      htmlFinal = htmlBase;
-    } else {
-      // ✅ Com blocos: insere no {{blocos}} se existir, senão no final
-      if (htmlBase.includes("{{blocos}}")) {
-        htmlFinal = htmlBase.replace("{{blocos}}", htmlBlocos);
-      } else {
-        htmlFinal = htmlBase + "\n" + htmlBlocos;
-      }
-    }
-
-    // Aplica placeholders APENAS se não for "puro"
-    if (modo !== "puro") {
-      htmlFinal = aplicarPlaceholders(htmlFinal, dados);
-    }
-
-    return htmlFinal;
-  }
-
-  // ✅ Preview completo (com todos os blocos, numerados e com bordas)
-  const btnPreview = document.createElement('button');
-  btnPreview.innerText = '👁️ Visualizar HTML (com blocos)';
-  btnPreview.style.marginTop = '10px';
-  btnPreview.type = "button";
-  btnPreview.onclick = () => {
-    const iframe = document.getElementById('iframe-html-preview');
-    iframe.srcdoc = montarHtmlNewsletterPreview("completo", null, true);
-    openModal('modal-html-preview');
-  };
-  htmlWrap.appendChild(btnPreview);
-
-  // ✅ Preview como Lead
-  const btnPreviewLead = document.createElement('button');
-  btnPreviewLead.innerText = '👤 Visualizar como Lead';
-  btnPreviewLead.style.marginLeft = '10px';
-  btnPreviewLead.style.marginTop = '10px';
-  btnPreviewLead.type = "button";
-  btnPreviewLead.onclick = () => {
-    const iframe = document.getElementById('iframe-html-preview');
-    iframe.srcdoc = montarHtmlNewsletterPreview("segmentado", "leads", false);
-    openModal('modal-html-preview');
-  };
-  htmlWrap.appendChild(btnPreviewLead);
-
-  // ✅ Preview como Assinante
-  const btnPreviewAssinante = document.createElement('button');
-  btnPreviewAssinante.innerText = '⭐ Visualizar como Assinante';
-  btnPreviewAssinante.style.marginLeft = '10px';
-  btnPreviewAssinante.style.marginTop = '10px';
-  btnPreviewAssinante.type = "button";
-  btnPreviewAssinante.onclick = () => {
-    const iframe = document.getElementById('iframe-html-preview');
-    iframe.srcdoc = montarHtmlNewsletterPreview("segmentado", "assinantes", false);
-    openModal('modal-html-preview');
-  };
-  htmlWrap.appendChild(btnPreviewAssinante);
-
-  // ✅ Preview HTML puro (sem placeholders, sem bordas, só resultado final com blocos)
-  const btnPreviewPuro = document.createElement('button');
-  btnPreviewPuro.innerText = '🧪 Visualizar HTML puro';
-  btnPreviewPuro.style.marginLeft = '10px';
-  btnPreviewPuro.style.marginTop = '10px';
-  btnPreviewPuro.type = "button";
-  btnPreviewPuro.onclick = () => {
-    const iframe = document.getElementById('iframe-html-preview');
-    iframe.srcdoc = montarHtmlNewsletterPreview("puro", null, false);
-    openModal('modal-html-preview');
-  };
-  htmlWrap.appendChild(btnPreviewPuro);
-
-  // ✅ Copiar HTML
-  const btnCopiar = document.createElement('button');
-  btnCopiar.innerText = '📋 Copiar HTML';
-  btnCopiar.style.marginLeft = '10px';
-  btnCopiar.style.marginTop = '10px';
-  btnCopiar.onclick = () => {
-    navigator.clipboard.writeText(ta.value)
-      .then(() => alert("HTML copiado!"))
-      .catch(() => alert("Erro ao copiar."));
-  };
-  htmlWrap.appendChild(btnCopiar);
-
-  // ✅ Pixel
-  const btnPixel = document.createElement('button');
-  btnPixel.innerText = '➕ Pixel';
-  btnPixel.style.marginLeft = '10px';
-  btnPixel.onclick = () => {
-    const texto = `
-    <img src="https://api.radarsiope.com.br/api/pixel?newsletter={{newsletterId}}&email={{email}}" 
-         width="1" height="1" style="display:none" alt="pixel" />
-    `;
-    if (!ta.value.includes("api/pixel")) ta.value += "\n" + texto;
-  };
-  htmlWrap.appendChild(btnPixel);
-
-  // ✅ Click
-  const btnClick = document.createElement('button');
-  btnClick.innerText = '➕ Click';
-  btnClick.style.marginLeft = '10px';
-  btnClick.onclick = () => {
-    let destino = prompt("Informe o link:", "https://www.radarsiope.com.br/");
-    if (!destino) destino = "https://www.radarsiope.com.br/";
-    if (!destino.startsWith("http")) destino = "https://" + destino;
-
-    const texto = `
-    <a href="https://api.radarsiope.com.br/api/click?envioId={{envioId}}&destinatarioId={{destinatarioId}}&newsletterId={{newsletterId}}&url=${encodeURIComponent(destino)}">
-      Clique aqui para acessar o conteúdo
-    </a>
-    `;
-    if (!ta.value.includes("api/click")) ta.value += "\n" + texto;
-  };
-  htmlWrap.appendChild(btnClick);
-
-  // ✅ Descadastramento
-  const btnDescadastramento = document.createElement('button');
-  btnDescadastramento.innerText = '➕ Descadastramento';
-  btnDescadastramento.style.marginLeft = '10px';
-  btnDescadastramento.onclick = () => {
-    const texto = `
-    <p style="font-size:12px; color:#888; margin-top:30px">
-      Não deseja mais receber nossas newsletters?
-      <a href="https://api.radarsiope.com.br/descadastramento.html?email={{email}}&newsletter={{newsletterId}}&titulo={{titulo}}">
-        Clique aqui para se descadastrar
-      </a>.
-    </p>
-    `;
-    if (!ta.value.includes("Clique aqui para se descadastrar")) ta.value += "\n" + texto;
-  };
-  htmlWrap.appendChild(btnDescadastramento);
-
   body.appendChild(htmlWrap);
 
   // -----------------------------
-  // ✅ SEÇÃO NOVA: BLOCOS DA EDIÇÃO
+  // SEÇÃO DE BLOCOS
   // -----------------------------
   const tituloBlocos = document.createElement('h4');
   tituloBlocos.innerText = "Blocos da Newsletter (opcional)";
@@ -645,13 +447,8 @@ async function abrirModalNewsletter(docId = null, isEdit = false) {
   containerBlocos.style.overflowY = "auto";
   body.appendChild(containerBlocos);
 
-    // ✅ Se estiver editando e houver blocos, carrega depois que o DOM montar
-  if (isEdit && data.blocos) {
-    setTimeout(() => carregarBlocosDaEdicao(data), 50);
-  }
-  
   // -----------------------------
-  // ✅ Botão salvar
+  // Botão salvar
   // -----------------------------
   document.getElementById('modal-edit-save').onclick = async () => {
     const payload = {};
@@ -666,10 +463,8 @@ async function abrirModalNewsletter(docId = null, isEdit = false) {
       }
     });
 
-    // ✅ Coleta blocos da edição
     payload.blocos = coletarBlocosEdicao();
 
-    // ✅ Validação universal
     const htmlNewsletter = payload['html_conteudo'] || "";
     const blocos = payload.blocos || [];
 
@@ -677,7 +472,6 @@ async function abrirModalNewsletter(docId = null, isEdit = false) {
       return;
     }
 
-    // ✅ Salva normalmente
     const ref = db.collection('newsletters');
     if (isEdit && docId) {
       await ref.doc(docId).set(payload, { merge: true });
@@ -689,7 +483,17 @@ async function abrirModalNewsletter(docId = null, isEdit = false) {
     carregarNewsletters();
   };
 
+  // -----------------------------
+  // ABRE O MODAL
+  // -----------------------------
   openModal('modal-edit-overlay');
+
+  // -----------------------------
+  // CARREGA OS BLOCOS (AGORA NO MOMENTO CERTO)
+  // -----------------------------
+  if (isEdit && data.blocos) {
+    setTimeout(() => carregarBlocosDaEdicao(data), 50);
+  }
 }
 
 function validarNewsletter(html, blocos) {
