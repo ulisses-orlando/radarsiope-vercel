@@ -97,17 +97,32 @@ function montarCarrossel(titulo, lista, container, tipoSecao) {
 
 // Cria o card de cada newsletter dentro do carrossel
 function criarCardNewsletter(dados) {
-  const { id, titulo, classificacao, data_publicacao } = dados;
+  const { id, titulo, classificacao, data_publicacao, assinantes, aberturas } = dados;
 
   const card = document.createElement("div");
   card.className = "card-news";
 
   const dataFormatada = formatarData(data_publicacao);
 
+  // ✔️ Regra correta baseada no Firestore:
+  // Somente "Premium" mostra blocos
+  const mostrarBlocos = classificacao === "Premium";
+
+  // ✔️ HTML dos blocos (somente se Premium)
+  const blocosHTML = mostrarBlocos
+    ? `
+      <div class="blocos-assinantes">
+        <p><strong>Assinantes:</strong> ${assinantes || 0}</p>
+        <p><strong>Aberturas:</strong> ${aberturas || 0}</p>
+      </div>
+    `
+    : "";
+
   card.innerHTML = `
     <h3>${titulo || "Sem título"}</h3>
     <p><strong>Classificação:</strong> ${classificacao || "-"}</p>
     ${dataFormatada ? `<p><strong>Data:</strong> ${dataFormatada}</p>` : ""}
+    ${blocosHTML}
     <button type="button">Visualizar</button>
   `;
 
