@@ -411,11 +411,20 @@
       font-family: monospace;
     }
 
-    /* Modal mais largo */
-    #modal-edit-overlay .modal-content {
-      width: 95%;
-      max-width: 1400px;
-    }
+#modal-edit-overlay {
+  display: flex !important;
+  justify-content: center !important;
+  align-items: flex-start !important;
+  padding-top: 40px !important;
+}
+
+#modal-edit-overlay .modal-content {
+  width: 95% !important;
+  max-width: 1400px !important;
+  margin: 0 auto !important;
+  position: relative !important;
+}
+
 
     /* Grid principal */
     .editor-grid {
