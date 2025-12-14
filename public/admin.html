@@ -410,6 +410,38 @@
     .bloco-newsletter textarea {
       font-family: monospace;
     }
+
+    /* Modal mais largo */
+    #modal-edit-overlay .modal-content {
+      width: 95%;
+      max-width: 1400px;
+    }
+
+    /* Grid principal */
+    .editor-grid {
+      display: grid;
+      grid-template-columns: 1fr 2fr;
+      gap: 25px;
+      margin-top: 20px;
+    }
+
+    /* Editor HTML em tela cheia */
+    #campo-html-newsletter.fullscreen {
+      position: fixed !important;
+      top: 20px;
+      left: 20px;
+      right: 20px;
+      bottom: 20px;
+      width: auto !important;
+      height: auto !important;
+      z-index: 99999;
+      background: white;
+      padding: 20px;
+      border: 2px solid #007acc;
+      border-radius: 8px;
+      font-size: 16px !important;
+      box-shadow: 0 0 20px rgba(0, 0, 0, 0.4);
+    }
   </style>
 </head>
 
