@@ -1344,8 +1344,6 @@ async function enviarLoteIndividual(newsletterId, envioId, loteId) {
 
 
             try {
-                console.log("Destinatário:", dest);
-                console.log("Destinatário bruto:", JSON.stringify(dest, null, 2));
 
                 // 🔹 Endpoint SES no backend
                 const response = await fetch("https://api.radarsiope.com.br/api/sendViaSES", {
@@ -1360,7 +1358,6 @@ async function enviarLoteIndividual(newsletterId, envioId, loteId) {
                 });
 
                 const text = await response.text();
-                console.log("Resposta bruta do backend:", text);
 
                 let result;
                 try {
@@ -1375,8 +1372,6 @@ async function enviarLoteIndividual(newsletterId, envioId, loteId) {
                 }
 
                 enviados++;
-                console.log(`✅ Email enviado para ${identificador}`);
-                console.log("Resposta SES:", result);
 
                 // Registro do envio
                 if (tipo === "leads") {
@@ -1447,6 +1442,11 @@ async function enviarLoteIndividual(newsletterId, envioId, loteId) {
                 data_envio: firebase.firestore.Timestamp.now()
             });
         }
+        // 🔥 Marca a newsletter como enviada/publicada
+        await db.collection("newsletters").doc(newsletterId).update({
+            enviada: true,
+            data_publicacao: firebase.firestore.Timestamp.now()
+        });
 
         alert(`✅ Lote nº ${numeroLote} enviado com sucesso!`);
     } catch (err) {

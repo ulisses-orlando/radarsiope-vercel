@@ -1,6 +1,9 @@
 // 🔹 Carrega newsletters e separa por classificação
 async function carregarNewslettersPublicas() {
-  const snap = await db.collection("newsletters").orderBy("data_publicacao", "desc").get();
+  const snap = await db.collection("newsletters")
+    .where("enviada", "==", true)
+    .orderBy("data_publicacao", "desc")
+    .get()
 
   const listaBasicas = document.getElementById("lista-basicas");
   const listaPremium = document.getElementById("lista-premium");
