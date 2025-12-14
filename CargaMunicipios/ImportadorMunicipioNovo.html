@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Importar Municípios para Firestore</title>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+  <style>
+    #progresso-container {
+      width: 100%;
+      background: #eee;
+      border-radius: 6px;
+      margin-top: 20px;
+    }
+    #progresso-barra {
+      height: 24px;
+      width: 0%;
+      background: #007acc;
+      color: white;
+      text-align: center;
+      line-height: 24px;
+      border-radius: 6px;
+    }
+  </style>
+</head>
+<body>
+  <h2>📥 Importar Municípios para Firestore</h2>
+  <p>Selecione o arquivo <strong>municipios.json</strong> com os dados do IBGE:</p>
+  <input type="file" id="upload-json" accept=".json">
+  <div id="progresso-container"><div id="progresso-barra">0%</div></div>
+  <p id="status" style="margin-top:10px;font-weight:bold;"></p>
+
+  <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyDcS4nneXnN8Cdb-S_cQukwaguLXJYbQ1U",
+      authDomain: "radarsiope.firebaseapp.com",
+      projectId: "radarsiope"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+
+    const mapaUF = {
+      11: { sigla: "RO", nome: "Rondônia", regiao: "Norte" },
+      12: { sigla: "AC", nome: "Acre", regiao: "Norte" },
+      13: { sigla: "AM", nome: "Amazonas", regiao: "Norte" },
+      14: { sigla: "RR", nome: "Roraima", regiao: "Norte" },
+      15: { sigla: "PA", nome: "Pará", regiao: "Norte" },
+      16: { sigla: "AP", nome: "Amapá", regiao: "Norte" },
+      17: { sigla: "TO", nome: "Tocantins", regiao: "Norte" },
+      21: { sigla: "MA", nome: "Maranhão", regiao: "Nordeste" },
+      22: { sigla: "PI", nome: "Piauí", regiao: "Nordeste" },
+      23: { sigla: "CE", nome: "Ceará", regiao: "Nordeste" },
+      24: { sigla: "RN", nome: "Rio Grande do Norte", regiao: "Nordeste" },
+      25: { sigla: "PB", nome: "Paraíba", regiao: "Nordeste" },
+      26: { sigla: "PE", nome: "Pernambuco", regiao: "Nordeste" },
+      27: { sigla: "AL", nome: "Alagoas", regiao: "Nordeste" },
+      28: { sigla: "SE", nome: "Sergipe", regiao: "Nordeste" },
+      29: { sigla: "BA", nome: "Bahia", regiao: "Nordeste" },
+      31: { sigla: "MG", nome: "Minas Gerais", regiao: "Sudeste" },
+      32: { sigla: "ES", nome: "Espírito Santo", regiao: "Sudeste" },
+      33: { sigla: "RJ", nome: "Rio de Janeiro", regiao: "Sudeste" },
+      35: { sigla: "SP", nome: "São Paulo", regiao: "Sudeste" },
+      41: { sigla: "PR", nome: "Paraná", regiao: "Sul" },
+      42: { sigla: "SC", nome: "Santa Catarina", regiao: "Sul" },
+      43: { sigla: "RS", nome: "Rio Grande do Sul", regiao: "Sul" },
+      50: { sigla: "MS", nome: "Mato Grosso do Sul", regiao: "Centro-Oeste" },
+      51: { sigla: "MT", nome: "Mato Grosso", regiao: "Centro-Oeste" },
+      52: { sigla: "GO", nome: "Goiás", regiao: "Centro-Oeste" },
+      53: { sigla: "DF", nome: "Distrito Federal", regiao: "Centro-Oeste" }
+    };
+
+    async function limparColecaoUF() {
+      const ufSnap = await db.collection("UF").get();
+      for (const doc of ufSnap.docs) {
+        const ufRef = db.collection("UF").doc(doc.id);
+        const municipiosSnap = await ufRef.collection("Municipio").get();
+        for (const mDoc of municipiosSnap.docs) {
+          await ufRef.collection("Municipio").doc(mDoc.id).delete();
+        }
+        await ufRef.delete();
+        console.log("🗑️ UF removida:", doc.id);
+      }
+    }
+
+    async function importarMunicipios(municipiosJson) {
+      const status = document.getElementById("status");
+      const barra = document.getElementById("progresso-barra");
+      status.innerText = "📦 Importando dados...";
+
+      let gravados = 0;
+      const limiteTotal = 100000;
+
+      for (const m of municipiosJson) {
+        if (gravados >= limiteTotal) break;
+
+        const ufInfo = mapaUF[m.codigo_uf];
+        if (!ufInfo) continue;
+
+        const ufRef = db.collection("UF").doc(ufInfo.sigla);
+        await ufRef.set({
+          cod_uf: m.codigo_uf,
+          nome_uf: ufInfo.nome,
+          regiao: ufInfo.regiao
+        });
+
+        await ufRef.collection("Municipio").doc(String(m.codigo_ibge)).set({
+          cod_municipio: m.codigo_ibge,
+          nome_municipio: m.nome
+        });
+
+        console.log("✅ Gravado:", m.codigo_ibge, m.nome);
+
+        gravados++;
+        const progresso = Math.round((gravados / limiteTotal) * 100);
+        barra.style.width = progresso + "%";
+        barra.textContent = progresso + "%";
+      }
+
+      status.innerText = "✅ Importação concluída com sucesso!";
+    }
+
+    document.getElementById("upload-json").addEventListener("change", async function (e) {
+      const file = e.target.files[0];
+      const reader = new FileReader();
+
+      reader.onload = async function (event) {
+        try {
+          console.log("📂 Arquivo carregado");
+          const municipiosJson = JSON.parse(event.target.result);
+
+          document.getElementById("status").innerText = "🧹 Limpando dados existentes...";
+          await limparColecaoUF();
+
+          await importarMunicipios(municipiosJson);
+        } catch (err) {
+          document.getElementById("status").innerText = "❌ Erro ao processar o arquivo.";
+          console.error("❌ Erro detectado:", err);
+        }
+      };
+
+      reader.readAsText(file);
+    });
+  </script>
+</body>
+</html>

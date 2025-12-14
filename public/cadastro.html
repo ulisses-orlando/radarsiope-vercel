@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8">
+  <title>Cadastro Gratuito - Radar SIOPE</title>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #E6F0FA;
+      padding: 40px;
+      max-width: 700px;
+      margin: 0 auto;
+      color: #004080;
+    }
+    header {
+      background-color: #004080;
+      color: white;
+      padding: 20px;
+      text-align: center;
+      border-radius: 8px;
+      margin-bottom: 30px;
+    }
+    h2 {
+      text-align: center;
+      font-size: 2em;
+      margin-bottom: 20px;
+    }
+    p {
+      text-align: center;
+      font-size: 1.1em;
+      margin-bottom: 30px;
+    }
+    label {
+      font-weight: bold;
+      display: block;
+      margin-top: 15px;
+    }
+    input, select {
+      width: 100%;
+      padding: 12px;
+      border-radius: 6px;
+      border: 1px solid #ccc;
+      font-size: 1em;
+      margin-bottom: 10px;
+    }
+    input[type="checkbox"] {
+      width: auto;
+      margin-right: 10px;
+    }
+    button {
+      background-color: #004080;
+      color: white;
+      padding: 14px 30px;
+      border: none;
+      border-radius: 6px;
+      font-size: 1em;
+      cursor: pointer;
+      margin-top: 20px;
+    }
+    button:hover {
+      background-color: #003060;
+    }
+    .success-message {
+      background-color: #D1FAE5;
+      color: #065F46;
+      padding: 15px;
+      border-radius: 6px;
+      margin-top: 20px;
+      text-align: center;
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Radar SIOPE</h1>
+    <p>Portal de inteligência sobre Fundeb e gestão educacional</p>
+  </header>
+
+  <h2>Cadastro para Conteúdo Gratuito</h2>
+  <p>Receba boletins básicos, acesse nossa biblioteca pública e acompanhe notícias sobre SIOPE e Fundeb.</p>
+
+  <form id="cadastroForm">
+    <label>Nome completo:</label>
+    <input type="text" id="nome" required>
+
+    <label>E-mail:</label>
+    <input type="email" id="email" required>
+
+    <label>Telefone (com DDD):</label>
+    <input type="text" id="telefone" required>
+
+    <label>Município:</label>
+    <input type="text" id="municipio" required>
+
+    <label>UF:</label>
+    <select id="UF" required>
+      <option value="" disabled selected>Selecione o estado</option>
+      <option value="AC">AC</option><option value="AL">AL</option><option value="AP">AP</option>
+      <option value="AM">AM</option><option value="BA">BA</option><option value="CE">CE</option>
+      <option value="DF">DF</option><option value="ES">ES</option><option value="GO">GO</option>
+      <option value="MA">MA</option><option value="MT">MT</option><option value="MS">MS</option>
+      <option value="MG">MG</option><option value="PA">PA</option><option value="PB">PB</option>
+      <option value="PR">PR</option><option value="PE">PE</option><option value="PI">PI</option>
+      <option value="RJ">RJ</option><option value="RN">RN</option><option value="RS">RS</option>
+      <option value="RO">RO</option><option value="RR">RR</option><option value="SC">SC</option>
+      <option value="SP">SP</option><option value="SE">SE</option><option value="TO">TO</option>
+    </select>
+
+    <label>Tipo de usuário:</label>
+    <select id="tipoUsuario" required>
+      <option value="" disabled selected>Selecione uma opção</option>
+      <option value="Contador">Contador</option>
+      <option value="Gestor">Gestor</option>
+      <option value="Técnico">Técnico</option>
+      <option value="CACS">CACS</option>
+      <option value="Pesquisador">Pesquisador</option>
+    </select>
+
+    <label><input type="checkbox" id="boletim" required> Desejo receber boletins mensais</label>
+
+    <button type="submit">Cadastrar e Acessar Recursos</button>
+  </form>
+
+  <div class="success-message" id="successMessage">
+    Cadastro realizado com sucesso! Redirecionando para a página de recursos…
+  </div>
+
+  <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyDcS4nneXnN8Cdb-S_cQukwaguLXJYbQ1U",
+      authDomain: "radarsiope.firebaseapp.com",
+      projectId: "radarsiope",
+      storageBucket: "radarsiope.firebasestorage.app",
+      messagingSenderId: "357921899865",
+      appId: "1:357921899865:web:3c7f93b4fa7b3ea7ab3848",
+      measurementId: "G-6FSVXQRBJN"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+
+    document.getElementById("cadastroForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+
+      const nome = document.getElementById("nome").value.trim();
+      const email = document.getElementById("email").value.trim();
+      const telefone = document.getElementById("telefone").value.trim();
+      const municipio = document.getElementById("municipio").value.trim();
+      const UF = document.getElementById("UF").value;
+      const tipoUsuario = document.getElementById("tipoUsuario").value;
+      const boletim = document.getElementById("boletim").checked;
+
+      if (!nome || !email || !telefone || !municipio || !UF || !tipoUsuario || !boletim) {
+        alert("Por favor, preencha todos os campos obrigatórios.");
+        return;
+      }
+
+      const telefoneLimpo = telefone.replace(/\D/g, "");
+      if (telefoneLimpo.length < 10) {
+        alert("Por favor, informe um telefone válido com DDD.");
+        return;
+      }
+
+      const usuario = {
+        nome,
+        email,
+        telefone,
+        municipio,
+        UF,
+        tipoUsuario,
+        boletim,
+        plano: "gratuito",
+        status: "ativo",
+        vencimento: null,
+        foto: "",
+        nascimento: null,
+        datanascimento: null,
+        dataLogin: null,
+        Instagram: "",
+        dataCadastro: new Date().toISOString(),
+        origem: "cadastro-newsletter"
+      };
+
+      try {
+        await db.collection("usuarios").add(usuario);
+        document.getElementById("successMessage").style.display = "block";
+        setTimeout(() => {
+          window.location.href = "https://www.radarsiope.com.br/recursos";
+        }, 2500);
+      } catch (error) {
+        alert("Erro ao cadastrar. Tente novamente.");
+        console.error(error);
+      }
+    });
+  </script>
+</body>
+</html>

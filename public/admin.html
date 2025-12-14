@@ -1,0 +1,2124 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gerenciador RadarSiope</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <style>
+    :root {
+      --accent: #007acc;
+      --accent-dark: #005fa3;
+      --bg: #f4f4f4
+    }
+
+    * {
+      box-sizing: border-box
+    }
+
+    body {
+      font-family: sans-serif;
+      margin: 0;
+      padding: 0;
+      background: var(--bg);
+      display: flex;
+      min-height: 100vh
+    }
+
+    aside#sidebar {
+      width: 220px;
+      background: var(--accent);
+      color: #fff;
+      padding: 18px;
+      flex: 0 0 220px
+    }
+
+    aside#sidebar h2 {
+      margin: 0 0 12px;
+      font-size: 16px
+    }
+
+    aside#sidebar button {
+      display: block;
+      width: 100%;
+      text-align: left;
+      padding: 10px;
+      border: 0;
+      background: transparent;
+      color: #fff;
+      border-radius: 6px;
+      cursor: pointer;
+      margin-bottom: 6px
+    }
+
+    aside#sidebar button:hover {
+      background: rgba(255, 255, 255, 0.05)
+    }
+
+    aside#sidebar button.active {
+      background: var(--accent-dark)
+    }
+
+    main#conteudo {
+      flex: 1;
+      padding: 18px;
+      overflow: auto
+    }
+
+    section {
+      display: none
+    }
+
+    .card {
+      background: #fff;
+      border-radius: 8px;
+      padding: 12px;
+      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+      margin-bottom: 12px
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: #fff
+    }
+
+    th,
+    td {
+      border: 1px solid #ddd;
+      padding: .5em;
+      text-align: left;
+      vertical-align: top
+    }
+
+    .icon-btn {
+      cursor: pointer;
+      margin-right: .3em
+    }
+
+    input[type="text"] {
+      padding: .4em;
+      width: 100%;
+      max-width: 420px;
+      margin: 8px 0;
+      display: inline-block
+    }
+
+    .modal-overlay.show {
+      display: flex
+    }
+
+    .field {
+      margin-bottom: .6em
+    }
+
+    .field label {
+      display: block;
+      font-weight: 600;
+      margin-bottom: .25em
+    }
+
+    .field input,
+    .field select,
+    .field textarea {
+      width: 100%;
+      padding: .45em;
+      border: 1px solid #ccc;
+      border-radius: 4px
+    }
+
+    .modal-buttons {
+      text-align: right;
+      margin-top: 12px
+    }
+
+    .modal-buttons button {
+      padding: .5em 1em;
+      margin-left: .4em
+    }
+
+    /* small responsive */
+    @media (max-width:760px) {
+      aside#sidebar {
+        display: none
+      }
+    }
+
+    .lead-Emcontato {
+      background-color: #e6ffe6;
+
+      td:has(.preferencia-email) {
+        background-color: #f0f8ff;
+      }
+
+      td:has(.preferencia-whatsapp) {
+        background-color: #e6ffe6;
+      }
+
+      td:has(.preferencia-ligacao) {
+        background-color: #fff0f0;
+      }
+    }
+
+    #btn-toggle-filtro {
+      background-color: #eaf1ff;
+      color: #2c3e50;
+      border: 1px solid #b0c4de;
+      padding: 8px 14px;
+      border-radius: 6px;
+      font-weight: bold;
+      cursor: pointer;
+      transition: background 0.3s ease;
+    }
+
+    #btn-toggle-filtro.filtro-ativo {
+      background-color: #007acc;
+      color: white;
+      border-color: #005fa3;
+    }
+
+    .modal-overlay.hidden {
+      display: none;
+    }
+
+    .modal-overlay.visible {
+      display: flex;
+    }
+
+    #modal-importacao-leads {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      background: rgba(0, 0, 0, 0.5);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+    }
+
+    #modal-importacao-leads .modal-conteudo {
+      background: white;
+      padding: 30px;
+      border-radius: 8px;
+      max-width: 90vw;
+      max-height: 90vh;
+      overflow-y: auto;
+      box-shadow: 0 0 20px rgba(0, 0, 0, 0.3);
+    }
+
+    .painel-container {
+      padding: 20px;
+      background-color: #f4f4f4;
+    }
+
+    .graficos-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 30px;
+    }
+
+    .grafico-card {
+      background: #fff;
+      border-radius: 8px;
+      padding: 15px;
+      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+    }
+
+    .abas-navegacao {
+      margin-bottom: 20px;
+    }
+
+    .abas-navegacao button {
+      margin-right: 10px;
+      padding: 8px 12px;
+      cursor: pointer;
+    }
+
+    .modal-overlay {
+      position: fixed;
+      top: 0;
+      right: 0;
+      bottom: 0;
+      width: 480px;
+      max-width: 100%;
+      height: 100%;
+      background: #fff;
+      box-shadow: -4px 0 12px rgba(0, 0, 0, 0.2);
+      z-index: 9999;
+      overflow-y: auto;
+      transform: translateX(100%);
+      transition: transform 0.3s ease, visibility 0.3s ease, opacity 0.3s ease;
+      visibility: hidden;
+      opacity: 0;
+    }
+
+    .modal-overlay-conf {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.5);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 999;
+    }
+
+    .modal-box {
+      background: white;
+      padding: 20px;
+      border-radius: 8px;
+      width: 350px;
+      box-shadow: 0 0 10px rgba(0, 0, 0, 0.3);
+      text-align: center;
+    }
+
+    .modal-botoes {
+      margin-top: 20px;
+      display: flex;
+      justify-content: space-around;
+    }
+
+    .modal-overlay.aberto {
+      transform: translateX(0);
+      visibility: visible;
+      opacity: 1;
+    }
+
+    .modal {
+      width: 100%;
+      height: 100%;
+      padding: 20px;
+      box-sizing: border-box;
+    }
+
+    .modal-preview-overlay {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      background-color: rgba(0, 0, 0, 0.6);
+      z-index: 9999;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .modal-preview-overlay.show {
+      display: flex;
+    }
+
+    .modal-confirm-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      background-color: rgba(0, 0, 0, 0.5);
+      z-index: 10000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .modal-confirm-overlay .modal {
+      background: white;
+      padding: 20px 24px;
+      border-radius: 8px;
+      max-width: 360px;
+      width: 90%;
+      box-shadow: 0 0 20px rgba(0, 0, 0, 0.3);
+      text-align: center;
+      max-height: none;
+      height: auto;
+    }
+
+    .tr-enviado {
+      background-color: #f0f0f0;
+      opacity: 0.6;
+    }
+
+    .barra-progresso {
+      width: 100px;
+      background: #eee;
+      border-radius: 4px;
+      overflow: hidden;
+      height: 18px;
+      font-size: 12px;
+      text-align: center;
+      color: white;
+    }
+
+    .barra-progresso .preenchimento {
+      background: #4caf50;
+      height: 100%;
+      line-height: 18px;
+    }
+
+    .linha-vencida {
+      background-color: #ffe5e5;
+      /* vermelho claro para inadimplentes */
+    }
+
+    #alert-modal {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.5);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 9999;
+    }
+
+    #alert-box {
+      background: #fff;
+      padding: 20px;
+      border-radius: 8px;
+      max-width: 400px;
+      text-align: left;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    }
+
+    #alert-box h3 {
+      margin-top: 0;
+      color: #d32f2f;
+    }
+
+    #alert-box ul {
+      padding-left: 20px;
+      color: #d32f2f;
+    }
+
+    #alert-box button {
+      margin-top: 15px;
+      padding: 6px 12px;
+      background: #d32f2f;
+      color: #fff;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+
+    .bloco-newsletter textarea {
+      font-family: monospace;
+    }
+  </style>
+</head>
+
+<body>
+  <script>
+    const usuario = JSON.parse(localStorage.getItem("usuarioLogado") || "{}");
+    const perfil = (usuario.tipo_perfil || "").toLowerCase();
+
+    if (perfil !== "admin") {
+      alert("Acesso restrito. Redirecionando...");
+      window.location.href = "login.html";
+    }
+  </script>
+
+  <aside id="sidebar" aria-label="Menu">
+    <hr style="margin: 30px 0;">
+    <h4>🔐 Admin RadarSiope</h4>
+    <div id="usuario-logado-topo" style="padding: 10px; background: #007acc; font-size: 1em; font-weight: bold;">
+      <!-- Nome do usuário será inserido aqui -->
+    </div>
+
+    <hr style="margin: 30px 0;">
+
+    <button onclick="abrirTab('usuarios')" class="active">👥 Usuários</button>
+    <button onclick="abrirTab('relatorio-avaliacoes')">🗳️ Relatório de Avaliações</button>
+    <button onclick="abrirTab('leads')">📥 Leads Capturados</button>
+    <button onclick="abrirTab('auditoria')">🕵️ Auditoria Leads</button>
+    <button onclick="abrirEnvioNewsletterLeads()">📮 Enviar Newsletters</button>
+    <button onclick="abrirPainelGestao()">🗞️ Painel</button>
+
+    <div style="margin-top:12px">
+      <h2 style="font-size:14px;margin-bottom:6px">Relatório de Preferências</h2>
+      <button onclick="abrirTab('relatorio-por-tipo')">📊 Por Tipo de Newsletters</button>
+      <button onclick="abrirTab('relatorio-por-usuario')">👤 Por Usuário</button>
+    </div>
+    <div style="margin-top:12px">
+      <h2 style="font-size:14px;margin-bottom:6px">Tabelas</h2>
+      <button onclick="abrirTab('newsletters')">📰 Newsletters</button>
+      <button onclick="abrirTab('template_newsletters')">📰 Templates de Newsletters</button>
+      <button onclick="abrirTab('tipo-newsletters')">📂 Tipo de Newsletters</button>
+      <button onclick="abrirTab('planos')">📑 Planos</button>
+      <button onclick="abrirTab('respostas_automaticas')">✉️ Respostas Automáticas</button>
+      <button onclick="abrirTab('aba-temas')">🗞️ Notícias</button>
+    </div>
+
+    <hr style="margin: 30px 0;">
+    <h3>🔐 Migração de Senhas Antigas</h3>
+    <p>Atualize todas as senhas salvas em texto puro para SHA-256.</p>
+    <button onclick="migrarSenhasAntigas()">🔄 Migrar Senhas</button>
+    <button onclick="Atualizarnomelower()">🔄 Atualizar nome lower</button>
+    <button onclick="popularDatas()">🔄 Popular data lotes gerais</button>
+    <div id="status-migracao" style="margin-top: 10px; font-weight: bold;"></div>
+
+    <button onclick="abrirAbaBacklog('secao-backlog')">📋 Backlog (Kanban)</button>
+
+    <button onclick="fazerLogoff()">🚪 Sair da Área Administrativa</button>
+    <div id="status-logoff" style="margin-top: 10px; font-weight: bold;"></div>
+  </aside>
+
+  <main id="conteudo">
+    <!-- Enviar Newsletters para Leads -->
+    <section id="secao-envio-newsletters" class="card">
+      <div class="abas-navegacao">
+        <button onclick="mostrarAba('secao-newsletters-envio')">📰 Newsletters Disponíveis</button>
+        <button onclick="abrirAbaDescadastramentos()">📉 Descadastramentos</button>
+        <button onclick="abrirTelaTodosOsLotes()">📂 Ver Todos os Lotes</button>
+        <button onclick="abrirAbaOrientacoes()">📖 Orientações</button>
+      </div>
+
+      <!-- Seletor de público-alvo -->
+      <div style="margin: 20px 0; display: flex; align-items: center; gap: 20px; flex-wrap: wrap;">
+        <!-- Combo "Enviar para:" -->
+        <label for="tipo-destinatario"><strong>Enviar para:</strong></label>
+        <select id="tipo-destinatario" onchange="alterarTipoDestinatario(this.value)">
+          <option value="" selected>Selecione</option>
+          <option value="leads">Leads</option>
+          <option value="usuarios">Usuários</option>
+        </select>
+
+        <!-- Campo "Tamanho do lote" -->
+        <label for="tamanho-lote"><strong>Tamanho do lote:</strong></label>
+        <input type="number" id="tamanho-lote" value="100" min="1" style="width: 80px;" />
+
+        <!-- Info da newsletter -->
+        <div id="dados-newsletter-selecionada" class="info-box"
+          style="background:#eef; padding:10px; border-left:4px solid #88f; min-width: 250px; flex: 1;">
+          <!-- preenchido via JS -->
+        </div>
+      </div>
+
+
+      <!-- Newsletters disponíveis -->
+      <section id="secao-newsletters-envio" style="margin-top:30px">
+        <h2>📰 Newsletters Disponíveis</h2>
+        <table id="tabela-newsletters-envio" class="tabela-padrao">
+          <thead>
+            <tr>
+              <th>Título</th>
+              <th>Edição</th>
+              <th>tipo</th>
+              <th>Classificação</th>
+              <th>Data</th>
+              <th>Ação</th>
+            </tr>
+          </thead>
+          <tbody>
+            <!-- conteúdo gerado dinamicamente via JavaScript -->
+          </tbody>
+        </table>
+      </section>
+
+      <!-- Seção de envio para Leads -->
+      <section id="secao-envio-leads" style="display:none; margin-top:30px">
+        <script src="js/EnvioLeads.js"></script>
+        <h2>📮 Envio de Newsletters para Leads</h2>
+
+        <!-- Filtros -->
+        <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 15px;">
+          <input type="text" id="filtro-nome" placeholder="🔍 Filtrar por nome" />
+          <input type="text" id="filtro-email" placeholder="📧 Filtrar por e-mail" />
+
+          <label for="filtro-perfil">Perfil:</label>
+          <select id="filtro-perfil">
+            <option value="">Todos perfis</option>
+            <option value="secretario">Secretário</option>
+            <option value="tecnico">Técnico</option>
+            <option value="contador">Contador</option>
+            <option value="pesquisador">Pesquisador</option>
+            <option value="cacs">CACS</option>
+            <option value="cidadao">Cidadão</option>
+          </select>
+
+          <label for="filtro-status-lead">Status:</label>
+          <select id="filtro-status-lead">
+            <option value="">Todos os status</option>
+            <option value="Novo">Novo</option>
+            <option value="Em contato">Em contato</option>
+            <option value="Negociando">Negociando</option>
+            <option value="Convertido">Convertido</option>
+            <option value="Descartado">Descartado</option>
+          </select>
+
+          <label for="filtro-tipo-news-envio">Preferência:</label>
+          <select id="filtro-tipo-news-envio">
+            <option value="">Todos os tipos</option>
+          </select>
+
+          <button onclick="filtrarLeadsEnvio()">🔎 Aplicar Filtros</button>
+        </div>
+
+        <!-- Ações -->
+        <div style="margin-top: 20px">
+          <button onclick="gerarPreviaEnvio()">📬 Gerar Prévia</button>
+          <button onclick="mostrarAba('secao-newsletters-envio')">⬅️ Voltar para Newsletters</button>
+        </div>
+
+        <!-- Tabela de leads -->
+        <table id="tabela-leads-envio" class="tabela-padrao">
+          <thead>
+            <tr>
+              <th><input type="checkbox" id="chk-todos-leads" onchange="selecionarTodosLeads(this)" /></th>
+              <th>Nome</th>
+              <th>Email</th>
+              <th>Perfil</th>
+              <th>Preferências</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            <!-- preenchido dinamicamente -->
+          </tbody>
+        </table>
+      </section>
+
+      <!-- Seção de envio para Usuários -->
+      <section id="secao-envio-usuarios" style="display:none; margin-top:30px">
+        <script src="js/EnvioUsuarios.js"></script>
+        <h2>📮 Envio de Newsletters para Usuários</h2>
+
+        <!-- Filtros -->
+        <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 15px;">
+          <input type="text" id="filtro-usuario-nome" placeholder="🔍 Filtrar por nome" />
+          <input type="text" id="filtro-usuario-email" placeholder="📧 Filtrar por e-mail" />
+
+          <label for="filtro-assinatura">Assinatura:</label>
+          <select id="filtro-assinatura">
+            <option value="">Todas</option>
+            <option value="ativa">Ativa</option>
+            <option value="expirada">Expirada</option>
+            <option value="cancelada">Cancelada</option>
+          </select>
+
+          <button onclick="filtrarUsuariosEnvio()">🔎 Aplicar Filtros</button>
+        </div>
+
+        <!-- Ações -->
+        <div style="margin-top: 20px">
+          <button onclick="gerarPreviaEnvioUsuarios()">📬 Gerar Prévia</button>
+          <button onclick="mostrarAba('secao-newsletters-envio')">⬅️ Voltar para Newsletters</button>
+        </div>
+
+        <!-- Tabela de usuários -->
+        <table id="tabela-usuarios-envio" class="tabela-padrao">
+          <thead>
+            <tr>
+              <th><input type="checkbox" id="chk-todos-usuarios" onchange="selecionarTodosUsuarios(this)" /></th>
+              <th>Nome</th>
+              <th>Perfil</th>
+              <th>Email</th>
+              <th>Assinatura</th>
+              <th>Pagamentos em dia?</th> <!-- 🔹 nova coluna -->
+            </tr>
+          </thead>
+          <tbody>
+            <!-- preenchido dinamicamente -->
+          </tbody>
+        </table>
+
+      </section>
+
+      <section id="secao-preview-envio" style="display:none; margin-top:30px">
+        <div style="display: flex; align-items: center; gap: 20px; justify-content: space-between;">
+          <h2 style="margin: 0;">📬 Prévia do Envio</h2>
+          <div id="barra-progresso"
+            style="flex: 1; max-width: 300px; height: 20px; background: #eee; border-radius: 5px; overflow: hidden;">
+            <div id="progresso-envio"
+              style="width: 0%; height: 100%; background: #4caf50; text-align: center; color: white; font-size: 12px;">
+              0%
+            </div>
+          </div>
+        </div>
+        <div style="margin-top: 20px">
+          <div style="display: flex; gap: 10px; margin-bottom: 15px;">
+            <!-- Botões com visibilidade condicional -->
+            <div id="botoes-envio-padrao" style="display: flex; gap: 10px;">
+              <button id="btn-gerar-lotes">📦 Gerar Lotes</button>
+              <button onclick="abrirLotesGerados()">📂 Ver Lotes Gerados</button>
+              <button onclick="mostrarAba('secao-newsletters-envio')">🔙 Voltar para Newsletters disponiveis</button>
+            </div>
+
+            <!-- Botão sempre visível -->
+            <div>
+              <button onclick="exportarCSV()">📤 Exportar CSV</button>
+            </div>
+          </div>
+
+          <div style="margin-top: 10px; display: flex; align-items: flex-start; gap: 20px; flex-wrap: wrap;">
+            <!-- Filtros -->
+            <div id="filtros-preview" style="display: flex; gap: 15px; flex-wrap: wrap;
+            background: #f9f9f9; border: 1px solid #ccc;
+            padding: 10px 15px; border-radius: 8px; align-items: center;">
+
+              <!-- Filtro por perfil -->
+              <div>
+                <label for="filtro-perfil-lead">Perfil:</label>
+                <select id="filtro-perfil-lead">
+                  <option value="">Todos</option>
+                  <option value="secretario">Secretário</option>
+                  <option value="tecnico">Técnico</option>
+                  <option value="contador">Contador</option>
+                  <option value="pesquisador">Pesquisador</option>
+                  <option value="cacs">CACS</option>
+                  <option value="cidadao">Cidadão</option>
+                </select>
+              </div>
+              <label><input type="checkbox" class="filtro-preview" value="compativeis" /> Compatíveis</label>
+              <label><input type="checkbox" class="filtro-preview" value="nao-compativeis" /> Não compatíveis</label>
+              <label><input type="checkbox" class="filtro-preview" value="enviados" /> Enviados</label>
+              <label><input type="checkbox" class="filtro-preview" value="nao-enviados" /> Não enviados</label>
+              <label><input type="checkbox" class="filtro-preview" value="erro-envio" /> Com erro</label>
+              <button onclick="limparFiltrosPreview()" style="margin-left: 10px;">🧹 Limpar filtros</button>
+            </div>
+
+            <!-- Contadores -->
+            <div
+              style="background: #f9f9f9; border: 1px solid #ccc; padding: 10px 15px; border-radius: 8px; display: flex; gap: 15px; flex-wrap: wrap;">
+              <span>Compatíveis: <strong id="contador-compativeis">0</strong></span>
+              <span>Não compatíveis: <strong id="contador-nao-compativeis">0</strong></span>
+              <span>Enviados: <strong id="contador-enviados">0</strong></span>
+              <span>Não enviados: <strong id="contador-nao-enviados">0</strong></span>
+              <span>Com erro: <strong id="contador-erro-envio">0</strong></span>
+              <span>Exibindo: <strong id="contador-visiveis">0</strong></span>
+            </div>
+          </div>
+        </div>
+        <table id="tabela-preview-envio" class="tabela-padrao">
+          <thead>
+            <tr>
+              <th><input type="checkbox" id="chk-todos-envios" onchange="selecionarTodosEnvios(this)" /></th>
+              <th>Lead</th>
+              <th>Perfil</th>
+              <th>Email</th>
+              <th>Newsletter</th>
+              <th>Interesses</th>
+              <th>Compatível</th>
+              <th>Newsletter enviada?</th>
+            </tr>
+          </thead>
+          <tbody>
+            <!-- preenchido dinamicamente pela função gerarPreviaEnvio() -->
+          </tbody>
+        </table>
+        <div id="cabecalho-newsletter-destinatario"></div>
+        <table id="tabela-preview-envio-destinatario">
+          <thead>
+            <tr>
+              <th>Nome</th>
+              <th>Perfil</th>
+              <th>Email</th>
+              <th>Newsletter enviada?</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </section>
+
+      <div id="modal-confirmacao" class="modal-overlay-conf" style="display:none;">
+        <div class="modal-box">
+          <h3>📦 Confirmar Geração de Lotes</h3>
+          <p id="info-campanha"></p>
+          <div class="modal-botoes">
+            <button onclick="prosseguirGeracao()">✅ Confirmar</button>
+            <button type="button" onclick="fecharModal()">❌ Cancelar</button>
+          </div>
+        </div>
+      </div>
+
+      <script>
+        let dadosCampanha = null;
+
+        document.getElementById("btn-gerar-lotes").addEventListener("click", function () {
+          const newsletterId = newsletterSelecionada.id;
+          const filtros = coletarFiltros();
+          const linhasSelecionadas = Array.from(document.querySelectorAll(".chk-envio-final:checked"));
+          const totalSelecionados = linhasSelecionadas.length;
+
+          if (totalSelecionados === 0) {
+            alert("Nenhum destinatário selecionado para envio.");
+            return;
+          }
+
+          dadosCampanha = { newsletterId, filtros };
+
+          const tipo = filtros.tipo === "leads" ? "Leads" : "Usuários";
+          const titulo = newsletterSelecionada.titulo;
+          const edicao = newsletterSelecionada.edicao || newsletterSelecionada.id;
+
+          document.getElementById("info-campanha").innerText =
+            `📰 Newsletter: ${titulo} (${edicao})\n` +
+            `👥 Tipo: ${tipo}\n` +
+            `📬 Destinatários selecionados: ${totalSelecionados}`;
+
+          document.getElementById("modal-confirmacao").style.display = "flex";
+        });
+
+        function fecharModal() {
+          document.getElementById("modal-confirmacao").style.display = "none";
+          dadosCampanha = null;
+        }
+
+        function fecharModalErrosEncontrados() {
+          document.getElementById("alert-modal").style.display = "none";
+          dadosCampanha = null;
+        }
+
+        async function prosseguirGeracao() {
+          document.getElementById("modal-confirmacao").style.display = "none";
+          if (dadosCampanha) {
+            await confirmarPrevia(dadosCampanha.newsletterId, dadosCampanha.filtros);
+            dadosCampanha = null;
+          }
+        }
+
+        document.querySelector("#modal-confirmacao button[onclick='fecharModal()']")
+          .addEventListener("click", fecharModal);
+
+      </script>
+
+      <section id="secao-lotes-envio" style="display:none; margin-top:30px">
+        <h2>📦 Lotes de Envio</h2>
+
+        <div style="margin-top: 20px">
+          <!-- Botão principal de envio -->
+          <!-- <button onclick="enviarLotes()">🚀 Enviar Newsletter</button> -->
+          <button onclick="voltarParaPrevia()">⬅️ Voltar para prévia</button>
+        </div>
+
+        <!-- Tabela de lotes -->
+        <table class="tabela-lotes">
+          <thead id="cabecalho-lotes-envio">
+            <tr>
+              <th>Nº Lote</th>
+              <th>Status</th>
+              <th>Qtd</th>
+              <th>Enviados</th>
+              <th>Erros</th>
+              <th>Abertos</th>
+              <th>Data de Geração</th>
+              <th>Data de Envio</th>
+              <th>Último Envio/Reenvio</th>
+              <th>Ações</th>
+            </tr>
+          </thead>
+          <tbody id="corpo-lotes-envio">
+            <!-- Linhas preenchidas dinamicamente pela função listarLotesEnvio -->
+          </tbody>
+        </table>
+
+      </section>
+
+      <section id="secao-todos-os-lotes" style="display:none">
+        <h2>📦 Todos os Lotes Gerados</h2>
+
+        <div class="filtros-lotes">
+          <select id="filtro-newsletter">
+            <option value="">Todas as newsletters</option>
+            <!-- preenchido dinamicamente -->
+          </select>
+
+          <select id="filtro-tipo">
+            <option value="">Todos os tipos</option>
+            <option value="leads">Leads</option>
+            <option value="usuarios">Usuários</option>
+          </select>
+
+          <label for="filtro-data-tipo">Filtrar por:</label>
+          <select id="filtro-data-tipo">
+            <option value="geracao">Data de Geração</option>
+            <option value="envio">Data de Envio</option>
+          </select>
+
+          <label for="filtro-data-inicio">Data Início:</label>
+          <input type="date" id="filtro-data-inicio">
+
+          <label for="filtro-data-fim">Data Fim:</label>
+          <input type="date" id="filtro-data-fim">
+
+          <button onclick="listarTodosOsLotes()">🔄 Aplicar Filtros</button>
+        </div>
+
+        <table class="tabela-padrao">
+          <thead>
+            <tr>
+              <th>Título</th>
+              <th>Edição</th>
+              <th>Data de Geração</th>
+              <th>Data de Envio</th>
+              <th>Nº Lote</th>
+              <th>Tipo</th>
+              <th>Status</th>
+              <th>Progresso</th>
+              <th>Qtd</th>
+              <th>Tamanho Lote</th>
+              <th>🕒 Último Envio/Reenvio</th>
+              <th>Ações</th>
+            </tr>
+          </thead>
+          <thead>
+          <tbody id="corpo-todos-os-lotes">
+            <!-- preenchido dinamicamente -->
+          </tbody>
+        </table>
+      </section>
+
+      <section id="secao-relatorio-envios" style="display:none; margin-top:30px">
+        <h2>📊 Relatório de Envios</h2>
+
+        <!-- Filtro por e-mail -->
+        <div style="margin-bottom:15px">
+          <input type="text" id="filtro-relatorio-email" placeholder="📧 Filtrar por e-mail"
+            style="margin-right:10px" />
+          <button onclick="carregarRelatorioEnvios()">🔎 Buscar</button>
+        </div>
+
+        <!-- Tabela de envios -->
+        <table id="tabela-relatorio-envios" class="tabela-padrao">
+          <thead>
+            <tr>
+              <th>Lead</th>
+              <th>Email</th>
+              <th>Newsletter</th>
+              <th>Data de Envio</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            <!-- preenchido dinamicamente -->
+          </tbody>
+        </table>
+      </section>
+
+      <section id="secao-historico-reenvios" style="display:none;">
+        <h3>📜 Histórico de Reenvios</h3>
+        <table>
+          <thead>
+            <tr>
+              <th>Data</th>
+              <th>Destinatários</th>
+              <th>Enviados</th>
+              <th>Status</th>
+              <th>Operador</th>
+            </tr>
+          </thead>
+          <tbody id="corpo-historico-reenvios"></tbody>
+        </table>
+        <button onclick="mostrarAba('secao-todos-os-lotes')">🔙 Voltar</button>
+      </section>
+
+      <section id="secao-descadastramentos" style="display:none; margin-top:30px">
+        <h2>📉 Descadastramentos</h2>
+
+        <table id="tabela-descadastramentos" class="tabela-padrao">
+          <thead>
+            <tr>
+              <th>Nome</th>
+              <th>Email</th>
+              <th>Newsletter</th>
+              <th>Data</th>
+              <th>Motivo</th>
+            </tr>
+          </thead>
+          <tbody>
+            <!-- preenchido dinamicamente -->
+          </tbody>
+        </table>
+      </section>
+
+      <section id="secao-orientacoes"
+        style="display:none; margin-top:30px; background:#fff8e1; padding:20px; border-left:4px solid #fbc02d;">
+        <h2>📖 Orientações de Envio de Newsletters</h2>
+
+        <div style="margin-bottom:20px;">
+          <h3>1. Providers de E-mail</h3>
+          <p>
+            Atualmente usamos <strong>Vercel</strong> para testes.
+            Para produção, basta alterar <code>EMAIL_PROVIDER</code> para <strong>"ses"</strong> e configurar o endpoint
+            <code>/api/sesEnviarEmail</code>.
+          </p>
+        </div>
+
+        <div style="margin-bottom:20px;">
+          <h3>2. Variáveis de Ambiente</h3>
+          <ul>
+            <li><code>AWS_ACCESS_KEY_ID</code></li>
+            <li><code>AWS_SECRET_ACCESS_KEY</code></li>
+            <li><code>AWS_REGION</code></li>
+            <li><code>SES_SOURCE_EMAIL</code> (e-mail verificado no SES)</li>
+            <li><code>SES_REPLYTO_EMAIL</code> (opcional)</li>
+          </ul>
+          <p>Configure essas variáveis no painel do Vercel (para testes) ou no ambiente AWS (produção).</p>
+        </div>
+
+        <div style="margin-bottom:20px;">
+          <h3>3. Regras de Envio</h3>
+          <ul>
+            <li>Leads → apenas newsletters <strong>básicas</strong>, se <code>receber_newsletter !== false</code>.</li>
+            <li>Usuários → podem receber <strong>premium</strong> se assinatura estiver <code>ativo</code>.</li>
+            <li>Canceladas/expiradas não recebem.</li>
+          </ul>
+        </div>
+
+        <div style="margin-bottom:20px;">
+          <h3>4. Rate Limiting e Paralelismo</h3>
+          <p>
+            O envio usa <strong>pool de workers</strong> com limite de paralelismo e pausa entre envios.
+            Exemplo atual: <code>5 workers</code> + <code>600ms delay</code> → ~50–100/min.
+          </p>
+        </div>
+
+        <div style="margin-bottom:20px;">
+          <h3>5. Checklist de Testes</h3>
+          <ul>
+            <li>Prévia mostra apenas destinatários válidos.</li>
+            <li>Botão "Preparar envio" só habilita após escolher tipo de destinatário.</li>
+            <li>Envio registra status no Firestore (<code>enviado</code> ou <code>erro</code>).</li>
+            <li>Barra de progresso atualiza corretamente.</li>
+          </ul>
+        </div>
+
+        <!-- Botão de voltar -->
+        <button onclick="mostrarAba('secao-newsletters-envio')">⬅️ Voltar para Newsletters</button>
+      </section>
+    </section>
+
+    <!-- USUÁRIOS -->
+    <section id="usuarios" class="card">
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <h3 style="margin:0">👥 Usuários</h3>
+        <button onclick="abrirModalCriarUsuario()">➕ Novo Usuário</button>
+      </div>
+
+      <!-- Filtros e busca -->
+      <div style="margin-top:10px; display:flex; flex-wrap:wrap; gap:10px; align-items:center;">
+
+        <input type="text" id="busca-usuarios" placeholder="Buscar usuário..." onkeyup="filtrarUsuarios()"
+          style="flex:1; min-width:200px;">
+        <label>Status:
+          <select id="filtro-status">
+            <option value="">Todos</option>
+            <option value="ativo">Ativos</option>
+            <option value="inativo">Inativos</option>
+          </select>
+        </label>
+
+        <label for="filtro-vencidos" style="color:#f44336">
+          <input type="checkbox" id="filtro-vencidos"> Parcelas vencidas
+        </label>
+        <label for="filtro-semvalor" style="color:#2196f3">
+          <input type="checkbox" id="filtro-semvalor"> Parcelas a gerar
+        </label>
+        <label for="filtro-solicitacoes" style="color:#ff9800">
+          <input type="checkbox" id="filtro-solicitacoes"> Solicitações pendentes
+        </label>
+
+        <!-- Botões de ação e navegação -->
+        <div style="display:flex; gap:10px; align-items:center;">
+          <button id="btn-listar" onclick="iniciarConsultaUsuarios()">🔍 Listar</button>
+          <button id="btn-anterior" onclick="irParaPaginaAnterior()" disabled>◀ Anterior</button>
+          <button id="btn-proxima" onclick="carregarUsuariosComFiltro()" disabled>▶ Próxima</button>
+          <button id="btn-primeira" onclick="irParaPrimeiraPagina()" disabled>⏮ Primeira</button>
+
+          <span id="status-consulta" style="font-style:italic; color:#555;"></span>
+          <progress id="barra-progresso" value="0" max="100" style="width:100%; display:none;"></progress>
+        </div>
+      </div>
+
+      <!-- Tabela -->
+      <table style="margin-top:10px; width:100%; border-collapse:collapse;">
+        <thead>
+          <tr>
+            <th>Nome</th>
+            <th>Email</th>
+            <th>UF</th>
+            <th>Município</th>
+            <th>Perfil</th>
+            <th>Ativo</th>
+            <th>Alerta</th>
+            <th>Ações</th>
+          </tr>
+        </thead>
+        <tbody id="lista-usuarios"></tbody>
+      </table>
+    </section>
+
+
+    <!-- Auditoria Leads capturados -->
+    <section id="auditoria" class="card">
+      <div>
+        <h2>🕵️ Painel de Auditoria</h2>
+        <p>Veja todas as interações registradas no sistema.</p>
+        <div id="filtros-auditoria" style="margin-bottom: 20px;">
+          <label>Tipo:
+            <select id="filtro-tipo">
+              <option value="">Todos</option>
+              <option value="vinculacao">Vinculação</option>
+              <option value="reativacao">Reativação</option>
+              <option value="E-mail">E-mail</option>
+            </select>
+          </label>
+
+          <label>Feito por:
+            <input type="text" id="filtro-feito-por" placeholder="Nome ou e-mail">
+          </label>
+
+          <label>Lead:
+            <input type="text" id="filtro-lead" placeholder="Nome do lead">
+          </label>
+
+          <button onclick="carregarInteracoesAuditoria()">🔍 Filtrar</button>
+        </div>
+
+        <div id="tabela-interacoes" style="margin-top: 20px;"></div>
+      </div>
+
+    </section>
+
+    <!-- PLANOS -->
+    <section id="planos" class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div>
+          <h3 style="margin:0">📑 Planos</h3>
+        </div>
+        <div><button onclick="abrirModalPlano()">➕ Novo Plano</button></div>
+      </div>
+      <div style="margin-top:10px">
+        <input type="text" id="busca-planos" placeholder="Buscar plano..." onkeyup="filtrarPlanos()">
+      </div>
+      <table style="margin-top:10px">
+        <thead>
+          <tr>
+            <th>Nome</th>
+            <th>Descrição</th>
+            <th>Qtde Parcelas</th>
+            <th>Tipo</th>
+            <th>Valor</th>
+            <th>Status</th>
+            <th>Ações</th>
+          </tr>
+        </thead>
+        <tbody id="lista-planos"></tbody>
+      </table>
+    </section>
+
+    <section id="secao-backlog" class="card">
+      <div style="display:flex; justify-content:space-between; align-items:center">
+        <div>
+          <h3 style="margin:0">📑 Backlog do Projeto</h3>
+        </div>
+        <div><button onclick="adicionarItemBacklog()">➕ Novo Item</button></div>
+      </div>
+      <div id="kanban" style="display:flex; gap:20px; margin-top:20px;">
+        <div class="kanban-col" data-status="afazer"
+          style="flex:1; background:#f5f5f5; padding:10px; border:1px solid #ccc;">
+          <h3>📝 A Fazer</h3>
+          <div class="kanban-list" id="kanban-afazer"></div>
+        </div>
+
+        <div class="kanban-col" data-status="andamento"
+          style="flex:1; background:#e3f2fd; padding:10px; border:1px solid #ccc;">
+          <h3>⚙️ Em andamento</h3>
+          <div class="kanban-list" id="kanban-andamento"></div>
+        </div>
+
+        <div class="kanban-col" data-status="concluido"
+          style="flex:1; background:#e8f5e9; padding:10px; border:1px solid #ccc;">
+          <h3>✅ Concluído</h3>
+          <div class="kanban-list" id="kanban-concluido"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- NEWSLETTERS -->
+    <section id="newsletters" class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div>
+          <h3 style="margin:0">📰 Newsletters</h3>
+        </div>
+        <div><button onclick="abrirModalNewsletter()">➕ Nova Newsletter</button></div>
+      </div>
+
+      <div class="filtros-newsletters" style="margin: 20px 0;">
+        <label for="filtro-tipo-news">Tipo:</label>
+        <select id="filtro-tipo-news">
+          <option value="">Todos os tipos</option>
+        </select>
+
+        <label for="filtro-classificacao">Classificação:</label>
+        <select id="filtro-classificacao">
+          <option value="">Todas</option>
+          <option value="Básica">Básica</option>
+          <option value="Premium">Premium</option>
+        </select>
+
+        <label for="filtro-busca">Busca:</label>
+        <input type="text" id="filtro-busca" placeholder="Buscar por título ou edição">
+
+        <button onclick="carregarNewsletters()">Filtrar</button>
+      </div>
+
+      <table style="margin-top:10px; width: 100%; border-collapse: collapse;">
+        <thead>
+          <tr>
+            <th>Data</th>
+            <th>Edição</th>
+            <th>Título</th>
+            <th>Tipo</th>
+            <th>Classificação</th>
+            <th>Ações</th>
+          </tr>
+        </thead>
+        <tbody id="lista-newsletters"></tbody>
+      </table>
+      <div id="alert-modal">
+        <div id="alert-box">
+          <h3>⚠️ Erros encontrados</h3>
+          <ul id="alert-list"></ul>
+          <button onclick="fecharModalErrosEncontrados()">Fechar</button>
+        </div>
+      </div>
+    </section>
+
+
+    <!-- preview da newsletter -->
+    <div id="modal-html-preview" class="modal-overlay" aria-hidden="true" style="
+          display:none;
+          position:fixed;
+          top:0; left:0;
+          width:100vw; height:100vh;
+          background-color:rgba(0,0,0,0.6);
+          z-index:999999; /* ✅ garante que fica acima de tudo */
+          display:flex;
+          align-items:center;
+          justify-content:center;
+        ">
+
+      <div class="modal-content" style="
+          background:#fff;
+          padding:20px;
+          width: 70vw;       
+          height:90vh;      
+          border-radius:8px;
+          box-shadow:0 0 20px rgba(0,0,0,0.3);
+          position:relative;
+          overflow:hidden;
+        ">
+        <span class="modal-close" onclick="closeModal('modal-html-preview')"
+          style="position:absolute; top:10px; right:15px; font-size:24px; cursor:pointer;">❌ Fechar</span>
+
+        <iframe id="iframe-html-preview"
+          style="width:100%; height:100%; border:1px solid #ccc; border-radius:4px;"></iframe>
+
+      </div>
+    </div>
+
+
+    <!-- TIPO NEWSLETTERS -->
+    <section id="tipo-newsletters" class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div>
+          <h3 style="margin:0">📂 Tipos de NewsLetters</h3>
+        </div>
+        <div><button onclick="abrirModalTipoNewsletter()">➕ Novo Tipo</button></div>
+      </div>
+      <div style="margin-top:10px">
+        <input type="text" id="busca-tipo-newsletters" placeholder="Buscar tipo..." onkeyup="filtrarTipoNewsletters()">
+      </div>
+      <table style="margin-top:10px">
+        <thead>
+          <tr>
+            <th>Nome</th>
+            <th>É Newsletter?</th>
+            <th>Ações</th>
+          </tr>
+        </thead>
+        <tbody id="lista-tipo-newsletters"></tbody>
+      </table>
+    </section>
+
+    <section id="template_newsletters" class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div>
+          <h3 style="margin:0">🧩 Templates de Newsletter</h3>
+        </div>
+        <div><button onclick="abrirModalTemplateNewsletter()">➕ Novo Template</button></div>
+      </div>
+
+      <div style="margin-top:10px">
+        <input type="text" id="busca-templates-newsletter" placeholder="Buscar template..."
+          onkeyup="filtrarTemplatesNewsletter()">
+      </div>
+
+      <table style="margin-top:10px">
+        <thead>
+          <tr>
+            <th>Nome</th>
+            <th>Descrição</th>
+            <th>Tipo</th>
+            <th>Classificação</th>
+            <th>Ativo</th>
+            <th>Criado em</th>
+            <th>Ações</th>
+          </tr>
+        </thead>
+        <tbody id="lista-templates-newsletter"></tbody>
+      </table>
+    </section>
+
+
+    <!-- RELATÓRIO DE PREFERÊNCIAS -->
+    <section id="relatorio-preferencias" class="card">
+      <div>
+        <h3 style="margin:0">📊 Relatório de Preferências por Newsletter</h3>
+      </div>
+      <table style="margin-top:10px">
+        <thead>
+          <tr>
+            <th>Tipo de Newsletter</th>
+            <th>Usuários</th>
+          </tr>
+        </thead>
+        <tbody id="tabela-relatorio-preferencias"></tbody>
+      </table>
+    </section>
+
+    <!-- RELATÓRIO POR USUÁRIO -->
+    <section id="relatorio-por-usuario" class="card">
+      <div>
+        <h3 style="margin:0">👤 Preferências por Usuário</h3>
+      </div>
+      <div style="margin-top:10px">
+        <input type="text" id="busca-relatorio-usuario" placeholder="Buscar usuário por nome, ID ou email..."
+          style="width:100%;max-width:400px" onkeyup="filtrarRelatorioUsuarios()">
+      </div>
+
+      <!-- 🔄 Layout em duas colunas -->
+      <div style="display:flex; gap:20px; margin-top:10px;">
+        <!-- Coluna esquerda: tabela -->
+        <div style="flex:1;">
+          <table style="width:100%;">
+            <thead>
+              <tr>
+                <th>Nome</th>
+                <th>Email</th>
+                <th>Ações</th>
+              </tr>
+            </thead>
+            <tbody id="tabela-relatorio-usuarios"></tbody>
+          </table>
+        </div>
+
+        <!-- Coluna direita: detalhes -->
+        <div id="detalhes-relatorio-usuario"
+          style="display:none; margin-top:20px; background:#fff; padding:12px; border:1px solid #ccc; border-radius:6px;">
+        </div>
+
+      </div>
+    </section>
+
+
+    <!-- RELATÓRIO POR TIPO -->
+    <section id="relatorio-por-tipo" class="card">
+      <div>
+        <h3 style="margin:0">📊 Preferências por Tipo de Newsletter</h3>
+      </div>
+
+      <div style="margin-top:10px">
+        <label for="filtro-cad-tipo-newsletter"><strong>Filtrar por tipo:</strong></label>
+        <select id="filtro-cad-tipo-newsletter">
+          <option value="">Todos</option>
+        </select>
+        <button onclick="gerarRelatorioPreferencias()" style="margin-left:10px">🔍 Gerar Relatório</button>
+      </div>
+      <table style="margin-top:10px">
+        <thead>
+          <tr>
+            <th>Tipo</th>
+            <th>Usuários</th>
+          </tr>
+        </thead>
+        <tbody id="tabela-relatorio-por-tipo"></tbody>
+      </table>
+    </section>
+
+    <!-- Respostas automaticas -->
+    <section id="respostas_automaticas" style="display:none"></section>
+
+    <div id="modalrespostaauto" style="
+          display:none;
+          position:fixed;
+          top:0;
+          left:0;
+          width:100%;
+          height:100%;
+          background:rgba(0,0,0,0.5);
+          z-index:9999;
+          justify-content:center;
+          align-items:center;
+        ">
+      <div class="modal-content" style="
+            background:#fff;
+            padding:20px;
+            border-radius:8px;
+            max-width:700px;
+            width:90%;
+            position:relative;
+            box-shadow:0 0 20px rgba(0,0,0,0.3);
+          ">
+        <button onclick="fecharModalRespostaAuto()" style="
+              position:absolute;
+              top:10px;
+              right:10px;
+              font-size:18px;
+              background:none;
+              border:none;
+              cursor:pointer;
+            ">❌ Fechar</button>
+        <div id="modalrespostaauto-body"></div>
+      </div>
+    </div>
+
+
+    <div id="modal-preview-html" style="
+          display:none;
+          position:fixed;
+          top:0;
+          left:0;
+          width:100%;
+          height:100%;
+          background:rgba(0,0,0,0.6);
+          z-index:9999;
+          justify-content:center;
+          align-items:center;
+        ">
+      <div style="
+            background:#fff;
+            padding:20px;
+            border-radius:8px;
+            max-width:800px;
+            width:90%;
+            overflow:auto;
+            max-height:90vh;
+            position:relative;
+          ">
+        <button onclick="fecharModalPreview()" style="
+              position:absolute;
+              top:10px;
+              right:10px;
+              font-size:18px;
+              background:none;
+              border:none;
+              cursor:pointer;
+            ">❌ Fechar</button>
+        <div id="preview-html-content"></div>
+      </div>
+    </div>
+
+    </section>
+
+
+    <!-- 🔖 Aba de Temas de Notícias -->
+    <section id="aba-temas" class="card">
+      <div>
+        <h2>🗞️ Temas de Notícias</h2>
+        <button onclick="editarTema()">➕ Novo Tema</button>
+        <table style="margin-top:10px">
+          <thead>
+            <tr>
+              <th>Nome</th>
+              <th>Palavras-chave</th>
+              <th>Prioridade</th>
+              <th>Cor</th>
+              <th>Ativo</th>
+              <th>Ação</th>
+            </tr>
+          </thead>
+          <!-- Conteúdo gerado dinamicamente pela função carregarTemas_noticias() -->
+          <tbody id="tabela-temas"></tbody>
+        </table>
+      </div>
+
+      <!-- 🧾 Modal de edição de tema -->
+      <div id="modal-tema" style="
+        display:none;
+        position:fixed;
+        top:0;
+        left:0;
+        width:100%;
+        height:100%;
+        background:rgba(0,0,0,0.5);
+        z-index:9999;
+        justify-content:center;
+        align-items:center;
+      ">
+        <div style="
+          background:#fff;
+          padding:20px;
+          border-radius:8px;
+          max-width:600px;
+          width:90%;
+          position:relative;
+          box-shadow:0 0 20px rgba(0,0,0,0.3);
+        ">
+          <button onclick="fecharModalTema()" style="
+            position:absolute;
+            top:10px;
+            right:10px;
+            font-size:18px;
+            background:none;
+            border:none;
+            cursor:pointer;
+          ">❌ Fechar</button>
+          <div id="modal-tema-body"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- LEADS -->
+    <section id="leads" class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin:10px 0">
+        <h3 style="margin:0">📥 Leads Capturados</h3>
+        <div style="display:flex;align-items:center;gap:20px">
+          <div id="resumo-leads" style="font-weight:bold;font-size:16px;text-align:right"></div>
+          <button onclick="exportarLeadsCSV()"
+            style="padding:8px 16px;background:#007acc;color:#fff;border:none;border-radius:6px">
+            📤 Exportar para CSV
+          </button>
+          <button onclick="abrirModalImportacaoLeads()">📥 Importar Leads via Planilha</button>
+
+        </div>
+      </div>
+
+      <div style="display:flex;gap:20px;align-items:flex-end;flex-wrap:wrap;margin:10px 0">
+        <div style="flex:1;min-width:250px">
+          <label for="busca-leads">Buscar por nome ou e-mail:</label>
+          <input type="text" id="busca-leads" placeholder="Buscar..." style="width:100%">
+        </div>
+
+        <div>
+          <label for="filtro-perfil-lead">Filtrar por perfil:</label>
+          <select id="filtro-perfil-lead">
+            <option value="">Todos</option>
+            <option value="secretario">Secretário</option>
+            <option value="tecnico">Técnico</option>
+            <option value="contador">Contador</option>
+            <option value="pesquisador">Pesquisador</option>
+            <option value="cacs">CACS</option>
+            <option value="cidadao">Cidadão</option>
+          </select>
+        </div>
+
+        <div>
+          <label for="filtro-preferencia">Filtrar por preferência de contato:</label>
+          <select id="filtro-preferencia">
+            <option value="">Todos</option>
+            <option value="E-mail">📧 E-mail</option>
+            <option value="WhatsApp">💬 WhatsApp</option>
+            <option value="Ligação">📞 Ligação</option>
+          </select>
+        </div>
+        <div>
+          <label for="filtro-status-lead-consulta">Status:</label>
+          <select id="filtro-status-lead-consulta">
+            <option value="">Todos</option>
+            <option value="Novo">Novo</option>
+            <option value="Em contato">Em contato</option>
+            <option value="Convertido">Convertido</option>
+            <option value="Descartado">Descartado</option>
+          </select>
+          </label>
+        </div>
+        <button onclick="carregarLeads(true)">🔍 Buscar Leads</button>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>Nome</th>
+            <th>E-mail</th>
+            <th>Telefone</th>
+            <th>Perfil</th>
+            <th>Interesses</th>
+            <th>Data</th>
+            <th>Preferência</th>
+            <th>Mensagem</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody id="tabela-leads"></tbody>
+      </table>
+
+      <div id="modal-contato-lead" style="
+        display:none;
+        position:fixed;
+        top:0;
+        left:0;
+        width:100%;
+        height:100%;
+        background:rgba(0,0,0,0.5);
+        z-index:9999;
+        justify-content:center;
+        align-items:center;
+      ">
+        <div style="
+          background:#fff;
+          padding:20px;
+          border-radius:8px;
+          max-width:500px;
+          width:90%;
+          position:relative;
+          box-shadow:0 0 20px rgba(0,0,0,0.3);
+        ">
+          <button onclick="fecharModalContatoLead()" style="
+            position:absolute;
+            top:10px;
+            right:10px;
+            font-size:18px;
+            background:none;
+            border:none;
+            cursor:pointer;
+          ">❌ Fechar</button>
+          <h3>📞 Registrar contato</h3>
+          <div class="field">
+            <label>Tipo de contato:</label>
+            <input type="text" id="tipo-contato-lead" readonly
+              style="background:#eee; padding:6px; border:1px solid #ccc; width:100%">
+          </div>
+          <div class="field" id="campo-email-lead" style="display:none">
+            <label>E-mail do lead:</label>
+            <input type="text" id="email-contato-lead" readonly
+              style="background:#eee; padding:6px; border:1px solid #ccc; width:100%">
+          </div>
+          <div class="field">
+            <label>Resultado do contato:</label>
+            <textarea id="resultado-contato-lead" rows="4" style="width:100%"></textarea>
+          </div>
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-top:10px;">
+            <div id="acao-email-lead" style="display:none">
+              <button id="btn-enviar-email-lead">📧 Enviar e-mail manual</button>
+            </div>
+            <button onclick="salvarInteracaoLead()">💾 Salvar interação</button>
+          </div>
+          <div id="historico-interacoes-lead" style="margin-top:20px; max-height:300px; overflow-y:auto;"></div>
+        </div>
+      </div>
+
+      <div id="modal-historico-lead" style="
+        display:none;
+        position:fixed;
+        top:0;
+        left:0;
+        width:100%;
+        height:100%;
+        background:rgba(0,0,0,0.5);
+        z-index:9999;
+        justify-content:center;
+        align-items:center;
+      ">
+        <div style="
+          background:#fff;
+          padding:20px;
+          border-radius:8px;
+          max-width:600px;
+          width:90%;
+          position:relative;
+          box-shadow:0 0 20px rgba(0,0,0,0.3);
+          max-height:80%;
+          overflow-y:auto;
+        ">
+          <button onclick="fecharModalHistorico()" style="
+            position:absolute;
+            top:10px;
+            right:10px;
+            font-size:18px;
+            background:none;
+            border:none;
+            cursor:pointer;
+          ">❌ Fechar</button>
+          <h3>📜 Histórico de Interações</h3>
+          <div id="conteudo-historico-lead"></div>
+        </div>
+      </div>
+      <div id="modal-vincular-lead" style="
+        display:none;
+        position:fixed;
+        top:0;
+        left:0;
+        width:100%;
+        height:100%;
+        background:rgba(0,0,0,0.5);
+        z-index:9999;
+        justify-content:center;
+        align-items:center;
+      ">
+        <div style="
+          background:#fff;
+          padding:20px;
+          border-radius:8px;
+          max-width:600px;
+          width:90%;
+          position:relative;
+          box-shadow:0 0 20px rgba(0,0,0,0.3);
+          max-height:80%;
+          overflow-y:auto;
+        ">
+          <button onclick="document.getElementById('modal-vincular-lead').style.display='none'" style="
+            position:absolute;
+            top:10px;
+            right:10px;
+            font-size:18px;
+            background:none;
+            border:none;
+            cursor:pointer;
+          ">❌ Fechar</button>
+          <h3>👤 Vincular Lead a Usuário</h3>
+          <div id="conteudo-vincular-lead" style="margin-top:10px"></div>
+        </div>
+      </div>
+      <!-- Modal fora da tabela -->
+      <div id="modal-importacao-leads" style="display:none;" class="modal">
+        <div class="modal-conteudo">
+          <h3>📥 Importar Leads</h3>
+          <p>Selecione um arquivo <strong>.csv</strong> com os campos abaixo, separados por <code>;</code>:</p>
+
+          <div style="overflow-x: auto; margin-bottom: 20px;">
+            <table style="min-width: 1000px; border-collapse: collapse;">
+              <thead>
+                <tr>
+                  <th>nome</th>
+                  <th>email</th>
+                  <th>telefone</th>
+                  <th>perfil</th>
+                  <th>preferencia_contato</th>
+                  <th>interesses</th>
+                  <th>mensagem</th>
+                  <th>origem</th>
+                  <th>Sigla_UF</th>
+                  <th>codigo_UF</th>
+                  <th>Nome_Municipio</th>
+                  <th>codigo_municipio</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>João Silva</td>
+                  <td>joao@email.com</td>
+                  <td>11999999999</td>
+                  <td>contador</td>
+                  <td>WhatsApp</td>
+                  <td>orçamento, dúvidas</td>
+                  <td>Quero mais informações</td>
+                  <td>Evento XPTO</td>
+                  <td>SP</td>
+                  <td>35</td>
+                  <td>São Paulo</td>
+                  <td>3550308</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div id="progresso-importacao" style="margin-top: 20px; font-weight: bold;">
+            ⏳ Processando: 0 / 0
+          </div>
+          <label for="origem-importacao">Origem dos leads:</label>
+          <input type="text" id="origem-importacao" placeholder="Ex: Evento, Landing Page, Indicação" required
+            style="margin-bottom: 10px; width: 100%;">
+          <input type="file" id="arquivo-leads" accept=".csv">
+          <button onclick="processarImportacaoLeads()">🚀 Importar</button>
+          <button onclick="fecharModalImportacaoLeads()">Fechar</button>
+        </div>
+      </div>
+      <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+    </section>
+
+    <section id="relatorio-avaliacoes" class="card">
+      <h3>🗳️ Relatório de Avaliações de Atendimento</h3>
+
+      <div style="margin-bottom:10px;">
+        <div style="margin-bottom:6px;">
+          <strong>Filtrar por avaliação:</strong><br>
+          <button onclick="filtrarAvaliacoes('todos')">Todos</button>
+          <button onclick="filtrarAvaliacoes('positivo')">👍 Positiva</button>
+          <button onclick="filtrarAvaliacoes('negativo')">👎 Negativa</button>
+        </div>
+
+        <div style="margin-top:10px;">
+          <strong>Filtrar por tipo:</strong><br>
+          <button onclick="filtrarTipoSolicitacao('todos')">Todos</button>
+          <button onclick="filtrarTipoSolicitacao('consultoria')">Consultoria</button>
+          <button onclick="filtrarTipoSolicitacao('treinamento')">Treinamento</button>
+          <button onclick="filtrarTipoSolicitacao('newsletters')">Newsletters</button>
+          <button onclick="filtrarTipoSolicitacao('outros')">Outros</button>
+        </div>
+        <div style="margin-top:10px;">
+          <strong>Filtrar por período:</strong><br>
+          <button onclick="filtrarPeriodoAvaliacoes('todos')">Todos</button>
+          <button onclick="filtrarPeriodoAvaliacoes('7')">Últimos 7 dias</button>
+          <button onclick="filtrarPeriodoAvaliacoes('30')">Últimos 30 dias</button>
+          <button onclick="filtrarPeriodoAvaliacoes('90')">Últimos 90 dias</button>
+        </div>
+      </div>
+      <div style="margin-top:10px;">
+        <strong>Filtrar por perfil:</strong><br>
+        <button onclick="filtrarPerfilAvaliacoes('todos')">Todos</button>
+        <button onclick="filtrarPerfilAvaliacoes('secretario')">Secretário</button>
+        <button onclick="filtrarPerfilAvaliacoes('tecnico')">Técnico</button>
+        <button onclick="filtrarPerfilAvaliacoes('contador')">Contador</button>
+        <button onclick="filtrarPerfilAvaliacoes('pesquisador')">Pesquisador</button>
+        <button onclick="filtrarPerfilAvaliacoes('cacs')">CACS</button>
+        <button onclick="filtrarPerfilAvaliacoes('cidadao')">Cidadão</button>
+      </div>
+
+      <table style="margin-top:10px">
+        <thead>
+          <tr>
+            <th>Usuário</th>
+            <th>Perfil</th>
+            <th>Tipo</th>
+            <th>Status</th>
+            <th>Avaliação</th>
+            <th>Data</th>
+          </tr>
+        </thead>
+        <tbody id="tabela-avaliacoes"></tbody>
+      </table>
+    </section>
+
+    <!-- Painel  -->
+    <section id="painel-gestao" class="painel-container">
+      <h2>Painel de Gestão Geral</h2>
+      <select id="filtro-periodo" onchange="atualizarGraficosPorPeriodo()">
+        <option value="7">Últimos 7 dias</option>
+        <option value="30" selected>Últimos 30 dias</option>
+        <option value="90">Últimos 90 dias</option>
+        <option value="365">Últimos 12 meses</option>
+      </select>
+
+      <div class="graficos-grid">
+        <div class="grafico-card">
+          <h3>👥 Usuários (Ativos vs Inativos)</h3>
+          <canvas id="grafico-usuarios"></canvas>
+        </div>
+        <div class="grafico-card">
+          <h3>📈 Leads por Status</h3>
+          <canvas id="grafico-leads"></canvas>
+        </div>
+        <div class="grafico-card">
+          <h3>💰 Pagamentos</h3>
+          <canvas id="grafico-pagamentos"></canvas>
+        </div>
+        <div class="grafico-card">
+          <h3>📰 Assinaturas por Tipo</h3>
+          <canvas id="grafico-assinaturas"></canvas>
+        </div>
+        <div style="margin-top: 40px">
+          <h3>📊 Comparativo: Preferências vs Assinaturas</h3>
+          <canvas id="grafico-comparativo" height="100"></canvas>
+        </div>
+        <div id="alertas-baixa-conversao"
+          style="margin-top: 20px; padding: 12px; background: #fff3cd; border: 1px solid #ffeeba; border-radius: 6px;">
+          <!-- Alertas serão inseridos aqui -->
+        </div>
+        <div id="sugestoes-acoes"
+          style="margin-top: 20px; padding: 12px; background: #e8f5e9; border: 1px solid #c8e6c9; border-radius: 6px;">
+          <!-- Sugestões serão inseridas aqui -->
+        </div>
+      </div>
+    </section>
+  </main>
+
+
+
+  <!-- Modal CRUD (reaproveitado) -->
+  <div class="modal-overlay" id="modal-edit-overlay" aria-hidden="true">
+    <div class="modal">
+      <h2 id="modal-edit-title"></h2>
+      <div id="modal-edit-body"></div>
+      <div class="modal-buttons">
+        <button onclick="closeModal('modal-edit-overlay')">Cancelar</button>
+        <button id="modal-edit-save">💾 Salvar</button>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- Modal de resposta para solicitações -->
+  <div class="modal-overlay" id="modal-resposta-overlay" aria-hidden="true">
+    <div class="modal">
+      <h2 id="modal-resposta-titulo">💬 Responder Solicitação</h2>
+      <div>
+        <label for="campo-resposta"><strong>Mensagem de resposta:</strong></label>
+        <textarea id="campo-resposta" rows="5"
+          style="width:100%; padding:8px; margin-top:6px; border:1px solid #ccc; border-radius:4px;"></textarea>
+      </div>
+      <div class="modal-buttons">
+        <button onclick="fecharModalResposta()">Cancelar</button>
+        <button onclick="confirmarRespostaSolicitacao()">Salvar</button>
+      </div>
+    </div>
+  </div>
+
+
+  <div id="visaoGeralContainer"
+    style="margin-top:30px; background:#fff; padding:20px; border-radius:8px; border:1px solid #ccc;"></div>
+
+  <!-- libs firebase compat (mantendo sua versão atual) -->
+  <script src="https://www.gstatic.com/firebasejs/10.0.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.0.0/firebase-firestore-compat.js"></script>
+
+  <!-- seus scripts (main.js deve conter firebase.initializeApp e db) -->
+  <script src="js/main.js"></script>
+  <script src="js/subcollections.js"></script>
+
+  <script src="js/functions.js"></script>
+
+  <script>
+    //    function closeModal(id) { document.getElementById(id).classList.remove('show'); document.getElementById(id).setAttribute('aria-hidden', 'true'); }
+    //function openModal(id) { document.getElementById(id).classList.add('show'); document.getElementById(id).setAttribute('aria-hidden', 'false'); }
+
+    function openModal(id) {
+      const modal = document.getElementById(id);
+      if (modal) {
+        modal.style.display = "block"; // garante que não está oculto
+        modal.classList.add("aberto");
+        modal.setAttribute("aria-hidden", "false");
+      } else {
+        console.warn("Modal não encontrado:", id);
+      }
+    }
+
+
+    function closeModal(id) {
+      const modal = document.getElementById(id);
+      if (modal) {
+        modal.classList.remove("aberto");
+        modal.setAttribute("aria-hidden", "true");
+        modal.style.display = "none"; // oculta novamente
+      }
+    }
+
+    function mostrarSecaoPrincipal(id) {
+      const secoesPrincipais = [
+        "secao-dashboard",
+        "secao-newsletters-envio",
+        "secao-orientacoes",
+        "secao-backlog"
+      ];
+
+      secoesPrincipais.forEach(secaoId => {
+        const el = document.getElementById(secaoId);
+        if (el) {
+          el.style.display = (secaoId === id ? "block" : "none");
+        }
+      });
+
+
+      const secoes = document.querySelectorAll("section.card");
+      secoes.forEach(secao => {
+        secao.style.display = "none";
+      });
+
+      secoes.forEach(secaoId => {
+        const el = document.getElementById(secaoId);
+        if (el) {
+          el.style.display = "none";
+        }
+      });
+
+      const el = document.getElementById("painel-gestao");
+      if (el) {
+        el.style.display = "none";
+      }
+
+
+      const ativa = document.getElementById(id);
+      if (ativa) {
+        ativa.style.display = "block";
+      }
+    }
+
+    async function abrirTab(tabId) {
+      document.querySelectorAll('main section').forEach(sec => sec.style.display = 'none');
+      document.querySelectorAll('aside#sidebar button').forEach(btn => btn.classList.remove('active'));
+      const btn = document.querySelector(`aside#sidebar button[onclick="abrirTab('${tabId}')"]`);
+      if (btn) btn.classList.add('active');
+      const el = document.getElementById(tabId);
+      if (el) el.style.display = 'block';
+
+      // carrega conteúdo da aba
+      //      if (tabId === 'usuarios') carregarUsuariosComFiltro();
+      if (tabId === 'planos') carregarPlanos();
+      else if (tabId === 'newsletters') {
+        preencherFiltroTipoNewsletter(document.getElementById("filtro-tipo-news"));
+        carregarNewsletters();
+      }
+      else if (tabId === 'template_newsletters') carregarTemplatesNewsletter();
+      else if (tabId === 'tipo-newsletters') carregarTipoNewsLetters();
+      // else if (tabId === 'leads') carregarLeads();
+      else if (tabId === 'auditoria') carregarInteracoesAuditoria();
+      else if (tabId === 'respostas_automaticas') carregarrespostas_automaticas();
+      else if (tabId === 'aba-temas') carregarTemas_noticias();
+      else if (tabId === 'relatorio-por-tipo') {
+        await montarComboTiposNewsletter();
+        gerarRelatorioPreferencias();
+      }
+      else if (tabId === 'relatorio-por-usuario') {
+        document.getElementById("detalhes-relatorio-usuario").innerHTML = "";
+        gerarRelatorioPorUsuario();
+      }
+      else if (tabId === 'relatorio-avaliacoes') {
+        carregarRelatorioAvaliacoes();
+      }
+    }
+
+    // inicializa com usuários visível
+    abrirTab('usuarios');
+  </script>
+  <script>
+    document.addEventListener("DOMContentLoaded", () => {
+      const dados = JSON.parse(localStorage.getItem("usuarioLogado"));
+      if (dados) {
+        const nome = dados.nome || dados.email || "Usuário";
+        const perfil = dados.tipo_perfil || "indefinido";
+
+        const topo = document.getElementById("usuario-logado-topo");
+        if (topo) {
+          topo.innerText = `👤${nome} (${perfil})`;
+        }
+      }
+    });
+  </script>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script>
+    // Usuários
+    const ctxUsuarios = document.getElementById('grafico-usuarios').getContext('2d');
+    window.graficoUsuarios = new Chart(ctxUsuarios, {
+      type: 'doughnut',
+      data: {
+        labels: ['Ativos', 'Inativos'],
+        datasets: [{
+          data: [0, 0], // inicial vazio
+          backgroundColor: ['#4caf50', '#f44336']
+        }]
+      },
+      options: {
+        responsive: true,
+        plugins: {
+          legend: { position: 'bottom' }
+        }
+      }
+    });
+
+
+    // Leads
+    const ctxLeads = document.getElementById('grafico-leads').getContext('2d');
+    window.graficoLeads = new Chart(ctxLeads, {
+      type: 'bar',
+      data: {
+        labels: ['Novo', 'Em contato', 'Negociando', 'Convertido', 'Descartado'],
+        datasets: [{
+          label: 'Leads',
+          data: [0, 0, 0, 0, 0],
+          backgroundColor: ['#2196f3', '#03a9f4', '#ffc107', '#4caf50', '#9e9e9e']
+        }]
+      },
+      options: {
+        indexAxis: 'y',
+        responsive: true,
+        plugins: {
+          legend: { display: false }
+        }
+      }
+    });
+
+    // Pagamentos
+    const ctxPagamentos = document.getElementById('grafico-pagamentos').getContext('2d');
+    window.graficoPagamentos = new Chart(ctxPagamentos, {
+      type: 'doughnut',
+      data: {
+        labels: ['pago', 'pendente', 'cancelado'],
+        datasets: [{
+          data: [],
+          backgroundColor: ['#4caf50', '#ff9800', '#9e9e9e']
+        }]
+      },
+      options: {
+        responsive: true,
+        plugins: {
+          legend: { position: 'bottom' }
+        }
+      }
+    });
+
+    // Assinaturas
+    const ctxAssinaturas = document.getElementById('grafico-assinaturas').getContext('2d');
+    window.graficoAssinaturas = new Chart(ctxAssinaturas, {
+      type: 'bar',
+      data: {
+        labels: [], // será preenchido dinamicamente
+        datasets: [{
+          label: 'Assinaturas por Tipo',
+          data: [],
+          backgroundColor: [], // será preenchido dinamicamente
+        }]
+      },
+      options: {
+        responsive: true,
+        plugins: {
+          legend: { display: false }
+        },
+        scales: {
+          y: { beginAtZero: true }
+        }
+      }
+    });
+
+    // comparativo preferencias/assinaturas
+    const ctxComparativo = document.getElementById('grafico-comparativo').getContext('2d');
+    window.graficoComparativo = new Chart(ctxComparativo, {
+      type: 'bar',
+      data: {
+        labels: [],
+        datasets: [
+          {
+            label: 'Preferências',
+            data: [],
+            backgroundColor: '#2196f3'
+          },
+          {
+            label: 'Assinaturas',
+            data: [],
+            backgroundColor: '#4caf50'
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        plugins: {
+          legend: { position: 'bottom' }
+        },
+        scales: {
+          y: { beginAtZero: true }
+        }
+      }
+    });
+
+  </script>
+
+  <script src="js/site.js"></script>
+
+</body>
+
+</html>

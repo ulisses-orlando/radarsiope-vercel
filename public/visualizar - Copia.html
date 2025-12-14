@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Visualizar Newsletter</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      margin: 0;
+      padding: 0;
+      background: #f4f4f4;
+    }
+    .top-bar {
+      text-align: center;
+      padding: 20px;
+      background: #007acc;
+    }
+    .top-bar a {
+      display: inline-block;
+      padding: 10px 20px;
+      background: #fff;
+      color: #007acc;
+      font-weight: bold;
+      text-decoration: none;
+      border-radius: 6px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+      transition: background 0.3s;
+    }
+    .top-bar a:hover {
+      background: #e6f0ff;
+    }
+    .container {
+      max-width: 960px;
+      margin: 30px auto;
+      background: #fff;
+      padding: 30px;
+      border-radius: 12px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    h1 {
+      font-size: 1.8em;
+      color: #2c3e50;
+      margin-bottom: 20px;
+    }
+    #conteudo-newsletter {
+      font-size: 1rem;
+      line-height: 1.6;
+      color: #333;
+    }
+    .mensagem {
+      background: #ffe9e9;
+      border: 1px solid #e74c3c;
+      color: #c0392b;
+      padding: 16px;
+      border-radius: 8px;
+      font-size: 1.1em;
+      margin-top: 20px;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="top-bar">
+    <a href="index.html">← Voltar para Newsletters</a>
+  </div>
+
+  <div class="container">
+    <h1 id="titulo-newsletter">Carregando newsletter...</h1>
+    <div id="conteudo-newsletter">Aguarde enquanto buscamos o conteúdo.</div>
+  </div>
+
+  <div class="form-container">
+  <h2>📩 Interesse em conteúdo exclusivo</h2>
+  <p>Preencha os dados abaixo para receber informações sobre planos, capacitação ou consultoria personalizada.</p>
+
+    <div id="formulario-interesse" style="margin-top:40px"></div>
+
+</div>
+
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+  <script>
+const firebaseConfig = {
+  apiKey: "AIzaSyDcS4nneXnN8Cdb-S_cQukwaguLXJYbQ1U",
+  authDomain: "radarsiope.firebaseapp.com",
+  projectId: "radarsiope"
+};
+
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+
+    const urlParams = new URLSearchParams(window.location.search);
+    const id = urlParams.get("id");
+
+    db.collection("newsletters").doc(id).get().then(doc => {
+      if (doc.exists) {
+        const d = doc.data();
+        document.getElementById("titulo-newsletter").innerText = d.titulo || "Newsletter";
+        document.getElementById("conteudo-newsletter").innerHTML = d.html_conteudo || "<p>Conteúdo não disponível.</p>";
+      } else {
+        document.getElementById("titulo-newsletter").innerText = "Newsletter não encontrada";
+        document.getElementById("conteudo-newsletter").innerHTML = `
+          <div class="mensagem">
+            Não foi possível localizar esta newsletter.<br>
+            Verifique o link ou tente novamente mais tarde.
+          </div>`;
+      }
+    });
+  </script>
+</body>
+</html>

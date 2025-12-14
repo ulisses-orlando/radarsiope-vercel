@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<title>Admin RadarSiope - Modular Completo</title>
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <aside id="menu">
+    <h2>Admin RadarSiope</h2>
+    <button onclick="abrirTab('usuarios')">Usuários</button>
+  </aside>
+
+  <main id="conteudo">
+    <section id="usuarios" class="card">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+        <div style="display:flex;align-items:center">
+          <h3 style="margin:0 12px 0 0">Usuários</h3>
+          <input class="search" id="busca-usuarios" placeholder="Buscar usuário..." oninput="filtrarUsuarios()" />
+        </div>
+        <div>
+          <button class="add-btn" onclick='abrirModalCriarUsuario()'>+ Adicionar Usuário</button>
+        </div>
+      </div>
+
+      <div id="lista-container">
+        <table class="card" id="tabela-usuarios" style="background:transparent;border:0">
+          <thead>
+            <tr><th>Nome</th><th>Email</th><th>Perfil</th><th>Ativo</th><th style="width:240px">Ações</th></tr>
+          </thead>
+          <tbody id="lista-usuarios"></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <!-- Modais -->
+  <div id="modal-edit-overlay" class="overlay" aria-hidden="true">
+    <div class="modal" id="modal-edit">
+      <h3 id="modal-edit-title">Editar</h3>
+      <div id="modal-edit-body"></div>
+      <div class="actions">
+        <button class="btn secondary" onclick="closeModal('modal-edit-overlay')">Fechar</button>
+        <button class="btn primary" id="modal-edit-save">Salvar</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="modal-sub-overlay" class="overlay" aria-hidden="true">
+    <div class="modal" id="modal-sub">
+      <h3 id="modal-sub-title">Subcoleção</h3>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin:8px 0">
+        <div><span id="modal-sub-hint" class="hint"></span></div>
+        <div><button class="btn primary" id="btn-sub-add">Adicionar</button></div>
+      </div>
+      <div style="overflow:auto">
+        <table id="sub-table" style="width:100%">
+          <thead id="sub-head"></thead>
+          <tbody id="sub-body"></tbody>
+        </table>
+      </div>
+      <div class="actions" style="margin-top:12px">
+        <button class="btn secondary" onclick="closeModal('modal-sub-overlay')">Fechar</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="confirm-overlay" class="overlay" aria-hidden="true">
+    <div class="modal" id="confirm-modal">
+      <h3>Confirmação</h3>
+      <div id="confirm-message"></div>
+      <div class="actions">
+        <button class="btn secondary" id="confirm-no">Cancelar</button>
+        <button class="btn primary" id="confirm-yes">Confirmar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Firebase v8 -->
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+
+  <!-- Scripts Modulares -->
+  <script src="js/firebase-config.js"></script>
+  <script src="js/utils.js"></script>
+  <script src="js/usuarios.js"></script>
+  <script src="js/subcolecoes.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<title>Admin RadarSiope - Completo</title>
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<style>
+:root{--bg:#f6f7fb;--card:#fff;--primary:#2c3e50;--accent:#1abc9c}
+*{box-sizing:border-box}
+body{margin:0;font-family:Inter,Arial,Helvetica,sans-serif;background:var(--bg);color:#222;display:flex;height:100vh}
+#menu{width:220px;background:var(--primary);color:#fff;padding:18px}
+#menu h2{margin:0 0 12px;font-size:18px}
+#menu button{width:100%;padding:10px;border:0;background:transparent;color:#fff;text-align:left;cursor:pointer;border-radius:6px}
+#menu button:hover{background:rgba(255,255,255,0.05)}
+#conteudo{flex:1;padding:18px;overflow:auto}
+.card{background:var(--card);padding:14px;border-radius:8px;box-shadow:0 1px 4px rgba(0,0,0,0.06)}
+.add-btn{background:var(--accent);color:#fff;border:0;padding:8px 12px;border-radius:6px;cursor:pointer}
+.search{padding:8px;width:60%;margin:0 8px 12px 0}
+table{width:100%;border-collapse:collapse;margin-top:12px}
+th,td{border:1px solid #e6e9ef;padding:8px;text-align:left}
+th{background:#f3f5f8}
+.icon-btn{cursor:pointer;margin-right:6px;font-size:16px}
+.overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:200;align-items:center;justify-content:center}
+.overlay.show{display:flex}
+.modal{background:#fff;border-radius:10px;max-width:760px;width:90%;padding:18px;max-height:86vh;overflow:auto}
+.modal h3{margin:0 0 12px}
+.modal .field{margin-bottom:10px}
+.modal label{display:block;font-size:13px;margin-bottom:6px;color:#333}
+.modal input[type="text"], .modal input[type="email"], .modal input[type="date"], .modal select{width:100%;padding:8px;border:1px solid #d6dbe6;border-radius:6px}
+.modal .actions{margin-top:12px;text-align:right}
+.btn{padding:8px 12px;border-radius:6px;border:0;cursor:pointer}
+.btn.secondary{background:#eee;color:#333}
+.btn.primary{background:var(--accent);color:#fff}
+.hint{font-size:12px;color:#777;margin-left:6px}
+</style>
+</head>
+<body>
+
+<aside id="menu">
+  <h2>Admin RadarSiope</h2>
+  <button onclick="abrirTab('usuarios')">Usuários</button>
+</aside>
+
+<main id="conteudo">
+  <section id="usuarios" class="card">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+      <div style="display:flex;align-items:center">
+        <h3 style="margin:0 12px 0 0">Usuários</h3>
+        <input class="search" id="busca-usuarios" placeholder="Buscar usuário..." oninput="filtrarUsuarios()" />
+      </div>
+      <div>
+        <button class="add-btn" onclick='abrirModalCriarUsuario()'>+ Adicionar Usuário</button>
+      </div>
+    </div>
+
+    <div id="lista-container">
+      <table class="card" id="tabela-usuarios" style="background:transparent;border:0">
+        <thead>
+          <tr><th>Nome</th><th>Email</th><th>Perfil</th><th>Ativo</th><th style="width:300px">Ações</th></tr>
+        </thead>
+        <tbody id="lista-usuarios"></tbody>
+      </table>
+    </div>
+  </section>
+</main>
+
+<!-- Modais -->
+<div id="modal-edit-overlay" class="overlay" aria-hidden="true">
+  <div class="modal" id="modal-edit">
+    <h3 id="modal-edit-title">Editar</h3>
+    <div id="modal-edit-body"></div>
+    <div class="actions">
+      <button class="btn secondary" onclick="closeModal('modal-edit-overlay')">Fechar</button>
+      <button class="btn primary" id="modal-edit-save">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<div id="modal-sub-overlay" class="overlay" aria-hidden="true">
+  <div class="modal" id="modal-sub">
+    <h3 id="modal-sub-title">Subcoleção</h3>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin:8px 0">
+      <div><span id="modal-sub-hint" class="hint"></span></div>
+      <div><button class="btn primary" id="btn-sub-add">Adicionar</button></div>
+    </div>
+    <div style="overflow:auto">
+      <table id="sub-table" style="width:100%">
+        <thead id="sub-head"></thead>
+        <tbody id="sub-body"></tbody>
+      </table>
+    </div>
+    <div class="actions" style="margin-top:12px">
+      <button class="btn secondary" onclick="closeModal('modal-sub-overlay')">Fechar</button>
+    </div>
+  </div>
+</div>
+
+<div id="confirm-overlay" class="overlay" aria-hidden="true">
+  <div class="modal" id="confirm-modal">
+    <h3>Confirmação</h3>
+    <div id="confirm-message"></div>
+    <div class="actions">
+      <button class="btn secondary" id="confirm-no">Cancelar</button>
+      <button class="btn primary" id="confirm-yes">Confirmar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Firebase v8 -->
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+
+<script>
+/* ======================== CONFIG ======================== */
+const firebaseConfig = {
+  apiKey: "AIzaSyDcS4nneXnN8Cdb-S_cQukwaguLXJYbQ1U",
+  authDomain: "radarsiope.firebaseapp.com",
+  projectId: "radarsiope"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+
+/* ======================== CACHE ======================== */
+let planMap = {}; let planList = []; let planosLoaded = false;
+
+/* ======================== UTIL ======================== */
+function isTimestamp(v){ return v && typeof v==='object' && v.seconds!==undefined; }
+function formatDateBRFromTimestamp(ts){ if(!isTimestamp(ts)) return ""; const d=new Date(ts.seconds*1000); return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`; }
+function dateInputValueFromTimestamp(ts){ if(!isTimestamp(ts)) return ""; const d=new Date(ts.seconds*1000); return d.toISOString().slice(0,10); }
+function openModal(id){ document.getElementById(id).classList.add('show'); document.getElementById(id).setAttribute('aria-hidden','false'); }
+function closeModal(id){ document.getElementById(id).classList.remove('show'); document.getElementById(id).setAttribute('aria-hidden','true'); }
+function confirmDialog(msg){return new Promise(resolve=>{const ov=document.getElementById('confirm-overlay');document.getElementById('confirm-message').innerText=msg;ov.classList.add('show');ov.setAttribute('aria-hidden','false');function cleanup(r){ov.classList.remove('show');ov.setAttribute('aria-hidden','true');document.getElementById('confirm-yes').removeEventListener('click',onYes);document.getElementById('confirm-no').removeEventListener('click',onNo);resolve(r);}function onYes(){cleanup(true);}function onNo(){cleanup(false);}document.getElementById('confirm-yes').addEventListener('click',onYes);document.getElementById('confirm-no').addEventListener('click',onNo);});}
+
+/* ======================== PLANOS ======================== */
+async function loadPlanos(force=false){
+  if(planosLoaded && !force) return;
+  planMap = {}; planList = [];
+  const snap = await db.collection('planos').get();
+  snap.forEach(doc=>{const d=doc.data()||{};planMap[doc.id]=d.nome||doc.id; planList.push({id:doc.id,nome:d.nome||doc.id});});
+  planosLoaded = true;
+}
+
+/* ======================== CAMPOS ======================== */
+function generateTextField(name,value){const wrap=document.createElement('div');wrap.className='field';const label=document.createElement('label');label.innerText=name;wrap.appendChild(label);const input=document.createElement('input');input.type='text';input.value=value||'';input.dataset.fieldName=name;wrap.appendChild(input);return wrap;}
+function generateBooleanSelect(name,value){const wrap=document.createElement('div');wrap.className='field';const label=document.createElement('label');label.innerText=name;wrap.appendChild(label);const select=document.createElement('select');select.dataset.fieldName=name;[{v:'true',t:'Sim'},{v:'false',t:'Não'}].forEach(o=>{const el=document.createElement('option');el.value=o.v;el.text=o.t;if(String(value)===o.v||(value===true&&o.v==='true')||(value===false&&o.v==='false'))el.selected=true;select.appendChild(el);});wrap.appendChild(select);return wrap;}
+function generateDomainSelect(name,optionsArray,value){const wrap=document.createElement('div');wrap.className='field';const label=document.createElement('label');label.innerText=name;wrap.appendChild(label);const select=document.createElement('select');select.dataset.fieldName=name;optionsArray.forEach(optVal=>{const el=document.createElement('option');el.value=optVal;el.text=optVal;if(String(value)===String(optVal))el.selected=true;select.appendChild(el);});wrap.appendChild(select);return wrap;}
+async function generatePlanSelect(name,currentValue){await loadPlanos(); const wrap=document.createElement('div');wrap.className='field';const label=document.createElement('label');label.innerText=name;wrap.appendChild(label);const select=document.createElement('select');select.dataset.fieldName=name;const empty=document.createElement('option');empty.value='';empty.text='-- selecione --';select.appendChild(empty);planList.forEach(p=>{const el=document.createElement('option');el.value=p.id;el.text=p.nome;select.appendChild(el);});if(currentValue!==undefined&&currentValue!==null&&currentValue!==''){let matched=false;for(const opt of select.options){if(opt.value===String(currentValue)){opt.selected=true;matched=true;break;}}if(!matched){for(const opt of select.options){if(opt.text===String(currentValue)){opt.selected=true;matched=true;break;}}}}wrap.appendChild(select);return wrap;}
+function generateDateInput(name,ts){const wrap=document.createElement('div');wrap.className='field';const label=document.createElement('label');label.innerText=name;wrap.appendChild(label);const input=document.createElement('input');input.type='date';input.dataset.fieldName=name;if(isTimestamp(ts))input.value=dateInputValueFromTimestamp(ts);else if(ts instanceof Date)input.value=ts.toISOString().slice(0,10);else if(typeof ts==='string'&&/^\d{4}-\d{2}-\d{2}/.test(ts))input.value=ts.slice(0,10);else input.value='';wrap.appendChild(input);return wrap;}
+
+/* ======================== USUÁRIOS ======================== */
+function abrirTab(tabId){document.querySelectorAll('#conteudo > section').forEach(s=>s.style.display='none');const el=document.getElementById(tabId);if(el)el.style.display='block';}
+abrirTab('usuarios');
+
+async function listarUsuarios(){
+  const tbody=document.getElementById('lista-usuarios');tbody.innerHTML='';
+  const snap=await db.collection('usuarios').get();
+  snap.forEach(doc=>{
+    const d=doc.data()||{};const tr=document.createElement('tr');
+    const ativoTxt=(d.ativo===true||String(d.ativo).toLowerCase()==='true')?'Sim':'Não';
+    tr.innerHTML=`<td>${d.nome||''}</td><td>${d.email||''}</td><td>${d.tipo_perfil||''}</td><td>${ativoTxt}</td>
+      <td>
+        <span class="icon-btn" title="Editar" onclick="abrirModalEditarUsuario('${doc.id}')">✏️</span>
+        <span class="icon-btn" title="Excluir" onclick="onExcluirUsuario('${doc.id}','${(d.nome||'sem-nome').replace(/'/g,"\\'")}')">🗑️</span>
+        <span class="icon-btn" title="Logs" onclick="abrirSubColecao('usuarios','${doc.id}','logs_acesso','${(d.nome||'sem-nome').replace(/'/g,"\\'")}')">📜</span>
+        <span class="icon-btn" title="Assinaturas" onclick="abrirSubColecao('usuarios','${doc.id}','assinaturas','${(d.nome||'sem-nome').replace(/'/g,"\\'")}')">📝</span>
+        <span class="icon-btn" title="Preferências" onclick="abrirSubColecao('usuarios','${doc.id}','preferencias_newsletter','${(d.nome||'sem-nome').replace(/'/g,"\\'")}')">⭐</span>
+        <span class="icon-btn" title="Pagamentos" onclick="abrirSubColecao('usuarios','${doc.id}','pagamentos','${(d.nome||'sem-nome').replace(/'/g,"\\'")}')">💳</span>
+        <span class="icon-btn" title="Solicitações" onclick="abrirSubColecao('usuarios','${doc.id}','solicitacoes','${(d.nome||'sem-nome').replace(/'/g,"\\'")}')">📬</span>
+      </td>`;
+    tbody.appendChild(tr);
+  });
+}
+
+/* ======================== CRIAR / EDITAR USUÁRIO ======================== */
+function abrirModalCriarUsuario(){
+  const title=document.getElementById('modal-edit-title');const body=document.getElementById('modal-edit-body');title.innerText='Criar Usuário';body.innerHTML='';
+  body.appendChild(generateTextField('nome',''));
+  body.appendChild(generateTextField('email',''));
+  body.appendChild(generateDomainSelect('tipo_perfil',['secretario','pesquisador','tecnico','cidadao','CACS','contador'],''));
+  body.appendChild(generateBooleanSelect('ativo','true'));
+  document.getElementById('modal-edit-save').onclick=async()=>{
+    const payload={};
+    body.querySelectorAll('[data-field-name]').forEach(el=>{let v=el.value;if(el.tagName==='SELECT'&&el.dataset.fieldName==='ativo')v=(v==='true'||v==='Sim');payload[el.dataset.fieldName]=v;});
+    await db.collection('usuarios').add(payload);
+    closeModal('modal-edit-overlay'); await listarUsuarios();
+  };
+  openModal('modal-edit-overlay');
+}
+
+async function abrirModalEditarUsuario(userId){
+  const doc=await db.collection('usuarios').doc(userId).get();const data=doc.exists?doc.data():{};
+  const title=document.getElementById('modal-edit-title');const body=document.getElementById('modal-edit-body');title.innerText='Editar Usuário';body.innerHTML='';
+  body.appendChild(generateTextField('nome',data.nome||''));
+  body.appendChild(generateTextField('email',data.email||''));
+  body.appendChild(generateDomainSelect('tipo_perfil',['secretario','pesquisador','tecnico','cidadao','CACS','contador'],data.tipo_perfil||''));
+  body.appendChild(generateBooleanSelect('ativo',data.ativo===true?'true':(data.ativo===false?'false':String(data.ativo))));
+  document.getElementById('modal-edit-save').onclick=async()=>{
+    const payload={};
+    body.querySelectorAll('[data-field-name]').forEach(el=>{let v=el.value;if(el.tagName==='SELECT'&&el.dataset.fieldName==='ativo')v=(v==='true'||v==='Sim');payload[el.dataset.fieldName]=v;});
+    await db.collection('usuarios').doc(userId).set(payload,{merge:true});
+    closeModal('modal-edit-overlay'); await listarUsuarios();
+  };
+  openModal('modal-edit-overlay');
+}
+
+/* ======================== EXCLUIR USUÁRIO ======================== */
+async function onExcluirUsuario(userId,nome){const ok=await confirmDialog(`Deseja excluir o usuário "${nome}"?`);if(!ok)return;await db.collection('usuarios').doc(userId).delete();await listarUsuarios();}
+ 
+/* ======================== FILTRO ======================== */
+function filtrarUsuarios(){const val=document.getElementById('busca-usuarios').value.toLowerCase();document.querySelectorAll('#lista-usuarios tr').forEach(tr=>{const txt=tr.children[0].innerText.toLowerCase();tr.style.display=txt.includes(val)?'':'none';});}
+
+/* ======================== SUBCOLEÇÕES ======================== */
+const subcolecoesCampos = {
+  logs_acesso: [
+    {nome:'data_acesso', tipo:'date'},
+    {nome:'ip_origem', tipo:'text'},
+    {nome:'dispositivo', tipo:'text'}
+  ],
+  assinaturas: [
+    {nome:'plano', tipo:'plan'},
+    {nome:'status', tipo:'domain', opcoes:['ativo','inativo','suspenso']},
+    {nome:'data_inicio', tipo:'date'},
+    {nome:'data_fim', tipo:'date'}
+  ],
+  preferencias_newsletter:[
+    {nome:'assinante', tipo:'boolean'}
+  ],
+  pagamentos:[
+    {nome:'assinatura_id', tipo:'text'},
+    {nome:'valor', tipo:'text'},
+    {nome:'moeda', tipo:'domain', opcoes:['BRL','USD','EUR']},
+    {nome:'status', tipo:'domain', opcoes:['pendente','pago','falhou','estornado']},
+    {nome:'metodo_pagamento', tipo:'domain', opcoes:['boleto','cartao','pix']},
+    {nome:'data_pagamento', tipo:'date'},
+    {nome:'comprovante_url', tipo:'text'}
+  ],
+  solicitacoes:[
+    {nome:'tipo', tipo:'domain', opcoes:['reclamacao','sugestao','duvida']},
+    {nome:'descricao', tipo:'text'},
+    {nome:'data_solicitacao', tipo:'date'},
+    {nome:'status', tipo:'domain', opcoes:['pendente','em andamento','resolvido']}
+  ]
+};
+
+/* ======================== SUBCOLEÇÃO ======================== */
+async function abrirSubColecao(collectionName, docId, subName, userNome){
+  await loadPlanos();
+  const overlay = document.getElementById('modal-sub-overlay');
+  const titleEl = document.getElementById('modal-sub-title');
+  const hint = document.getElementById('modal-sub-hint');
+  const head = document.getElementById('sub-head');
+  const body = document.getElementById('sub-body');
+  titleEl.innerText = `${subName} — ${userNome}`;
+  hint.innerText = '';
+  head.innerHTML = ''; 
+  body.innerHTML = '';
+
+  const ref = db.collection(collectionName).doc(docId).collection(subName);
+  const snap = await ref.get();
+  const campos = subcolecoesCampos[subName] || [];
+  const cols = campos.map(c=>c.nome); cols.push('__acoes');
+
+  const trh = document.createElement('tr');
+  cols.forEach(c=>{const th=document.createElement('th');th.innerText=(c==='__acoes')?'Ações':c;trh.appendChild(th);});
+  head.appendChild(trh);
+
+  snap.forEach(doc=>{
+    const d=doc.data()||{};
+    const tr=document.createElement('tr');
+    cols.forEach(c=>{
+      const td=document.createElement('td');
+      if(c==='__acoes'){
+        const edit=document.createElement('span'); edit.className='icon-btn'; edit.innerText='✏️';
+        edit.title='Editar'; edit.onclick=()=>abrirModalCriarSub(collectionName,docId,subName,doc.id,true);
+        const del=document.createElement('span'); del.className='icon-btn'; del.innerText='🗑️';
+        del.title='Excluir'; del.onclick=()=>onExcluirSub(collectionName,docId,subName,doc.id,userNome,d);
+        td.appendChild(edit); td.appendChild(del);
+      } else {
+        const campoCfg=campos.find(x=>x.nome===c);
+        if(!campoCfg){td.innerText=d[c]||'';} else {
+          if(campoCfg.tipo==='date'){td.innerText=isTimestamp(d[c])?formatDateBRFromTimestamp(d[c]):(d[c]?new Date(d[c]).toLocaleDateString():'');}
+          else if(campoCfg.tipo==='boolean'){td.innerText=d[c]===true?'Sim':'Não';}
+          else if(campoCfg.tipo==='plan'){td.innerText=planMap[d[c]]||d[c]||'';}
+          else if(campoCfg.tipo==='domain'){td.innerText=d[c]||'';}
+          else{td.innerText=d[c]||'';}
+        }
+      }
+      tr.appendChild(td);
+    });
+    body.appendChild(tr);
+  });
+
+  document.getElementById('btn-sub-add').onclick=()=>abrirModalCriarSub(collectionName,docId,subName,null,false);
+  openModal('modal-sub-overlay');
+}
+
+/* ======================== CRIAR/EDITAR SUBCOLEÇÃO ======================== */
+async function abrirModalCriarSub(collectionName, docId, subName, subId=null, isEdit=false){
+  await loadPlanos();
+  const title=document.getElementById('modal-edit-title');
+  const body=document.getElementById('modal-edit-body');
+  title.innerText=isEdit?`Editar ${subName}`:`Criar ${subName}`;
+  body.innerHTML='';
+
+  const ref=db.collection(collectionName).doc(docId).collection(subName);
+  let data={};
+  if(isEdit && subId){const snap=await ref.doc(subId).get();data=snap.exists?snap.data():{};}
+
+  const campos=subcolecoesCampos[subName]||[];
+  for(const c of campos){
+    if(c.tipo==='text') body.appendChild(generateTextField(c.nome,data[c.nome]||''));
+    else if(c.tipo==='date') body.appendChild(generateDateInput(c.nome,data[c.nome]));
+    else if(c.tipo==='boolean') body.appendChild(generateBooleanSelect(c.nome,data[c.nome]===true?'true':'false'));
+    else if(c.tipo==='plan') {const wrap=await generatePlanSelect(c.nome,data[c.nome]||'');body.appendChild(wrap);}
+    else if(c.tipo==='domain') body.appendChild(generateDomainSelect(c.nome,c.opcoes||[],data[c.nome]||''));
+  }
+
+  document.getElementById('modal-edit-save').onclick=async()=>{
+    const payload={};
+    body.querySelectorAll('[data-field-name]').forEach(el=>{
+      const k=el.dataset.fieldName;
+      if(el.tagName==='SELECT'){if(k==='plano'){payload[k]=el.value||'';} else if(el.value==='true'||el.value==='false'){payload[k]=el.value==='true';} else{payload[k]=el.value;}}
+      else if(el.type==='date'){payload[k]=el.value?firebase.firestore.Timestamp.fromDate(new Date(el.value+'T00:00:00')):null;}
+      else{payload[k]=el.value;}
+    });
+    if(isEdit && subId) await ref.doc(subId).set(payload,{merge:true});
+    else await ref.add(payload);
+    closeModal('modal-edit-overlay');
+    abrirSubColecao(collectionName,docId,subName,'Usuário');
+  };
+  openModal('modal-edit-overlay');
+}
+
+/* ======================== EXCLUIR SUBCOLEÇÃO ======================== */
+async function onExcluirSub(collectionName, docId, subName, subId, userNome,data){const ok=await confirmDialog(`Deseja excluir este item da subcoleção "${subName}"?`);if(!ok)return;await db.collection(collectionName).doc(docId).collection(subName).doc(subId).delete();abrirSubColecao(collectionName,docId,subName,userNome);}
+
+/* ======================== INICIAL ======================== */
+listarUsuarios();
+</script>
+</body>
+</html>

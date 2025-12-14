@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Área do Assinante</title>
+
+  <!-- Estilos -->
+  <link rel="stylesheet" href="styles/main.css">
+
+  <!-- Firebase SDKs -->
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+
+  <!-- Configuração do Firebase -->
+  <script src="scripts/firebase-config.js"></script>
+  <script src="scripts/auth.js"></script>
+</head>
+<body>
+  <div class="container">
+    <h1>Área do Assinante</h1>
+    <img id="foto" width="80" style="border-radius: 50%; margin-bottom: 16px;">
+    <h2 id="nome">Carregando...</h2>
+    <p id="email"></p>
+    <button id="logout">Sair</button>
+  </div>
+
+  <!-- Script principal -->
+  <script>
+    window.addEventListener("DOMContentLoaded", () => {
+      const auth = firebase.auth();
+
+      auth.onAuthStateChanged(user => {
+        if (user) {
+          document.getElementById("nome").textContent = user.displayName;
+          document.getElementById("email").textContent = user.email;
+          document.getElementById("foto").src = user.photoURL;
+        } else {
+          window.location.href = "/login";
+        }
+      });
+
+      const logoutBtn = document.getElementById("logout");
+      if (logoutBtn) {
+        logoutBtn.addEventListener("click", () => {
+          auth.signOut().then(() => {
+            window.location.href = "/login";
+          }).catch(error => {
+            console.error("Erro ao sair:", error);
+            alert("Erro ao sair. Verifique o console.");
+          });
+        });
+      }
+    });
+  </script>
+</body>
+</html>

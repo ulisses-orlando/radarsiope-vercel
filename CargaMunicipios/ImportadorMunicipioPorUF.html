@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Importar Municípios por UF</title>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+  <style>
+    #progresso-container {
+      width: 100%;
+      background: #eee;
+      border-radius: 6px;
+      margin-top: 20px;
+    }
+    #progresso-barra {
+      height: 24px;
+      width: 0%;
+      background: #007acc;
+      color: white;
+      text-align: center;
+      line-height: 24px;
+      border-radius: 6px;
+    }
+  </style>
+</head>
+<body>
+  <h2>📥 Importar Municípios por UF</h2>
+  <p>Selecione o arquivo <strong>municipios.json</strong> com os dados do IBGE:</p>
+  <input type="file" id="upload-json" accept=".json"><br><br>
+
+  <label for="uf-select">Selecione a UF:</label>
+  <select id="uf-select">
+    <option value="">-- Escolha --</option>
+  </select>
+  <button id="btn-importar">Importar municípios da UF selecionada</button>
+  <button id="btn-apagar">🗑️ Apagar UF selecionada</button>
+
+  <div id="progresso-container"><div id="progresso-barra">0%</div></div>
+  <p id="status" style="margin-top:10px;font-weight:bold;"></p>
+
+<script>
+  const firebaseConfig = {
+    apiKey: "AIzaSyDcS4nneXnN8Cdb-S_cQukwaguLXJYbQ1U",
+    authDomain: "radarsiope.firebaseapp.com",
+    projectId: "radarsiope"
+  };
+
+  firebase.initializeApp(firebaseConfig);
+  const db = firebase.firestore();
+
+  const mapaUF = {
+    11: { sigla: "RO", nome: "Rondônia", regiao: "Norte" },
+    12: { sigla: "AC", nome: "Acre", regiao: "Norte" },
+    13: { sigla: "AM", nome: "Amazonas", regiao: "Norte" },
+    14: { sigla: "RR", nome: "Roraima", regiao: "Norte" },
+    15: { sigla: "PA", nome: "Pará", regiao: "Norte" },
+    16: { sigla: "AP", nome: "Amapá", regiao: "Norte" },
+    17: { sigla: "TO", nome: "Tocantins", regiao: "Norte" },
+    21: { sigla: "MA", nome: "Maranhão", regiao: "Nordeste" },
+    22: { sigla: "PI", nome: "Piauí", regiao: "Nordeste" },
+    23: { sigla: "CE", nome: "Ceará", regiao: "Nordeste" },
+    24: { sigla: "RN", nome: "Rio Grande do Norte", regiao: "Nordeste" },
+    25: { sigla: "PB", nome: "Paraíba", regiao: "Nordeste" },
+    26: { sigla: "PE", nome: "Pernambuco", regiao: "Nordeste" },
+    27: { sigla: "AL", nome: "Alagoas", regiao: "Nordeste" },
+    28: { sigla: "SE", nome: "Sergipe", regiao: "Nordeste" },
+    29: { sigla: "BA", nome: "Bahia", regiao: "Nordeste" },
+    31: { sigla: "MG", nome: "Minas Gerais", regiao: "Sudeste" },
+    32: { sigla: "ES", nome: "Espírito Santo", regiao: "Sudeste" },
+    33: { sigla: "RJ", nome: "Rio de Janeiro", regiao: "Sudeste" },
+    35: { sigla: "SP", nome: "São Paulo", regiao: "Sudeste" },
+    41: { sigla: "PR", nome: "Paraná", regiao: "Sul" },
+    42: { sigla: "SC", nome: "Santa Catarina", regiao: "Sul" },
+    43: { sigla: "RS", nome: "Rio Grande do Sul", regiao: "Sul" },
+    50: { sigla: "MS", nome: "Mato Grosso do Sul", regiao: "Centro-Oeste" },
+    51: { sigla: "MT", nome: "Mato Grosso", regiao: "Centro-Oeste" },
+    52: { sigla: "GO", nome: "Goiás", regiao: "Centro-Oeste" },
+    53: { sigla: "DF", nome: "Distrito Federal", regiao: "Centro-Oeste" }
+  };
+
+  // Preenche o dropdown de UF
+  const ufSelect = document.getElementById("uf-select");
+  for (const [codigo, { sigla, nome }] of Object.entries(mapaUF)) {
+    const option = document.createElement("option");
+    option.value = sigla;
+    option.textContent = `${sigla} - ${nome}`;
+    ufSelect.appendChild(option);
+  }
+
+  let municipiosJson = [];
+
+  // Leitura do arquivo JSON
+  document.getElementById("upload-json").addEventListener("change", function (e) {
+    const file = e.target.files[0];
+    const reader = new FileReader();
+    reader.onload = function (event) {
+      try {
+        municipiosJson = JSON.parse(event.target.result);
+        document.getElementById("status").innerText = "✅ Arquivo carregado com sucesso.";
+      } catch (err) {
+        document.getElementById("status").innerText = "❌ Erro ao ler o arquivo JSON.";
+        console.error(err);
+      }
+    };
+    reader.readAsText(file);
+  });
+  document.getElementById("btn-importar").addEventListener("click", async function () {
+  const siglaUF = ufSelect.value;
+  if (!siglaUF || municipiosJson.length === 0) {
+    alert("Selecione uma UF e carregue o arquivo JSON.");
+    return;
+  }
+
+  const status = document.getElementById("status");
+  const barra = document.getElementById("progresso-barra");
+  const ufInfo = Object.values(mapaUF).find(uf => uf.sigla === siglaUF);
+  const codUF = parseInt(Object.keys(mapaUF).find(k => mapaUF[k].sigla === siglaUF));
+  const municipiosUF = municipiosJson.filter(m => m.codigo_uf === codUF);
+
+  if (municipiosUF.length === 0) {    
+    status.innerText = "⚠️ Nenhum município encontrado para essa UF.";
+    return;
+  }
+
+  status.innerText = `📦 Importando ${municipiosUF.length} municípios de ${siglaUF}...`;
+  const ufRef = db.collection("UF").doc(siglaUF);
+
+  // 🔎 Verifica se a UF já existe
+  const ufDoc = await ufRef.get();
+  if (!ufDoc.exists) {
+    await ufRef.set({
+      cod_uf: codUF,
+      nome_uf: ufInfo.nome,
+      regiao: ufInfo.regiao
+    });
+  } else {
+    console.log(`UF ${siglaUF} já existe, não será sobrescrita.`);
+  }
+
+  let gravados = 0;
+  for (const m of municipiosUF) {
+    const munRef = ufRef.collection("Municipio").doc(String(m.codigo_ibge));
+    const munDoc = await munRef.get();
+
+    // 🔎 Só grava se não existir
+    if (!munDoc.exists) {
+      await munRef.set({
+        cod_municipio: m.codigo_ibge,
+        nome_municipio: m.nome
+      });
+      gravados++;
+    } else {
+      console.log(`Município ${m.nome} (${m.codigo_ibge}) já existe, ignorado.`);
+    }
+
+    const progresso = Math.round((gravados / municipiosUF.length) * 100);
+    barra.style.width = progresso + "%";
+    barra.textContent = progresso + "%";
+  }
+
+  status.innerText = `✅ ${gravados} municípios novos de ${siglaUF} importados com sucesso.`;
+});
+
+  document.getElementById("btn-apagar").addEventListener("click", async function () {
+    const siglaUF = ufSelect.value;
+    if (!siglaUF) {
+      alert("Selecione uma UF para apagar.");
+      return;
+    }
+
+    if (!confirm(`Tem certeza que deseja apagar os dados da UF ${siglaUF}?`)) return;
+
+    const status = document.getElementById("status");
+    status.innerText = `🧹 Apagando dados da UF ${siglaUF}...`;
+    const barra = document.getElementById("progresso-barra");
+    barra.style.width = "0%";
+    barra.textContent = "0%";
+
+    try {
+      const ufRef = db.collection("UF").doc(siglaUF);
+      const municipiosSnap = await ufRef.collection("Municipio").get();
+      let apagados = 0;
+
+      for (const mDoc of municipiosSnap.docs) {
+        await ufRef.collection("Municipio").doc(mDoc.id).delete();
+        apagados++;
+        const progresso = Math.round((apagados / municipiosSnap.size) * 100);
+        barra.style.width = progresso + "%";
+        barra.textContent = progresso + "%";
+      }
+
+      await ufRef.delete();
+      status.innerText = `🗑️ UF ${siglaUF} e ${apagados} municípios apagados com sucesso.`;
+    } catch (err) {
+      status.innerText = "❌ Erro ao apagar dados.";
+      console.error(err);
+    }
+  });
+</script>
+</body>
+</html>
