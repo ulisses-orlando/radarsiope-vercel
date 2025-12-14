@@ -261,7 +261,7 @@
       box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
     }
 
-    /* Modal de agradecimento */
+    /* Overlay */
     .modal-agradecimento {
       position: fixed;
       top: 0;
@@ -272,29 +272,56 @@
       display: none;
       justify-content: center;
       align-items: center;
-      /* centraliza verticalmente */
       z-index: 100000;
+      padding: 0;
+      /* evita empurrar o conteúdo */
     }
 
     /* Conteúdo compacto */
     .modal-agradecimento-conteudo {
       background: #fff;
-      padding: 24px 28px;
+      padding: 20px 24px;
       border-radius: 10px;
-      max-width: 380px;
       width: 90%;
+      max-width: 360px;
+
+      /* 🔥 ESSA LINHA É A CHAVE */
+      max-height: fit-content !important;
+
+      /* 🔥 Impede que o flexbox estique verticalmente */
+      align-self: center;
+
+      /* 🔥 Remove qualquer tentativa de expandir */
+      flex-shrink: 1;
+      flex-grow: 0;
+
       text-align: center;
       box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
 
-      /* 🔹 Limita a altura e evita esticar demais */
-      max-height: 260px;
-      overflow: hidden;
+      /* 🔥 Garante que nunca passe de ~250px */
+      min-height: auto;
+    }
 
-      /* 🔹 Deixa mais elegante */
-      display: flex;
-      flex-direction: column;
-      justify-content: space-between;
-      gap: 12px;
+    /* Ajuste fino do título */
+    .modal-agradecimento-conteudo h2 {
+      font-size: 1.2rem;
+      margin: 0 0 10px 0;
+    }
+
+    /* Ajuste fino do texto */
+    .modal-agradecimento-conteudo p {
+      font-size: 0.95rem;
+      margin: 0 0 16px 0;
+    }
+
+    /* Botão */
+    .modal-agradecimento-conteudo button {
+      padding: 10px 20px;
+      background: #007acc;
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
     }
   </style>
 </head>
