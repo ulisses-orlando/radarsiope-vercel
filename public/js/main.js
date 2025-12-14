@@ -277,10 +277,6 @@ async function abrirModalNewsletter(docId = null, isEdit = false) {
     data = snap.exists ? snap.data() : {};
   }
 
-  // ✅ Se estiver editando e houver blocos, carrega depois que o DOM montar
-  if (isEdit && data.blocos) {
-    setTimeout(() => carregarBlocosDaEdicao(data), 50);
-  }
 
   // -----------------------------
   // ✅ Campos principais
@@ -649,6 +645,11 @@ async function abrirModalNewsletter(docId = null, isEdit = false) {
   containerBlocos.style.overflowY = "auto";
   body.appendChild(containerBlocos);
 
+    // ✅ Se estiver editando e houver blocos, carrega depois que o DOM montar
+  if (isEdit && data.blocos) {
+    setTimeout(() => carregarBlocosDaEdicao(data), 50);
+  }
+  
   // -----------------------------
   // ✅ Botão salvar
   // -----------------------------
