@@ -1,13 +1,12 @@
-import AWS from "aws-sdk";
+import { SESClient, SendEmailCommand } from "@aws-sdk/client-ses";
 
-// Configuração do AWS SDK
-AWS.config.update({
+const sesClient = new SESClient({
   region: process.env.AWS_REGION || "sa-east-1",
-  accessKeyId: process.env.AWS_ACCESS_KEY_ID,
-  secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY
+  credentials: {
+    accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY
+  }
 });
-
-const ses = new AWS.SES();
 
 export default async function handler(req, res) {
   if (req.method !== "POST") {
@@ -21,7 +20,7 @@ export default async function handler(req, res) {
   }
 
   const params = {
-    Source: "contato@radarsiope.com.br", // ⚠️ precisa ser verificado no SES
+    Source: "contato@radarsiope.com.br",
     Destination: { ToAddresses: [email] },
     Message: {
       Subject: { Charset: "UTF-8", Data: assunto || "Radar SIOPE - Newsletter" },
@@ -30,18 +29,19 @@ export default async function handler(req, res) {
   };
 
   try {
-    const result = await ses.sendEmail(params).promise();
+    const command = new SendEmailCommand(params);
+    const result = await sesClient.send(command);
+
     console.log("✅ SES envio bem-sucedido:", result);
+
     return res.status(200).json({ ok: true, result });
   } catch (err) {
     console.error("❌ Erro SES:", err);
+
     return res.status(500).json({
       ok: false,
       error: err.message,
-      code: err.code,
-      statusCode: err.statusCode,
-      time: err.time,
-      requestId: err.requestId,
+      code: err.name,
       details: err
     });
   }
