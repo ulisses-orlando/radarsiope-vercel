@@ -88,6 +88,21 @@
 
   <!-- Script principal (deve vir depois) -->
   <script>
+    function formatarDataFirestore(valor) {
+      if (!valor) return "";
+
+      // Se já for string, retorna direto
+      if (typeof valor === "string") return valor;
+
+      // Se for Timestamp do Firestore
+      if (valor.seconds) {
+        const data = new Date(valor.seconds * 1000);
+        return data.toLocaleDateString("pt-BR");
+      }
+
+      return "";
+    }
+
     window.addEventListener("DOMContentLoaded", () => {
       if (!window.db) {
         console.error("Firebase não foi inicializado corretamente.");
@@ -129,7 +144,7 @@
         let html = d.html_conteudo || "<p>Conteúdo não disponível.</p>";
 
         // 🔹 Substitui placeholders básicos
-        html = html.replace(/{{data_publicacao}}/g, d.data_publicacao || "");
+        html = html.replace(/{{data_publicacao}}/g, formatarDataFirestore(d.data_publicacao));
         html = html.replace(/{{edicao}}/g, d.edicao || "");
         html = html.replace(/{{titulo}}/g, d.titulo || "");
 
@@ -143,6 +158,9 @@
         // 🔹 Remove "Olá ()" se existir
         html = html.replace(/Olá\s*\(\s*\)/g, "Olá");
 
+        // Remove parênteses vazios
+        html = html.replace(/\(\s*\)/g, "");
+        
         // 🔹 Renderiza
         conteudoEl.innerHTML = html;
 
