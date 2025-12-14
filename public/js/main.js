@@ -268,6 +268,146 @@ async function abrirModalNewsletter(docId = null, isEdit = false) {
   const body = document.getElementById('modal-edit-body');
   body.innerHTML = '';
 
+  // Carrega dados da edição
+  let data = {};
+  if (isEdit && docId) {
+    const snap = await db.collection('newsletters').doc(docId).get();
+    data = snap.exists ? snap.data() : {};
+  }
+
+  // Criar grid principal
+  const grid = document.createElement('div');
+  grid.className = "editor-grid";
+
+  const colEsq = document.createElement('div');
+  const colDir = document.createElement('div');
+
+  grid.appendChild(colEsq);
+  grid.appendChild(colDir);
+  body.appendChild(grid);
+
+  // -----------------------------
+  // CAMPOS PRINCIPAIS (coluna esquerda)
+  // -----------------------------
+  colEsq.appendChild(generateDateInput('data_publicacao', data.data_publicacao ? data.data_publicacao.toDate() : null));
+  colEsq.appendChild(generateTextField('edicao', data.edicao));
+  colEsq.appendChild(generateTextField('titulo', data.titulo));
+
+  const tiposSnap = await db.collection("tipo_newsletters").get();
+  const tiposArr = tiposSnap.docs.map(doc => doc.data().nome).filter(Boolean);
+  colEsq.appendChild(generateDomainSelect("tipo", tiposArr, data.tipo));
+  colEsq.appendChild(generateDomainSelect('classificacao', ['Básica', 'Premium'], data.classificacao || 'Básica'));
+
+  // -----------------------------
+  // HTML principal (coluna direita)
+  // -----------------------------
+  const htmlWrap = document.createElement('div');
+  htmlWrap.className = 'field';
+
+  const lbl = document.createElement('label');
+  lbl.innerText = 'Conteúdo do HTML';
+  lbl.style.marginTop = "10px";
+  htmlWrap.appendChild(lbl);
+
+  const ta = document.createElement('textarea');
+  ta.rows = 20;
+  ta.style.width = '100%';
+  ta.style.minHeight = "400px";
+  ta.style.fontFamily = "monospace";
+  ta.style.fontSize = "14px";
+  ta.dataset.fieldName = 'html_conteudo';
+  ta.id = 'campo-html-newsletter';
+  ta.value = data.html_conteudo || '';
+  htmlWrap.appendChild(ta);
+
+  // Botão tela cheia
+  const btnFull = document.createElement('button');
+  btnFull.innerText = "🖥️ Tela cheia";
+  btnFull.style.marginTop = "8px";
+  btnFull.onclick = () => ta.classList.toggle("fullscreen");
+  htmlWrap.appendChild(btnFull);
+
+  colDir.appendChild(htmlWrap);
+  // -----------------------------
+  // SEÇÃO DE BLOCOS (coluna direita)
+  // -----------------------------
+  const tituloBlocos = document.createElement('h3');
+  tituloBlocos.innerText = "Blocos da Newsletter";
+  tituloBlocos.style.marginTop = "25px";
+  colDir.appendChild(tituloBlocos);
+
+  const btnAddBloco = document.createElement('button');
+  btnAddBloco.type = "button";
+  btnAddBloco.innerText = "➕ Adicionar bloco";
+  btnAddBloco.style.marginBottom = "10px";
+  btnAddBloco.onclick = () => adicionarBlocoEdicao();
+  colDir.appendChild(btnAddBloco);
+
+  const containerBlocos = document.createElement('div');
+  containerBlocos.id = "container-blocos-edicao";
+  containerBlocos.style.border = "1px solid #ddd";
+  containerBlocos.style.padding = "10px";
+  containerBlocos.style.borderRadius = "4px";
+  containerBlocos.style.maxHeight = "450px";
+  containerBlocos.style.overflowY = "auto";
+  containerBlocos.style.background = "#fdfdfd";
+  colDir.appendChild(containerBlocos);
+
+  // -----------------------------
+  // BOTÃO SALVAR
+  // -----------------------------
+  document.getElementById('modal-edit-save').onclick = async () => {
+    const payload = {};
+
+    body.querySelectorAll('[data-field-name]').forEach(el => {
+      if (el.type === 'date') {
+        payload[el.dataset.fieldName] = el.value
+          ? firebase.firestore.Timestamp.fromDate(new Date(el.value + 'T00:00:00'))
+          : null;
+      } else {
+        payload[el.dataset.fieldName] = el.value;
+      }
+    });
+
+    payload.blocos = coletarBlocosEdicao();
+
+    const htmlNewsletter = payload['html_conteudo'] || "";
+    const blocos = payload.blocos || [];
+
+    if (!validarNewsletter(htmlNewsletter, blocos)) return;
+
+    const ref = db.collection('newsletters');
+    if (isEdit && docId) {
+      await ref.doc(docId).set(payload, { merge: true });
+    } else {
+      await ref.add(payload);
+    }
+
+    closeModal('modal-edit-overlay');
+    carregarNewsletters();
+  };
+
+  // -----------------------------
+  // ABRE O MODAL
+  // -----------------------------
+  openModal('modal-edit-overlay');
+
+  // -----------------------------
+  // CARREGA OS BLOCOS (momento correto)
+  // -----------------------------
+  if (isEdit && data.blocos) {
+    setTimeout(() => carregarBlocosDaEdicao(data), 50);
+  }
+}
+
+async function abrirModalNewsletterxxxxx(docId = null, isEdit = false) {
+  const title = document.getElementById('modal-edit-title');
+  title.innerText = isEdit ? 'Editar Newsletter' : 'Nova Newsletter';
+  document.getElementById("modal-edit-save").style.display = "inline-block";
+
+  const body = document.getElementById('modal-edit-body');
+  body.innerHTML = '';
+
   // -----------------------------
   // Carrega dados da edição
   // -----------------------------
@@ -3064,7 +3204,7 @@ async function abrirModalTemplateNewsletter(docId = null, isEdit = false, dadosP
     if (!validarTemplate(htmlTemplate, blocos)) {
       return;
     }
-    
+
     if (isEdit && docId) {
       await db.collection('templates_newsletter').doc(docId).set(payload, { merge: true });
     } else {
