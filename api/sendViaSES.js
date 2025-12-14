@@ -15,6 +15,8 @@ export default async function handler(req, res) {
 
   const { email, nome, mensagemHtml, assunto } = req.body;
 
+  console.log("📩 Email recebido no backend:", email);
+
   if (!email || !mensagemHtml) {
     return res.status(400).json({ ok: false, error: "Campos obrigatórios: email e mensagemHtml" });
   }
