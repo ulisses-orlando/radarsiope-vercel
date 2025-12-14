@@ -273,45 +273,41 @@
       justify-content: center;
       align-items: center;
       z-index: 100000;
-      padding: 0;
-      /* evita empurrar o conteúdo */
     }
 
-    /* Conteúdo compacto */
+    /* Conteúdo compacto com tema Radar SIOPE */
     .modal-agradecimento-conteudo {
-      background: #fff;
-      padding: 20px 24px;
-      border-radius: 10px;
+      background: #ffffff;
+      padding: 24px 28px;
+      border-radius: 12px;
       width: 90%;
       max-width: 360px;
-
-      /* 🔥 ESSA LINHA É A CHAVE */
-      max-height: fit-content !important;
-
-      /* 🔥 Impede que o flexbox estique verticalmente */
-      align-self: center;
-
-      /* 🔥 Remove qualquer tentativa de expandir */
-      flex-shrink: 1;
-      flex-grow: 0;
-
       text-align: center;
-      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
 
-      /* 🔥 Garante que nunca passe de ~250px */
-      min-height: auto;
+      /* Borda colorida estilo Radar SIOPE */
+      border: 3px solid #007acc;
+
+      /* Sombra elegante */
+      box-shadow: 0 4px 18px rgba(0, 0, 0, 0.25);
+
+      /* Altura compacta */
+      max-height: fit-content;
+      flex-grow: 0;
+      flex-shrink: 1;
     }
 
-    /* Ajuste fino do título */
+    /* Título */
     .modal-agradecimento-conteudo h2 {
-      font-size: 1.2rem;
-      margin: 0 0 10px 0;
+      font-size: 1.3rem;
+      margin: 10px 0;
+      color: #007acc;
     }
 
-    /* Ajuste fino do texto */
+    /* Texto */
     .modal-agradecimento-conteudo p {
       font-size: 0.95rem;
-      margin: 0 0 16px 0;
+      margin-bottom: 16px;
+      color: #333;
     }
 
     /* Botão */
@@ -322,6 +318,64 @@
       border: none;
       border-radius: 6px;
       cursor: pointer;
+      font-weight: bold;
+      transition: 0.2s;
+    }
+
+    .modal-agradecimento-conteudo button:hover {
+      background: #005fa3;
+    }
+
+    /* ----------------------------- */
+    /* ÍCONE DE CHECK ANIMADO        */
+    /* ----------------------------- */
+
+    .check-container {
+      width: 70px;
+      height: 70px;
+      border-radius: 50%;
+      border: 3px solid #007acc;
+      margin: 0 auto 12px auto;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      animation: pop 0.4s ease-out;
+    }
+
+    .checkmark {
+      width: 28px;
+      height: 14px;
+      border-left: 4px solid #007acc;
+      border-bottom: 4px solid #007acc;
+      transform: rotate(-45deg);
+      opacity: 0;
+      animation: draw 0.5s ease-out forwards 0.3s;
+    }
+
+    /* Animação do círculo */
+    @keyframes pop {
+      0% {
+        transform: scale(0.4);
+        opacity: 0;
+      }
+
+      100% {
+        transform: scale(1);
+        opacity: 1;
+      }
+    }
+
+    /* Animação do check */
+    @keyframes draw {
+      0% {
+        opacity: 0;
+        transform: rotate(-45deg) scale(0.5);
+      }
+
+      100% {
+        opacity: 1;
+        transform: rotate(-45deg) scale(1);
+      }
     }
   </style>
 </head>
@@ -361,15 +415,22 @@
     </div>
   </div>
 
-  <div id="modalAgradecimento"
-    style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background-color:rgba(0,0,0,0.6); z-index:9999;">
-    <div
-      style="background:#fff; padding:30px; max-width:400px; margin:100px auto; border-radius:8px; text-align:center;">
+  <div id="modalAgradecimento" class="modal-agradecimento">
+    <div class="modal-agradecimento-conteudo">
+
+      <!-- Ícone animado -->
+      <div class="check-container">
+        <div class="checkmark"></div>
+      </div>
+
       <h2>✅ Obrigado, <span id="nomeModal"></span>!</h2>
       <p>Recebemos sua mensagem e entraremos em contato em breve.</p>
+
       <button onclick="fecharModalAgradecimento()">Fechar</button>
     </div>
   </div>
+
+
   <!-- Lista de newsletters -->
   <div id="lista-basicas"></div>
   <div id="lista-premium"></div>
@@ -379,14 +440,6 @@
     <div id="modal-body"></div>
   </div>
 
-  <!-- Modal de agradecimento -->
-  <div id="modalAgradecimento" class="modal-agradecimento">
-    <div class="modal-agradecimento-conteudo">
-      <h2>Obrigado, <span id="nomeModal"></span>!</h2>
-      <p>Seu interesse foi registrado. Em breve entraremos em contato.</p>
-      <button onclick="fecharModalAgradecimento()">Fechar</button>
-    </div>
-  </div>
   <script src="https://www.gstatic.com/firebasejs/10.0.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.0.0/firebase-firestore-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.0.0/firebase-auth-compat.js"></script>
