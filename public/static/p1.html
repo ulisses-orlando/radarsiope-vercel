@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Notícias – Radar SIOPE</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <style>
+        body {
+            font-family: 'Segoe UI', sans-serif;
+            margin: 0;
+            padding: 0;
+            background: #f4f4f4;
+        }
+
+        header {
+            background: #007acc;
+            padding: 20px;
+            text-align: center;
+        }
+
+        header h1 {
+            color: #fff;
+            margin: 0;
+            font-size: 1.8rem;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 30px auto;
+            padding: 20px;
+            background: #fff;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .voltar {
+            display: inline-block;
+            margin-bottom: 20px;
+            padding: 10px 16px;
+            background: #007acc;
+            color: #fff;
+            border-radius: 6px;
+            text-decoration: none;
+            font-weight: bold;
+        }
+
+        /* Seção de notícias */
+        .secao-news {
+            margin-top: 20px;
+            padding: 16px;
+            border-radius: 12px;
+            background: #f9f9f9;
+            border: 2px solid #007acc33;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+        }
+
+        /* Wrapper com setas */
+        .carrossel-wrapper {
+            position: relative;
+            display: flex;
+            align-items: center;
+            margin-top: 12px;
+        }
+
+        /* Botões de navegação */
+        .carrossel-seta {
+            flex: 0 0 auto;
+            height: 100%;
+            font-size: 24px;
+            cursor: pointer;
+            border: none;
+            background: #fff;
+            width: 48px;
+            transition: 0.2s;
+            border-radius: 6px;
+        }
+
+        .carrossel-seta:hover {
+            background: #e6f0ff;
+        }
+
+        /* Container do carrossel */
+        .carrossel-container {
+            overflow: hidden;
+            flex: 1;
+            max-width: 904px;
+            margin: 0 auto;
+        }
+
+        /* Faixa interna */
+        .carrossel {
+            display: flex;
+            gap: 16px;
+            padding: 8px 16px;
+            scroll-behavior: smooth;
+            overflow-x: auto;
+            scroll-snap-type: x mandatory;
+        }
+
+        /* Card da notícia */
+        .card-news {
+            min-width: 255px;
+            max-width: 255px;
+            flex: 0 0 auto;
+            border: 2px solid #007acc;
+            border-radius: 8px;
+            padding: 12px;
+            background: #fff;
+            scroll-snap-align: start;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
+        }
+
+        .card-news h3 {
+            margin-top: 0;
+            font-size: 1.1rem;
+            color: #007acc;
+        }
+
+        .card-news p {
+            margin: 6px 0;
+            color: #333;
+        }
+
+        .card-news button {
+            margin-top: 10px;
+            padding: 8px 12px;
+            background: #007acc;
+            color: #fff;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            width: 100%;
+        }
+
+        .card-news button:hover {
+            background: #005fa3;
+        }
+    </style>
+</head>
+
+<body>
+
+    <header>
+        <h1>Notícias Radar SIOPE</h1>
+    </header>
+
+    <div class="container">
+        <a href="index.html" class="voltar">← Voltar</a>
+
+        <h2>Últimas Notícias</h2>
+
+        <!-- Aqui o carrossel será inserido -->
+        <div id="carrossel-noticias"></div>
+    </div>
+
+    <!-- Firebase (se necessário para rastreamento ou logs) -->
+    <script src="https://www.gstatic.com/firebasejs/10.0.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.0.0/firebase-firestore-compat.js"></script>
+    <script src="js/firebase-init.js"></script>
+
+    <!-- Script da página -->
+    <script src="js/noticias.js"></script>
+
+</body>
+
+</html>
