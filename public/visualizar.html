@@ -158,9 +158,18 @@
         // 🔹 Remove "Olá ()" se existir
         html = html.replace(/Olá\s*\(\s*\)/g, "Olá");
 
-        // Remove parênteses vazios
-        html = html.replace(/\(\s*\)/g, "");
-        
+        // Remove parênteses vazios com QUALQUER tipo de espaço
+        html = html.replace(/\(\s*?\)/g, "");
+
+        // Remove parênteses vazios com espaços invisíveis (NBSP, etc.)
+        html = html.replace(/\(\s*?\u00A0*?\)/g, "");
+
+        // Remove "()" grudado em vírgula
+        html = html.replace(/\(\s*?\),/g, "");
+
+        // Remove vírgula sobrando após remover os parênteses
+        html = html.replace(/,\s*</g, "<");
+
         // 🔹 Renderiza
         conteudoEl.innerHTML = html;
 
