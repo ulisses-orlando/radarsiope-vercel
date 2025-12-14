@@ -398,6 +398,14 @@ async function abrirModalNewsletter(docId = null, isEdit = false) {
   if (isEdit && data.blocos) {
     setTimeout(() => carregarBlocosDaEdicao(data), 50);
   }
+
+  document.addEventListener("keydown", function escListener(e) {
+    if (e.key === "Escape" && ta.classList.contains("fullscreen")) {
+      ta.classList.remove("fullscreen");
+      btnFull.innerText = "🖥️ Tela cheia";
+    }
+  });
+
 }
 
 async function abrirModalNewsletterxxxxx(docId = null, isEdit = false) {
