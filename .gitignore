@@ -1,3 +1,4 @@
+env.download
 # Logs
 logs
 *.log
