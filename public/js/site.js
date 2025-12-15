@@ -39,14 +39,14 @@ async function abrirNewsletter(id, classificacao) {
   }
 
   // Se for premium, verifica usuário logado (se quiser manter essa lógica)
-  const user = firebase.auth().currentUser;
+  /* const user = firebase.auth().currentUser;
 
   if (user) {
     // Usuário logado → abre direto
     window.location.href = `visualizar.html?id=${id}`;
     return;
   }
-
+*/
   // Não logado → exibe formulário de interesse
   const modal = document.getElementById("modal-interesse");
   const modalBody = document.getElementById("modal-body");
