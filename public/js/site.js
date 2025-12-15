@@ -908,3 +908,5 @@ async function buscarNoticias(rssUrl) {
 window.addEventListener("DOMContentLoaded", () => {
   montarCarrosselNoticias();
 });
+
+window.abrirNewsletter = abrirNewsletter;
