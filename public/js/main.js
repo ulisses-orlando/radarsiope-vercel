@@ -278,39 +278,139 @@ async function abrirModalNewsletter(docId = null, isEdit = false) {
   }
 
   // -----------------------------
-  // GRID PRINCIPAL (2 colunas)
+  // GRID PRINCIPAL (3 colunas)
   // -----------------------------
   const grid = document.createElement('div');
-  grid.className = "editor-grid";
-
-  const colEsq = document.createElement('div');
-  const colDir = document.createElement('div');
-
-  grid.appendChild(colEsq);
-  grid.appendChild(colDir);
+  grid.className = "newsletter-grid";
   body.appendChild(grid);
 
+  const col1 = document.createElement('div'); // Campos iniciais
+  const col2 = document.createElement('div'); // Editor HTML + templates + preview
+  const col3 = document.createElement('div'); // Blocos
+
+  grid.appendChild(col1);
+  grid.appendChild(col2);
+  grid.appendChild(col3);
+
   // -----------------------------
-  // CAMPOS PRINCIPAIS (coluna esquerda)
+  // COLUNA 1 — CAMPOS INICIAIS
   // -----------------------------
-  colEsq.appendChild(generateDateInput('data_publicacao', data.data_publicacao ? data.data_publicacao.toDate() : null));
-  colEsq.appendChild(generateTextField('edicao', data.edicao));
-  colEsq.appendChild(generateTextField('titulo', data.titulo));
+  col1.appendChild(generateDateInput('data_publicacao', data.data_publicacao ? data.data_publicacao.toDate() : null));
+  col1.appendChild(generateTextField('edicao', data.edicao));
+  col1.appendChild(generateTextField('titulo', data.titulo));
 
   const tiposSnap = await db.collection("tipo_newsletters").get();
   const tiposArr = tiposSnap.docs.map(doc => doc.data().nome).filter(Boolean);
-  colEsq.appendChild(generateDomainSelect("tipo", tiposArr, data.tipo));
-  colEsq.appendChild(generateDomainSelect('classificacao', ['Básica', 'Premium'], data.classificacao || 'Básica'));
+  col1.appendChild(generateDomainSelect("tipo", tiposArr, data.tipo));
+  col1.appendChild(generateDomainSelect('classificacao', ['Básica', 'Premium'], data.classificacao || 'Básica'));
 
   // -----------------------------
-  // EDITOR HTML (coluna direita)
+  // COLUNA 2 — EDITOR HTML + TEMPLATES + PREVIEW
   // -----------------------------
   const htmlWrap = document.createElement('div');
   htmlWrap.className = 'field';
+  col2.appendChild(htmlWrap);
 
+  // Explicação dos placeholders
+  const explicacao = document.createElement('div');
+  explicacao.innerHTML = `
+    <div class="info-box" style="background:#eef; padding:10px; border-left:4px solid #88f; margin-bottom:10px;">
+      <strong>📌 Placeholders disponíveis:</strong>
+      <ul style="margin-top:5px; font-size:14px;">
+        <li><code>{{nome}}</code></li>
+        <li><code>{{email}}</code></li>
+        <li><code>{{edicao}}</code></li>
+        <li><code>{{tipo}}</code></li>
+        <li><code>{{titulo}}</code></li>
+        <li><code>{{data_publicacao}}</code></li>
+        <li><code>{{blocos}}</code></li>
+      </ul>
+    </div>`;
+  htmlWrap.appendChild(explicacao);
+
+  // Filtros de template
+  const filtroWrap = document.createElement('div');
+  filtroWrap.style.marginTop = '10px';
+  filtroWrap.style.display = 'flex';
+  filtroWrap.style.gap = '10px';
+
+  const filtroTipo = document.createElement('select');
+  filtroTipo.id = 'filtro-tipo-template';
+  filtroTipo.style.flex = '1';
+  filtroTipo.innerHTML = `<option value="">Filtrar por tipo</option>`;
+  tiposArr.forEach(tipo => {
+    filtroTipo.innerHTML += `<option value="${tipo}">${tipo}</option>`;
+  });
+  filtroWrap.appendChild(filtroTipo);
+
+  const filtroClassificacao = document.createElement('select');
+  filtroClassificacao.id = 'filtro-classificacao-template';
+  filtroClassificacao.style.flex = '1';
+  filtroClassificacao.innerHTML = `
+    <option value="">Filtrar por classificação</option>
+    <option value="Básica">Básica</option>
+    <option value="Premium">Premium</option>
+  `;
+  filtroWrap.appendChild(filtroClassificacao);
+
+  htmlWrap.appendChild(filtroWrap);
+
+  // Seletor de template
+  const seletorTemplate = document.createElement('select');
+  seletorTemplate.id = 'seletor-template-newsletter';
+  seletorTemplate.style.width = '100%';
+  seletorTemplate.style.marginTop = '10px';
+  htmlWrap.appendChild(seletorTemplate);
+
+  const todosTemplates = [];
+  const templatesSnap = await db.collection('templates_newsletter').orderBy('nome').get();
+  templatesSnap.forEach(doc => {
+    const d = doc.data();
+    todosTemplates.push({ id: doc.id, ...d });
+  });
+
+  function atualizarListaTemplates() {
+    const tipoSelecionado = filtroTipo.value;
+    const classifSelecionada = filtroClassificacao.value;
+
+    seletorTemplate.innerHTML = `<option value="">Selecione um template para carregar HTML</option>`;
+    todosTemplates.forEach(t => {
+      const matchTipo = !tipoSelecionado || t.tipo === tipoSelecionado;
+      const matchClassif = !classifSelecionada || t.classificacao === classifSelecionada;
+      if (matchTipo && matchClassif) {
+        seletorTemplate.innerHTML += `<option value="${t.id}">${t.nome}</option>`;
+      }
+    });
+  }
+
+  filtroTipo.onchange = atualizarListaTemplates;
+  filtroClassificacao.onchange = atualizarListaTemplates;
+  atualizarListaTemplates();
+
+  // Botão carregar template
+  const btnCarregarTemplate = document.createElement('button');
+  btnCarregarTemplate.innerText = '📥 Carregar HTML do Template';
+  btnCarregarTemplate.style.marginTop = '10px';
+  btnCarregarTemplate.onclick = async () => {
+    const templateId = seletorTemplate.value;
+    if (!templateId) return alert("Selecione um template.");
+
+    const snap = await db.collection('templates_newsletter').doc(templateId).get();
+    if (!snap.exists) return alert("Template não encontrado.");
+
+    const template = snap.data();
+    ta.value = template.html_base || '';
+
+    if (template.blocos) {
+      carregarBlocosDoTemplateNaEdicao(templateId);
+    }
+  };
+  htmlWrap.appendChild(btnCarregarTemplate);
+
+  // Campo HTML principal
   const lbl = document.createElement('label');
   lbl.innerText = 'Conteúdo do HTML';
-  lbl.style.marginTop = "10px";
+  lbl.style.marginTop = "15px";
   htmlWrap.appendChild(lbl);
 
   const ta = document.createElement('textarea');
@@ -324,24 +424,18 @@ async function abrirModalNewsletter(docId = null, isEdit = false) {
   ta.value = data.html_conteudo || '';
   htmlWrap.appendChild(ta);
 
-  // -----------------------------
-  // BOTÃO TELA CHEIA
-  // -----------------------------
+  // Botão Tela Cheia
   const btnFull = document.createElement('button');
   btnFull.innerText = "🖥️ Tela cheia";
   btnFull.style.marginTop = "8px";
 
   btnFull.onclick = () => {
     ta.classList.toggle("fullscreen");
-
-    if (ta.classList.contains("fullscreen")) {
-      btnFull.innerText = "🗗 Sair da tela cheia";
-    } else {
-      btnFull.innerText = "🖥️ Tela cheia";
-    }
+    btnFull.innerText = ta.classList.contains("fullscreen")
+      ? "🗗 Sair da tela cheia"
+      : "🖥️ Tela cheia";
   };
 
-  // ESC para sair
   document.addEventListener("keydown", function(e) {
     if (e.key === "Escape" && ta.classList.contains("fullscreen")) {
       ta.classList.remove("fullscreen");
@@ -351,9 +445,7 @@ async function abrirModalNewsletter(docId = null, isEdit = false) {
 
   htmlWrap.appendChild(btnFull);
 
-  // -----------------------------
-  // BOTÕES DE PREVIEW
-  // -----------------------------
+  // Botões de preview
   const previewWrap = document.createElement('div');
   previewWrap.style.marginTop = "10px";
   previewWrap.style.display = "flex";
@@ -378,22 +470,29 @@ async function abrirModalNewsletter(docId = null, isEdit = false) {
 
   htmlWrap.appendChild(previewWrap);
 
-  colDir.appendChild(htmlWrap);
-
   // -----------------------------
-  // SEÇÃO DE BLOCOS
+  // COLUNA 3 — BLOCOS
   // -----------------------------
   const tituloBlocos = document.createElement('h3');
   tituloBlocos.innerText = "Blocos da Newsletter";
-  tituloBlocos.style.marginTop = "25px";
-  colDir.appendChild(tituloBlocos);
+  tituloBlocos.style.marginTop = "10px";
+  col3.appendChild(tituloBlocos);
+
+  const descBlocos = document.createElement('p');
+  descBlocos.style.fontSize = "13px";
+  descBlocos.style.color = "#555";
+  descBlocos.innerHTML = `
+    Se você usar blocos, o HTML acima será ignorado no envio.<br>
+    Cada bloco pode ser exibido para: <strong>Todos</strong>, <strong>Leads</strong> ou <strong>Assinantes</strong>.
+  `;
+  col3.appendChild(descBlocos);
 
   const btnAddBloco = document.createElement('button');
   btnAddBloco.type = "button";
   btnAddBloco.innerText = "➕ Adicionar bloco";
   btnAddBloco.style.marginBottom = "10px";
   btnAddBloco.onclick = () => adicionarBlocoEdicao();
-  colDir.appendChild(btnAddBloco);
+  col3.appendChild(btnAddBloco);
 
   const containerBlocos = document.createElement('div');
   containerBlocos.id = "container-blocos-edicao";
@@ -403,7 +502,7 @@ async function abrirModalNewsletter(docId = null, isEdit = false) {
   containerBlocos.style.maxHeight = "450px";
   containerBlocos.style.overflowY = "auto";
   containerBlocos.style.background = "#fdfdfd";
-  colDir.appendChild(containerBlocos);
+  col3.appendChild(containerBlocos);
 
   // -----------------------------
   // BOTÃO SALVAR
@@ -445,12 +544,13 @@ async function abrirModalNewsletter(docId = null, isEdit = false) {
   openModal('modal-edit-overlay');
 
   // -----------------------------
-  // CARREGA OS BLOCOS (momento correto)
+  // CARREGA OS BLOCOS
   // -----------------------------
   if (isEdit && data.blocos) {
     setTimeout(() => carregarBlocosDaEdicao(data), 50);
   }
 }
+
 
 
 async function abrirModalNewsletterxxxxx(docId = null, isEdit = false) {
