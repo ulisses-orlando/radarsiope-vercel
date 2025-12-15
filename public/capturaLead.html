@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Cadastro de Interesse – Radar SIOPE</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <link rel="stylesheet" href="public/css/capturaLead.css">
+</head>
+
+<body>
+
+  <div class="container">
+    <h2>🔒 Conteúdo exclusivo para assinantes</h2>
+    <p>Preencha o formulário abaixo para receber informações sobre planos, capacitação ou consultoria.</p>
+
+    <form id="form-interesse">
+      <label>Nome:</label>
+      <input type="text" id="nome" required>
+
+      <label>E-mail:</label>
+      <input type="email" id="email" required>
+      <input type="email" id="confirmar_email" placeholder="Confirme seu e-mail" required>
+
+      <label>Telefone:</label>
+      <input type="tel" id="telefone" required>
+
+      <label>Como prefere ser contatado?</label>
+      <select id="preferencia-contato" required>
+        <option value="">Selecione...</option>
+        <option value="E-mail">📧 E-mail</option>
+        <option value="WhatsApp">🟢 WhatsApp</option>
+        <option value="Ligação">📞 Ligação</option>
+      </select>
+
+      <label>Qual o seu Perfil?</label>
+      <select id="perfil" required>
+        <option value="">Selecione...</option>
+        <option value="secretario">Secretário</option>
+        <option value="tecnico">Técnico</option>
+        <option value="contador">Contador</option>
+        <option value="pesquisador">Pesquisador</option>
+        <option value="cacs">CACS</option>
+        <option value="cidadao">Cidadão</option>
+      </select>
+
+      <label>Mensagem (opcional):</label>
+      <textarea id="mensagem" rows="4"></textarea>
+
+      <div id="campo-newsletters"></div>
+
+      <button type="submit">Quero saber mais</button>
+      <p id="status-envio"></p>
+    </form>
+  </div>
+
+  <!-- Modal de agradecimento -->
+  <div id="modalAgradecimento">
+    <div class="box">
+      <h3>Obrigado, <span id="nomeModal"></span>!</h3>
+      <p>Recebemos seu interesse e entraremos em contato.</p>
+      <button onclick="fecharModalAgradecimento()">Fechar</button>
+    </div>
+  </div>
+
+  <!-- Firebase -->
+  <script src="https://www.gstatic.com/firebasejs/10.0.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.0.0/firebase-firestore-compat.js"></script>
+  <script src="public/js/firebase-init.js"></script>
+
+  <!-- Suas funções já existentes -->
+  <script src="js/functions.js"></script>
+  <!-- Lógica da captura -->
+  <script src="public/js/capturaLead.js"></script>
+
+</body>
+</html>
