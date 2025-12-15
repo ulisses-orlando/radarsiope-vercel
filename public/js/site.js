@@ -46,7 +46,7 @@ async function abrirNewsletter(id, classificacao) {
     window.location.href = `visualizar.html?id=${id}`;
     return;
   }
-*/
+  */
   // Não logado → exibe formulário de interesse
   const modal = document.getElementById("modal-interesse");
   const modalBody = document.getElementById("modal-body");
@@ -121,8 +121,7 @@ async function abrirNewsletter(id, classificacao) {
   modalBody.scrollTop = 0;
 
   // Listener de submit
-  const form = document.getElementById("form-interesse");
-  form.addEventListener("submit", async (e) => {
+  document.getElementById("form-interesse").addEventListener("submit", async (e) => {
     e.preventDefault();
     await processarEnvioInteresse(e);
   });
