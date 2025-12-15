@@ -1,35 +1,66 @@
 window.addEventListener("DOMContentLoaded", () => {
-  carregarNoticias();
+  carregarTemasENoticias();
 });
 
-// URL da sua API de notícias (ajuste se necessário)
-const API_URL = "https://api.radarsiope.com.br/api/noticias";
+const API_TEMAS = "https://api.radarsiope.com.br/api/noticiasApi";
 
-async function carregarNoticias() {
+// ===============================
+// 1. Carrega temas do Firestore
+// ===============================
+async function carregarTemasENoticias() {
   const container = document.getElementById("carrossel-noticias");
   container.innerHTML = "<p>Carregando notícias...</p>";
 
   try {
-    const response = await fetch(API_URL);
-    const noticias = await response.json();
+    const response = await fetch(API_TEMAS);
+    container.error("const response:", response);
+container.error("const response json:", response.json());
+    const temas = await response.json();
+    container.error("const temas:", temas);
 
-    if (!noticias || noticias.length === 0) {
-      container.innerHTML = "<p>Nenhuma notícia encontrada.</p>";
+    if (!Array.isArray(temas) || temas.length === 0) {
+      container.innerHTML = "<p>Nenhum tema encontrado.</p>";
       return;
     }
 
-    montarCarrosselNoticias(noticias, container);
+    container.innerHTML = "";
+
+    for (const tema of temas) {
+      await montarCarrosselPorTema(tema, container);
+    }
 
   } catch (err) {
-    console.error("Erro ao carregar notícias:", err);
+    console.error("Erro ao carregar temas:", err);
     container.innerHTML = "<p>Erro ao carregar notícias.</p>";
   }
 }
 
-function montarCarrosselNoticias(lista, container) {
+// ===============================
+// 2. Monta carrossel por tema
+// ===============================
+async function montarCarrosselPorTema(tema, container) {
+  const rssUrl = gerarRSSUrl(tema.palavras_chave);
+  const noticias = await buscarNoticias(rssUrl);
+
+  if (!noticias || noticias.length === 0) return;
+
+  const cor = tema.cor || "#007acc";
+
+  // Seção do tema
   const secao = document.createElement("section");
   secao.className = "secao-news";
+  secao.style.borderColor = cor;
 
+  // Título do tema
+  const titulo = document.createElement("h2");
+  titulo.textContent = tema.nome;
+  titulo.style.borderLeft = `8px solid ${cor}`;
+  titulo.style.paddingLeft = "12px";
+  titulo.style.color = cor;
+  titulo.style.marginBottom = "16px";
+  secao.appendChild(titulo);
+
+  // Wrapper com setas
   const wrapper = document.createElement("div");
   wrapper.className = "carrossel-wrapper";
 
@@ -47,8 +78,22 @@ function montarCarrosselNoticias(lista, container) {
   const faixa = document.createElement("div");
   faixa.className = "carrossel";
 
-  lista.forEach(n => {
-    const card = criarCardNoticia(n);
+  // ===============================
+  // 3. Criar cards das notícias
+  // ===============================
+  noticias.forEach(n => {
+    const card = document.createElement("div");
+    card.className = "card-news";
+    card.style.borderColor = cor;
+
+    card.innerHTML = `
+      <div style="height:6px;background:${cor};border-radius:4px;margin-bottom:8px;"></div>
+      <h3>${n.titulo}</h3>
+      ${n.imagem ? `<img src="${n.imagem}" style="width:100%;border-radius:6px;margin:8px 0;">` : ""}
+      ${tema.prioridade <= 2 ? `<p style="color:#e67e22;font-weight:bold;">🔥 Prioridade Alta</p>` : ""}
+      <button onclick="window.open('${n.link}', '_blank')">Ler notícia</button>
+    `;
+
     faixa.appendChild(card);
   });
 
@@ -67,32 +112,36 @@ function montarCarrosselNoticias(lista, container) {
   wrapper.appendChild(btnDir);
 
   secao.appendChild(wrapper);
-  container.innerHTML = "";
   container.appendChild(secao);
 }
 
-function criarCardNoticia(n) {
-  const card = document.createElement("div");
-  card.className = "card-news";
-
-  const titulo = n.titulo || "Sem título";
-  const link = n.link || "#";
-  const data = formatarData(n.data);
-
-  card.innerHTML = `
-    <h3>${titulo}</h3>
-    ${data ? `<p><strong>Data:</strong> ${data}</p>` : ""}
-    <button onclick="window.open('${link}', '_blank')">Ler notícia</button>
-  `;
-
-  return card;
+// ===============================
+// 4. Gera URL do Google News RSS
+// ===============================
+function gerarRSSUrl(palavras_chave) {
+  const query = palavras_chave.map(p => `"${p}"`).join(" OR ");
+  return `https://news.google.com/rss/search?q=${encodeURIComponent(query)}&hl=pt-BR&gl=BR&ceid=BR:pt-419`;
 }
 
-function formatarData(valor) {
-  if (!valor) return "";
+// ===============================
+// 5. Busca notícias via RSS2JSON
+// ===============================
+async function buscarNoticias(rssUrl) {
+  try {
+    const apiUrl = `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(rssUrl)}`;
+    const res = await fetch(apiUrl);
+    const json = await res.json();
 
-  const dt = new Date(valor);
-  if (isNaN(dt.getTime())) return "";
+    if (!json.items) return [];
 
-  return dt.toLocaleDateString("pt-BR");
+    return json.items.map(item => ({
+      titulo: item.title,
+      link: item.link,
+      imagem: item.thumbnail || null
+    }));
+
+  } catch (err) {
+    console.error("Erro ao buscar RSS:", err);
+    return [];
+  }
 }
