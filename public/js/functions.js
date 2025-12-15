@@ -218,3 +218,28 @@ function getDataMinima(dias) {
   hoje.setHours(0, 0, 0, 0);
   return new Date(hoje.getTime() - dias * 24 * 60 * 60 * 1000);
 }
+
+function gerarHtmlPlaceholdersExpandivel() {
+  return `
+    <div class="placeholder-box">
+      <div class="placeholder-header" onclick="this.parentElement.classList.toggle('open')">
+        <strong>📌 Placeholders disponíveis</strong>
+        <span class="toggle-icon">▼</span>
+      </div>
+
+      <div class="placeholder-content">
+        <ul>
+          <li><code>{{nome}}</code> → Nome do usuário</li>
+          <li><code>{{email}}</code> → E-mail do usuário</li>
+          <li><code>{{edicao}}</code> → Número da edição</li>
+          <li><code>{{tipo}}</code> → Tipo da newsletter</li>
+          <li><code>{{titulo}}</code> → Título da edição</li>
+          <li><code>{{data_publicacao}}</code> → Data da edição (DD/MM/AAAA)</li>
+          <li><code>{{blocos}}</code> → Local onde os blocos serão inseridos</li>
+        </ul>
+        <p>Esses campos serão substituídos automaticamente no momento do envio.</p>
+      </div>
+    </div>
+  `;
+}
+

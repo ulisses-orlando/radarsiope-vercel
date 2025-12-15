@@ -694,20 +694,8 @@ async function abrirModalEnvioManual(usuarioId, solicitacaoId, dadosSolicitacao)
     `<option value="${r.id}">${r.titulo}</option>`
   ).join("");
 
-  body.innerHTML = `
-  <div class="info-box" style="background:#eef; padding:10px; border-left:4px solid #88f; margin-bottom:10px;">
-    <strong>📌 Placeholders disponíveis:</strong>
-      <ul style="margin-top:5px; font-size:14px;">
-        <li><code>{{nome}}</code> → Nome do usuário</li>
-        <li><code>{{email}}</code> → E-mail do usuário</li>
-        <li><code>{{edicao}}</code> → Número da edição</li>
-        <li><code>{{tipo}}</code> → Tipo Newsletter</li>
-        <li><code>{{titulo}}</code> → Título da edição</li>
-        <li><code>{{data_publicacao}}</code> → Data da edição (formato DD/MM/AAAA)</li>
-      </ul>
-    <p>Esses campos serão substituídos automaticamente no momento do envio.</p>
-  </div>
-
+  body.innerHTML = gerarHtmlPlaceholdersExpandivel();
+  body.innerHTML += `
     <div class="field">
       <label>Selecione a resposta</label>
       <select id="resposta-select">${selectHTML}</select>
@@ -907,19 +895,8 @@ async function abrirModalEnvioNewsletterManual(usuarioId, assinaturaId) {
     return `<option value="${ed.id}">${data} - ${edicao} - ${titulo}</option>`;
   }).join("");
 
-  body.innerHTML = `
-      <div class="info-box" style="background:#eef; padding:10px; border-left:4px solid #88f; margin-bottom:10px;">
-      <strong>📌 Placeholders disponíveis:</strong>
-      <ul style="margin-top:5px; font-size:14px;">
-        <li><code>{{nome}}</code> → Nome do usuário</li>
-        <li><code>{{email}}</code> → E-mail do usuário</li>
-        <li><code>{{edicao}}</code> → Número da edição</li>
-        <li><code>{{tipo}}</code> → Tipo Newsletter</li>
-        <li><code>{{titulo}}</code> → Título da edição</li>
-        <li><code>{{data_publicacao}}</code> → Data da edição (formato DD/MM/AAAA)</li>
-      </ul>
-      <p style="margin-top:8px;">Esses campos serão substituídos automaticamente no momento do envio.</p>
-    </div>
+  body.innerHTML = gerarHtmlPlaceholdersExpandivel();
+  body.innerHTML += `
     <div class="field">
       <label>Edição da Newsletter</label>
       <select id="edicao-select">${selectHTML}</select>

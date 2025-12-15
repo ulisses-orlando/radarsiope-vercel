@@ -313,19 +313,7 @@ async function abrirModalNewsletter(docId = null, isEdit = false) {
 
   // Explicação dos placeholders
   const explicacao = document.createElement('div');
-  explicacao.innerHTML = `
-    <div class="info-box" style="background:#eef; padding:10px; border-left:4px solid #88f; margin-bottom:10px;">
-      <strong>📌 Placeholders disponíveis:</strong>
-      <ul style="margin-top:5px; font-size:14px;">
-        <li><code>{{nome}}</code></li>
-        <li><code>{{email}}</code></li>
-        <li><code>{{edicao}}</code></li>
-        <li><code>{{tipo}}</code></li>
-        <li><code>{{titulo}}</code></li>
-        <li><code>{{data_publicacao}}</code></li>
-        <li><code>{{blocos}}</code></li>
-      </ul>
-    </div>`;
+  explicacao.innerHTML = gerarHtmlPlaceholdersExpandivel();
   htmlWrap.appendChild(explicacao);
 
   // Filtros de template
@@ -424,26 +412,100 @@ async function abrirModalNewsletter(docId = null, isEdit = false) {
   ta.value = data.html_conteudo || '';
   htmlWrap.appendChild(ta);
 
-  // Botão Tela Cheia
-  const btnFull = document.createElement('button');
-  btnFull.innerText = "🖥️ Tela cheia";
-  btnFull.style.marginTop = "8px";
+  // -----------------------------
+// BOTÕES: COPIAR, PIXEL, CLICK, DESCADASTRAMENTO
+// -----------------------------
+const botoesExtrasWrap = document.createElement('div');
+botoesExtrasWrap.style.marginTop = "10px";
+botoesExtrasWrap.style.display = "flex";
+botoesExtrasWrap.style.flexWrap = "wrap";
+botoesExtrasWrap.style.gap = "10px";
 
-  btnFull.onclick = () => {
-    ta.classList.toggle("fullscreen");
-    btnFull.innerText = ta.classList.contains("fullscreen")
-      ? "🗗 Sair da tela cheia"
-      : "🖥️ Tela cheia";
-  };
+// COPIAR HTML
+const btnCopiar = document.createElement('button');
+btnCopiar.innerText = '📋 Copiar HTML';
+btnCopiar.onclick = () => {
+  const html = ta.value;
+  if (!html) {
+    alert("O campo HTML está vazio.");
+    return;
+  }
 
-  document.addEventListener("keydown", function(e) {
-    if (e.key === "Escape" && ta.classList.contains("fullscreen")) {
-      ta.classList.remove("fullscreen");
-      btnFull.innerText = "🖥️ Tela cheia";
-    }
-  });
+  navigator.clipboard.writeText(html)
+    .then(() => alert("HTML copiado para a área de transferência!"))
+    .catch(err => {
+      console.error("Erro ao copiar:", err);
+      alert("Não foi possível copiar o HTML.");
+    });
+};
+botoesExtrasWrap.appendChild(btnCopiar);
 
-  htmlWrap.appendChild(btnFull);
+// PIXEL
+const btnPixel = document.createElement('button');
+btnPixel.innerText = '➕ Pixel';
+btnPixel.onclick = () => {
+  const texto = `
+<!-- Código de Pixel -->
+<img src="https://api.radarsiope.com.br/api/pixel?newsletter={{newsletterId}}&email={{email}}" 
+     width="1" height="1" style="display:none" alt="pixel" />
+`;
+  if (!ta.value.includes("api/pixel")) {
+    ta.value += "\n" + texto;
+  } else {
+    alert("O código de Pixel já está incluído.");
+  }
+};
+botoesExtrasWrap.appendChild(btnPixel);
+
+// CLICK
+const btnClick = document.createElement('button');
+btnClick.innerText = '➕ Click';
+btnClick.onclick = () => {
+  let destino = prompt("Informe o link de destino:", "https://www.radarsiope.com.br/");
+
+  if (!destino) destino = "https://www.radarsiope.com.br/";
+
+  if (!destino.startsWith("http://") && !destino.startsWith("https://")) {
+    destino = "https://" + destino;
+  }
+
+  const texto = `
+<a href="https://api.radarsiope.com.br/api/click?envioId={{envioId}}&destinatarioId={{destinatarioId}}&newsletterId={{newsletterId}}&url=${encodeURIComponent(destino)}">
+  Clique aqui para acessar o conteúdo
+</a>
+`;
+
+  if (!ta.value.includes("api/click")) {
+    ta.value += "\n" + texto;
+  } else {
+    alert("O link de Click já está incluído.");
+  }
+};
+botoesExtrasWrap.appendChild(btnClick);
+
+// DESCADASTRAMENTO
+const btnDescadastramento = document.createElement('button');
+btnDescadastramento.innerText = '➕ Descadastramento';
+btnDescadastramento.onclick = () => {
+  const texto = `
+<p style="font-size:12px; color:#888; margin-top:30px">
+  Não deseja mais receber nossas newsletters?
+  <a href="https://api.radarsiope.com.br/descadastramento.html?email={{email}}&newsletter={{newsletterId}}&titulo={{titulo}}">
+    Clique aqui para se descadastrar
+  </a>.
+</p>
+`;
+
+  if (!ta.value.includes("Clique aqui para se descadastrar")) {
+    ta.value += "\n" + texto;
+  } else {
+    alert("O link de descadastramento já está incluído.");
+  }
+};
+botoesExtrasWrap.appendChild(btnDescadastramento);
+
+htmlWrap.appendChild(botoesExtrasWrap);
+
 
   // Botões de preview
   const previewWrap = document.createElement('div');
@@ -499,7 +561,7 @@ async function abrirModalNewsletter(docId = null, isEdit = false) {
   containerBlocos.style.border = "1px solid #ddd";
   containerBlocos.style.padding = "10px";
   containerBlocos.style.borderRadius = "4px";
-  containerBlocos.style.maxHeight = "450px";
+  containerBlocos.style.maxHeight = "650px";
   containerBlocos.style.overflowY = "auto";
   containerBlocos.style.background = "#fdfdfd";
   col3.appendChild(containerBlocos);
@@ -551,6 +613,65 @@ async function abrirModalNewsletter(docId = null, isEdit = false) {
   }
 }
 
+function montarHtmlNewsletterPreview(modo, segmento = null, bordas = false) {
+  const campoHTML = document.getElementById('campo-html-newsletter');
+  const htmlBase = campoHTML ? campoHTML.value : "";
+
+  const blocos = coletarBlocosEdicao();
+
+  // -----------------------------
+  // MONTA HTML DOS BLOCOS (sempre)
+  // -----------------------------
+  let htmlBlocos = "";
+
+  blocos.forEach(b => {
+    const acesso = b.acesso || "todos";
+    let conteudo = b.html || "";
+
+    if (bordas) {
+      conteudo = `
+        <div style="border:2px dashed #999; padding:10px; margin:10px 0;">
+          ${conteudo}
+        </div>
+      `;
+    }
+
+    // Modo puro → inclui TODOS os blocos
+    if (modo === "puro") {
+      htmlBlocos += conteudo + "\n";
+      return;
+    }
+
+    // Modo completo → inclui TODOS os blocos
+    if (modo === "completo") {
+      htmlBlocos += conteudo + "\n";
+      return;
+    }
+
+    // Modo segmentado
+    const deveExibir =
+      acesso === "todos" ||
+      (acesso === "leads" && segmento === "leads") ||
+      (acesso === "assinantes" && segmento === "assinantes");
+
+    if (deveExibir) {
+      htmlBlocos += conteudo + "\n";
+    }
+  });
+
+  // -----------------------------
+  // SE O HTML BASE TEM {{blocos}}
+  // -----------------------------
+  if (htmlBase.includes("{{blocos}}")) {
+    return htmlBase.replace("{{blocos}}", htmlBlocos);
+  }
+
+  // -----------------------------
+  // SENÃO, CONCATENA NO FINAL
+  // -----------------------------
+  return htmlBase + "\n" + htmlBlocos;
+}
+
 
 
 async function abrirModalNewsletterxxxxx(docId = null, isEdit = false) {
@@ -589,19 +710,7 @@ async function abrirModalNewsletterxxxxx(docId = null, isEdit = false) {
   htmlWrap.className = 'field';
 
   const explicacao = document.createElement('div');
-  explicacao.innerHTML = `
-    <div class="info-box" style="background:#eef; padding:10px; border-left:4px solid #88f; margin-bottom:10px;">
-      <strong>📌 Placeholders disponíveis:</strong>
-      <ul style="margin-top:5px; font-size:14px;">
-        <li><code>{{nome}}</code></li>
-        <li><code>{{email}}</code></li>
-        <li><code>{{edicao}}</code></li>
-        <li><code>{{tipo}}</code></li>
-        <li><code>{{titulo}}</code></li>
-        <li><code>{{data_publicacao}}</code></li>
-        <li><code>{{blocos}}</code></li>
-      </ul>
-    </div>`;
+  explicacao.innerHTML = gerarHtmlPlaceholdersExpandivel();
   htmlWrap.appendChild(explicacao);
 
   // -----------------------------
@@ -3182,20 +3291,7 @@ async function abrirModalTemplateNewsletter(docId = null, isEdit = false, dadosP
 
   // Explicação dos placeholders
   const explicacao = document.createElement('div');
-  explicacao.innerHTML = `
-    <div class="info-box" style="background:#eef; padding:10px; border-left:4px solid #88f; margin-top:10px;">
-      <strong>📌 Placeholders disponíveis:</strong>
-      <ul style="margin-top:5px; font-size:14px;">
-        <li><code>{{nome}}</code> → Nome do usuário</li>
-        <li><code>{{email}}</code> → E-mail do usuário</li>
-        <li><code>{{edicao}}</code> → Número da edição</li>
-        <li><code>{{tipo}}</code> → Tipo Newsletter</li>
-        <li><code>{{titulo}}</code> → Título da edição</li>
-        <li><code>{{data_publicacao}}</code> → Data da edição (formato DD/MM/AAAA)</li>
-        <li><code>{{blocos}}</code> → Local de inserção dos blocos</li>
-      </ul>
-      <p>Esses campos serão substituídos automaticamente no momento do envio.</p>
-    </div>`;
+  explicacao.innerHTML = gerarHtmlPlaceholdersExpandivel();
   body.appendChild(explicacao);
 
   const lbl = document.createElement('label');
