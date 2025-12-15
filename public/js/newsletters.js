@@ -128,7 +128,7 @@ function criarCardNewsletter(dados) {
 
   const botao = card.querySelector("button");
   botao.addEventListener("click", () => {
-    abrirNewsletter(id, classificacao);
+    abrirNewsletterSite(id, classificacao);
   });
 
   return card;
@@ -149,14 +149,17 @@ function formatarData(valor) {
 }
 
 // Abre newsletter conforme classificação
-function abrirNewsletter(id, classificacao) {
+function abrirNewsletterSite(id, classificacao) {
   if (classificacao === "Básica") {
     // Básica → abre direto
     window.location.href = `visualizar.html?id=${id}`;
     return;
   }
 
-  // Premium → você pode ajustar para o fluxo que quiser
-  // Exemplo: mandar para index com parâmetros
+  // Premium → chama a função do site.js
+  if (typeof abrirNewsletter === "function") {
+    abrirNewsletter(id);
+    return;
+  }
   window.location.href = `index.html?newsletter=${id}&premium=true`;
 }
