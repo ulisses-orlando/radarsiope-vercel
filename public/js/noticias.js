@@ -13,10 +13,8 @@ async function carregarTemasENoticias() {
 
   try {
     const response = await fetch(API_TEMAS);
-    container.error("const response:", response);
-container.error("const response json:", response.json());
+
     const temas = await response.json();
-    container.error("const temas:", temas);
 
     if (!Array.isArray(temas) || temas.length === 0) {
       container.innerHTML = "<p>Nenhum tema encontrado.</p>";
@@ -40,6 +38,9 @@ container.error("const response json:", response.json());
 // ===============================
 async function montarCarrosselPorTema(tema, container) {
   const rssUrl = gerarRSSUrl(tema.palavras_chave);
+  
+  if (!rssUrl) return; // evita erro
+
   const noticias = await buscarNoticias(rssUrl);
 
   if (!noticias || noticias.length === 0) return;
@@ -119,6 +120,11 @@ async function montarCarrosselPorTema(tema, container) {
 // 4. Gera URL do Google News RSS
 // ===============================
 function gerarRSSUrl(palavras_chave) {
+  if (!Array.isArray(palavras_chave) || palavras_chave.length === 0) {
+    console.warn("Tema sem palavras_chave. Ignorando tema.");
+    return null;
+  }
+
   const query = palavras_chave.map(p => `"${p}"`).join(" OR ");
   return `https://news.google.com/rss/search?q=${encodeURIComponent(query)}&hl=pt-BR&gl=BR&ceid=BR:pt-419`;
 }
