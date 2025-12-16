@@ -690,6 +690,14 @@ async function abrirModalEnvioManual(usuarioId, solicitacaoId, dadosSolicitacao)
     ...doc.data()
   }));
 
+  const usuarioSnap = await db.collection("usuarios").doc(usuarioId).get();
+  const dadosUsuario = usuarioSnap.exists ? usuarioSnap.data() : {};
+
+  const dadosCompletos = {
+    ...dadosSolicitacao,
+    ...dadosUsuario
+  };
+
   const selectHTML = respostas.map(r =>
     `<option value="${r.id}">${r.titulo}</option>`
   ).join("");
@@ -716,13 +724,6 @@ async function abrirModalEnvioManual(usuarioId, solicitacaoId, dadosSolicitacao)
   const select = document.getElementById("resposta-select");
   const textarea = document.getElementById("resposta-html");
 
-  const usuarioSnap = await db.collection("usuarios").doc(usuarioId).get();
-  const dadosUsuario = usuarioSnap.exists ? usuarioSnap.data() : {};
-
-  const dadosCompletos = {
-    ...dadosSolicitacao,
-    ...dadosUsuario
-  };
 
   select.onchange = () => {
     const resposta = respostas.find(r => r.id === select.value);
@@ -842,8 +843,8 @@ function aplicarPlaceholders(template, dados) {
     .replace(/{{titulo}}/gi, titulo)
     .replace(/{{data_publicacao}}/gi, dataFormatada)
     .replace(/{{newsletterId}}/gi, newsletterId)
-    .replace(/{{envioId}}/gi, envioId)              
-    .replace(/{{destinatarioId}}/gi, destinatarioId); 
+    .replace(/{{envioId}}/gi, envioId)
+    .replace(/{{destinatarioId}}/gi, destinatarioId);
 }
 
 
