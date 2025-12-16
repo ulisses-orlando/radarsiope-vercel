@@ -697,6 +697,10 @@ async function abrirModalEnvioManual(usuarioId, solicitacaoId, dadosSolicitacao)
   body.innerHTML = gerarHtmlPlaceholdersExpandivel();
   body.innerHTML += `
     <div class="field">
+      <label>Enviar para o e-mail:</label>
+      <input type="email" id="email-destino" value="${dadosCompletos.email || ''}">
+    </div>
+    <div class="field">
       <label>Selecione a resposta</label>
       <select id="resposta-select">${selectHTML}</select>
     </div>
@@ -746,7 +750,7 @@ async function abrirModalEnvioManual(usuarioId, solicitacaoId, dadosSolicitacao)
     );
 
     const nome = dadosCompletos.nome || "Usuário";
-    const email = dadosCompletos.email;
+    const email = document.getElementById("email-destino").value; // dadosCompletos.email;
 
     if (!email) {
       alert("Solicitação não possui e-mail.");
