@@ -37,7 +37,7 @@ function mostrarModalAgradecimento(nome) {
 function fecharModalAgradecimento() {
     document.getElementById("modalAgradecimento").style.display = "none";
     setTimeout(() => {
-        window.location.href = "https://www.radarsiope.com.br/pagina-inicial";
+        window.location.href = "newsletters.html";
     }, 200);
 }
 
