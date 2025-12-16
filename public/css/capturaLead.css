@@ -78,16 +78,38 @@ button[type="submit"]:hover {
 /* ============================
    Checkboxes de interesse
 ============================ */
-#campo-newsletters label {
-  margin-top: 10px;
+#campo-newsletters {
+  margin-top: 20px;
+}
+
+#campo-newsletters > label {
+  font-weight: 600;
+  margin-bottom: 8px;
   display: block;
 }
 
-#grupo-newsletters label {
+.caixa-interesses {
+  background: #f0f7ff;
+  border: 1px solid #007acc33;
+  padding: 15px;
+  border-radius: 8px;
+  max-height: 180px;
+  overflow-y: auto;
+  box-shadow: inset 0 1px 3px rgba(0,0,0,0.08);
+}
+
+/* Checkboxes compactos */
+.caixa-interesses label {
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin-bottom: 8px;
+  gap: 6px;
+  padding: 4px 0;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.caixa-interesses input[type="checkbox"] {
+  transform: scale(1.1);
 }
 
 /* ============================
@@ -97,25 +119,40 @@ button[type="submit"]:hover {
   position: fixed;
   top: 0; left: 0;
   width: 100%; height: 100%;
-  background: rgba(0,0,0,0.5);
+  background: rgba(0,0,0,0.45);
   display: none;
   justify-content: center;
   align-items: center;
   z-index: 9999;
+  backdrop-filter: blur(3px);
+  animation: fadeIn 0.25s ease-out;
 }
 
 #modalAgradecimento .box {
-  background: #fff;
-  padding: 30px;
-  border-radius: 12px;
-  max-width: 400px;
+  background: linear-gradient(135deg, #ffffff 0%, #f0f7ff 100%);
+  padding: 30px 25px;
+  border-radius: 14px;
+  max-width: 380px;
   width: 90%;
   text-align: center;
-  box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+  box-shadow: 0 8px 22px rgba(0,0,0,0.18);
+  border: 2px solid #007acc33;
+  animation: slideUp 0.3s ease-out;
+}
+
+#modalAgradecimento h3 {
+  margin-top: 0;
+  color: #007acc;
+  font-size: 1.4rem;
+}
+
+#modalAgradecimento p {
+  color: #444;
+  margin: 10px 0 20px;
+  font-size: 1rem;
 }
 
 #modalAgradecimento button {
-  margin-top: 20px;
   padding: 12px 20px;
   background: #007acc;
   color: #fff;
@@ -124,8 +161,93 @@ button[type="submit"]:hover {
   cursor: pointer;
   width: 100%;
   font-size: 16px;
+  font-weight: bold;
+  transition: background 0.2s ease;
 }
 
 #modalAgradecimento button:hover {
   background: #005fa3;
+}
+
+/* Animações */
+@keyframes fadeIn {
+  from { opacity: 0 }
+  to { opacity: 1 }
+}
+
+@keyframes slideUp {
+  from { transform: translateY(20px); opacity: 0 }
+  to { transform: translateY(0); opacity: 1 }
+}
+/* Caixa geral */
+.caixa-interesses {
+  background: #f0f7ff;
+  border: 1px solid #007acc33;
+  padding: 15px;
+  border-radius: 8px;
+  max-height: 200px;
+  overflow-y: auto;
+  box-shadow: inset 0 1px 3px rgba(0,0,0,0.08);
+}
+
+/* Duas colunas */
+.caixa-interesses.duas-colunas {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px 20px;
+}
+
+/* Cada item */
+.item-interesse {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-size: 14px;
+  padding: 4px 0;
+  user-select: none;
+}
+
+/* Esconde o checkbox padrão */
+.item-interesse input[type="checkbox"] {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 0;
+  height: 0;
+  position: absolute;
+  opacity: 0;
+}
+
+/* Ícone customizado */
+.item-interesse .icone {
+  width: 18px;
+  height: 18px;
+  border: 2px solid #007acc;
+  border-radius: 4px;
+  display: inline-block;
+  position: relative;
+  background: #fff;
+  transition: 0.2s;
+}
+
+/* Ícone marcado */
+.item-interesse input[type="checkbox"]:checked + .icone {
+  background: #007acc;
+  border-color: #005fa3;
+}
+
+/* Checkmark */
+.item-interesse input[type="checkbox"]:checked + .icone::after {
+  content: "✔";
+  color: #fff;
+  font-size: 12px;
+  position: absolute;
+  top: 0;
+  left: 3px;
+}
+
+/* Texto */
+.item-interesse .texto {
+  flex: 1;
+  color: #333;
 }
