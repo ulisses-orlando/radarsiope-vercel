@@ -23,6 +23,9 @@ const momentosEnvio = [
   { valor: "interesse_capacitacao", descricao: "🎓 Interesse marcado: Capacitação" },
   { valor: "interesse_consultoria", descricao: "🧭 Interesse marcado: Consultoria" },
   { valor: "interesse_siope", descricao: "📊 Interesse marcado: SIOPE" },
+  { valor: "interesse_fundeb", descricao: "📊 Interesse marcado: FUNDEB" },
+  { valor: "interesse_cacs", descricao: "📊 Interesse marcado: CACS" },
+  { valor: "interesse_salario-educacao", descricao: "📊 Interesse marcado: SALARIO-EDUCACAO" },
   { valor: "resposta_personalizada_manual", descricao: "✍️ Resposta manual personalizada" },
   { valor: "padrao", descricao: "📌 Resposta padrão para envio manual" }
 ];
