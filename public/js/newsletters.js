@@ -157,5 +157,5 @@ function abrirNewsletterSite(id, classificacao) {
   }
 
   // Premium 
-  window.location.href = `capturaLead.html`;
+  window.location.href = `capturaLead.html?origem=newsletter_publica_premium`;
 }

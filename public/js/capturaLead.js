@@ -1,3 +1,10 @@
+function getParametro(nome) {
+    const url = new URL(window.location.href);
+    return url.searchParams.get(nome);
+}
+
+const origem = getParametro("origem") || "origem_nao_informada";
+
 // ============================
 // 1. Monta checkboxes de tipos
 // ============================
@@ -119,7 +126,7 @@ async function processarEnvioInteresse(e) {
             mensagem: mensagem || null,
             interesses,
             preferencia_contato: preferencia,
-            origem: "newsletter_publica_premium",
+            origem: origem,
             status: "Novo",
             data_criacao: firebase.firestore.Timestamp.now()
         });
