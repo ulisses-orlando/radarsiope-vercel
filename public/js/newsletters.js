@@ -156,10 +156,6 @@ function abrirNewsletterSite(id, classificacao) {
     return;
   }
 
-  // Premium → chama a função do site.js
-  if (typeof abrirNewsletter === "function") {
-    abrirNewsletter(id);
-    return;
-  }
-  window.location.href = `index.html?newsletter=${id}&premium=true`;
+  // Premium 
+  window.location.href = `capturaLead.html`;
 }

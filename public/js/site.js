@@ -12,11 +12,11 @@ async function carregarNewslettersPublicas() {
     const d = doc.data();
     const card = document.createElement("div");
     card.className = "card";
-    card.innerHTML = `
-      <h3>${d.titulo}</h3>
-      <p><strong>Tipo:</strong> ${d.tipo}</p>
-      <button onclick="abrirNewsletter('${doc.id}', '${d.classificacao}')">Visualizar</button>
-    `;
+//    card.innerHTML = `
+//      <h3>${d.titulo}</h3>
+//      <p><strong>Tipo:</strong> ${d.tipo}</p>
+//      <button onclick="abrirNewsletter('${doc.id}', '${d.classificacao}')">Visualizar</button>
+//    `;
 
     if (d.classificacao === "Básica") listaBasicas.appendChild(card);
     else listaPremium.appendChild(card);
@@ -908,5 +908,3 @@ async function buscarNoticias(rssUrl) {
 window.addEventListener("DOMContentLoaded", () => {
   montarCarrosselNoticias();
 });
-
-window.abrirNewsletter = abrirNewsletter;
