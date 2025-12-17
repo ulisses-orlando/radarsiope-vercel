@@ -154,13 +154,13 @@
       const boletim = document.getElementById("boletim").checked;
 
       if (!nome || !email || !telefone || !municipio || !UF || !tipoUsuario || !boletim) {
-        alert("Por favor, preencha todos os campos obrigatórios.");
+        mostrarMensagem("Por favor, preencha todos os campos obrigatórios.");
         return;
       }
 
       const telefoneLimpo = telefone.replace(/\D/g, "");
       if (telefoneLimpo.length < 10) {
-        alert("Por favor, informe um telefone válido com DDD.");
+        mostrarMensagem("Por favor, informe um telefone válido com DDD.");
         return;
       }
 
@@ -191,7 +191,7 @@
           window.location.href = "https://www.radarsiope.com.br/recursos";
         }, 2500);
       } catch (error) {
-        alert("Erro ao cadastrar. Tente novamente.");
+        mostrarMensagem("Erro ao cadastrar. Tente novamente.");
         console.error(error);
       }
     });

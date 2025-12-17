@@ -492,7 +492,7 @@
     const perfil = (usuario.tipo_perfil || "").toLowerCase();
 
     if (perfil !== "admin") {
-      alert("Acesso restrito. Redirecionando...");
+      mostrarMensagem("Acesso restrito. Redirecionando...");
       window.location.href = "login.html";
     }
   </script>
@@ -820,7 +820,7 @@
           const totalSelecionados = linhasSelecionadas.length;
 
           if (totalSelecionados === 0) {
-            alert("Nenhum destinatário selecionado para envio.");
+            mostrarMensagem("Nenhum destinatário selecionado para envio.");
             return;
           }
 
@@ -1953,9 +1953,9 @@
   <!-- seus scripts (main.js deve conter firebase.initializeApp e db) -->
   <script src="js/main.js"></script>
   <script src="js/subcollections.js"></script>
-
+  <script src="js/site.js"></script>
   <script src="js/functions.js"></script>
-
+  
   <script>
     //    function closeModal(id) { document.getElementById(id).classList.remove('show'); document.getElementById(id).setAttribute('aria-hidden', 'true'); }
     //function openModal(id) { document.getElementById(id).classList.add('show'); document.getElementById(id).setAttribute('aria-hidden', 'false'); }
@@ -2189,9 +2189,6 @@
     });
 
   </script>
-
-  <script src="js/site.js"></script>
-  <script src="js/functions.js"></script>
 
 </body>
 
