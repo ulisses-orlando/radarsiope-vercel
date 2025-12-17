@@ -786,10 +786,10 @@ async function abrirModalEnvioManual(usuarioId, solicitacaoId, dadosSolicitacao)
       // Preenche campo de resultado no modal de leads, se estiver visível
       const resultadoCampo = document.getElementById("resultado-contato-lead");
       if (resultadoCampo) {
-        const agora = new Date();
+        const agora = new Date(); 
         const dataFormatada = agora.toLocaleDateString("pt-BR");
         const horaFormatada = agora.toLocaleTimeString("pt-BR", { hour: '2-digit', minute: '2-digit' });
-        resultadoCampo.value = `E-mail enviado em ${dataFormatada} às ${horaFormatada}hs`;
+        resultadoCampo.value = mensagemHtml;
       }
 
     } catch (e) {
