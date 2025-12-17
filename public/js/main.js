@@ -1685,6 +1685,7 @@ function salvarInteracaoLead() {
     tipo,
     resultado,
     data: new Date(),
+    mensagem_html_email: mensagemHtml,
     usuario_responsavel: "adminId"
   }).then(() => {
     // Atualiza status do lead
