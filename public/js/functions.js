@@ -236,6 +236,10 @@ function gerarHtmlPlaceholdersExpandivel() {
           <li><code>{{titulo}}</code> → Título da edição</li>
           <li><code>{{data_publicacao}}</code> → Data da edição (DD/MM/AAAA)</li>
           <li><code>{{blocos}}</code> → Local onde os blocos serão inseridos</li>
+          <li><code>{{UF}}</code> → UF do usuário</li>
+          <li><code>{{municipio}}</code> → Municipio do usuário</li>
+          <li><code>{{cargo}}</code> → Cargo do usuário</li>
+          <li><code>{{interesse}}</code> → Interesse do usuário</li>
         </ul>
         <p>Esses campos serão substituídos automaticamente no momento do envio.</p>
       </div>

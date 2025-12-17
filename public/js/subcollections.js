@@ -827,7 +827,10 @@ function aplicarPlaceholders(template, dados) {
   const titulo = dados.titulo || "(sem título)";
   const newsletterId = dados.newsletterId || "(sem newsletterId)";
   const envioId = dados.envioId || "(sem envioId)";
-  const destinatarioId = dados.destinatarioId || "(sem destinatarioId)";
+  const UFId = dados.UFId || "(sem UFId)";
+  const municipioId = dados.municipioId || "(sem municipioId)";
+  const cargoId = dados.cargoId || "(sem cargoId)";
+  const interesseId = dados.interesseId || "(sem interesseId)";
   let dataFormatada = "";
 
   if (dados.data_publicacao) {
@@ -844,7 +847,11 @@ function aplicarPlaceholders(template, dados) {
     .replace(/{{data_publicacao}}/gi, dataFormatada)
     .replace(/{{newsletterId}}/gi, newsletterId)
     .replace(/{{envioId}}/gi, envioId)
-    .replace(/{{destinatarioId}}/gi, destinatarioId);
+    .replace(/{{destinatarioId}}/gi, destinatarioId)
+    .replace(/{{UFId}}/gi, UFId)
+    .replace(/{{municipioId}}/gi, municipioId)
+    .replace(/{{cargoId}}/gi, cargoId)
+    .replace(/{{interesseId}}/gi, interesseId);
 }
 
 
