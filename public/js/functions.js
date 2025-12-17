@@ -174,13 +174,13 @@ async function inserirCamposUfMunicipio(container, ufPadrao = "", municipioPadra
     const nome_municipio = municipioSelect.options[municipioSelect.selectedIndex]?.textContent || null;
 
     if (!cod_uf) {
-      alert("⚠️ Selecione o estado (UF).");
+      mostrarMensagem("⚠️ Selecione o estado (UF).");
       ufSelect.style.border = "2px solid red";
       return null;
     }
 
     if (!cod_municipio) {
-      alert("⚠️ Selecione o município.");
+      mostrarMensagem("⚠️ Selecione o município.");
       municipioSelect.style.border = "2px solid red";
       return null;
     }
@@ -243,3 +243,72 @@ function gerarHtmlPlaceholdersExpandivel() {
   `;
 }
 
+function mostrarMensagem(mensagem) {
+  // Se já existir um modal aberto, remove antes
+  const existente = document.getElementById("modal-radar-siope");
+  if (existente) existente.remove();
+
+  // Cria o fundo escuro
+  const fundo = document.createElement("div");
+  fundo.id = "modal-radar-siope";
+  fundo.style.position = "fixed";
+  fundo.style.top = "0";
+  fundo.style.left = "0";
+  fundo.style.width = "100vw";
+  fundo.style.height = "100vh";
+  fundo.style.background = "rgba(0,0,0,0.55)";
+  fundo.style.display = "flex";
+  fundo.style.alignItems = "center";
+  fundo.style.justifyContent = "center";
+  fundo.style.zIndex = "99999";
+
+  // Caixa do modal
+  const caixa = document.createElement("div");
+  caixa.style.background = "#fff";
+  caixa.style.padding = "25px";
+  caixa.style.borderRadius = "10px";
+  caixa.style.width = "90%";
+  caixa.style.maxWidth = "420px";
+  caixa.style.boxShadow = "0 4px 20px rgba(0,0,0,0.25)";
+  caixa.style.textAlign = "center";
+  caixa.style.fontFamily = "Arial, sans-serif";
+
+  // Título
+  const titulo = document.createElement("h2");
+  titulo.innerText = "Radar SIOPE";
+  titulo.style.marginTop = "0";
+  titulo.style.color = "#007acc";
+  titulo.style.fontWeight = "bold";
+
+  // Mensagem
+  const texto = document.createElement("p");
+  texto.innerText = mensagem;
+  texto.style.fontSize = "16px";
+  texto.style.margin = "15px 0";
+
+  // Botão OK
+  const botao = document.createElement("button");
+  botao.innerText = "OK";
+  botao.style.padding = "10px 25px";
+  botao.style.background = "#007acc";
+  botao.style.color = "#fff";
+  botao.style.border = "none";
+  botao.style.borderRadius = "6px";
+  botao.style.fontSize = "16px";
+  botao.style.cursor = "pointer";
+  botao.style.marginTop = "10px";
+  botao.style.fontWeight = "bold";
+  botao.style.transition = "0.2s";
+
+  botao.onmouseover = () => botao.style.background = "#005fa3";
+  botao.onmouseout  = () => botao.style.background = "#007acc";
+
+  botao.onclick = () => fundo.remove();
+
+  // Monta o modal
+  caixa.appendChild(titulo);
+  caixa.appendChild(texto);
+  caixa.appendChild(botao);
+  fundo.appendChild(caixa);
+  document.body.appendChild(fundo);
+}

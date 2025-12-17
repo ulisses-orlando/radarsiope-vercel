@@ -33,7 +33,7 @@ function editarSolicitacao(usuarioId, solicitacaoId, descricaoAtual) {
 function salvarEdicaoSolicitacao() {
   const novaDescricao = document.getElementById("nova-descricao").value.trim();
   if (!novaDescricao) {
-    alert("A descrição não pode estar vazia.");
+    mostrarMensagem("A descrição não pode estar vazia.");
     return;
   }
 
@@ -44,12 +44,12 @@ function salvarEdicaoSolicitacao() {
     .update({ descricao: novaDescricao })
     .then(() => {
       fecharModalEdicao();
-      alert("Solicitação atualizada com sucesso.");
+      mostrarMensagem("Solicitação atualizada com sucesso.");
       carregarHistoricoSolicitacoes(solicitacaoEmEdicao.usuarioId);
     })
     .catch(error => {
       console.error("Erro ao editar solicitação:", error);
-      alert("Erro ao atualizar a solicitação.");
+      mostrarMensagem("Erro ao atualizar a solicitação.");
     });
 }
 
@@ -370,12 +370,12 @@ function cancelarSolicitacao(usuarioId, solicitacaoId) {
     .doc(solicitacaoId)
     .update({ status: "cancelada" })
     .then(() => {
-      alert("Solicitação cancelada com sucesso.");
+      mostrarMensagem("Solicitação cancelada com sucesso.");
       carregarHistoricoSolicitacoes(usuarioId);
     })
     .catch(error => {
       console.error("Erro ao cancelar solicitação:", error);
-      alert("Erro ao cancelar a solicitação.");
+      mostrarMensagem("Erro ao cancelar a solicitação.");
     });
 }
 
@@ -390,12 +390,12 @@ function solicitarCancelamento(usuarioId, assinaturaId) {
     .doc(assinaturaId)
     .update({ status: "cancelamento_solicitado" })
     .then(() => {
-      alert("Cancelamento solicitado com sucesso.");
+      mostrarMensagem("Cancelamento solicitado com sucesso.");
       carregarAssinaturas(usuarioId);
     })
     .catch(error => {
       console.error("Erro ao solicitar cancelamento:", error);
-      alert("Erro ao solicitar cancelamento.");
+      mostrarMensagem("Erro ao solicitar cancelamento.");
     });
 }
 
@@ -410,6 +410,6 @@ function avaliarSolicitacao(usuarioId, solicitacaoId, avaliacao) {
     })
     .catch(error => {
       console.error("Erro ao registrar avaliação:", error);
-      alert("Erro ao salvar sua avaliação.");
+      mostrarMensagem("Erro ao salvar sua avaliação.");
     });
 }

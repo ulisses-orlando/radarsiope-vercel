@@ -136,7 +136,7 @@ function mostrarDadosNewsletterSelecionada() {
 
 async function visualizarNewsletterHtml(newsletterId) {
     const snap = await db.collection("newsletters").doc(newsletterId).get();
-    if (!snap.exists) return alert("Newsletter não encontrada.");
+    if (!snap.exists) return mostrarMensagem("Newsletter não encontrada.");
 
     const dados = snap.data();
 
@@ -268,7 +268,7 @@ let newsletterSelecionada = null;
 async function prepararEnvioParaLeads(newsletterId) {
     const snap = await db.collection("newsletters").doc(newsletterId).get();
     if (!snap.exists) {
-        alert("Newsletter não encontrada.");
+        mostrarMensagem("Newsletter não encontrada.");
         return;
     }
 
@@ -295,7 +295,7 @@ async function prepararEnvioParaLeads(newsletterId) {
 async function prepararEnvioParaUsuarios(newsletterId) {
     const snap = await db.collection("newsletters").doc(newsletterId).get();
     if (!snap.exists) {
-        alert("Newsletter não encontrada.");
+        mostrarMensagem("Newsletter não encontrada.");
         return;
     }
 
@@ -353,7 +353,7 @@ async function listarNewslettersDisponiveis() {
 
 function prepararEnvioNewsletter(newsletterId) {
     if (!tipoDestinatarioSelecionado) {
-        alert("Selecione primeiro se deseja enviar para Leads ou Usuários.");
+        mostrarMensagem("Selecione primeiro se deseja enviar para Leads ou Usuários.");
         return;
     }
     configurarBotoesPrevia("envio");
@@ -382,7 +382,7 @@ async function gerarPreviaEnvio() {
 
     const linhasLeads = document.querySelectorAll("#tabela-leads-envio tbody tr");
     if (linhasLeads.length === 0) {
-        alert("Nenhum lead disponível para gerar prévia.");
+        mostrarMensagem("Nenhum lead disponível para gerar prévia.");
         return;
     }
 
@@ -569,7 +569,7 @@ function exportarCSVPrevia() {
     const visiveis = Array.from(linhas).filter(l => l.style.display !== "none");
 
     if (visiveis.length === 0) {
-        alert("Nenhum dado visível para exportar.");
+        mostrarMensagem("Nenhum dado visível para exportar.");
         return;
     }
 
@@ -757,7 +757,7 @@ async function listarUsuariosComAssinaturas(newsletterId) {
 
     if (usuariosFiltraveis.length === 0) {
         corpo.innerHTML = `<tr><td colspan='5'>⚠️ Nenhum usuário possui assinatura ativa para a newsletter selecionada.</td></tr>`;
-        alert("Nenhum usuário com assinatura ativa foi encontrado para esta newsletter.");
+        mostrarMensagem("Nenhum usuário com assinatura ativa foi encontrado para esta newsletter.");
     } else {
         corpo.innerHTML = linhas;
     }
@@ -800,7 +800,7 @@ function filtrarUsuariosEnvio() {
 // Preparar prévia de envio para usuários
 async function gerarPreviaEnvioUsuarios() {
     if (!newsletterSelecionada) {
-        alert("Selecione uma newsletter primeiro.");
+        mostrarMensagem("Selecione uma newsletter primeiro.");
         return;
     }
 
@@ -931,7 +931,7 @@ async function gerarPreviaEnvioUsuarios() {
 
 async function gerarPreviaEnvioLeads() {
     if (!newsletterSelecionada) {
-        alert("Selecione uma newsletter primeiro.");
+        mostrarMensagem("Selecione uma newsletter primeiro.");
         return;
     }
 
@@ -1067,7 +1067,7 @@ async function enviarNewsletters(newsletterId, envioId) {
             .get();
 
         if (lotesSnap.empty) {
-            alert("❌ Nenhum lote encontrado para envio.");
+            mostrarMensagem("❌ Nenhum lote encontrado para envio.");
             return;
         }
 
@@ -1076,10 +1076,10 @@ async function enviarNewsletters(newsletterId, envioId) {
             await enviarLoteIndividual(newsletterId, envioId, loteId);
         }
 
-        alert("✅ Todos os lotes foram enviados com sucesso!");
+        mostrarMensagem("✅ Todos os lotes foram enviados com sucesso!");
     } catch (err) {
         console.error("Erro ao enviar newsletters:", err);
-        alert("❌ Erro ao enviar newsletters.");
+        mostrarMensagem("❌ Erro ao enviar newsletters.");
     }
 }
 
@@ -1109,7 +1109,7 @@ async function confirmarPrevia(newsletterId, filtros) {
     });
 
     if (destinatarios.length === 0) {
-        alert("Nenhum destinatário selecionado para envio.");
+        mostrarMensagem("Nenhum destinatário selecionado para envio.");
         return;
     }
 
@@ -1176,7 +1176,7 @@ async function confirmarPrevia(newsletterId, filtros) {
         numero++;
     }
 
-    alert(`Campanha criada com ${destinatarios.length} destinatários em ${numero - ultimoNumeroGlobal - 1} novos lotes.`);
+    mostrarMensagem(`Campanha criada com ${destinatarios.length} destinatários em ${numero - ultimoNumeroGlobal - 1} novos lotes.`);
     await listarLotesEnvio(newsletterId, envioId);
 
     mostrarAba("secao-lotes-envio");
@@ -1285,7 +1285,7 @@ async function enviarLoteIndividual(newsletterId, envioId, loteId) {
 
         const loteSnap = await loteRef.get();
         if (!loteSnap.exists) {
-            alert("❌ Lote não encontrado.");
+            mostrarMensagem("❌ Lote não encontrado.");
             return;
         }
 
@@ -1448,10 +1448,10 @@ async function enviarLoteIndividual(newsletterId, envioId, loteId) {
             data_publicacao: firebase.firestore.Timestamp.now()
         });
 
-        alert(`✅ Lote nº ${numeroLote} enviado com sucesso!`);
+        mostrarMensagem(`✅ Lote nº ${numeroLote} enviado com sucesso!`);
     } catch (err) {
         console.error("Erro ao enviar lote:", err);
-        alert("❌ Erro ao enviar lote.");
+        mostrarMensagem("❌ Erro ao enviar lote.");
     }
 }
 
@@ -1541,7 +1541,7 @@ function coletarFiltros() {
 
 function abrirLotesGerados() {
     if (!newsletterSelecionada || !newsletterSelecionada.id) {
-        alert("Nenhuma newsletter selecionada.");
+        mostrarMensagem("Nenhuma newsletter selecionada.");
         return;
     }
 
@@ -1566,7 +1566,7 @@ function abrirLotesGerados() {
             }
 
             if (snapshot.empty) {
-                alert("Nenhum lote encontrado para esse tipo.");
+                mostrarMensagem("Nenhum lote encontrado para esse tipo.");
                 return;
             }
 
@@ -1595,7 +1595,7 @@ function abrirLotesGerados() {
         })
         .catch(err => {
             console.error("Erro ao abrir lotes gerados:", err);
-            alert("❌ Erro ao carregar lotes.");
+            mostrarMensagem("❌ Erro ao carregar lotes.");
         });
 }
 
@@ -1613,7 +1613,7 @@ function verDestinatariosLote(loteId) {
         .get()
         .then(doc => {
             if (!doc.exists) {
-                alert("Lote não encontrado.");
+                mostrarMensagem("Lote não encontrado.");
                 return;
             }
 
@@ -1796,7 +1796,7 @@ function verDestinatariosLoteCompleto(newsletterId, envioId, loteId) {
 
     loteRef.get().then(doc => {
         if (!doc.exists) {
-            alert("Lote não encontrado.");
+            mostrarMensagem("Lote não encontrado.");
             return;
         }
 
@@ -1843,7 +1843,7 @@ async function enviarLote(newsletterId, envioId, loteId) {
 
     const loteSnap = await loteRef.get();
     if (!loteSnap.exists) {
-        alert("Lote não encontrado.");
+        mostrarMensagem("Lote não encontrado.");
         return;
     }
 
@@ -1890,7 +1890,7 @@ async function enviarLote(newsletterId, envioId, loteId) {
         });
     }
 
-    alert(`Lote ${lote.numero_lote} enviado: ${enviados} enviados, ${erros} erros.`);
+    mostrarMensagem(`Lote ${lote.numero_lote} enviado: ${enviados} enviados, ${erros} erros.`);
 }
 
 async function preencherFiltroNewsletters() {
@@ -1949,7 +1949,7 @@ async function verDestinatariosLoteUnificado(loteId) {
             .get();
 
         if (loteSnap.empty) {
-            alert("❌ Lote não encontrado.");
+            mostrarMensagem("❌ Lote não encontrado.");
             return;
         }
 
@@ -1972,7 +1972,7 @@ async function verDestinatariosLoteUnificado(loteId) {
             .get();
 
         if (!doc.exists) {
-            alert("❌ Lote não encontrado dentro da newsletter.");
+            mostrarMensagem("❌ Lote não encontrado dentro da newsletter.");
             return;
         }
 

@@ -52,7 +52,7 @@ async function abrirNewsletter(id, classificacao) {
   const modalBody = document.getElementById("modal-body");
 
   if (!modal || !modalBody) {
-    alert("Erro ao exibir o formulário. Elementos do modal não encontrados.");
+    mostrarMensagem("Erro ao exibir o formulário. Elementos do modal não encontrados.");
     return;
   }
 

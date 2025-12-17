@@ -754,7 +754,7 @@ async function abrirModalEnvioManual(usuarioId, solicitacaoId, dadosSolicitacao)
     const email = document.getElementById("email-destino").value; // dadosCompletos.email;
 
     if (!email) {
-      alert("Solicitação não possui e-mail.");
+      mostrarMensagem("Solicitação não possui e-mail.");
       return;
     }
 
@@ -781,7 +781,7 @@ async function abrirModalEnvioManual(usuarioId, solicitacaoId, dadosSolicitacao)
         abrirSubcolecao(usuarioId, "solicitacoes");
       }
 
-      alert("E-mail enviado com sucesso!");
+      mostrarMensagem("E-mail enviado com sucesso!");
 
       // Preenche campo de resultado no modal de leads, se estiver visível
       const resultadoCampo = document.getElementById("resultado-contato-lead");
@@ -794,7 +794,7 @@ async function abrirModalEnvioManual(usuarioId, solicitacaoId, dadosSolicitacao)
 
     } catch (e) {
       console.error("Erro ao enviar e-mail:", e);
-      alert("Erro ao enviar e-mail.");
+      mostrarMensagem("Erro ao enviar e-mail.");
     }
   };
 
@@ -982,7 +982,7 @@ async function abrirModalEnvioNewsletterManual(usuarioId, assinaturaId) {
     const email = dadosUsuario.email;
 
     if (!email) {
-      alert("Usuário não possui e-mail.");
+      mostrarMensagem("Usuário não possui e-mail.");
       return;
     }
 
@@ -1006,10 +1006,10 @@ async function abrirModalEnvioNewsletterManual(usuarioId, assinaturaId) {
           origem: "manual"
         });
 
-      alert("Newsletter enviada e registrada com sucesso!");
+      mostrarMensagem("Newsletter enviada e registrada com sucesso!");
     } catch (e) {
       console.error("Erro ao enviar newsletter:", e);
-      alert("Erro ao enviar newsletter.");
+      mostrarMensagem("Erro ao enviar newsletter.");
     }
   };
 
@@ -1496,7 +1496,7 @@ function exportarSubcolecao(sub, userId) {
     a.click();
     URL.revokeObjectURL(url);
   }).catch(err => {
-    alert("Erro ao exportar: " + err.message);
+    mostrarMensagem("Erro ao exportar: " + err.message);
   });
 }
 
@@ -1533,7 +1533,7 @@ function abrirModalResposta(usuarioId, solicitacaoId, novoStatus) {
   const modal = document.getElementById("modal-resposta-overlay");
 
   if (!campo || !titulo || !modal) {
-    alert("Erro: elementos do modal de resposta não encontrados.");
+    mostrarMensagem("Erro: elementos do modal de resposta não encontrados.");
     return;
   }
 
@@ -1560,7 +1560,7 @@ function fecharModalResposta() {
 function confirmarRespostaSolicitacao() {
   const resposta = document.getElementById("campo-resposta").value.trim();
   if (!resposta) {
-    alert("Por favor, escreva uma resposta.");
+    mostrarMensagem("Por favor, escreva uma resposta.");
     return;
   }
 
@@ -1578,7 +1578,7 @@ function confirmarRespostaSolicitacao() {
     })
     .catch(error => {
       console.error("Erro ao salvar resposta:", error);
-      alert("Erro ao atualizar a solicitação.");
+      mostrarMensagem("Erro ao atualizar a solicitação.");
     });
 }
 

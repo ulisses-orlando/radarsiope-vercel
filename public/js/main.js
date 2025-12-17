@@ -113,13 +113,13 @@ async function abrirModalCriarUsuario(dadosIniciais = {}, leadId = null) {
     // Verifica duplicidade de e-mail
     const email = data.email?.trim().toLowerCase();
     if (!email) {
-      alert("E-mail é obrigatório.");
+      mostrarMensagem("E-mail é obrigatório.");
       return;
     }
 
     const snap = await db.collection("usuarios").where("email", "==", email).limit(1).get();
     if (!snap.empty) {
-      alert("Já existe um usuário cadastrado com este e-mail.");
+      mostrarMensagem("Já existe um usuário cadastrado com este e-mail.");
       return;
     }
 
@@ -155,10 +155,10 @@ async function abrirModalCriarUsuario(dadosIniciais = {}, leadId = null) {
 
       document.getElementById("modal-vincular-lead").style.display = "none";
       carregarLeads();
-      alert("✅ Usuário criado e lead vinculado com sucesso!");
+      mostrarMensagem("✅ Usuário criado e lead vinculado com sucesso!");
     } else {
       carregarUsuariosComFiltro();
-      alert("✅ Usuário criado com sucesso!");
+      mostrarMensagem("✅ Usuário criado com sucesso!");
     }
 
     closeModal('modal-edit-overlay');
@@ -195,7 +195,7 @@ async function abrirModalEditarUsuario(id) {
     // 🔍 Verifica se o e-mail já está em uso por outro usuário
     const email = data.email?.trim().toLowerCase();
     if (!email) {
-      alert("E-mail é obrigatório.");
+      mostrarMensagem("E-mail é obrigatório.");
       return;
     }
 
@@ -203,7 +203,7 @@ async function abrirModalEditarUsuario(id) {
     if (!snap.empty) {
       const usuarioEncontrado = snap.docs[0];
       if (usuarioEncontrado.id !== id) {
-        alert("Já existe outro usuário cadastrado com este e-mail.");
+        mostrarMensagem("Já existe outro usuário cadastrado com este e-mail.");
         return;
       }
     }
@@ -384,10 +384,10 @@ async function abrirModalNewsletter(docId = null, isEdit = false) {
   btnCarregarTemplate.style.marginTop = '10px';
   btnCarregarTemplate.onclick = async () => {
     const templateId = seletorTemplate.value;
-    if (!templateId) return alert("Selecione um template.");
+    if (!templateId) return mostrarMensagem("Selecione um template.");
 
     const snap = await db.collection('templates_newsletter').doc(templateId).get();
-    if (!snap.exists) return alert("Template não encontrado.");
+    if (!snap.exists) return mostrarMensagem("Template não encontrado.");
 
     const template = snap.data();
     ta.value = template.html_base || '';
@@ -430,15 +430,15 @@ btnCopiar.innerText = '📋 Copiar HTML';
 btnCopiar.onclick = () => {
   const html = ta.value;
   if (!html) {
-    alert("O campo HTML está vazio.");
+    mostrarMensagem("O campo HTML está vazio.");
     return;
   }
 
   navigator.clipboard.writeText(html)
-    .then(() => alert("HTML copiado para a área de transferência!"))
+    .then(() => mostrarMensagem("HTML copiado para a área de transferência!"))
     .catch(err => {
       console.error("Erro ao copiar:", err);
-      alert("Não foi possível copiar o HTML.");
+      mostrarMensagem("Não foi possível copiar o HTML.");
     });
 };
 botoesExtrasWrap.appendChild(btnCopiar);
@@ -455,7 +455,7 @@ btnPixel.onclick = () => {
   if (!ta.value.includes("api/pixel")) {
     ta.value += "\n" + texto;
   } else {
-    alert("O código de Pixel já está incluído.");
+    mostrarMensagem("O código de Pixel já está incluído.");
   }
 };
 botoesExtrasWrap.appendChild(btnPixel);
@@ -481,7 +481,7 @@ btnClick.onclick = () => {
   if (!ta.value.includes("api/click")) {
     ta.value += "\n" + texto;
   } else {
-    alert("O link de Click já está incluído.");
+    mostrarMensagem("O link de Click já está incluído.");
   }
 };
 botoesExtrasWrap.appendChild(btnClick);
@@ -502,7 +502,7 @@ btnDescadastramento.onclick = () => {
   if (!ta.value.includes("Clique aqui para se descadastrar")) {
     ta.value += "\n" + texto;
   } else {
-    alert("O link de descadastramento já está incluído.");
+    mostrarMensagem("O link de descadastramento já está incluído.");
   }
 };
 botoesExtrasWrap.appendChild(btnDescadastramento);
@@ -786,10 +786,10 @@ async function abrirModalNewsletterxxxxx(docId = null, isEdit = false) {
   btnCarregarTemplate.style.marginTop = '10px';
   btnCarregarTemplate.onclick = async () => {
     const templateId = document.getElementById('seletor-template-newsletter')?.value;
-    if (!templateId) return alert("Selecione um template.");
+    if (!templateId) return mostrarMensagem("Selecione um template.");
 
     const snap = await db.collection('templates_newsletter').doc(templateId).get();
-    if (!snap.exists) return alert("Template não encontrado.");
+    if (!snap.exists) return mostrarMensagem("Template não encontrado.");
 
     const template = snap.data();
     const campoHTML = document.getElementById('campo-html-newsletter');
@@ -905,7 +905,7 @@ function validarNewsletter(html, blocos) {
   const erros = validarHtmlEmail(html, blocos);
 
   if (erros.length > 0) {
-    alert("⚠️ Problemas encontrados no HTML:\n\n" + erros.map(e => "• " + e).join("\n"));
+    mostrarMensagem("⚠️ Problemas encontrados no HTML:\n\n" + erros.map(e => "• " + e).join("\n"));
     return false;
   }
 
@@ -1593,7 +1593,7 @@ function abrirModalContatoLead(leadId) {
   leadAtual = leadId;
 
   db.collection("leads").doc(leadId).get().then(doc => {
-    if (!doc.exists) return alert("Lead não encontrado.");
+    if (!doc.exists) return mostrarMensagem("Lead não encontrado.");
     dadosLeadAtual = doc.data();
 
     const tipo = dadosLeadAtual.preferencia_contato?.toLowerCase() || "E-mail";
@@ -1679,7 +1679,7 @@ function salvarInteracaoLead() {
   const tipo = dadosLeadAtual.preferencia_contato?.toLowerCase() || "e-mail";
   const resultado = document.getElementById("resultado-contato-lead").value;
 
-  if (!resultado.trim()) return alert("Preencha o resultado do contato.");
+  if (!resultado.trim()) return mostrarMensagem("Preencha o resultado do contato.");
 
   db.collection("leads").doc(leadAtual).collection("interacoes").add({
     tipo,
@@ -1692,12 +1692,12 @@ function salvarInteracaoLead() {
       status: "Em contato"
     });
 
-    alert("Interação registrada com sucesso.");
+    mostrarMensagem("Interação registrada com sucesso.");
     fecharModalContatoLead();
     carregarLeads();
   }).catch(err => {
     console.error("Erro ao salvar interação:", err);
-    alert("Erro ao salvar interação.");
+    mostrarMensagem("Erro ao salvar interação.");
   });
 }
 
@@ -1717,12 +1717,12 @@ async function processarImportacaoLeads() {
   const origemInput = document.getElementById("origem-importacao");
   const arquivoInput = document.getElementById("arquivo-leads");
 
-  if (!origemInput || !arquivoInput) return alert("Campos obrigatórios não encontrados.");
+  if (!origemInput || !arquivoInput) return mostrarMensagem("Campos obrigatórios não encontrados.");
   const origem = origemInput.value.trim();
   const arquivo = arquivoInput.files[0];
 
-  if (!origem) return alert("Informe a origem dos leads.");
-  if (!arquivo) return alert("Selecione uma planilha.");
+  if (!origem) return mostrarMensagem("Informe a origem dos leads.");
+  if (!arquivo) return mostrarMensagem("Selecione uma planilha.");
 
   Papa.parse(arquivo, {
     header: true,
@@ -1799,7 +1799,7 @@ async function processarImportacaoLeads() {
         progresso.textContent = `✅ Importados: ${importados} | ❌ Erros: ${erros.length}`;
       }
 
-      alert(`✅ ${importados} leads importados com sucesso.\n❌ ${erros.length} com erro.`);
+      mostrarMensagem(`✅ ${importados} leads importados com sucesso.\n❌ ${erros.length} com erro.`);
 
       if (erros.length) {
         const conteudoCSV = "erro\n" + erros.map(e => `"${e.replace(/"/g, '""')}"`).join("\n");
@@ -1877,7 +1877,7 @@ function exportarLeadsCSV() {
     a.click();
     URL.revokeObjectURL(url);
   } catch (err) {
-    alert("Erro ao exportar leads.");
+    mostrarMensagem("Erro ao exportar leads.");
     console.error("Erro ao exportar CSV:", err);
   }
 }
@@ -1893,7 +1893,7 @@ async function atualizarStatusLead(leadId, novoStatus) {
     const motivo = prompt("Informe o motivo do descarte:");
 
     if (!motivo || motivo.trim().length < 3) {
-      alert("Motivo obrigatório para descartar o lead.");
+      mostrarMensagem("Motivo obrigatório para descartar o lead.");
       // Recarrega a tabela para restaurar o status anterior
       carregarLeads();
       return;
@@ -1907,7 +1907,7 @@ async function atualizarStatusLead(leadId, novoStatus) {
       data: firebase.firestore.Timestamp.now()
     });
 
-    alert("Lead descartado com motivo registrado.");
+    mostrarMensagem("Lead descartado com motivo registrado.");
   } else {
     await leadRef.update({ status: novoStatus });
   }
@@ -2033,7 +2033,7 @@ async function vincularLeadUsuario(leadId, usuarioId) {
     const usuario = usuarioDoc.data();
 
     if (!usuario || !usuario.ativo) {
-      alert("Usuário inválido ou inativo.");
+      mostrarMensagem("Usuário inválido ou inativo.");
       return;
     }
 
@@ -2060,12 +2060,12 @@ async function vincularLeadUsuario(leadId, usuarioId) {
       }
     });
 
-    alert("✅ Lead vinculado com sucesso!");
+    mostrarMensagem("✅ Lead vinculado com sucesso!");
     document.getElementById("modal-vincular-lead").style.display = "none";
     carregarLeads();
   } catch (err) {
     console.error("Erro ao vincular lead:", err);
-    alert("❌ Erro ao vincular lead.");
+    mostrarMensagem("❌ Erro ao vincular lead.");
   }
 }
 
@@ -2082,7 +2082,7 @@ async function reativarEVincularUsuario(leadId, usuarioId) {
     const usuario = usuarioDoc.data();
 
     if (!usuario || !usuario.ativo) {
-      alert("Usuário inválido ou inativo.");
+      mostrarMensagem("Usuário inválido ou inativo.");
       return;
     }
 
@@ -2112,12 +2112,12 @@ async function reativarEVincularUsuario(leadId, usuarioId) {
       }
     });
 
-    alert("✅ Usuário reativado e lead vinculado com sucesso!");
+    mostrarMensagem("✅ Usuário reativado e lead vinculado com sucesso!");
     document.getElementById("modal-vincular-lead").style.display = "none";
     carregarLeads();
   } catch (err) {
     console.error("Erro ao reativar e vincular:", err);
-    alert("❌ Erro ao reativar e vincular usuário.");
+    mostrarMensagem("❌ Erro ao reativar e vincular usuário.");
   }
 }
 
@@ -2245,7 +2245,7 @@ async function editarTema(id) {
   if (id) {
     const doc = await db.collection("temas_noticias").doc(id).get();
     if (!doc.exists) {
-      alert("Tema não encontrado.");
+      mostrarMensagem("Tema não encontrado.");
       return;
     }
 
@@ -3219,7 +3219,7 @@ async function carregarTemplatesNewsletter() {
 async function duplicarTemplateNewsletter(templateId) {
   const snap = await db.collection('templates_newsletter').doc(templateId).get();
   if (!snap.exists) {
-    alert("Template original não encontrado.");
+    mostrarMensagem("Template original não encontrado.");
     return;
   }
 
@@ -3358,10 +3358,10 @@ async function abrirModalTemplateNewsletter(docId = null, isEdit = false, dadosP
 
   btnPreview.onclick = async () => {
     const leadId = document.getElementById('seletor-lead-preview')?.value;
-    if (!leadId) return alert("Selecione um usuário para visualizar.");
+    if (!leadId) return mostrarMensagem("Selecione um usuário para visualizar.");
 
     const leadSnap = await db.collection('leads').doc(leadId).get();
-    if (!leadSnap.exists) return alert("Usuário não encontrado.");
+    if (!leadSnap.exists) return mostrarMensagem("Usuário não encontrado.");
 
     const dados = leadSnap.data();
     dados.edicao = "001";
@@ -3483,7 +3483,7 @@ function validarTemplate(html, blocos) {
   erros = erros.filter(e => !e.includes("descadastramento"));
 
   if (erros.length > 0) {
-    alert("⚠️ Problemas encontrados no template:\n\n" + erros.map(e => "• " + e).join("\n"));
+    mostrarMensagem("⚠️ Problemas encontrados no template:\n\n" + erros.map(e => "• " + e).join("\n"));
     return false;
   }
 
