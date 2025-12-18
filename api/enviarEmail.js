@@ -10,7 +10,7 @@ export default async function handler(req, res) {
     return res.status(200).end();
   }
 
-  const { nome, email, mensagemHtml } = req.body;
+  const { nome, email, assunto, mensagemHtml } = req.body;
 
   try {
     const transporter = nodemailer.createTransport({
@@ -26,7 +26,7 @@ export default async function handler(req, res) {
     await transporter.sendMail({
       from: "Radar SIOPE <contato@radarsiope.com.br>",
       to: email,
-      subject: "Obrigado pelo seu interesse!",
+      subject: assunto,
       html: mensagemHtml
     });
 
