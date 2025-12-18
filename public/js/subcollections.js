@@ -696,13 +696,38 @@ async function abrirModalEnvioManual(usuarioId, solicitacaoId, dadosSolicitacao)
     ...doc.data()
   }));
 
-  const usuarioSnap = await db.collection("usuarios").doc(usuarioId).get();
-  const dadosUsuario = usuarioSnap.exists ? usuarioSnap.data() : {};
+  const usuarioSnap = usuarioId
+    ? await db.collection("usuarios").doc(usuarioId).get()
+    : null;
 
-  const dadosCompletos = {
+  let dadosUsuario = {};
+  let interessesUsuario = null;
+
+  // Só trata como "usuário" se o doc existir em `usuarios`
+  if (usuarioSnap && usuarioSnap.exists) {
+    dadosUsuario = usuarioSnap.data();
+
+    const prefsSnap = await db.collection("usuarios")
+      .doc(usuarioId)
+      .collection("preferencias_newsletter")
+      .get();
+
+    const interesses = prefsSnap.docs.map(doc => doc.id);
+    if (interesses.length) {
+      interessesUsuario = interesses;
+    }
+  }
+
+  // Monta dadosCompletos sem apagar nada do lead
+  let dadosCompletos = {
     ...dadosSolicitacao,
     ...dadosUsuario
   };
+
+  // Só sobrescreve `interesses` se de fato achou preferências do usuário
+  if (interessesUsuario && interessesUsuario.length) {
+    dadosCompletos.interesses = interessesUsuario;
+  }
 
   const selectHTML = respostas.map(r =>
     `<option value="${r.id}">${r.titulo}</option>`
@@ -834,14 +859,25 @@ function aplicarPlaceholders(template, dados) {
   const nome = dados.nome || "(nome não informado)";
   const email = dados.email || "(email não informado)";
   const edicao = dados.edicao || "(sem edição)";
-  const tipo = dados.tipo || "(sem tipo)";
+
+  // 🔥 Ajuste: tipo pode vir de usuário (string) ou de lead (array)
+  let tipo = "(sem tipo)";
+
+  if (Array.isArray(dados.interesses) && dados.interesses.length > 0) {
+    // Lead com múltiplos interesses
+    tipo = dados.interesses.join(", ");
+  } else if (dados.tipo) {
+    // Usuário com tipo único
+    tipo = dados.tipo;
+  }
+
   const titulo = dados.titulo || "(sem título)";
   const newsletterId = dados.newsletterId || "(sem newsletterId)";
   const envioId = dados.envioId || "(sem envioId)";
   const destinatarioId = dados.destinatarioId || "(sem destinatarioId)";
-  const UFId = dados.UFId || "(sem UFId)";
-  const municipioId = dados.municipioId || "(sem municipioId)";
-  const cargoId = dados.cargoId || "(sem cargoId)";
+  const cod_uf = dados.cod_uf || "(sem UFId)";
+  const nome_municipio = dados.nome_municipio || "(sem municipioId)";
+  const cargo = dados.tipo_perfil || dados.perfil || "(sem cargoId)";
   const interesseId = dados.interesseId || "(sem interesseId)";
   let dataFormatada = "";
 
@@ -860,12 +896,11 @@ function aplicarPlaceholders(template, dados) {
     .replace(/{{newsletterId}}/gi, newsletterId)
     .replace(/{{envioId}}/gi, envioId)
     .replace(/{{destinatarioId}}/gi, destinatarioId)
-    .replace(/{{UFId}}/gi, UFId)
-    .replace(/{{municipioId}}/gi, municipioId)
-    .replace(/{{cargoId}}/gi, cargoId)
+    .replace(/{{uf}}/gi, cod_uf)
+    .replace(/{{municipio}}/gi, nome_municipio)
+    .replace(/{{cargo}}/gi, cargo)
     .replace(/{{interesseId}}/gi, interesseId);
 }
-
 
 async function abrirModalEnvioNewsletterManual(usuarioId, assinaturaId) {
   const modal = document.getElementById("modal-edit-overlay");

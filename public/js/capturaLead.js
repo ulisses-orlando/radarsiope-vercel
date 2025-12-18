@@ -111,6 +111,12 @@ async function processarEnvioInteresse(e) {
     }
 
     // ============================
+    // Validação UF e Município
+    // ============================
+    const dadosUf = validarUfMunicipio();
+    if (!dadosUf) return;
+
+    // ============================
     // Gravação no Firestore
     // ============================
     status.innerText = "Enviando...";
@@ -128,6 +134,12 @@ async function processarEnvioInteresse(e) {
             preferencia_contato: preferencia,
             origem: origem,
             status: "Novo",
+
+            // 🔹 Campos novos
+            cod_uf: dadosUf.cod_uf,
+            cod_municipio: dadosUf.cod_municipio,
+            nome_municipio: dadosUf.nome_municipio,
+
             data_criacao: firebase.firestore.Timestamp.now()
         });
 
@@ -153,6 +165,11 @@ async function processarEnvioInteresse(e) {
 async function initCapturaLead() {
     aplicarMascaraTelefone(document.getElementById("telefone"));
     await carregarTiposNewsletter();
+
+    // 🔹 Inserir UF e Município
+    window.validarUfMunicipio = await inserirCamposUfMunicipio(
+        document.getElementById("campo-uf-municipio")
+    );
 
     document.getElementById("form-interesse")
         .addEventListener("submit", processarEnvioInteresse);
