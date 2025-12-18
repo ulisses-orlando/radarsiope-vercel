@@ -307,6 +307,16 @@ async function abrirModalNewsletter(docId = null, isEdit = false) {
   col1.appendChild(generateDomainSelect("tipo", tiposArr, data.tipo));
   col1.appendChild(generateDomainSelect('classificacao', ['Básica', 'Premium'], data.classificacao || 'Básica'));
 
+  // Campo "Enviada" (somente leitura)
+  const enviadaDiv = document.createElement("div");
+  enviadaDiv.className = "field";
+  enviadaDiv.style.marginTop = "10px";
+  enviadaDiv.innerHTML = `
+      <label><strong>Status de Envio:</strong></label>
+      <div id="status-envio-news" style="margin-top:4px; color:#555;">Carregando...</div>
+    `;
+  col1.appendChild(enviadaDiv);
+
   // -----------------------------
   // COLUNA 2 — EDITOR HTML + TEMPLATES + PREVIEW
   // -----------------------------
@@ -416,98 +426,98 @@ async function abrirModalNewsletter(docId = null, isEdit = false) {
   htmlWrap.appendChild(ta);
 
   // -----------------------------
-// BOTÕES: COPIAR, PIXEL, CLICK, DESCADASTRAMENTO
-// -----------------------------
-const botoesExtrasWrap = document.createElement('div');
-botoesExtrasWrap.style.marginTop = "10px";
-botoesExtrasWrap.style.display = "flex";
-botoesExtrasWrap.style.flexWrap = "wrap";
-botoesExtrasWrap.style.gap = "10px";
+  // BOTÕES: COPIAR, PIXEL, CLICK, DESCADASTRAMENTO
+  // -----------------------------
+  const botoesExtrasWrap = document.createElement('div');
+  botoesExtrasWrap.style.marginTop = "10px";
+  botoesExtrasWrap.style.display = "flex";
+  botoesExtrasWrap.style.flexWrap = "wrap";
+  botoesExtrasWrap.style.gap = "10px";
 
-// COPIAR HTML
-const btnCopiar = document.createElement('button');
-btnCopiar.innerText = '📋 Copiar HTML';
-btnCopiar.onclick = () => {
-  const html = ta.value;
-  if (!html) {
-    mostrarMensagem("O campo HTML está vazio.");
-    return;
-  }
+  // COPIAR HTML
+  const btnCopiar = document.createElement('button');
+  btnCopiar.innerText = '📋 Copiar HTML';
+  btnCopiar.onclick = () => {
+    const html = ta.value;
+    if (!html) {
+      mostrarMensagem("O campo HTML está vazio.");
+      return;
+    }
 
-  navigator.clipboard.writeText(html)
-    .then(() => mostrarMensagem("HTML copiado para a área de transferência!"))
-    .catch(err => {
-      console.error("Erro ao copiar:", err);
-      mostrarMensagem("Não foi possível copiar o HTML.");
-    });
-};
-botoesExtrasWrap.appendChild(btnCopiar);
+    navigator.clipboard.writeText(html)
+      .then(() => mostrarMensagem("HTML copiado para a área de transferência!"))
+      .catch(err => {
+        console.error("Erro ao copiar:", err);
+        mostrarMensagem("Não foi possível copiar o HTML.");
+      });
+  };
+  botoesExtrasWrap.appendChild(btnCopiar);
 
-// PIXEL
-const btnPixel = document.createElement('button');
-btnPixel.innerText = '➕ Pixel';
-btnPixel.onclick = () => {
-  const texto = `
-<!-- Código de Pixel -->
-<img src="https://api.radarsiope.com.br/api/pixel?newsletter={{newsletterId}}&email={{email}}" 
-     width="1" height="1" style="display:none" alt="pixel" />
-`;
-  if (!ta.value.includes("api/pixel")) {
-    ta.value += "\n" + texto;
-  } else {
-    mostrarMensagem("O código de Pixel já está incluído.");
-  }
-};
-botoesExtrasWrap.appendChild(btnPixel);
+  // PIXEL
+  const btnPixel = document.createElement('button');
+  btnPixel.innerText = '➕ Pixel';
+  btnPixel.onclick = () => {
+    const texto = `
+  <!-- Código de Pixel -->
+  <img src="https://api.radarsiope.com.br/api/pixel?newsletter={{newsletterId}}&email={{email}}" 
+      width="1" height="1" style="display:none" alt="pixel" />
+  `;
+    if (!ta.value.includes("api/pixel")) {
+      ta.value += "\n" + texto;
+    } else {
+      mostrarMensagem("O código de Pixel já está incluído.");
+    }
+  };
+  botoesExtrasWrap.appendChild(btnPixel);
 
-// CLICK
-const btnClick = document.createElement('button');
-btnClick.innerText = '➕ Click';
-btnClick.onclick = () => {
-  let destino = prompt("Informe o link de destino:", "https://www.radarsiope.com.br/");
+  // CLICK
+  const btnClick = document.createElement('button');
+  btnClick.innerText = '➕ Click';
+  btnClick.onclick = () => {
+    let destino = prompt("Informe o link de destino:", "https://www.radarsiope.com.br/");
 
-  if (!destino) destino = "https://www.radarsiope.com.br/";
+    if (!destino) destino = "https://www.radarsiope.com.br/";
 
-  if (!destino.startsWith("http://") && !destino.startsWith("https://")) {
-    destino = "https://" + destino;
-  }
+    if (!destino.startsWith("http://") && !destino.startsWith("https://")) {
+      destino = "https://" + destino;
+    }
 
-  const texto = `
-<a href="https://api.radarsiope.com.br/api/click?envioId={{envioId}}&destinatarioId={{destinatarioId}}&newsletterId={{newsletterId}}&url=${encodeURIComponent(destino)}">
-  Clique aqui para acessar o conteúdo
-</a>
-`;
+    const texto = `
+  <a href="https://api.radarsiope.com.br/api/click?envioId={{envioId}}&destinatarioId={{destinatarioId}}&newsletterId={{newsletterId}}&url=${encodeURIComponent(destino)}">
+    Clique aqui para acessar o conteúdo
+  </a>
+  `;
 
-  if (!ta.value.includes("api/click")) {
-    ta.value += "\n" + texto;
-  } else {
-    mostrarMensagem("O link de Click já está incluído.");
-  }
-};
-botoesExtrasWrap.appendChild(btnClick);
+    if (!ta.value.includes("api/click")) {
+      ta.value += "\n" + texto;
+    } else {
+      mostrarMensagem("O link de Click já está incluído.");
+    }
+  };
+  botoesExtrasWrap.appendChild(btnClick);
 
-// DESCADASTRAMENTO
-const btnDescadastramento = document.createElement('button');
-btnDescadastramento.innerText = '➕ Descadastramento';
-btnDescadastramento.onclick = () => {
-  const texto = `
-<p style="font-size:12px; color:#888; margin-top:30px">
-  Não deseja mais receber nossas newsletters?
-  <a href="https://api.radarsiope.com.br/descadastramento.html?email={{email}}&newsletter={{newsletterId}}&titulo={{titulo}}">
-    Clique aqui para se descadastrar
-  </a>.
-</p>
-`;
+  // DESCADASTRAMENTO
+  const btnDescadastramento = document.createElement('button');
+  btnDescadastramento.innerText = '➕ Descadastramento';
+  btnDescadastramento.onclick = () => {
+    const texto = `
+  <p style="font-size:12px; color:#888; margin-top:30px">
+    Não deseja mais receber nossas newsletters?
+    <a href="https://api.radarsiope.com.br/descadastramento.html?email={{email}}&newsletter={{newsletterId}}&titulo={{titulo}}">
+      Clique aqui para se descadastrar
+    </a>.
+  </p>
+  `;
 
-  if (!ta.value.includes("Clique aqui para se descadastrar")) {
-    ta.value += "\n" + texto;
-  } else {
-    mostrarMensagem("O link de descadastramento já está incluído.");
-  }
-};
-botoesExtrasWrap.appendChild(btnDescadastramento);
+    if (!ta.value.includes("Clique aqui para se descadastrar")) {
+      ta.value += "\n" + texto;
+    } else {
+      mostrarMensagem("O link de descadastramento já está incluído.");
+    }
+  };
+  botoesExtrasWrap.appendChild(btnDescadastramento);
 
-htmlWrap.appendChild(botoesExtrasWrap);
+  htmlWrap.appendChild(botoesExtrasWrap);
 
 
   // Botões de preview
@@ -607,6 +617,30 @@ htmlWrap.appendChild(botoesExtrasWrap);
   // ABRE O MODAL
   // -----------------------------
   openModal('modal-edit-overlay');
+
+  // -----------------------------
+  // CARREGA STATUS DE ENVIO
+  // -----------------------------
+  if (isEdit && docId) {
+    const statusDiv = document.getElementById("status-envio-news");
+
+    if (statusDiv) {
+      const enviosSnap = await db.collection("newsletters")
+        .doc(docId)
+        .collection("envios")
+        .orderBy("data_envio", "desc")
+        .limit(1)
+        .get();
+
+      if (enviosSnap.empty) {
+        statusDiv.innerHTML = `<span style="color:red;">❌ Ainda não enviada</span>`;
+      } else {
+        const envio = enviosSnap.docs[0].data();
+        const dt = envio.data_envio.toDate().toLocaleDateString("pt-BR");
+        statusDiv.innerHTML = `<span style="color:green;">✔️ Enviada em ${dt}</span>`;
+      }
+    }
+  }
 
   // -----------------------------
   // CARREGA OS BLOCOS

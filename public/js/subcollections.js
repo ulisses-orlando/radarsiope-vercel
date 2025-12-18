@@ -161,6 +161,11 @@ async function carregarNewsletters() {
     const dt = d.data_publicacao
       ? new Date(d.data_publicacao.seconds * 1000).toLocaleDateString('pt-BR')
       : '';
+
+    const enviadaIcon = d.enviada
+      ? `<span style="color:green; font-size:18px;">✔️</span>`
+      : `<span style="color:red; font-size:18px;">❌</span>`;
+
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td>${dt}</td>
@@ -168,6 +173,7 @@ async function carregarNewsletters() {
       <td>${d.titulo || ''}</td>
       <td>${d.tipo || ''}</td>
       <td>${d.classificacao || 'Básica'}</td>
+      <td style="text-align:center;">${enviadaIcon}</td>
       <td>
         <span class="icon-btn" title="Editar" onclick="abrirModalNewsletter('${doc.id}', true)">✏️</span>
         <span class="icon-btn" title="Duplicar" onclick="duplicarNewsletter('${doc.id}')">📄</span>
@@ -716,6 +722,10 @@ async function abrirModalEnvioManual(usuarioId, solicitacaoId, dadosSolicitacao)
       <label>Mensagem HTML</label>
       <textarea id="resposta-html" rows="10"></textarea>
     </div>
+    <div class="field">
+      <label>Assunto:</label>
+      <input type="assunto" id="assunto-email">
+    </div>
     <button id="btn-preview-email">👁️ Visualizar e-mail</button>
     <button id="btn-enviar-email">📤 Enviar e-mail</button>
     <div id="preview-container" style="border:1px solid #ccc; padding:10px; margin-top:10px; background:#f9f9f9;"></div>
@@ -752,6 +762,7 @@ async function abrirModalEnvioManual(usuarioId, solicitacaoId, dadosSolicitacao)
 
     const nome = dadosCompletos.nome || "Usuário";
     const email = document.getElementById("email-destino").value; // dadosCompletos.email;
+    const assunto = document.getElementById("assunto-email").value || "Resposta à sua solicitação";
 
     if (!email) {
       mostrarMensagem("Solicitação não possui e-mail.");
@@ -762,7 +773,7 @@ async function abrirModalEnvioManual(usuarioId, solicitacaoId, dadosSolicitacao)
       await fetch("/api/enviarEmail", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ nome, email, mensagemHtml })
+        body: JSON.stringify({ nome, email, assunto, mensagemHtml })
       });
 
       // Atualiza status da solicitação (somente se estiver no contexto de usuário + solicitação)
@@ -786,7 +797,7 @@ async function abrirModalEnvioManual(usuarioId, solicitacaoId, dadosSolicitacao)
       // Preenche campo de resultado no modal de leads, se estiver visível
       const resultadoCampo = document.getElementById("resultado-contato-lead");
       if (resultadoCampo) {
-        const agora = new Date(); 
+        const agora = new Date();
         const dataFormatada = agora.toLocaleDateString("pt-BR");
         const horaFormatada = agora.toLocaleTimeString("pt-BR", { hour: '2-digit', minute: '2-digit' });
         resultadoCampo.value = mensagemHtml;
@@ -827,6 +838,7 @@ function aplicarPlaceholders(template, dados) {
   const titulo = dados.titulo || "(sem título)";
   const newsletterId = dados.newsletterId || "(sem newsletterId)";
   const envioId = dados.envioId || "(sem envioId)";
+  const destinatarioId = dados.destinatarioId || "(sem destinatarioId)";
   const UFId = dados.UFId || "(sem UFId)";
   const municipioId = dados.municipioId || "(sem municipioId)";
   const cargoId = dados.cargoId || "(sem cargoId)";
