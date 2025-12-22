@@ -1,4 +1,3 @@
-
 // Configuração do Firebase
 const firebaseConfig = {
   apiKey: "AIzaSyDcS4nneXnN8Cdb-S_cQukwaguLXJYbQ1U",
@@ -6,10 +5,7 @@ const firebaseConfig = {
   projectId: "radarsiope"
 };
 
-// Inicializa Firebase
 firebase.initializeApp(firebaseConfig);
-
-// Cria referência ao Firestore
 const db = firebase.firestore();
 
 async function VerNewsletterComToken() {
@@ -18,7 +14,7 @@ async function VerNewsletterComToken() {
   const env = params.get("env");
   const uid = params.get("uid");
   const token = params.get("token");
-  const assinaturaId = params.get("assinaturaId"); // só para usuários
+  const assinaturaId = params.get("assinaturaId");
 
   const container = document.getElementById("conteudo-newsletter");
   container.innerHTML = "<p>Validando acesso...</p>";
@@ -27,7 +23,6 @@ async function VerNewsletterComToken() {
     let envioSnap;
 
     if (assinaturaId) {
-      // 🔥 Usuário
       envioSnap = await db.collection("usuarios")
         .doc(uid)
         .collection("assinaturas")
@@ -36,7 +31,6 @@ async function VerNewsletterComToken() {
         .doc(env)
         .get();
     } else {
-      // 🔥 Lead
       envioSnap = await db.collection("leads")
         .doc(uid)
         .collection("envios")
@@ -51,7 +45,6 @@ async function VerNewsletterComToken() {
 
     const envio = envioSnap.data();
 
-    // Valida token
     if (envio.token_acesso !== token) {
       container.innerHTML = "<p>Acesso inválido: token incorreto.</p>";
       return;
@@ -62,13 +55,11 @@ async function VerNewsletterComToken() {
       return;
     }
 
-    // Atualiza log
     await envioSnap.ref.update({
       ultimo_acesso: new Date(),
       acessos_totais: firebase.firestore.FieldValue.increment(1)
     });
 
-    // Busca conteúdo da newsletter
     const newsletterSnap = await db.collection("newsletters").doc(nid).get();
     if (!newsletterSnap.exists) {
       container.innerHTML = "<p>Newsletter não encontrada.</p>";
@@ -77,8 +68,8 @@ async function VerNewsletterComToken() {
 
     const newsletter = newsletterSnap.data();
 
-    // Renderiza HTML com placeholders
-    const htmlFinal = aplicarPlaceholders(newsletter.html, {
+    // ⚠️ Aqui estava o problema: usar html_conteudo
+    const htmlFinal = aplicarPlaceholders(newsletter.html_conteudo, {
       ...newsletter,
       newsletterId: nid,
       envioId: env,
