@@ -51,8 +51,8 @@ async function VerNewsletterComToken() {
             return;
         }
 
-        console.log(envio.expira_em)
-        
+        console.log('expira em:',envio.expira_em)
+
         if (envio.expira_em) {
             let expiraDate;
 
