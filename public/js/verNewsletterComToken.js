@@ -109,7 +109,8 @@ async function VerNewsletterComToken() {
             assinaturaId: assinaturaId || "",
             token_acesso: token
         };
- console.log(dados) 
+// 👉 Log para validar os dados antes de aplicar placeholders 
+console.log("📌 Dados para placeholders:", dados);
         // 6. Aplicar placeholders
         if (newsletter.html_conteudo) {
             const htmlFinal = aplicarPlaceholders(newsletter.html_conteudo, dados);
