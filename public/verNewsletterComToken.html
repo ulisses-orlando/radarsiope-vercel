@@ -2,10 +2,30 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
-  <title>Newsletter</title>
+  <title>Visualizar Newsletter</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 20px;
+      background-color: #f9f9f9;
+    }
+    #conteudo-newsletter {
+      background: #fff;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+    }
+  </style>
 </head>
 <body>
-  <div id="conteudo-newsletter"></div>
+  <!-- Container onde o JS vai renderizar a newsletter -->
+  <div id="conteudo-newsletter">
+    <p>Carregando newsletter...</p>
+  </div>
+
+  <!-- Caminho correto para o JS -->
   <script src="js/verNewsletterComToken.js"></script>
 </body>
 </html>
