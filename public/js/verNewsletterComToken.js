@@ -61,7 +61,7 @@ async function VerNewsletterComToken() {
             ultimo_acesso: new Date(),
             acessos_totais: firebase.firestore.FieldValue.increment(1)
         });
-
+console.log('news 111');
         // 3. Buscar newsletter
         const newsletterSnap = await db.collection("newsletters").doc(nid).get();
         if (!newsletterSnap.exists) {
@@ -70,7 +70,7 @@ async function VerNewsletterComToken() {
         }
         const newsletter = newsletterSnap.data();
 
-        console.log(newsletter)
+        console.log('news',newsletter);
 
         // 4. Buscar destinatário (usuário ou lead)
         let destinatarioSnap;
