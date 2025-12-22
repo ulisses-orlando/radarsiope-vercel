@@ -51,20 +51,17 @@ async function VerNewsletterComToken() {
             return;
         }
 
-        console.log('expira em:', envio.expira_em);
-
         if (envio.expira_em) {
-            // Firestore Timestamp → converte para Date
             const expiraDate = envio.expira_em.toDate();
-
             console.log("📌 Expira em:", expiraDate);
 
-            if (expiraDate < new Date()) {
+            if (expiraDate.getTime() < Date.now()) {
                 console.warn("⚠️ Link expirado:", expiraDate);
                 container.innerHTML = "<p>Este link expirou. Solicite novo acesso.</p>";
                 return;
             }
         }
+
 
         await envioSnap.ref.update({
             ultimo_acesso: new Date(),
