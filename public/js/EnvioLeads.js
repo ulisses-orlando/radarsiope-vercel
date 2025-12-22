@@ -1387,7 +1387,8 @@ async function enviarLoteIndividual(newsletterId, envioId, loteId) {
                         destinatarioId: idDest,
                         token_acesso: token,
                         expira_em: expiraEm,
-                        ultimo_acesso: null
+                        ultimo_acesso: null,
+                        acessos_totais: 0
                     });
                 } else {
                     await db.collection("usuarios").doc(idDest)
@@ -1397,9 +1398,11 @@ async function enviarLoteIndividual(newsletterId, envioId, loteId) {
                             data_envio: firebase.firestore.Timestamp.now(),
                             status: "enviado",
                             destinatarioId: idDest,
+                            assinaturaId: dest.assinaturaId, // 🔥 incluímos para facilitar validação
                             token_acesso: token,
                             expira_em: expiraEm,
-                            ultimo_acesso: null
+                            ultimo_acesso: null,
+                            acessos_totais: 0
                         });
                 }
             } catch (err) {

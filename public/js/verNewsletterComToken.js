@@ -1,39 +1,43 @@
-// Quando a página carregar
-window.addEventListener("DOMContentLoaded", () => {
-  VerNewsletterComToken();
-});
-
 async function VerNewsletterComToken() {
   const params = new URLSearchParams(window.location.search);
   const nid = params.get("nid");
   const env = params.get("env");
   const uid = params.get("uid");
   const token = params.get("token");
+  const assinaturaId = params.get("assinaturaId"); // só para usuários
 
   const container = document.getElementById("conteudo-newsletter");
   container.innerHTML = "<p>Validando acesso...</p>";
 
   try {
-    // Busca envio no Firestore
-    const envioSnap = await db.collection("newsletters")
-      .doc(nid)
-      .collection("envios")
-      .doc(env)
-      .get();
+    let envioSnap;
+
+    if (assinaturaId) {
+      // 🔥 Usuário
+      envioSnap = await db.collection("usuarios")
+        .doc(uid)
+        .collection("assinaturas")
+        .doc(assinaturaId)
+        .collection("envios")
+        .doc(env)
+        .get();
+    } else {
+      // 🔥 Lead
+      envioSnap = await db.collection("leads")
+        .doc(uid)
+        .collection("envios")
+        .doc(env)
+        .get();
+    }
 
     if (!envioSnap.exists) {
-      container.innerHTML = "<p>Envio não encontrado.</p>";
+      container.innerHTML = "<p>Envio não encontrado para este destinatário.</p>";
       return;
     }
 
     const envio = envioSnap.data();
 
-    // Valida destinatário e token
-    if (envio.destinatarioId !== uid) {
-      container.innerHTML = "<p>Acesso inválido: destinatário não confere.</p>";
-      return;
-    }
-
+    // Valida token
     if (envio.token_acesso !== token) {
       container.innerHTML = "<p>Acesso inválido: token incorreto.</p>";
       return;
@@ -44,7 +48,7 @@ async function VerNewsletterComToken() {
       return;
     }
 
-    // Atualiza log de acesso
+    // Atualiza log
     await envioSnap.ref.update({
       ultimo_acesso: new Date(),
       acessos_totais: firebase.firestore.FieldValue.increment(1)
@@ -59,12 +63,13 @@ async function VerNewsletterComToken() {
 
     const newsletter = newsletterSnap.data();
 
-    // Renderiza HTML completo (com placeholders aplicados)
+    // Renderiza HTML com placeholders
     const htmlFinal = aplicarPlaceholders(newsletter.html, {
       ...newsletter,
       newsletterId: nid,
       envioId: env,
       destinatarioId: uid,
+      assinaturaId: assinaturaId || "",
       token_acesso: token
     });
 
