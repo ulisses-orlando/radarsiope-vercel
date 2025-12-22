@@ -240,6 +240,7 @@ function gerarHtmlPlaceholdersExpandivel() {
           <li><code>{{municipio}}</code> → Municipio do usuário</li>
           <li><code>{{cargo}}</code> → Cargo do usuário</li>
           <li><code>{{interesse}}</code> → Interesse do usuário</li>
+          <li><code>{{token}}</code> → token para envio da newsletter</li>
         </ul>
         <p>Esses campos serão substituídos automaticamente no momento do envio.</p>
       </div>
@@ -315,4 +316,63 @@ function mostrarMensagem(mensagem) {
   caixa.appendChild(botao);
   fundo.appendChild(caixa);
   document.body.appendChild(fundo);
+}
+
+// Função utilitária para gerar token aleatório
+function gerarTokenAcesso(tamanho = 20) {
+  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+  let token = "";
+  for (let i = 0; i < tamanho; i++) {
+    token += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return token;
+}
+function aplicarPlaceholders(template, dados) {
+  const nome = dados.nome || "(nome não informado)";
+  const email = dados.email || "(email não informado)";
+  const edicao = dados.edicao || "(sem edição)";
+
+  // 🔥 Ajuste: tipo pode vir de usuário (string) ou de lead (array)
+  let tipo = "(sem tipo)";
+
+  if (Array.isArray(dados.interesses) && dados.interesses.length > 0) {
+    // Lead com múltiplos interesses
+    tipo = dados.interesses.join(", ");
+  } else if (dados.tipo) {
+    // Usuário com tipo único
+    tipo = dados.tipo;
+  }
+
+  const titulo = dados.titulo || "(sem título)";
+  const newsletterId = dados.newsletterId || "(sem newsletterId)";
+  const envioId = dados.envioId || "(sem envioId)";
+  const destinatarioId = dados.destinatarioId || "(sem destinatarioId)";
+  const cod_uf = dados.cod_uf || "(sem UFId)";
+  const nome_municipio = dados.nome_municipio || "(sem municipioId)";
+  const cargo = dados.tipo_perfil || dados.perfil || "(sem cargoId)";
+  const interesseId = dados.interesseId || "(sem interesseId)";
+  const token = dados.token_acesso || "(sem token)";
+
+  let dataFormatada = "";
+
+  if (dados.data_publicacao) {
+    const dataObj = dados.data_publicacao.toDate?.() || dados.data_publicacao;
+    dataFormatada = formatDateBR(dataObj);
+  }
+
+  return template
+    .replace(/{{nome}}/gi, nome)
+    .replace(/{{email}}/gi, email)
+    .replace(/{{edicao}}/gi, edicao)
+    .replace(/{{tipo}}/gi, tipo)
+    .replace(/{{titulo}}/gi, titulo)
+    .replace(/{{data_publicacao}}/gi, dataFormatada)
+    .replace(/{{newsletterId}}/gi, newsletterId)
+    .replace(/{{envioId}}/gi, envioId)
+    .replace(/{{destinatarioId}}/gi, destinatarioId)
+    .replace(/{{uf}}/gi, cod_uf)
+    .replace(/{{municipio}}/gi, nome_municipio)
+    .replace(/{{cargo}}/gi, cargo)
+    .replace(/{{interesseId}}/gi, interesseId)
+    .replace(/{{token}}/gi, token);
 }

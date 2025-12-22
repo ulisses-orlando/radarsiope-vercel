@@ -519,6 +519,32 @@ async function abrirModalNewsletter(docId = null, isEdit = false) {
 
   htmlWrap.appendChild(botoesExtrasWrap);
 
+ // Token
+  const btnToken = document.createElement('button');
+  btnToken.innerText = '➕ Token';
+  btnToken.onclick = () => {
+    const texto = `
+  <p style="font-size:12px; color:#888; margin-top:30px">
+    Não deseja mais receber nossas newsletters?
+    <a href="https://radarsiope.com.br/newsletter.html
+        ?nid={{newsletterId}}
+        &env={{envioId}}
+        &uid={{destinatarioId}}
+        &token={{token}}">
+        👉 Acessar edição completa
+    </a>.
+  </p>
+  `;
+
+    if (!ta.value.includes("Acessar edição completa")) {
+      ta.value += "\n" + texto;
+    } else {
+      mostrarMensagem("O link de token já está incluído.");
+    }
+  };
+  botoesExtrasWrap.appendChild(btnToken);
+
+  htmlWrap.appendChild(botoesExtrasWrap);
 
   // Botões de preview
   const previewWrap = document.createElement('div');
@@ -988,9 +1014,11 @@ function validarHtmlEmail(html, blocos = []) {
   }
 
   // -----------------------------
-  // 5. Pixel dentro da tabela
+  // 5. Pixel dentro da tabela e existência
   // -----------------------------
-  if (html.includes("api.radarsiope.com.br/api/pixel") && idxTableClose !== -1) {
+  if (!html.includes("api.radarsiope.com.br/api/pixel")) {
+    erros.push("O HTML não contém o pixel de rastreamento.");
+  } else if (idxTableClose !== -1) {
     const pixelPos = html.indexOf("api.radarsiope.com.br/api/pixel");
     if (pixelPos > idxTableClose) {
       erros.push("O pixel de rastreamento está fora da tabela principal.");
@@ -998,9 +1026,11 @@ function validarHtmlEmail(html, blocos = []) {
   }
 
   // -----------------------------
-  // 6. Link de click dentro da tabela
+  // 6. Link de click dentro da tabela e existência
   // -----------------------------
-  if (html.includes("api.radarsiope.com.br/api/click") && idxTableClose !== -1) {
+  if (!html.includes("api.radarsiope.com.br/api/click")) {
+    erros.push("O HTML não contém o link de rastreamento de clique.");
+  } else if (idxTableClose !== -1) {
     const clickPos = html.indexOf("api.radarsiope.com.br/api/click");
     if (clickPos > idxTableClose) {
       erros.push("O link de rastreamento de clique está fora da tabela principal.");
@@ -1008,9 +1038,11 @@ function validarHtmlEmail(html, blocos = []) {
   }
 
   // -----------------------------
-  // 7. Descadastramento dentro da tabela
+  // 7. Descadastramento dentro da tabela e existência
   // -----------------------------
-  if (html.includes("descadastramento") && idxTableClose !== -1) {
+  if (!html.includes("descadastramento")) {
+    erros.push("O HTML não contém o link de descadastramento.");
+  } else if (idxTableClose !== -1) {
     const descPos = html.indexOf("descadastramento");
     if (descPos > idxTableClose) {
       erros.push("O link de descadastramento está fora da tabela principal.");
@@ -1018,7 +1050,14 @@ function validarHtmlEmail(html, blocos = []) {
   }
 
   // -----------------------------
-  // 8. Verifica tags <tr> mal fechadas
+  // 8. Placeholder de token
+  // -----------------------------
+  if (!html.includes("{{token}}")) {
+    erros.push("O HTML não contém o placeholder {{token}}.");
+  }
+
+  // -----------------------------
+  // 9. Verifica tags <tr> mal fechadas
   // -----------------------------
   const qtdTrAbertas = (htmlLower.match(/<tr/g) || []).length;
   const qtdTrFechadas = (htmlLower.match(/<\/tr>/g) || []).length;
@@ -1027,7 +1066,7 @@ function validarHtmlEmail(html, blocos = []) {
   }
 
   // -----------------------------
-  // 9. Verifica tags <td> mal fechadas
+  // 10. Verifica tags <td> mal fechadas
   // -----------------------------
   const qtdTdAbertas = (htmlLower.match(/<td/g) || []).length;
   const qtdTdFechadas = (htmlLower.match(/<\/td>/g) || []).length;

@@ -1374,11 +1374,20 @@ async function enviarLoteIndividual(newsletterId, envioId, loteId) {
                 enviados++;
 
                 // Registro do envio
+                const token = gerarTokenAcesso();
+                const expiraEm = firebase.firestore.Timestamp.fromDate(
+                    new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) // expira em 30 dias
+                );
+
                 if (tipo === "leads") {
                     await db.collection("leads").doc(idDest).collection("envios").add({
                         newsletter_id: newsletterId,
                         data_envio: firebase.firestore.Timestamp.now(),
-                        status: "enviado"
+                        status: "enviado",
+                        destinatarioId: idDest,
+                        token_acesso: token,
+                        expira_em: expiraEm,
+                        ultimo_acesso: null
                     });
                 } else {
                     await db.collection("usuarios").doc(idDest)
@@ -1386,7 +1395,11 @@ async function enviarLoteIndividual(newsletterId, envioId, loteId) {
                         .collection("envios").add({
                             newsletter_id: newsletterId,
                             data_envio: firebase.firestore.Timestamp.now(),
-                            status: "enviado"
+                            status: "enviado",
+                            destinatarioId: idDest,
+                            token_acesso: token,
+                            expira_em: expiraEm,
+                            ultimo_acesso: null
                         });
                 }
             } catch (err) {
