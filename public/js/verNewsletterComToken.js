@@ -126,3 +126,5 @@ async function VerNewsletterComToken() {
   }
 }
 */
+// Chama a função ao carregar a página 
+VerNewsletterComToken();
