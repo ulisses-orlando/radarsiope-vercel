@@ -8,8 +8,9 @@ console.log("🔎 inicializando bd");
 firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
 console.log("🔎 inicializado o bd");
+
 async function VerNewsletterComToken() {
-  console.log("🔎 Iniciando VerNewsletterComToken...");
+  console.log("🚀 Entrou na função VerNewsletterComToken");
 
   const params = new URLSearchParams(window.location.search);
   const nid = params.get("nid");
@@ -54,7 +55,6 @@ async function VerNewsletterComToken() {
     const envio = envioSnap.data();
     console.log("📄 Dados do envio:", envio);
 
-    // Valida token
     if (envio.token_acesso !== token) {
       console.warn("⚠️ Token inválido:", envio.token_acesso, token);
       container.innerHTML = "<p>Acesso inválido: token incorreto.</p>";
@@ -69,14 +69,12 @@ async function VerNewsletterComToken() {
 
     console.log("✅ Token válido e link ativo.");
 
-    // Atualiza log
     await envioSnap.ref.update({
       ultimo_acesso: new Date(),
       acessos_totais: firebase.firestore.FieldValue.increment(1)
     });
     console.log("📝 Log de acesso atualizado.");
 
-    // Busca conteúdo da newsletter
     console.log("📂 Buscando newsletter:", nid);
     const newsletterSnap = await db.collection("newsletters").doc(nid).get();
     console.log("📄 newsletterSnap.exists:", newsletterSnap.exists);
@@ -89,7 +87,6 @@ async function VerNewsletterComToken() {
     const newsletter = newsletterSnap.data();
     console.log("📄 Dados da newsletter:", newsletter);
 
-    // Renderiza HTML direto (sem aplicarPlaceholders)
     if (newsletter.html_conteudo) {
       console.log("✅ Renderizando newsletter...");
       container.innerHTML = newsletter.html_conteudo;
@@ -103,6 +100,10 @@ async function VerNewsletterComToken() {
     container.innerHTML = "<p>Erro ao validar acesso.</p>";
   }
 }
+
+// ⚠️ Sem isso a função nunca roda
+VerNewsletterComToken();
+
 /*
     const newsletter = newsletterSnap.data();
 
@@ -126,5 +127,3 @@ async function VerNewsletterComToken() {
   }
 }
 */
-// Chama a função ao carregar a página 
-VerNewsletterComToken();
