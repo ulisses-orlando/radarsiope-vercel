@@ -14,8 +14,6 @@ async function VerNewsletterComToken() {
     const uid = params.get("uid");
     const token = params.get("token");
     const assinaturaId = params.get("assinaturaId");
-    
-console.log('params', params);
 
     const container = document.getElementById("conteudo-newsletter");
     container.innerHTML = "<p>Validando acesso...</p>";
@@ -53,17 +51,31 @@ console.log('params', params);
             return;
         }
 
-        if (envio.expira_em && envio.expira_em.toDate() < new Date()) {
-            console.warn("⚠️ Link expirado:", envio.expira_em.toDate());
-            container.innerHTML = "<p>Este link expirou. Solicite novo acesso.</p>";
-            return;
+        console.log(envio.expira_em)
+        
+        if (envio.expira_em) {
+            let expiraDate;
+
+            // Se for Timestamp do Firestore
+            if (typeof envio.expira_em.toDate === "function") {
+                expiraDate = envio.expira_em.toDate();
+            } else {
+                // Se for string ou Date
+                expiraDate = new Date(envio.expira_em);
+            }
+
+            if (expiraDate < new Date()) {
+                console.warn("⚠️ Link expirado:", expiraDate);
+                container.innerHTML = "<p>Este link expirou. Solicite novo acesso.</p>";
+                return;
+            }
         }
 
         await envioSnap.ref.update({
             ultimo_acesso: new Date(),
             acessos_totais: firebase.firestore.FieldValue.increment(1)
         });
-console.log('news 111');
+
         // 3. Buscar newsletter
         const newsletterSnap = await db.collection("newsletters").doc(nid).get();
         if (!newsletterSnap.exists) {
@@ -71,8 +83,6 @@ console.log('news 111');
             return;
         }
         const newsletter = newsletterSnap.data();
-
-        console.log('news',newsletter); 
 
         // 4. Buscar destinatário (usuário ou lead)
         let destinatarioSnap;
@@ -93,9 +103,6 @@ console.log('news 111');
             nome: destinatario.nome,
             email: destinatario.email
         };
-
-        // 👉 Log para validar os dados antes de aplicar placeholders 
-        console.log("📌 Dados para placeholders:", dados);
 
         // 6. Aplicar placeholders
         if (newsletter.conteudo_html_completo) {
