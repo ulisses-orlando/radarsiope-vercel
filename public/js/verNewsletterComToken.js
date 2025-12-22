@@ -69,7 +69,7 @@ async function VerNewsletterComToken() {
     const newsletter = newsletterSnap.data();
 
     // ⚠️ Aqui estava o problema: usar html_conteudo
-    const htmlFinal = aplicarPlaceholders(newsletter.html_conteudo, {
+   /* const htmlFinal = aplicarPlaceholders(newsletter.html_conteudo, {
       ...newsletter,
       newsletterId: nid,
       envioId: env,
@@ -79,6 +79,8 @@ async function VerNewsletterComToken() {
     });
 
     container.innerHTML = htmlFinal;
+*/
+    container.innerHTML = newsletter.html_conteudo;
 
   } catch (err) {
     console.error("Erro ao validar acesso:", err);
