@@ -14,6 +14,8 @@ async function VerNewsletterComToken() {
     const uid = params.get("uid");
     const token = params.get("token");
     const assinaturaId = params.get("assinaturaId");
+    
+console.log('params', params);
 
     const container = document.getElementById("conteudo-newsletter");
     container.innerHTML = "<p>Validando acesso...</p>";
