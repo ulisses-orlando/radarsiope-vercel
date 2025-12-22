@@ -1,3 +1,17 @@
+
+// Configuração do Firebase
+const firebaseConfig = {
+  apiKey: "AIzaSyDcS4nneXnN8Cdb-S_cQukwaguLXJYbQ1U",
+  authDomain: "radarsiope.firebaseapp.com",
+  projectId: "radarsiope"
+};
+
+// Inicializa Firebase
+firebase.initializeApp(firebaseConfig);
+
+// Cria referência ao Firestore
+const db = firebase.firestore();
+
 async function VerNewsletterComToken() {
   const params = new URLSearchParams(window.location.search);
   const nid = params.get("nid");
