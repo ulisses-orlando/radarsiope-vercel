@@ -425,6 +425,23 @@ async function abrirModalNewsletter(docId = null, isEdit = false) {
   ta.value = data.html_conteudo || '';
   htmlWrap.appendChild(ta);
 
+  // Campo HTML completo
+  const lblCompleto = document.createElement('label');
+  lblCompleto.innerText = 'Conteúdo HTML Completo';
+  lblCompleto.style.marginTop = "15px";
+  htmlWrap.appendChild(lblCompleto);
+
+  const taCompleto = document.createElement('textarea');
+  taCompleto.rows = 20;
+  taCompleto.style.width = '100%';
+  taCompleto.style.minHeight = "400px";
+  taCompleto.style.fontFamily = "monospace";
+  taCompleto.style.fontSize = "14px";
+  taCompleto.dataset.fieldName = 'conteudo_html_completo';
+  taCompleto.id = 'campo-html-completo-newsletter';
+  taCompleto.value = data.conteudo_html_completo || '';
+  htmlWrap.appendChild(taCompleto);
+
   // -----------------------------
   // BOTÕES: COPIAR, PIXEL, CLICK, DESCADASTRAMENTO
   // -----------------------------
@@ -525,7 +542,7 @@ async function abrirModalNewsletter(docId = null, isEdit = false) {
   btnToken.onclick = () => {
     const texto = `
 <p style="font-size:12px; color:#888; margin-top:30px">
-  👉 <a href="https://radarsiope.com.br/verNewsletterComToken.html?nid={{newsletterId}}&env={{envioId}}&uid={{destinatarioId}}&assinaturaId={{assinaturaId}}&token={{token}}">
+  👉 <a href="https://radarsiope-vercel.vercel.app/verNewsletterComToken.html?nid={{newsletterId}}&env={{envioId}}&uid={{destinatarioId}}&assinaturaId={{assinaturaId}}&token={{token}}">
     Acessar edição completa
   </a>
 </p>
@@ -563,6 +580,7 @@ async function abrirModalNewsletter(docId = null, isEdit = false) {
   addPreviewButton('👤 Visualizar como Lead', "segmentado", "leads", false);
   addPreviewButton('⭐ Visualizar como Assinante', "segmentado", "assinantes", false);
   addPreviewButton('🧪 Visualizar HTML puro', "puro", null, false);
+  addPreviewButton('📖 Visualizar HTML Completo', "completo_html", null, true);
 
   htmlWrap.appendChild(previewWrap);
 
@@ -673,7 +691,10 @@ async function abrirModalNewsletter(docId = null, isEdit = false) {
 
 function montarHtmlNewsletterPreview(modo, segmento = null, bordas = false) {
   const campoHTML = document.getElementById('campo-html-newsletter');
+  const campoHTMLCompleto = document.getElementById('campo-html-completo-newsletter');
+
   const htmlBase = campoHTML ? campoHTML.value : "";
+  const htmlCompleto = campoHTMLCompleto ? campoHTMLCompleto.value : "";
 
   const blocos = coletarBlocosEdicao();
 
@@ -718,6 +739,18 @@ function montarHtmlNewsletterPreview(modo, segmento = null, bordas = false) {
   });
 
   // -----------------------------
+  // NOVO MODO: COMPLETO_HTML
+  // -----------------------------
+  if (modo === "completo_html") {
+    // Se o HTML completo tiver {{blocos}}, substitui
+    if (htmlCompleto.includes("{{blocos}}")) {
+      return htmlCompleto.replace("{{blocos}}", htmlBlocos);
+    }
+    // Senão, concatena os blocos no final
+    return htmlCompleto + "\n" + htmlBlocos;
+  }
+
+  // -----------------------------
   // SE O HTML BASE TEM {{blocos}}
   // -----------------------------
   if (htmlBase.includes("{{blocos}}")) {
@@ -729,8 +762,6 @@ function montarHtmlNewsletterPreview(modo, segmento = null, bordas = false) {
   // -----------------------------
   return htmlBase + "\n" + htmlBlocos;
 }
-
-
 
 async function abrirModalNewsletterxxxxx(docId = null, isEdit = false) {
   const title = document.getElementById('modal-edit-title');

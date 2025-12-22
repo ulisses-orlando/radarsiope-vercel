@@ -85,40 +85,23 @@ async function VerNewsletterComToken() {
 
         // 5. Montar objeto de dados para placeholders
         const dados = {
-            // dados do destinatário
+            // apenas os dados do destinatário que queremos substituir
             nome: destinatario.nome,
-            email: destinatario.email,
-            cod_uf: destinatario.cod_uf,
-            nome_municipio: destinatario.nome_municipio,
-            tipo_perfil: destinatario.tipo_perfil,
-            perfil: destinatario.perfil,
-            interesses: destinatario.interesses,
-            interesseId: destinatario.interesseId,
-
-            // dados da newsletter
-            edicao: newsletter.edicao,
-            tipo: newsletter.tipo,
-            titulo: newsletter.titulo,
-            data_publicacao: newsletter.data_publicacao,
-            blocos: newsletter.blocos,
-
-            // dados técnicos
-            newsletterId: nid,
-            envioId: env,
-            destinatarioId: uid,
-            assinaturaId: assinaturaId || "",
-            token_acesso: token
+            email: destinatario.email
         };
-// 👉 Log para validar os dados antes de aplicar placeholders 
-console.log("📌 Dados para placeholders:", dados);
+
+        // 👉 Log para validar os dados antes de aplicar placeholders 
+        console.log("📌 Dados para placeholders:", dados);
+
         // 6. Aplicar placeholders
-        if (newsletter.html_conteudo) {
-            const htmlFinal = aplicarPlaceholders(newsletter.html_conteudo, dados);
+        if (newsletter.conteudo_html_completo) {
+            const htmlFinal = aplicarPlaceholders(newsletter.conteudo_html_completo, dados);
             container.innerHTML = htmlFinal;
         } else {
-            console.warn("⚠️ Campo html_conteudo não encontrado.");
-            container.innerHTML = "<p>Newsletter sem conteúdo HTML.</p>";
+            console.warn("⚠️ Campo conteudo_html_completo não encontrado.");
+            container.innerHTML = "<p>Newsletter sem conteúdo completo.</p>";
         }
+
 
     } catch (err) {
         console.error("❌ Erro ao validar acesso:", err);
