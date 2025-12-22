@@ -70,6 +70,8 @@ async function VerNewsletterComToken() {
         }
         const newsletter = newsletterSnap.data();
 
+        console.log(newsletter)
+
         // 4. Buscar destinatário (usuário ou lead)
         let destinatarioSnap;
         if (assinaturaId) {
