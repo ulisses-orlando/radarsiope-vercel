@@ -70,7 +70,7 @@ console.log('news 111');
         }
         const newsletter = newsletterSnap.data();
 
-        console.log('news',newsletter);
+        console.log('news',newsletter); 
 
         // 4. Buscar destinatário (usuário ou lead)
         let destinatarioSnap;
