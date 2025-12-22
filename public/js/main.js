@@ -519,22 +519,17 @@ async function abrirModalNewsletter(docId = null, isEdit = false) {
 
   htmlWrap.appendChild(botoesExtrasWrap);
 
- // Token
+  // Token
   const btnToken = document.createElement('button');
   btnToken.innerText = '➕ Token';
   btnToken.onclick = () => {
     const texto = `
-  <p style="font-size:12px; color:#888; margin-top:30px">
-    Não deseja mais receber nossas newsletters?
-    <a href="https://radarsiope.com.br/verNewsletterComToken.html
-        ?nid={{newsletterId}}
-        &env={{envioId}}
-        &uid={{destinatarioId}}
-        &token={{token}}">
-        👉 Acessar edição completa
-    </a>.
-  </p>
-  `;
+<p style="font-size:12px; color:#888; margin-top:30px">
+  👉 <a href="https://radarsiope.com.br/verNewsletterComToken.html?nid={{newsletterId}}&env={{envioId}}&uid={{destinatarioId}}&assinaturaId={{assinaturaId}}&token={{token}}">
+    Acessar edição completa
+  </a>
+</p>
+`;
 
     if (!ta.value.includes("Acessar edição completa")) {
       ta.value += "\n" + texto;
@@ -543,8 +538,8 @@ async function abrirModalNewsletter(docId = null, isEdit = false) {
     }
   };
   botoesExtrasWrap.appendChild(btnToken);
-
   htmlWrap.appendChild(botoesExtrasWrap);
+
 
   // Botões de preview
   const previewWrap = document.createElement('div');

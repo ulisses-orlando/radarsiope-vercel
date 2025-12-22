@@ -1,15 +1,6 @@
-const nodemailer = require("nodemailer");
-
-// Configuração do transporte SMTP usando Zoho
-const transporter = nodemailer.createTransport({
-  host: "smtp.zoho.com",
-  port: 465,
-  secure: true,
-  auth: {
-    user: "contato@radarsiope.com.br", // seu e-mail Zoho
-    pass: "5CVcb7zCsdpy"               // senha de aplicativo gerada no Zoho
-  }
-});
+// =======================
+// Funções utilitárias (frontend)
+// =======================
 
 function validarEmail(email) {
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -37,156 +28,10 @@ function aplicarMascaraTelefone(input) {
   });
 }
 
-/**
- * Função para enviar e-mail de resposta automática
- * @param {Object} data - Dados do lead
- * @param {string} data.nome - Nome do destinatário
- * @param {string} data.email - E-mail do destinatário
- * @param {string} data.mensagemHtml - Conteúdo HTML do e-mail
- */
-exports.enviarEmailLead = async (data) => {
-  const { nome, email, mensagemHtml } = data;
-
-  const mailOptions = {
-    from: "Radar SIOPE <contato@radarsiope.com.br>",
-    to: email,
-    subject: "Obrigado pelo seu interesse!",
-    html: mensagemHtml
-  };
-
-  try {
-    await transporter.sendMail(mailOptions);
-  } catch (error) {
-    console.error("❌ Erro ao enviar e-mail:", error);
-  }
-};
-
-async function inserirCamposUfMunicipio(container, ufPadrao = "", municipioPadrao = "") {
-  // 🔎 Mapeamento de DDD para UF
-  const dddParaUf = {
-    "11": "SP", "12": "SP", "13": "SP", "14": "SP", "15": "SP", "16": "SP", "17": "SP", "18": "SP", "19": "SP",
-    "21": "RJ", "22": "RJ", "24": "RJ",
-    "27": "ES", "28": "ES",
-    "31": "MG", "32": "MG", "33": "MG", "34": "MG", "35": "MG", "37": "MG", "38": "MG",
-    "41": "PR", "42": "PR", "43": "PR", "44": "PR", "45": "PR", "46": "PR",
-    "47": "SC", "48": "SC", "49": "SC",
-    "51": "RS", "53": "RS", "54": "RS", "55": "RS",
-    "61": "DF",
-    "62": "GO", "64": "GO",
-    "63": "TO",
-    "65": "MT", "66": "MT",
-    "67": "MS",
-    "68": "AC",
-    "69": "RO",
-    "71": "BA", "73": "BA", "74": "BA", "75": "BA", "77": "BA",
-    "79": "SE",
-    "81": "PE", "87": "PE",
-    "82": "AL",
-    "83": "PB",
-    "84": "RN",
-    "85": "CE", "88": "CE",
-    "86": "PI", "89": "PI",
-    "91": "PA", "93": "PA", "94": "PA",
-    "92": "AM", "97": "AM",
-    "95": "RR",
-    "96": "AP",
-    "98": "MA", "99": "MA"
-  };
-
-  // 🧱 Criação dos elementos
-  const ufLabel = document.createElement("label");
-  ufLabel.textContent = "Estado (UF):";
-  const ufSelect = document.createElement("select");
-  ufSelect.id = "uf";
-  ufSelect.required = true;
-  ufSelect.style.cssText = "width:100%;padding:8px;margin-bottom:10px;border:1px solid #ccc";
-  ufSelect.innerHTML = '<option value="">Selecione o estado...</option>';
-
-  const municipioLabel = document.createElement("label");
-  municipioLabel.textContent = "Município:";
-  const municipioSelect = document.createElement("select");
-  municipioSelect.id = "municipio";
-  municipioSelect.required = true;
-  municipioSelect.style.cssText = "width:100%;padding:8px;margin-bottom:10px;border:1px solid #ccc";
-  municipioSelect.innerHTML = '<option value="">Selecione o município...</option>';
-
-  container.appendChild(ufLabel);
-  container.appendChild(ufSelect);
-  container.appendChild(municipioLabel);
-  container.appendChild(municipioSelect);
-
-  // 📥 Preenche UF
-  const ufSnap = await db.collection("UF").get();
-  ufSnap.forEach(doc => {
-    const { nome_uf } = doc.data();
-    const option = document.createElement("option");
-    option.value = doc.id;
-    option.textContent = `${nome_uf} (${doc.id})`;
-    ufSelect.appendChild(option);
-  });
-
-  if (ufPadrao) ufSelect.value = ufPadrao;
-
-  // 📥 Preenche municípios ao mudar UF
-  ufSelect.addEventListener("change", async () => {
-    municipioSelect.innerHTML = '<option value="">Selecione o município...</option>';
-    const ufId = ufSelect.value;
-    if (!ufId) return;
-
-    const municipiosSnap = await db.collection("UF").doc(ufId).collection("Municipio").get();
-    municipiosSnap.forEach(doc => {
-      const { nome_municipio, cod_municipio } = doc.data();
-      const option = document.createElement("option");
-      option.value = cod_municipio;
-      option.textContent = nome_municipio;
-      municipioSelect.appendChild(option);
-    });
-
-    if (municipioPadrao) municipioSelect.value = municipioPadrao;
-  });
-
-  if (ufPadrao) {
-    ufSelect.dispatchEvent(new Event("change"));
-  }
-
-  // 📞 Sugestão automática de UF com base no DDD
-  const telefoneInput = document.getElementById("telefone");
-  if (telefoneInput) {
-    telefoneInput.addEventListener("input", () => {
-      const match = telefoneInput.value.match(/\(?(\d{2})\)?/);
-      const ddd = match?.[1];
-      const ufSugerida = dddParaUf[ddd];
-
-      if (ufSugerida) {
-        ufSelect.value = ufSugerida;
-        ufSelect.dispatchEvent(new Event("change"));
-      }
-    });
-  }
-
-  // ✅ Retorna função de validação e coleta
-  return function validarUfMunicipio() {
-    ufSelect.style.border = "1px solid #ccc";
-    municipioSelect.style.border = "1px solid #ccc";
-
-    const cod_uf = ufSelect.value;
-    const cod_municipio = municipioSelect.value;
-    const nome_municipio = municipioSelect.options[municipioSelect.selectedIndex]?.textContent || null;
-
-    if (!cod_uf) {
-      mostrarMensagem("⚠️ Selecione o estado (UF).");
-      ufSelect.style.border = "2px solid red";
-      return null;
-    }
-
-    if (!cod_municipio) {
-      mostrarMensagem("⚠️ Selecione o município.");
-      municipioSelect.style.border = "2px solid red";
-      return null;
-    }
-
-    return { cod_uf, cod_municipio, nome_municipio };
-  };
+function formatDateBR(date) {
+  if (!date) return "";
+  const d = new Date(date.seconds ? date.seconds * 1000 : date);
+  return d.toLocaleDateString("pt-BR");
 }
 
 function formatarBRL(valor) {
@@ -208,7 +53,7 @@ function irParaPaginaAnterior() {
     irParaPrimeiraPagina();
     return;
   }
-  paginaAtual -= 2; // volta uma página
+  paginaAtual -= 2;
   document.getElementById('lista-usuarios').innerHTML = '';
   carregarUsuariosComFiltro();
 }
@@ -226,7 +71,6 @@ function gerarHtmlPlaceholdersExpandivel() {
         <strong>📌 Placeholders disponíveis</strong>
         <span class="toggle-icon">▼</span>
       </div>
-
       <div class="placeholder-content">
         <ul>
           <li><code>{{nome}}</code> → Nome do usuário</li>
@@ -237,10 +81,10 @@ function gerarHtmlPlaceholdersExpandivel() {
           <li><code>{{data_publicacao}}</code> → Data da edição (DD/MM/AAAA)</li>
           <li><code>{{blocos}}</code> → Local onde os blocos serão inseridos</li>
           <li><code>{{UF}}</code> → UF do usuário</li>
-          <li><code>{{municipio}}</code> → Municipio do usuário</li>
+          <li><code>{{municipio}}</code> → Município do usuário</li>
           <li><code>{{cargo}}</code> → Cargo do usuário</li>
           <li><code>{{interesse}}</code> → Interesse do usuário</li>
-          <li><code>{{token}}</code> → token para envio da newsletter</li>
+          <li><code>{{token}}</code> → Token para envio da newsletter</li>
         </ul>
         <p>Esses campos serão substituídos automaticamente no momento do envio.</p>
       </div>
@@ -249,11 +93,9 @@ function gerarHtmlPlaceholdersExpandivel() {
 }
 
 function mostrarMensagem(mensagem) {
-  // Se já existir um modal aberto, remove antes
   const existente = document.getElementById("modal-radar-siope");
   if (existente) existente.remove();
 
-  // Cria o fundo escuro
   const fundo = document.createElement("div");
   fundo.id = "modal-radar-siope";
   fundo.style.position = "fixed";
@@ -267,7 +109,6 @@ function mostrarMensagem(mensagem) {
   fundo.style.justifyContent = "center";
   fundo.style.zIndex = "99999";
 
-  // Caixa do modal
   const caixa = document.createElement("div");
   caixa.style.background = "#fff";
   caixa.style.padding = "25px";
@@ -276,22 +117,17 @@ function mostrarMensagem(mensagem) {
   caixa.style.maxWidth = "420px";
   caixa.style.boxShadow = "0 4px 20px rgba(0,0,0,0.25)";
   caixa.style.textAlign = "center";
-  caixa.style.fontFamily = "Arial, sans-serif";
 
-  // Título
   const titulo = document.createElement("h2");
   titulo.innerText = "Radar SIOPE";
   titulo.style.marginTop = "0";
   titulo.style.color = "#007acc";
-  titulo.style.fontWeight = "bold";
 
-  // Mensagem
   const texto = document.createElement("p");
   texto.innerText = mensagem;
   texto.style.fontSize = "16px";
   texto.style.margin = "15px 0";
 
-  // Botão OK
   const botao = document.createElement("button");
   botao.innerText = "OK";
   botao.style.padding = "10px 25px";
@@ -299,18 +135,9 @@ function mostrarMensagem(mensagem) {
   botao.style.color = "#fff";
   botao.style.border = "none";
   botao.style.borderRadius = "6px";
-  botao.style.fontSize = "16px";
   botao.style.cursor = "pointer";
-  botao.style.marginTop = "10px";
-  botao.style.fontWeight = "bold";
-  botao.style.transition = "0.2s";
-
-  botao.onmouseover = () => botao.style.background = "#005fa3";
-  botao.onmouseout  = () => botao.style.background = "#007acc";
-
   botao.onclick = () => fundo.remove();
 
-  // Monta o modal
   caixa.appendChild(titulo);
   caixa.appendChild(texto);
   caixa.appendChild(botao);
@@ -318,7 +145,6 @@ function mostrarMensagem(mensagem) {
   document.body.appendChild(fundo);
 }
 
-// Função utilitária para gerar token aleatório
 function gerarTokenAcesso(tamanho = 20) {
   const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
   let token = "";
@@ -327,22 +153,17 @@ function gerarTokenAcesso(tamanho = 20) {
   }
   return token;
 }
+
 function aplicarPlaceholders(template, dados) {
   const nome = dados.nome || "(nome não informado)";
   const email = dados.email || "(email não informado)";
   const edicao = dados.edicao || "(sem edição)";
-
-  // 🔥 Ajuste: tipo pode vir de usuário (string) ou de lead (array)
   let tipo = "(sem tipo)";
-
   if (Array.isArray(dados.interesses) && dados.interesses.length > 0) {
-    // Lead com múltiplos interesses
     tipo = dados.interesses.join(", ");
   } else if (dados.tipo) {
-    // Usuário com tipo único
     tipo = dados.tipo;
   }
-
   const titulo = dados.titulo || "(sem título)";
   const newsletterId = dados.newsletterId || "(sem newsletterId)";
   const envioId = dados.envioId || "(sem envioId)";
@@ -354,7 +175,6 @@ function aplicarPlaceholders(template, dados) {
   const token = dados.token_acesso || "(sem token)";
 
   let dataFormatada = "";
-
   if (dados.data_publicacao) {
     const dataObj = dados.data_publicacao.toDate?.() || dados.data_publicacao;
     dataFormatada = formatDateBR(dataObj);

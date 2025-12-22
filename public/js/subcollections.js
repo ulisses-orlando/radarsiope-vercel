@@ -7,11 +7,6 @@ let solicitacaoResposta = {
 /* ====================
    FUNÇÕES AUXILIARES
    ==================== */
-function formatDateBR(date) {
-  if (!date) return "";
-  const d = new Date(date.seconds ? date.seconds * 1000 : date);
-  return d.toLocaleDateString("pt-BR");
-}
 
 function parseDateInput(value) {
   if (!value) return null;
