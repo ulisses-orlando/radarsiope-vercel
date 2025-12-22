@@ -4,10 +4,10 @@ const firebaseConfig = {
   authDomain: "radarsiope.firebaseapp.com",
   projectId: "radarsiope"
 };
-
+console.log("🔎 inicializando bd");
 firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
-
+console.log("🔎 inicializado o bd");
 async function VerNewsletterComToken() {
   console.log("🔎 Iniciando VerNewsletterComToken...");
 
