@@ -526,7 +526,7 @@ async function abrirModalNewsletter(docId = null, isEdit = false) {
     const texto = `
   <p style="font-size:12px; color:#888; margin-top:30px">
     Não deseja mais receber nossas newsletters?
-    <a href="https://radarsiope.com.br/newsletter.html
+    <a href="https://radarsiope.com.br/verNewsletterComToken.html
         ?nid={{newsletterId}}
         &env={{envioId}}
         &uid={{destinatarioId}}
