@@ -11,7 +11,7 @@ const transporter = nodemailer.createTransport({
   secure: true, // true para 465, false para outras portas
   auth: {
     user: "contato@radarsiope.com.br", // seu e-mail Zoho
-    pass: "SUA_SENHA_DE_APP"           // senha de aplicativo gerada no Zoho
+    pass: process.env.ZOHO_PASS           // senha de aplicativo gerada no Zoho
   }
 });
 
