@@ -1,5 +1,4 @@
-const { TimestreamQuery } = require("aws-sdk");
-
+// Inicializa o Firebase
 // Configuração do Firebase
 const firebaseConfig = {
     apiKey: "AIzaSyDcS4nneXnN8Cdb-S_cQukwaguLXJYbQ1U",
