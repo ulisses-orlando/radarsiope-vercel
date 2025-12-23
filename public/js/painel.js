@@ -246,20 +246,20 @@ function carregarBibliotecaTecnica(usuarioId, email) {
           // Cria o grid
           container.innerHTML = `<div class="lista-newsletters" id="lista-newsletters"></div>`;
           const grid = document.getElementById("lista-newsletters");
-
-          // Renderiza os cards
           grid.innerHTML = newsSnapshot.docs.map(doc => {
             const n = doc.data();
             return `
-        <div class="newsletter-card">
-          <h4>${n.titulo || "Newsletter"}</h4>
-          <p>Edição ${n.edicao || "-"} · ${n.tipo || ""}</p>
-          <div class="acoes">
-            <button onclick="abrirNewsletter('${doc.id}')">Ver</button>
-          </div>
-        </div>
-      `;
+              <div class="newsletter-card">
+                ${n.imagem_capa ? `<img src="${n.imagem_capa}" alt="Capa da newsletter" style="width:100%;border-radius:6px;margin-bottom:10px;">` : ""}
+                <h4>${n.titulo || "Newsletter"}</h4>
+                <p>Edição ${n.edicao || "-"} · ${n.tipo || ""}</p>
+                <div class="acoes">
+                  <button onclick="abrirNewsletter('${doc.id}')">Ver newsletter</button>
+                </div>
+              </div>
+            `;
           }).join("");
+
         });
     })
     .catch(error => {
@@ -449,7 +449,6 @@ function avaliarSolicitacao(usuarioId, solicitacaoId, avaliacao) {
 }
 
 function abrirNewsletter(newsletterId) {
-  // Redireciona para o formulário de leitura já existente
-  window.location.href = `verNewsletterUsuario.html?nid=${newsletterId}`;
+  window.open(`verNewsletterUsuario.html?nid=${newsletterId}`, "_blank");
 }
 
