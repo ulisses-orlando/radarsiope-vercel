@@ -52,7 +52,9 @@ async function VerNewsletterComToken() {
         }
 
         if (envio.expira_em) {
-            const expiraDate = envio.expira_em.toDate();
+            const expiraDate = typeof envio.expira_em.toDate === "function"
+                ? envio.expira_em.toDate()
+                : new Date(envio.expira_em);
             console.log("📌 Expira em:", expiraDate);
 
             const agora = new Date();
