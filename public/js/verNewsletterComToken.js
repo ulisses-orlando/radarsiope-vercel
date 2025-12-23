@@ -74,27 +74,6 @@ async function VerNewsletterComToken() {
         const envioAtualizado = await envioSnap.ref.get();
         const dadosEnvio = envioAtualizado.data();
 
-        // Definir limiar de acessos (exemplo: 5 em 24h)
-        const LIMIAR_ACESSOS = 5;
-
-        // Verificar se ultrapassou o limiar
-        if (dadosEnvio.acessos_totais > LIMIAR_ACESSOS) {
-            await envioSnap.ref.update({
-                sinalizacao_compartilhamento: true
-            });
-            container.innerHTML = `
-                    <div style="padding:20px; background:#fff3cd; color:#856404; border:1px solid #ffeeba; border-radius:4px; margin:20px 0;">
-                    <strong>Atenção:</strong> Detectamos múltiplos acessos a esta edição da newsletter.<br><br>
-                    Este conteúdo é exclusivo para você, ${dados.nome}. 
-                    Caso tenha compartilhado o link, pedimos que não o faça para manter sua assinatura ativa.<br><br>
-                    Se acredita que recebeu esta mensagem por engano, entre em contato com nosso suporte para regularizar seu acesso.<br><br>
-                    <em>Dica:</em> todas as edições da newsletter estão disponíveis de forma segura no <strong>Painel do Assinante</strong>. 
-                    Acesse o painel para consultar o histórico completo sem precisar usar este link.
-                    </div>
-                `;
-            console.warn("⚠️ Sinalização de compartilhamento ativada para este envio.");
-        }
-
         // 3. Buscar newsletter
         const newsletterSnap = await db.collection("newsletters").doc(nid).get();
         if (!newsletterSnap.exists) {
@@ -127,6 +106,28 @@ async function VerNewsletterComToken() {
             titulo: newsletter.titulo
         };
 
+        
+        // Definir limiar de acessos (exemplo: 5 em 24h)
+        const LIMIAR_ACESSOS = 5;
+
+        // Verificar se ultrapassou o limiar
+        if (dadosEnvio.acessos_totais > LIMIAR_ACESSOS) {
+            await envioSnap.ref.update({
+                sinalizacao_compartilhamento: true
+            });
+            container.innerHTML = `
+                    <div style="padding:20px; background:#fff3cd; color:#856404; border:1px solid #ffeeba; border-radius:4px; margin:20px 0;">
+                    <strong>Atenção:</strong> Detectamos múltiplos acessos a esta edição da newsletter.<br><br>
+                    Este conteúdo é exclusivo para você, ${dados.nome}. 
+                    Caso tenha compartilhado o link, pedimos que não o faça para manter sua assinatura ativa.<br><br>
+                    Se acredita que recebeu esta mensagem por engano, entre em contato com nosso suporte para regularizar seu acesso.<br><br>
+                    <em>Dica:</em> todas as edições da newsletter estão disponíveis de forma segura no <strong>Painel do Assinante</strong>. 
+                    Acesse o painel para consultar o histórico completo sem precisar usar este link.
+                    </div>
+                `;
+            console.warn("⚠️ Sinalização de compartilhamento ativada para este envio.");
+        }
+        
         // 6. Aplicar placeholders
         if (newsletter.conteudo_html_completo) {
             try {
