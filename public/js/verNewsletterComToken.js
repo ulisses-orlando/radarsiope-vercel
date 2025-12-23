@@ -10,21 +10,22 @@ firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
 
 async function VerNewsletterComToken() {
+    console.log("passo 0");
     const params = new URLSearchParams(window.location.search);
     const nid = params.get("nid");
     const env = params.get("env");
     const uid = params.get("uid");
     const token = params.get("token");
     const assinaturaId = params.get("assinaturaId");
-
+console.log("passo 1");
     const container = document.getElementById("conteudo-newsletter");
     container.innerHTML = "<p>Validando acesso...</p>";
-
+console.log("passo 2");
     try {
         // 1. Buscar envio
         let envioSnap;
         if (assinaturaId) {
-            envioSnap = await db.collection("usuarios")
+            envioSnap = await db.collection("usuarios") 
                 .doc(uid)
                 .collection("assinaturas")
                 .doc(assinaturaId)
@@ -111,6 +112,7 @@ console.log("📌 Dados para placeholders:", dados);
         if (newsletter.conteudo_html_completo) {
             const htmlFinal = aplicarPlaceholders(newsletter.conteudo_html_completo, dados);
             container.innerHTML = htmlFinal;
+            console.log("📌 HTML final montado:", htmlFinal);
         } else {
             console.warn("⚠️ Campo conteudo_html_completo não encontrado.");
             container.innerHTML = "<p>Newsletter sem conteúdo completo.</p>";
