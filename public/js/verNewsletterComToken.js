@@ -22,7 +22,7 @@ async function VerNewsletterComToken() {
         // 1. Buscar envio
         let envioSnap;
         if (assinaturaId) {
-            envioSnap = await db.collection("usuarios") 
+            envioSnap = await db.collection("usuarios")
                 .doc(uid)
                 .collection("assinaturas")
                 .doc(assinaturaId)
@@ -104,8 +104,31 @@ async function VerNewsletterComToken() {
 
         // 6. Aplicar placeholders
         if (newsletter.conteudo_html_completo) {
-            const htmlFinal = aplicarPlaceholders(newsletter.conteudo_html_completo, dados);
-            container.innerHTML = htmlFinal;
+            try {
+                const htmlFinal = aplicarPlaceholders(newsletter.conteudo_html_completo, dados);
+
+                // Gerar watermark dinâmica
+                const watermark = `
+                    <div style="font-size:12px;color:#888;text-align:center;margin:10px 0;">
+                        Edição exclusiva para: ${dados.nome} · ${dados.email} · ${new Date().toLocaleString("pt-BR")}
+                    </div>
+                    `;
+
+                // Injetar watermark no topo e rodapé
+                const htmlComWatermark = `
+                        ${watermark}
+                        ${htmlFinal}
+                        ${watermark}
+                        `;
+
+                // Renderizar com watermark
+                container.innerHTML = htmlComWatermark;
+
+                console.log("📌 HTML final montado:", htmlComWatermark);
+            } catch (err) {
+                console.error("❌ Erro ao aplicar placeholders:", err);
+                container.innerHTML = "<p>Erro ao montar newsletter.</p>";
+            }
         } else {
             console.warn("⚠️ Campo conteudo_html_completo não encontrado.");
             container.innerHTML = "<p>Newsletter sem conteúdo completo.</p>";
