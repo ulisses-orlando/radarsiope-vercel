@@ -221,16 +221,20 @@ function carregarBibliotecaTecnica(usuarioId, email) {
       const tipos = [];
       snapshot.forEach(doc => {
         const assinatura = doc.data();
-        tipos.push(assinatura.tipo_newsletter);
+        if (assinatura.tipo_newsletter && assinatura.status === "ativa") {
+          tipos.push(assinatura.tipo_newsletter);
+        }
       });
 
-      if (tipos.length === 0) {
+      const tiposValidos = tipos.filter(t => t !== undefined && t !== null);
+
+      if (tiposValidos.length === 0) {
         container.innerHTML = "<p>Você não possui acesso a newsletters no momento.</p>";
         return;
       }
 
       db.collection("newsletters")
-        .where("tipo", "in", tipos)
+        .where("tipo", "in", tiposValidos)
         .orderBy("edicao", "desc")
         .get()
         .then(newsSnapshot => {
