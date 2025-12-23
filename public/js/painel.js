@@ -445,6 +445,6 @@ function avaliarSolicitacao(usuarioId, solicitacaoId, avaliacao) {
 
 function abrirNewsletter(newsletterId) {
   // Redireciona para o formulário de leitura já existente
-  window.location.href = `verNewsletterComToken.html?nid=${newsletterId}`;
+  window.location.href = `verNewsletterUsuario.html?nid=${newsletterId}`;
 }
 
