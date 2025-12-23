@@ -217,7 +217,6 @@
       border-color: #c7d2fe;
     }
   </style>
-  <div class="lista-newsletters" id="lista-newsletters"></div>
 </head>
 
 <body>
@@ -235,6 +234,7 @@
         <li><a href="#bloco-assinaturas">📄 Minhas Assinaturas</a></li>
         <li><a href="#bloco-pagamentos">💳 Pagamentos</a></li>
         <li><a href="#bloco-biblioteca">📚 Biblioteca Técnica</a></li>
+        <li><a href="#bloco-newsletters">📰 Newsletters</a></li> <!-- novo link -->
         <li><a href="#bloco-suporte">💬 Suporte</a></li>
         <li><a href="#bloco-perfil">⚙️ Perfil</a></li>
       </ul>
@@ -254,6 +254,14 @@
       <section class="bloco" id="bloco-biblioteca" aria-labelledby="titulo-biblioteca">
         <h2 id="titulo-biblioteca">📚 Biblioteca Técnica</h2>
         <div id="biblioteca-tecnica">Carregando...</div>
+      </section>
+
+      <!-- ✅ Novo bloco para newsletters -->
+      <section class="bloco" id="bloco-newsletters" aria-labelledby="titulo-newsletters">
+        <h2 id="titulo-newsletters">📰 Minhas Newsletters</h2>
+        <div class="lista-newsletters" id="lista-newsletters">
+          <!-- Os cards serão renderizados aqui via JS -->
+        </div>
       </section>
 
       <section class="bloco" id="bloco-suporte" aria-labelledby="titulo-suporte">
@@ -280,7 +288,6 @@
           <button onclick="filtrarSolicitacoes('cancelada')">Cancelada</button>
         </div>
 
-        <!-- Único container para histórico (corrigido) -->
         <div id="historico-solicitacoes" class="grid-solicitacoes">
           <!-- Conteúdo dinâmico -->
         </div>
@@ -296,6 +303,7 @@
       </section>
     </main>
   </div>
+
 
   <!-- Modal edição de solicitação (acessível) -->
   <div id="modal-editar-solicitacao" class="modal-overlay" role="dialog" aria-modal="true"
