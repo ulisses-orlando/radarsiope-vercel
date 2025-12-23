@@ -95,11 +95,13 @@ async function VerNewsletterComToken() {
 
         // 5. Montar objeto de dados para placeholders
         const dados = {
-            // apenas os dados do destinatário que queremos substituir
+            // dados do destinatário
             nome: destinatario.nome,
             email: destinatario.email,
+
+            // dados da newsletter
             edicao: newsletter.edicao,
-            Titulo: newsletter.titulo
+            titulo: newsletter.titulo
         };
 
         // 6. Aplicar placeholders
