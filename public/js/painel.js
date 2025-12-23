@@ -1,26 +1,35 @@
 
 document.addEventListener("DOMContentLoaded", () => {
-const usuario = JSON.parse(localStorage.getItem("usuarioLogado"));
-const usuarioId = usuario.id;
 
-carregarAssinaturas(usuarioId);
-carregarPagamentos(usuarioId);
-carregarBibliotecaTecnica(usuarioId, usuario.email);
-carregarHistoricoSolicitacoes(usuario.id);
+  // 🔐 Validação de sessão
+  firebase.auth().onAuthStateChanged(user => {
+    if (!user) {
+      // Se não houver usuário autenticado, redireciona para login
+      localStorage.removeItem("usuarioLogado");
+      window.location.href = "login.html";
+    }
+  });
+
+  const usuario = JSON.parse(localStorage.getItem("usuarioLogado"));
+  const usuarioId = usuario.id;
+
+  carregarAssinaturas(usuarioId);
+  carregarPagamentos(usuarioId);
+  carregarBibliotecaTecnica(usuarioId, usuario.email);
+  carregarHistoricoSolicitacoes(usuario.id);
 
 });
 
 // 🔐 Logout
 document.getElementById("btn-logout").addEventListener("click", () => {
-  localStorage.removeItem("usuarioLogado");
-  window.location.href = "login.html";
+  firebase.auth().signOut().then(() => {
+    localStorage.removeItem("usuarioLogado");
+    window.location.href = "login.html";
+  }).catch(error => {
+    console.error("Erro ao sair:", error);
+    mostrarMensagem("Erro ao encerrar sessão.");
+  });
 });
-
-let filtroStatusSolicitacoes = "todos";
-let solicitacaoEmEdicao = {
-  usuarioId: "",
-  solicitacaoId: ""
-};
 
 function editarSolicitacao(usuarioId, solicitacaoId, descricaoAtual) {
   solicitacaoEmEdicao.usuarioId = usuarioId;
@@ -229,7 +238,7 @@ function carregarBibliotecaTecnica(usuarioId, email) {
             html += `
               <div class="newsletter">
                 <h3>${n.titulo} (Edição ${n.edicao})</h3>
-                <div>${n.html_conteudo}</div>
+                <button onclick="abrirNewsletter('${doc.id}')">📖 Ler edição</button>
               </div><hr>
             `;
           });
@@ -304,6 +313,7 @@ function carregarHistoricoSolicitacoes(usuarioId) {
         const s = doc.data();
         const tipo = s.tipo?.toLowerCase() || "outros";
         const status = s.status?.toLowerCase() || "pendente";
+        if (contadores[status] !== undefined) contadores[status]++;
         if (filtroStatusSolicitacoes !== "todos" && status !== filtroStatusSolicitacoes) return;
 
         let cor = "#999", icone = "❔";
@@ -341,6 +351,13 @@ function carregarHistoricoSolicitacoes(usuarioId) {
 
         colunas[tipo]?.push(html);
       });
+      // Atualiza botões de filtro 
+      document.querySelector("#filtros-solicitacoes").innerHTML = ` 
+        <button onclick="filtrarSolicitacoes('todos')">Todos</button> 
+        <button onclick="filtrarSolicitacoes('pendente')">Pendente (${contadores.pendente})
+        </button> <button onclick="filtrarSolicitacoes('aberta')">Aberta (${contadores.aberta})
+        </button> <button onclick="filtrarSolicitacoes('atendida')">Atendida (${contadores.atendida})</button> 
+        <button onclick="filtrarSolicitacoes('cancelada')">Cancelada (${contadores.cancelada})</button> `;
 
       // Montar colunas
       tipos.forEach(tipo => {
@@ -413,3 +430,9 @@ function avaliarSolicitacao(usuarioId, solicitacaoId, avaliacao) {
       mostrarMensagem("Erro ao salvar sua avaliação.");
     });
 }
+
+function abrirNewsletter(newsletterId) {
+  // Redireciona para o formulário de leitura já existente
+  window.location.href = `verNewsletterComToken.html?id=${newsletterId}`;
+}
+
