@@ -905,6 +905,6 @@ async function buscarNoticias(rssUrl) {
 
 // ... outras funções como montarCarrosselNoticias(), gerarRSSUrl(), buscarNoticias()
 
-window.addEventListener("DOMContentLoaded", () => {
-  montarCarrosselNoticias();
-});
+//window.addEventListener("DOMContentLoaded", () => {
+//  montarCarrosselNoticias();
+//});
