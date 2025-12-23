@@ -34,6 +34,18 @@
 
     <script src="/js/functions.js"></script>
     <script src="/js/verNewsletterComToken.js"></script>
+    <!-- Bloqueios leves --> 
+     <script> 
+        // Bloqueio de clique direito 
+        document.addEventListener("contextmenu", e => e.preventDefault()); 
+        
+        // Bloqueio de atalhos básicos (Ctrl+C / Cmd+C) 
+        document.addEventListener("keydown", e => { 
+            if ((e.ctrlKey || e.metaKey) && (e.key.toLowerCase() === "c")) { 
+                e.preventDefault(); 
+            } 
+        }); 
+    </script>
 </body>
 
 </html>
