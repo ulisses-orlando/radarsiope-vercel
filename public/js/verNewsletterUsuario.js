@@ -33,7 +33,7 @@ async function VerNewsletterUsuario() {
     }
     const newsletter = newsletterSnap.data();
 
-    // 2. Atualizar contador de acessos na assinatura
+    // 2. Atualizar contador de acessos no envio da assinatura
     const assinaturaSnap = await db.collection("usuarios")
       .doc(usuario.id)
       .collection("assinaturas")
@@ -44,10 +44,13 @@ async function VerNewsletterUsuario() {
 
     if (!assinaturaSnap.empty) {
       const assinaturaDoc = assinaturaSnap.docs[0];
-      await assinaturaDoc.ref.collection("acessos").add({
-        newsletterId: nid,
-        data: new Date()
-      });
+      await assinaturaDoc.ref
+        .collection("envios")
+        .doc(nid)
+        .set({
+          ultimo_acesso: new Date(),
+          acessos_totais: firebase.firestore.FieldValue.increment(1)
+        }, { merge: true });
     }
 
     // 3. Montar placeholders

@@ -239,22 +239,27 @@ function carregarBibliotecaTecnica(usuarioId, email) {
         .get()
         .then(newsSnapshot => {
           if (newsSnapshot.empty) {
-            container.innerHTML = "<p>Nenhuma newsletter disponível.</p>";
+            container.innerHTML = "<p>Nenhuma newsletter encontrada.</p>";
             return;
           }
 
-          let html = "";
-          newsSnapshot.forEach(doc => {
-            const n = doc.data();
-            html += `
-              <div class="newsletter">
-                <h3>${n.titulo} (Edição ${n.edicao})</h3>
-                <button onclick="abrirNewsletter('${doc.id}')">📖 Ler edição</button>
-              </div><hr>
-            `;
-          });
+          // Cria o grid
+          container.innerHTML = `<div class="lista-newsletters" id="lista-newsletters"></div>`;
+          const grid = document.getElementById("lista-newsletters");
 
-          container.innerHTML = html;
+          // Renderiza os cards
+          grid.innerHTML = newsSnapshot.docs.map(doc => {
+            const n = doc.data();
+            return `
+        <div class="newsletter-card">
+          <h4>${n.titulo || "Newsletter"}</h4>
+          <p>Edição ${n.edicao || "-"} · ${n.tipo || ""}</p>
+          <div class="acoes">
+            <button onclick="abrirNewsletter('${doc.id}')">Ver</button>
+          </div>
+        </div>
+      `;
+          }).join("");
         });
     })
     .catch(error => {
