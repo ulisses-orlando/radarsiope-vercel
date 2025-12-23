@@ -103,6 +103,9 @@ async function VerNewsletterComToken() {
             edicao: newsletter.edicao,
             titulo: newsletter.titulo
         };
+console.log("📌 Newsletter carregada:", newsletter); 
+console.log("📌 Destinatário carregado:", destinatario); 
+console.log("📌 Dados para placeholders:", dados);
 
         // 6. Aplicar placeholders
         if (newsletter.conteudo_html_completo) {
