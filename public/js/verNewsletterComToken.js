@@ -55,13 +55,14 @@ async function VerNewsletterComToken() {
             const expiraDate = envio.expira_em.toDate();
             console.log("📌 Expira em:", expiraDate);
 
-            if (expiraDate.getTime() < Date.now()) {
+            const agora = new Date();
+
+            if (agora > expiraDate) {
                 console.warn("⚠️ Link expirado:", expiraDate);
                 container.innerHTML = "<p>Este link expirou. Solicite novo acesso.</p>";
                 return;
             }
         }
-
 
         await envioSnap.ref.update({
             ultimo_acesso: new Date(),
