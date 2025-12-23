@@ -108,20 +108,31 @@ async function VerNewsletterComToken() {
                 const htmlFinal = aplicarPlaceholders(newsletter.conteudo_html_completo, dados);
 
                 // Gerar watermark dinâmica
+                // Gerar watermark dinâmica
                 const watermark = `
-                    <div style="font-size:12px;color:#888;text-align:center;margin:10px 0;">
-                        Edição exclusiva para: ${dados.nome} · ${dados.email} · ${new Date().toLocaleString("pt-BR")}
-                    </div>
-                    `;
-
-                // Injetar watermark no topo e rodapé
-                const htmlComWatermark = `
-                        ${watermark}
-                        ${htmlFinal}
-                        ${watermark}
+                        <div style="font-size:12px;color:#888;text-align:center;margin:10px 0;">
+                            Edição exclusiva para: ${dados.nome} · ${dados.email} · ${new Date().toLocaleString("pt-BR")}
+                        </div>
                         `;
 
-                // Renderizar com watermark
+                // CSS específico da newsletter
+                const bloqueioCss = `
+                        <style>
+                            /* Bloqueio de seleção em áreas críticas */
+                            .content, .footer {
+                            user-select: none;
+                            }
+                        </style>
+                        `;
+
+                // Injetar watermark + CSS + conteúdo
+                const htmlComWatermark = `
+                    ${bloqueioCss}
+                    ${watermark}
+                    ${htmlFinal}
+                    ${watermark}
+                    `;
+
                 container.innerHTML = htmlComWatermark;
 
                 console.log("📌 HTML final montado:", htmlComWatermark);
