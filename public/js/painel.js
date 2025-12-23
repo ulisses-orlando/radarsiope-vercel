@@ -1,35 +1,42 @@
+// Estado global de filtro
+let filtroStatusSolicitacoes = "todos";
 
+// 🔐 Validação de sessão baseada no localStorage
 document.addEventListener("DOMContentLoaded", () => {
-
-  // 🔐 Validação de sessão
-  firebase.auth().onAuthStateChanged(user => {
-    if (!user) {
-      // Se não houver usuário autenticado, redireciona para login
-      localStorage.removeItem("usuarioLogado");
-      window.location.href = "login.html";
-    }
-  });
-
   const usuario = JSON.parse(localStorage.getItem("usuarioLogado"));
-  const usuarioId = usuario.id;
+  if (!usuario) {
+    // Se não houver dados no localStorage, volta para login
+    window.location.href = "login.html";
+    return;
+  }
 
+  // Se houver usuário, carrega os dados normalmente
+  const usuarioId = usuario.id;
   carregarAssinaturas(usuarioId);
   carregarPagamentos(usuarioId);
   carregarBibliotecaTecnica(usuarioId, usuario.email);
   carregarHistoricoSolicitacoes(usuario.id);
 
+  // Exibe nome e perfil no header
+  const nomeEl = document.getElementById("nome-usuario");
+  if (nomeEl) {
+    const nome = usuario.nome || usuario.email || "Usuário";
+    nomeEl.textContent = nome;
+
+    const perfilSpan = document.createElement("span");
+    perfilSpan.textContent = ` (${usuario.tipo_perfil || "indefinido"})`;
+    perfilSpan.style.fontWeight = "normal";
+    perfilSpan.style.fontSize = "0.9em";
+    nomeEl.appendChild(perfilSpan);
+  }
 });
 
-// 🔐 Logout
+// 🚪 Logout baseado no localStorage
 document.getElementById("btn-logout").addEventListener("click", () => {
-  firebase.auth().signOut().then(() => {
-    localStorage.removeItem("usuarioLogado");
-    window.location.href = "login.html";
-  }).catch(error => {
-    console.error("Erro ao sair:", error);
-    mostrarMensagem("Erro ao encerrar sessão.");
-  });
+  localStorage.removeItem("usuarioLogado");
+  window.location.href = "login.html";
 });
+
 
 function editarSolicitacao(usuarioId, solicitacaoId, descricaoAtual) {
   solicitacaoEmEdicao.usuarioId = usuarioId;
@@ -293,10 +300,10 @@ function carregarHistoricoSolicitacoes(usuarioId) {
 
   const tipos = ["consultoria", "treinamento", "newsletters", "outros"];
   const colunas = {};
+  tipos.forEach(tipo => { colunas[tipo] = []; });
 
-  tipos.forEach(tipo => {
-    colunas[tipo] = [];
-  });
+  // ✅ Inicializa contadores aqui
+  const contadores = { pendente: 0, aberta: 0, atendida: 0, cancelada: 0 };
 
   db.collection("usuarios")
     .doc(usuarioId)
@@ -313,7 +320,10 @@ function carregarHistoricoSolicitacoes(usuarioId) {
         const s = doc.data();
         const tipo = s.tipo?.toLowerCase() || "outros";
         const status = s.status?.toLowerCase() || "pendente";
+
+        // ✅ Atualiza contadores
         if (contadores[status] !== undefined) contadores[status]++;
+
         if (filtroStatusSolicitacoes !== "todos" && status !== filtroStatusSolicitacoes) return;
 
         let cor = "#999", icone = "❔";
@@ -337,7 +347,6 @@ function carregarHistoricoSolicitacoes(usuarioId) {
             </div>`
           : "";
 
-
         const html = `
           <div class="item-solicitacao" style="border-left-color:${cor};">
             <strong>${icone} ${tipo}</strong><br>
@@ -351,13 +360,15 @@ function carregarHistoricoSolicitacoes(usuarioId) {
 
         colunas[tipo]?.push(html);
       });
-      // Atualiza botões de filtro 
-      document.querySelector("#filtros-solicitacoes").innerHTML = ` 
-        <button onclick="filtrarSolicitacoes('todos')">Todos</button> 
-        <button onclick="filtrarSolicitacoes('pendente')">Pendente (${contadores.pendente})
-        </button> <button onclick="filtrarSolicitacoes('aberta')">Aberta (${contadores.aberta})
-        </button> <button onclick="filtrarSolicitacoes('atendida')">Atendida (${contadores.atendida})</button> 
-        <button onclick="filtrarSolicitacoes('cancelada')">Cancelada (${contadores.cancelada})</button> `;
+
+      // ✅ Atualiza botões de filtro com contadores
+      document.querySelector("#filtros-solicitacoes").innerHTML = `
+        <button onclick="filtrarSolicitacoes('todos')">Todos</button>
+        <button onclick="filtrarSolicitacoes('pendente')">Pendente (${contadores.pendente})</button>
+        <button onclick="filtrarSolicitacoes('aberta')">Aberta (${contadores.aberta})</button>
+        <button onclick="filtrarSolicitacoes('atendida')">Atendida (${contadores.atendida})</button>
+        <button onclick="filtrarSolicitacoes('cancelada')">Cancelada (${contadores.cancelada})</button>
+      `;
 
       // Montar colunas
       tipos.forEach(tipo => {
@@ -374,9 +385,6 @@ function carregarHistoricoSolicitacoes(usuarioId) {
       container.innerHTML = "<p>Erro ao carregar histórico.</p>";
     });
 }
-
-
-
 
 function cancelarSolicitacao(usuarioId, solicitacaoId) {
   if (!confirm("Deseja realmente cancelar esta solicitação?")) return;
