@@ -1,3 +1,5 @@
+const { TimestreamQuery } = require("aws-sdk");
+
 // Configuração do Firebase
 const firebaseConfig = {
     apiKey: "AIzaSyDcS4nneXnN8Cdb-S_cQukwaguLXJYbQ1U",
@@ -55,7 +57,6 @@ async function VerNewsletterComToken() {
             const expiraDate = typeof envio.expira_em.toDate === "function"
                 ? envio.expira_em.toDate()
                 : new Date(envio.expira_em);
-            console.log("📌 Expira em:", expiraDate);
 
             const agora = new Date();
 
@@ -96,7 +97,9 @@ async function VerNewsletterComToken() {
         const dados = {
             // apenas os dados do destinatário que queremos substituir
             nome: destinatario.nome,
-            email: destinatario.email
+            email: destinatario.email,
+            edicao: newsletter.edicao,
+            Titulo: newsletter.titulo
         };
 
         // 6. Aplicar placeholders
