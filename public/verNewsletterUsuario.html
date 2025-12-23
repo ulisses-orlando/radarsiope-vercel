@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Visualizar Newsletter</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <!-- Firebase -->
+  <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
+  <!-- Funções utilitárias -->
+  <script src="js/functions.js"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f9f9f9;
+      margin: 0;
+      padding: 20px;
+    }
+    #conteudo-newsletter {
+      background: #fff;
+      padding: 20px;
+      border-radius: 6px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+      min-height: 200px;
+    }
+  </style>
+</head>
+<body>
+  <h2>📖 Visualizar Newsletter</h2>
+  <div id="conteudo-newsletter">Carregando newsletter...</div>
+
+  <!-- Script dedicado para assinantes -->
+  <script src="js/verNewsletterUsuario.js"></script>
+</body>
+</html>
