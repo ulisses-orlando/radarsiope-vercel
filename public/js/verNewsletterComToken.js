@@ -110,15 +110,18 @@ async function VerNewsletterComToken() {
                 sinalizacao_compartilhamento: true
             });
             container.innerHTML = `
-                        <div style="padding:20px; background:#fff3cd; color:#856404; border:1px solid #ffeeba; border-radius:4px; margin:20px 0;">
-                        <strong>Atenção:</strong> Detectamos múltiplos acessos a esta edição da newsletter.<br><br>
-                        Este conteúdo é exclusivo para você, ${dados.nome}. 
-                        Caso tenha compartilhado o link, pedimos que não o faça para manter sua assinatura ativa.<br><br>
-                        Se acredita que recebeu esta mensagem por engano, entre em contato com nosso suporte para regularizar seu acesso.<br><br>
-                        <em>Dica:</em> todas as edições da newsletter estão disponíveis de forma segura no <strong>Painel do Assinante</strong>. 
-                        Acesse o painel para consultar o histórico completo sem precisar usar este link.
-                        </div>
-                    `;
+                <div style="padding:20px; background:#fff3cd; color:#856404; border:1px solid #ffeeba; border-radius:4px; margin:20px 0;">
+                    <strong>Atenção:</strong> Detectamos múltiplos acessos a esta edição da newsletter.<br><br>
+                    Este conteúdo é exclusivo para você, ${dados.nome}. 
+                    Caso tenha compartilhado o link, pedimos que não o faça para manter sua assinatura ativa.<br><br>
+                    Se acredita que recebeu esta mensagem por engano, entre em contato com nosso suporte para regularizar seu acesso.<br><br>
+                    <em>Dica:</em> todas as edições da newsletter estão disponíveis de forma segura no 
+                    <strong><a href="https://radarsiope-vercel.vercel.app/login.html" target="_blank" style="color:#004080;text-decoration:none;">
+                    Painel do Assinante
+                    </a></strong>. 
+                    Acesse o painel para consultar o histórico completo sem precisar usar este link.
+                </div>
+                `;
             console.warn("⚠️ Sinalização de compartilhamento ativada para este envio.");
             return; // 🔥 encerra aqui para não renderizar a newsletter
         }
