@@ -1,289 +1,289 @@
-<!DOCTYPE html>
-<html lang="pt-BR">
+  <!DOCTYPE html>
+  <html lang="pt-BR">
 
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>RadarSiope - Painel do Cliente</title>
-  <link rel="stylesheet" href="style.css">
-  <style>
-    body {
-      margin: 0;
-      font-family: sans-serif;
-      background: #f4f4f4;
-    }
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RadarSiope - Painel do Assinante</title>
+    <link rel="stylesheet" href="style.css">
+    <style>
+      body {
+        margin: 0;
+        font-family: sans-serif;
+        background: #f4f4f4;
+      }
 
-    header {
-      background: #007acc;
-      color: white;
-      padding: 16px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
+      header {
+        background: #007acc;
+        color: white;
+        padding: 16px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
 
-    header h1 {
-      margin: 0;
-      font-size: 1.4em;
-    }
+      header h1 {
+        margin: 0;
+        font-size: 1.4em;
+      }
 
-    .painel {
-      display: flex;
-      min-height: 100vh;
-    }
+      .painel {
+        display: flex;
+        min-height: 100vh;
+      }
 
-    nav {
-      width: 220px;
-      background: #fff;
-      border-right: 1px solid #ccc;
-      padding: 20px;
-    }
+      nav {
+        width: 220px;
+        background: #fff;
+        border-right: 1px solid #ccc;
+        padding: 20px;
+      }
 
-    nav ul {
-      list-style: none;
-      padding: 0;
-    }
+      nav ul {
+        list-style: none;
+        padding: 0;
+      }
 
-    nav li {
-      margin-bottom: 12px;
-    }
+      nav li {
+        margin-bottom: 12px;
+      }
 
-    nav a {
-      text-decoration: none;
-      color: #2c3e50;
-      font-weight: bold;
-    }
+      nav a {
+        text-decoration: none;
+        color: #2c3e50;
+        font-weight: bold;
+      }
 
-    main {
-      flex: 1;
-      padding: 30px;
-    }
+      main {
+        flex: 1;
+        padding: 30px;
+      }
 
-    .bloco {
-      background: #fff;
-      padding: 20px;
-      border-radius: 8px;
-      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
-      margin-bottom: 20px;
-    }
+      .bloco {
+        background: #fff;
+        padding: 20px;
+        border-radius: 8px;
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+        margin-bottom: 20px;
+      }
 
-    .bloco h2 {
-      margin-top: 0;
-      color: #007acc;
-    }
+      .bloco h2 {
+        margin-top: 0;
+        color: #007acc;
+      }
 
-    .notificacao {
-      margin-top: 8px;
-      padding: 10px;
-      background: #eaf6ff;
-      border-left: 4px solid #007acc;
-      border-radius: 4px;
-    }
+      .notificacao {
+        margin-top: 8px;
+        padding: 10px;
+        background: #eaf6ff;
+        border-left: 4px solid #007acc;
+        border-radius: 4px;
+      }
 
-    #btn-logout {
-      margin-top: 5px;
-      padding: 6px 12px;
-      background-color: #d9534f;
-      color: white;
-      border: none;
-      border-radius: 4px;
-      cursor: pointer;
-    }
+      #btn-logout {
+        margin-top: 5px;
+        padding: 6px 12px;
+        background-color: #d9534f;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+      }
 
-    #btn-logout:hover {
-      background-color: #c9302c;
-    }
+      #btn-logout:hover {
+        background-color: #c9302c;
+      }
 
-    textarea {
-      width: 100%;
-      height: 80px;
-      margin-top: 10px;
-      padding: 10px;
-      border-radius: 4px;
-      border: 1px solid #ccc;
-      resize: vertical;
-    }
+      textarea {
+        width: 100%;
+        height: 80px;
+        margin-top: 10px;
+        padding: 10px;
+        border-radius: 4px;
+        border: 1px solid #ccc;
+        resize: vertical;
+      }
 
-    button {
-      margin-top: 10px;
-      padding: 8px 16px;
-      background-color: #007acc;
-      color: white;
-      border: none;
-      border-radius: 4px;
-      cursor: pointer;
-    }
+      button {
+        margin-top: 10px;
+        padding: 8px 16px;
+        background-color: #007acc;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+      }
 
-    button:hover {
-      background-color: #005f99;
-    }
+      button:hover {
+        background-color: #005f99;
+      }
 
-    .modal-overlay {
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      background: rgba(0, 0, 0, 0.5);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      z-index: 999;
-    }
+      .modal-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.5);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 999;
+      }
 
-    .modal-content {
-      background: #fff;
-      padding: 20px;
-      border-radius: 8px;
-      width: 90%;
-      max-width: 500px;
-      box-shadow: 0 0 10px rgba(0, 0, 0, 0.3);
-    }
+      .modal-content {
+        background: #fff;
+        padding: 20px;
+        border-radius: 8px;
+        width: 90%;
+        max-width: 500px;
+        box-shadow: 0 0 10px rgba(0, 0, 0, 0.3);
+      }
 
-    .grid-solicitacoes {
-      display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: 20px;
-    }
+      .grid-solicitacoes {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 20px;
+      }
 
-    .coluna-solicitacoes {
-      background: #f9f9f9;
-      padding: 10px;
-      border-radius: 6px;
-    }
+      .coluna-solicitacoes {
+        background: #f9f9f9;
+        padding: 10px;
+        border-radius: 6px;
+      }
 
-    .coluna-solicitacoes h4 {
-      margin-top: 0;
-      text-align: center;
-      font-size: 16px;
-      color: #333;
-    }
+      .coluna-solicitacoes h4 {
+        margin-top: 0;
+        text-align: center;
+        font-size: 16px;
+        color: #333;
+      }
 
-    .item-solicitacao {
-      border-left: 6px solid #ccc;
-      padding-left: 10px;
-      margin-bottom: 15px;
-      background: #fff;
-      border-radius: 4px;
-      box-shadow: 0 0 4px rgba(0, 0, 0, 0.05);
-    }
-  </style>
-</head>
+      .item-solicitacao {
+        border-left: 6px solid #ccc;
+        padding-left: 10px;
+        margin-bottom: 15px;
+        background: #fff;
+        border-radius: 4px;
+        box-shadow: 0 0 4px rgba(0, 0, 0, 0.05);
+      }
+    </style>
+  </head>
 
-<body>
-  <header>
-    <h1>📊 Painel do Cliente</h1>
-    <div id="usuario-info" style="text-align: right; margin: 20px;">
-      <span id="nome-usuario" style="font-weight: bold;"></span><br>
-      <button id="btn-logout">Sair</button>
-    </div>
-  </header>
-
-  <div class="painel">
-    <nav>
-      <ul>
-        <li><a href="#bloco-assinaturas">📄 Minhas Assinaturas</a></li>
-        <li><a href="#bloco-pagamentos">💳 Pagamentos</a></li>
-        <li><a href="#bloco-biblioteca">📚 Biblioteca Técnica</a></li>
-        <li><a href="#bloco-suporte">💬 Suporte</a></li>
-        <li><a href="#bloco-perfil">⚙️ Perfil</a></li>
-      </ul>
-    </nav>
-
-    <main>
-      <div class="bloco" id="bloco-assinaturas">
-        <h2>📄 Minhas Assinaturas</h2>
-        <div id="minhas-assinaturas">Carregando...</div>
+  <body>
+    <header>
+      <h1>📊 Painel do Assinante</h1>
+      <div id="usuario-info" style="text-align: right; margin: 20px;">
+        <span id="nome-usuario" style="font-weight: bold;"></span><br>
+        <button id="btn-logout">Sair</button>
       </div>
+    </header>
 
-      <div class="bloco" id="bloco-pagamentos">
-        <h2>💳 Pagamentos</h2>
-        <div id="meus-pagamentos">Carregando...</div>
-      </div>
+    <div class="painel">
+      <nav>
+        <ul>
+          <li><a href="#bloco-assinaturas">📄 Minhas Assinaturas</a></li>
+          <li><a href="#bloco-pagamentos">💳 Pagamentos</a></li>
+          <li><a href="#bloco-biblioteca">📚 Biblioteca Técnica</a></li>
+          <li><a href="#bloco-suporte">💬 Suporte</a></li>
+          <li><a href="#bloco-perfil">⚙️ Perfil</a></li>
+        </ul>
+      </nav>
 
-      <div class="bloco" id="bloco-biblioteca">
-        <h2>📚 Biblioteca Técnica</h2>
-        <div id="biblioteca-tecnica">Carregando...</div>
-      </div>
-
-      <div class="bloco" id="bloco-suporte">
-        <h2>💬 Suporte</h2>
-
-        <label for="tipo-suporte">Tipo:</label>
-        <select id="tipo-suporte" style="margin-bottom: 12px;">
-          <option value="treinamento">Treinamento</option>
-          <option value="consultoria">Consultoria</option>
-          <option value="newsletters">Newsletters</option>
-          <option value="outros">Outros</option>
-        </select>
-
-        <label for="mensagem-suporte">Descrição:</label>
-        <textarea id="mensagem-suporte" placeholder="Descreva sua solicitação..."></textarea>
-        <button id="btn-enviar-suporte">Enviar solicitação</button>
-        <h3 style="margin-top: 30px;">📜 Histórico de solicitações</h3>
-        <div id="filtros-solicitacoes" style="margin-bottom: 10px;">
-          <button onclick="filtrarSolicitacoes('todos')">Todos</button>
-          <button onclick="filtrarSolicitacoes('pendente')">Pendente</button>
-          <button onclick="filtrarSolicitacoes('aberta')">Aberta</button>
-          <button onclick="filtrarSolicitacoes('atendida')">Atendida</button>
-          <button onclick="filtrarSolicitacoes('cancelada')">Cancelada</button>
+      <main>
+        <div class="bloco" id="bloco-assinaturas">
+          <h2>📄 Minhas Assinaturas</h2>
+          <div id="minhas-assinaturas">Carregando...</div>
         </div>
 
-        <div id="historico-solicitacoes" class="grid-solicitacoes"></div>
-        <div id="historico-solicitacoes">Carregando...</div>
+        <div class="bloco" id="bloco-pagamentos">
+          <h2>💳 Pagamentos</h2>
+          <div id="meus-pagamentos">Carregando...</div>
+        </div>
 
-        <div id="suporte-feedback" style="margin-top: 12px;"></div>
-      </div>
+        <div class="bloco" id="bloco-biblioteca">
+          <h2>📚 Biblioteca Técnica</h2>
+          <div id="biblioteca-tecnica">Carregando...</div>
+        </div>
 
-    </main>
-  </div>
+        <div class="bloco" id="bloco-suporte">
+          <h2>💬 Suporte</h2>
 
-  <div id="modal-editar-solicitacao" class="modal-overlay" style="display:none;">
-    <div class="modal-content">
-      <h3>✏️ Editar Solicitação</h3>
-      <label for="nova-descricao">Nova descrição:</label>
-      <textarea id="nova-descricao" rows="4" style="width:100%;"></textarea>
-      <div style="margin-top:10px; text-align:right;">
-        <button onclick="salvarEdicaoSolicitacao()">💾 Salvar</button>
-        <button onclick="fecharModalEdicao()">❌ Cancelar</button>
+          <label for="tipo-suporte">Tipo:</label>
+          <select id="tipo-suporte" style="margin-bottom: 12px;">
+            <option value="treinamento">Treinamento</option>
+            <option value="consultoria">Consultoria</option>
+            <option value="newsletters">Newsletters</option>
+            <option value="outros">Outros</option>
+          </select>
+
+          <label for="mensagem-suporte">Descrição:</label>
+          <textarea id="mensagem-suporte" placeholder="Descreva sua solicitação..."></textarea>
+          <button id="btn-enviar-suporte">Enviar solicitação</button>
+          <h3 style="margin-top: 30px;">📜 Histórico de solicitações</h3>
+          <div id="filtros-solicitacoes" style="margin-bottom: 10px;">
+            <button onclick="filtrarSolicitacoes('todos')">Todos</button>
+            <button onclick="filtrarSolicitacoes('pendente')">Pendente</button>
+            <button onclick="filtrarSolicitacoes('aberta')">Aberta</button>
+            <button onclick="filtrarSolicitacoes('atendida')">Atendida</button>
+            <button onclick="filtrarSolicitacoes('cancelada')">Cancelada</button>
+          </div>
+
+          <div id="historico-solicitacoes" class="grid-solicitacoes"></div>
+          <div id="historico-solicitacoes">Carregando...</div>
+
+          <div id="suporte-feedback" style="margin-top: 12px;"></div>
+        </div>
+
+      </main>
+    </div>
+
+    <div id="modal-editar-solicitacao" class="modal-overlay" style="display:none;">
+      <div class="modal-content">
+        <h3>✏️ Editar Solicitação</h3>
+        <label for="nova-descricao">Nova descrição:</label>
+        <textarea id="nova-descricao" rows="4" style="width:100%;"></textarea>
+        <div style="margin-top:10px; text-align:right;">
+          <button onclick="salvarEdicaoSolicitacao()">💾 Salvar</button>
+          <button onclick="fecharModalEdicao()">❌ Cancelar</button>
+        </div>
       </div>
     </div>
-  </div>
 
-  <script>
-    document.addEventListener("DOMContentLoaded", () => {
-      const dados = JSON.parse(localStorage.getItem("usuarioLogado"));
-      if (dados) {
-        const nome = dados.nome || dados.email || "Usuário";
-        const nomeEl = document.getElementById("nome-usuario");
-        if (nomeEl) {
-          nomeEl.innerText = nome;
+    <script>
+      document.addEventListener("DOMContentLoaded", () => {
+        const dados = JSON.parse(localStorage.getItem("usuarioLogado"));
+        if (dados) {
+          const nome = dados.nome || dados.email || "Usuário";
+          const nomeEl = document.getElementById("nome-usuario");
+          if (nomeEl) {
+            nomeEl.innerText = nome;
 
-          const perfilSpan = document.createElement("span");
-          perfilSpan.innerText = ` (${dados.tipo_perfil || "indefinido"})`;
-          perfilSpan.style.fontWeight = "normal";
-          perfilSpan.style.fontSize = "0.9em";
-          nomeEl.appendChild(perfilSpan);
+            const perfilSpan = document.createElement("span");
+            perfilSpan.innerText = ` (${dados.tipo_perfil || "indefinido"})`;
+            perfilSpan.style.fontWeight = "normal";
+            perfilSpan.style.fontSize = "0.9em";
+            nomeEl.appendChild(perfilSpan);
+          }
         }
-      }
-    });
-  </script>
-</body>
+      });
+    </script>
+  </body>
 
-</html>
+  </html>
 
 
-<!-- Firebase SDK versão compatível com navegador -->
-<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
-<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
-<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+  <!-- Firebase SDK versão compatível com navegador -->
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
 
-<!-- Inicialização personalizada -->
-<script src="js/firebase-init.js"></script>
+  <!-- Inicialização personalizada -->
+  <script src="js/firebase-init.js"></script>
 
-<!-- Script principal do painel -->
-<script src="js/painel.js"></script>
+  <!-- Script principal do painel -->
+  <script src="js/painel.js"></script>
 
-</body>
+  </body>
 
-</html>
+  </html>
