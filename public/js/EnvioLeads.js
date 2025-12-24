@@ -364,21 +364,34 @@ function prepararEnvioNewsletter(newsletterId) {
     }
 }
 
+function selecionarTodosEnvioFinalLeads(chkMaster) {
+  const todos = document.querySelectorAll("#tabela-preview-envio .chk-envio-final");
+  for (const chk of todos) {
+    chk.checked = chkMaster.checked;
+  }
+}
+
 async function gerarPreviaEnvio() {
     const corpo = document.querySelector("#tabela-preview-envio tbody");
     const cabecalho = document.querySelector("#tabela-preview-envio thead tr");
 
     corpo.innerHTML = "";
+    // Cabeçalho consistente com checkbox master
     cabecalho.innerHTML = `
-      <th>Enviar?</th>
-      <th>Nome</th>
-      <th>Perfil</th>
-      <th>Email</th>
-      <th>Newsletter</th>
-      <th>Interesses</th>
-      <th class="col-compativel">Compatível</th>
-      <th class="col-enviado">Newsletter enviada?</th>
-    `;
+        <th>
+            <input type="checkbox" id="chk-master-preview-leads"
+                title="Selecionar todos"
+                onclick="selecionarTodosEnvioFinalLeads(this)" />
+            Enviar?
+        </th>
+        <th>Nome</th>
+        <th>Perfil</th>
+        <th>Email</th>
+        <th>Newsletter</th>
+        <th>Interesses</th>
+        <th class="col-compativel">Compatível</th>
+        <th class="col-enviado">Newsletter enviada?</th>
+        `;
 
     const linhasLeads = document.querySelectorAll("#tabela-leads-envio tbody tr");
     if (linhasLeads.length === 0) {
@@ -795,6 +808,12 @@ function filtrarUsuariosEnvio() {
     corpo.innerHTML = linhas || "<tr><td colspan='5'>Nenhum usuário encontrado com os filtros.</td></tr>";
 }
 
+function selecionarTodosEnvioFinal(chkMaster) {
+    const todos = document.querySelectorAll("#tabela-preview-envio .chk-envio-final");
+    for (const chk of todos) {
+        chk.checked = chkMaster.checked;
+    }
+}
 
 
 // Preparar prévia de envio para usuários
@@ -808,16 +827,22 @@ async function gerarPreviaEnvioUsuarios() {
     const cabecalho = document.querySelector("#tabela-preview-envio thead tr");
 
     // Cabeçalho consistente
+    // Cabeçalho consistente com checkbox master
     cabecalho.innerHTML = `
-      <th>Enviar?</th>
-      <th>Nome</th>
-      <th>Perfil</th>
-      <th>Email</th>
-      <th>Newsletter</th>
-      <th>Interesses</th>
-      <th class="col-pagamento">Em dia?</th>
-      <th class="col-enviado">Newsletter enviada?</th>
-    `;
+        <th>
+            <input type="checkbox" id="chk-master-preview"
+                title="Selecionar todos"
+                onclick="selecionarTodosEnvioFinal(this)" />
+            Enviar?
+        </th>
+        <th>Nome</th>
+        <th>Perfil</th>
+        <th>Email</th>
+        <th>Newsletter</th>
+        <th>Interesses</th>
+        <th class="col-pagamento">Em dia?</th>
+        <th class="col-enviado">Newsletter enviada?</th>
+        `;
 
     corpo.innerHTML = "<tr><td colspan='8'>Gerando prévia...</td></tr>";
 

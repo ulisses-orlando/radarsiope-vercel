@@ -16,22 +16,36 @@ let filtroPeriodoAvaliacoes = "todos";
 let filtroPerfilAvaliacoes = "todos";
 
 const momentosEnvio = [
+  // ——— Entrada e fluxo inicial ———
   { valor: "primeiro_contato", descricao: "📩 Primeiro contato via formulário de captura" },
   { valor: "pos_cadastro_assinante", descricao: "🎉 Após cadastro e ativação da assinatura" },
   { valor: "pos_envio_newsletter_1", descricao: "📰 Após envio da 1ª edição da newsletter" },
   { valor: "pos_envio_newsletter_2", descricao: "📰 Após envio da 2ª edição da newsletter" },
   { valor: "pos_envio_primeira_newsletter_regular", descricao: "📰 Primeira newsletter recebida junto com os demais assinantes" },
+
+  // ——— Reengajamento ———
   { valor: "sem_interacao_7_dias", descricao: "⏳ Sem interação por 7 dias" },
   { valor: "sem_interacao_14_dias", descricao: "⏳ Sem interação por 14 dias" },
+
+  // ——— Ciclo financeiro/contratual ———
   { valor: "renovacao_assinatura", descricao: "🔄 Renovação da assinatura confirmada" },
   { valor: "parcela_em_atraso", descricao: "💳 Parcela em atraso detectada" },
   { valor: "assinatura_cancelada", descricao: "❌ Assinatura cancelada" },
+
+  // ——— Inclusões novas ———
+  { valor: "aniversario_assinatura", descricao: "🎂 Aniversário da assinatura (1 ano ou mais)" },
+  { valor: "upgrade_plano", descricao: "🚀 Upgrade de plano realizado" },
+  { valor: "suporte_resolvido", descricao: "✅ Solicitação de suporte resolvida" },
+
+  // ——— Interesses ———
   { valor: "interesse_capacitacao", descricao: "🎓 Interesse marcado: Capacitação" },
   { valor: "interesse_consultoria", descricao: "🧭 Interesse marcado: Consultoria" },
   { valor: "interesse_siope", descricao: "📊 Interesse marcado: SIOPE" },
   { valor: "interesse_fundeb", descricao: "📊 Interesse marcado: FUNDEB" },
   { valor: "interesse_cacs", descricao: "📊 Interesse marcado: CACS" },
-  { valor: "interesse_salario-educacao", descricao: "📊 Interesse marcado: SALARIO-EDUCACAO" },
+  { valor: "interesse_salario-educacao", descricao: "📊 Interesse marcado: SALÁRIO-EDUCAÇÃO" },
+
+  // ——— Uso manual/padrão ———
   { valor: "resposta_personalizada_manual", descricao: "✍️ Resposta manual personalizada" },
   { valor: "padrao", descricao: "📌 Resposta padrão para envio manual" }
 ];

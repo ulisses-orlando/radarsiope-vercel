@@ -489,6 +489,316 @@ async function atualizarNomeLowercaseLeads() {
   }
 }
 
+async function seedRespostasAutomaticas() {
+  // 1. Excluir todos os registros existentes com tipo = "Momento envio"
+  const snapshot = await db.collection("respostas_automaticas")
+    .where("tipo", "==", "Momento envio")
+    .get();
+
+  const batchDelete = db.batch();
+  snapshot.forEach(doc => {
+    batchDelete.delete(doc.ref);
+  });
+  await batchDelete.commit();
+  console.log(`Excluídos ${snapshot.size} registros antigos de tipo "Momento envio".`);
+
+  // 2. Inserir os novos registros revisados
+  const mensagens = [
+    // ——— Entrada e fluxo inicial ———
+    {
+      ativo: true,
+      enviar_automaticamente: true,
+      mensagem_html: `
+        <p>Olá {{nome}},</p>
+        <p>Bem-vindo ao Radar SIOPE! 🎉</p>
+        <p>Todas as edições anteriores estão disponíveis na sua 
+        <a href="https://radarsiope-vercel.vercel.app/login.html" target="_blank">Área do Assinante</a>, 
+        na seção <strong>Biblioteca de Newsletters</strong>.</p>
+        <p>Você continuará recebendo as novas edições normalmente.</p>
+      `,
+      momento_envio: "primeiro_contato",
+      tipo: "Momento envio",
+      titulo: "Boas-vindas e acesso à biblioteca"
+    },
+    {
+      ativo: true,
+      enviar_automaticamente: true,
+      mensagem_html: `
+        <p>Olá {{nome}},</p>
+        <p>Sua assinatura do plano {{plano}} foi confirmada em {{data_assinatura}} 🎉.</p>
+        <p>Na sua <a href="https://radarsiope-vercel.vercel.app/login.html" target="_blank">Área do Assinante</a> 
+        você encontra biblioteca de newsletters, parcelas e histórico de solicitações.</p>
+      `,
+      momento_envio: "pos_cadastro_assinante",
+      tipo: "Momento envio",
+      titulo: "Confirmação de assinatura"
+    },
+    {
+      ativo: true,
+      enviar_automaticamente: true,
+      mensagem_html: `
+        <p>Olá {{nome}},</p>
+        <p>Você acaba de receber sua primeira edição da newsletter Radar SIOPE.</p>
+        <p>Lembre-se: todas as edições anteriores estão disponíveis na 
+        <a href="https://radarsiope-vercel.vercel.app/login.html" target="_blank">Área do Assinante</a>.</p>
+      `,
+      momento_envio: "pos_envio_newsletter_1",
+      tipo: "Momento envio",
+      titulo: "Reforço após primeira newsletter"
+    },
+    {
+      ativo: true,
+      enviar_automaticamente: true,
+      mensagem_html: `
+        <p>Olá {{nome}},</p>
+        <p>Você já recebeu duas edições da nossa newsletter 🎉.</p>
+        <p>Continue acompanhando e explore conteúdos anteriores na 
+        <a href="https://radarsiope-vercel.vercel.app/login.html" target="_blank">Biblioteca de Newsletters</a>.</p>
+      `,
+      momento_envio: "pos_envio_newsletter_2",
+      tipo: "Momento envio",
+      titulo: "Reforço após segunda newsletter"
+    },
+    {
+      ativo: true,
+      enviar_automaticamente: true,
+      mensagem_html: `
+        <p>Olá {{nome}},</p>
+        <p>Agora você está recebendo as edições junto com todos os assinantes 🎉.</p>
+        <p>As anteriores continuam disponíveis na 
+        <a href="https://radarsiope-vercel.vercel.app/login.html" target="_blank">Biblioteca de Newsletters</a>.</p>
+      `,
+      momento_envio: "pos_envio_primeira_newsletter_regular",
+      tipo: "Momento envio",
+      titulo: "Primeira newsletter regular"
+    },
+
+    // ——— Reengajamento ———
+    {
+      ativo: true,
+      enviar_automaticamente: true,
+      mensagem_html: `
+        <p>Olá {{nome}},</p>
+        <p>Notamos que você não acessou nossas newsletters nos últimos 7 dias ⏳.</p>
+        <p>Relembre que todas as edições estão disponíveis na 
+        <a href="https://radarsiope-vercel.vercel.app/login.html" target="_blank">Área do Assinante</a>.</p>
+      `,
+      momento_envio: "sem_interacao_7_dias",
+      tipo: "Momento envio",
+      titulo: "Lembrete após 7 dias sem interação"
+    },
+    {
+      ativo: true,
+      enviar_automaticamente: true,
+      mensagem_html: `
+        <p>Olá {{nome}},</p>
+        <p>Já se passaram 14 dias sem interação ⏳.</p>
+        <p>Reative seu acesso visitando a 
+        <a href="https://radarsiope-vercel.vercel.app/login.html" target="_blank">Área do Assinante</a> 
+        e explorando a biblioteca de newsletters.</p>
+      `,
+      momento_envio: "sem_interacao_14_dias",
+      tipo: "Momento envio",
+      titulo: "Lembrete após 14 dias sem interação"
+    },
+
+    // ——— Ciclo financeiro/contratual ———
+    {
+      ativo: true,
+      enviar_automaticamente: true,
+      mensagem_html: `
+        <p>Olá {{nome}},</p>
+        <p>Sua assinatura do plano {{plano}} foi renovada em {{data_assinatura}} 🔄.</p>
+        <p>Obrigado por continuar conosco! Explore conteúdos exclusivos na 
+        <a href="https://radarsiope-vercel.vercel.app/login.html" target="_blank">Área do Assinante</a>.</p>
+      `,
+      momento_envio: "renovacao_assinatura",
+      tipo: "Momento envio",
+      titulo: "Confirmação de renovação"
+    },
+    {
+      ativo: true,
+      enviar_automaticamente: true,
+      mensagem_html: `
+        <p>Olá {{nome}},</p>
+        <p>Identificamos uma parcela em atraso 💳.</p>
+        <p>Para evitar interrupções, regularize seu pagamento acessando a 
+        <a href="https://radarsiope-vercel.vercel.app/login.html" target="_blank">Área do Assinante</a>.</p>
+      `,
+      momento_envio: "parcela_em_atraso",
+      tipo: "Momento envio",
+      titulo: "Aviso de parcela em atraso"
+    },
+    {
+      ativo: true,
+      enviar_automaticamente: true,
+      mensagem_html: `
+        <p>Olá {{nome}},</p>
+        <p>Sua assinatura foi cancelada ❌.</p>
+        <p>Esperamos vê-lo novamente! Você pode reativar acessando a 
+        <a href="https://radarsiope-vercel.vercel.app/login.html" target="_blank">Área do Assinante</a>.</p>
+      `,
+      momento_envio: "assinatura_cancelada",
+      tipo: "Momento envio",
+      titulo: "Aviso de cancelamento"
+    },
+
+    // ——— Inclusões novas ———
+    {
+      ativo: true,
+      enviar_automaticamente: true,
+      mensagem_html: `
+        <p>Olá {{nome}},</p>
+        <p>Hoje faz {{anos_assinatura}} ano(s) que você está conosco 🎉.</p>
+        <p>Obrigado por acompanhar o Radar SIOPE!</p>
+      `,
+      momento_envio: "aniversario_assinatura",
+      tipo: "Momento envio",
+      titulo: "Aniversário de assinatura"
+    },
+    {
+      ativo: true,
+      enviar_automaticamente: true,
+      mensagem_html: `
+        <p>Olá {{nome}},</p>
+        <p>Sua assinatura foi atualizada para o plano {{plano}} 🚀.</p>
+        <p>Explore os novos recursos disponíveis na 
+        <a href="https://radarsiope-vercel.vercel.app/login.html" target="_blank">Área do Assinante</a>.</p>
+      `,
+      momento_envio: "upgrade_plano",
+      tipo: "Momento envio",
+      titulo: "Upgrade de plano"
+    },
+    {
+      ativo: true,
+      enviar_automaticamente: true,
+      mensagem_html: `
+        <p>Olá {{nome}},</p>
+        <p>Sua solicitação de suporte foi concluída ✅.</p>
+        <p>Obrigado por contar com nossa equipe. Você pode acompanhar o histórico na 
+        <a href="https://radarsiope-vercel.vercel.app/login.html" target="_blank">Área do Assinante</a>.</p>
+      `,
+      momento_envio: "suporte_resolvido",
+      tipo: "Momento envio",
+      titulo: "Solicitação de suporte resolvida"
+    },
+
+        // ——— Interesses ———
+    {
+      ativo: true,
+      enviar_automaticamente: true,
+      mensagem_html: `
+        <p>Olá {{nome}},</p>
+        <p>Ficamos felizes com seu interesse em Capacitação 🎓.</p>
+        <p>Em breve enviaremos mais detalhes sobre cursos e treinamentos.</p>
+      `,
+      momento_envio: "interesse_capacitacao",
+      tipo: "Momento envio",
+      titulo: "Convite para Capacitação"
+    },
+    {
+      ativo: true,
+      enviar_automaticamente: true,
+      mensagem_html: `
+        <p>Olá {{nome}},</p>
+        <p>Ficamos felizes com seu interesse em Consultoria 🧭.</p>
+        <p>Em breve enviaremos mais detalhes sobre nossos serviços.</p>
+      `,
+      momento_envio: "interesse_consultoria",
+      tipo: "Momento envio",
+      titulo: "Convite para Consultoria"
+    },
+    {
+      ativo: true,
+      enviar_automaticamente: true,
+      mensagem_html: `
+        <p>Olá {{nome}},</p>
+        <p>Você demonstrou interesse em SIOPE 📊.</p>
+        <p>Em breve enviaremos conteúdos e oportunidades relacionadas.</p>
+      `,
+      momento_envio: "interesse_siope",
+      tipo: "Momento envio",
+      titulo: "Interesse em SIOPE"
+    },
+    {
+      ativo: true,
+      enviar_automaticamente: true,
+      mensagem_html: `
+        <p>Olá {{nome}},</p>
+        <p>Você demonstrou interesse em FUNDEB 📊.</p>
+        <p>Em breve enviaremos conteúdos e oportunidades relacionadas.</p>
+      `,
+      momento_envio: "interesse_fundeb",
+      tipo: "Momento envio",
+      titulo: "Interesse em FUNDEB"
+    },
+    {
+      ativo: true,
+      enviar_automaticamente: true,
+      mensagem_html: `
+        <p>Olá {{nome}},</p>
+        <p>Você demonstrou interesse em CACS 📊.</p>
+        <p>Em breve enviaremos conteúdos e oportunidades relacionadas.</p>
+      `,
+      momento_envio: "interesse_cacs",
+      tipo: "Momento envio",
+      titulo: "Interesse em CACS"
+    },
+    {
+      ativo: true,
+      enviar_automaticamente: true,
+      mensagem_html: `
+        <p>Olá {{nome}},</p>
+        <p>Você demonstrou interesse em Salário-Educação 📊.</p>
+        <p>Em breve enviaremos conteúdos e oportunidades relacionadas.</p>
+      `,
+      momento_envio: "interesse_salario-educacao",
+      tipo: "Momento envio",
+      titulo: "Interesse em Salário-Educação"
+    },
+
+    // ——— Uso manual/padrão ———
+    {
+      ativo: true,
+      enviar_automaticamente: false,
+      mensagem_html: `
+        <p>Olá {{nome}},</p>
+        <p>{{mensagem_personalizada}}</p>
+        <p>Se precisar, acesse sua 
+        <a href="https://radarsiope-vercel.vercel.app/login.html" target="_blank">Área do Assinante</a> 
+        para acompanhar novidades e histórico.</p>
+      `,
+      momento_envio: "resposta_personalizada_manual",
+      tipo: "Momento envio",
+      titulo: "Resposta manual personalizada"
+    },
+    {
+      ativo: true,
+      enviar_automaticamente: false,
+      mensagem_html: `
+        <p>Olá {{nome}},</p>
+        <p>Obrigado pelo contato. Em breve retornaremos.</p>
+        <p>Enquanto isso, você pode acessar sua 
+        <a href="https://radarsiope-vercel.vercel.app/login.html" target="_blank">Área do Assinante</a> 
+        e explorar a <strong>Biblioteca de Newsletters</strong>.</p>
+      `,
+      momento_envio: "padrao",
+      tipo: "Momento envio",
+      titulo: "Resposta padrão para envio manual"
+    }
+  ];
+
+  const batch = db.batch();
+  mensagens.forEach((msg) => {
+    const ref = db.collection("respostas_automaticas").doc(); // gera ID automático
+    batch.set(ref, msg);
+  });
+
+  await batch.commit();
+  console.log(`Seed concluído. ${mensagens.length} mensagens adicionadas.`);
+}
+
+
 async function popularDatas() {
   const snapshot = await db.collection("lotes_gerais").get();
   console.log(`Encontrados ${snapshot.size} documentos.`);
