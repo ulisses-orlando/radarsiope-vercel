@@ -2,16 +2,18 @@
 <html lang="pt-BR">
 
 <head>
-    <meta charset="UTF-8">
+    <meta charset="UTF-8" />
     <title>Newsletters – Radar SIOPE</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
     <style>
+        /* Base */
         body {
             font-family: 'Segoe UI', sans-serif;
             margin: 0;
             padding: 0;
             background: #f4f4f4;
+            color: #1a1a1a;
         }
 
         header {
@@ -46,7 +48,7 @@
             font-weight: bold;
         }
 
-        /* Container de cada seção */
+        /* Seções (cada carrossel) */
         .secao-news {
             margin-bottom: 48px;
             padding: 16px;
@@ -56,23 +58,23 @@
             box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
         }
 
-        /* Título da seção */
         .secao-news h2 {
             border-left: 8px solid #007acc;
             padding-left: 12px;
             color: #007acc;
             font-size: 1.4em;
+            margin: 0 0 8px 0;
         }
 
-        /* Wrapper com setas */
+        /* Carrossel */
         .carrossel-wrapper {
             position: relative;
             display: flex;
             align-items: center;
             margin-top: 12px;
+            gap: 8px;
         }
 
-        /* Botões de navegação */
         .carrossel-seta {
             flex: 0 0 auto;
             height: 100%;
@@ -81,69 +83,137 @@
             border: none;
             background: #fff;
             width: 48px;
-            transition: 0.2s;
+            border-radius: 8px;
+            transition: background 0.2s ease;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
         }
 
         .carrossel-seta:hover {
             background: #e6f0ff;
         }
 
-        /* Container do carrossel */
         .carrossel-container {
             overflow: hidden;
             flex: 1;
-            max-width: 904px;
-            margin: 0 auto;
+            max-width: 100%;
         }
 
-        /* Faixa interna */
         .carrossel {
             display: flex;
             gap: 16px;
-            padding: 8px 16px;
+            padding: 8px 8px;
             scroll-behavior: smooth;
             overflow-x: auto;
             scroll-snap-type: x mandatory;
         }
 
-        /* Card da newsletter */
+        /* Card da newsletter (versão única, consolidada) */
         .card-news {
-            min-width: 255px;
-            max-width: 255px;
+            width: 240px;
+            min-width: 240px;
             flex: 0 0 auto;
-            border: 2px solid #007acc;
-            border-radius: 8px;
-            padding: 12px;
             background: #fff;
+            border: 1px solid #e6e6e6;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.08);
+            display: flex;
+            flex-direction: column;
             scroll-snap-align: start;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
         }
 
-        .card-news h3 {
-            margin-top: 0;
-            font-size: 1.1rem;
-            color: #007acc;
+        .card-thumb {
+            width: 100%;
+            background: #f5f7fb;
+            overflow: hidden;
+            position: relative;
         }
 
-        .card-news button {
-            margin-top: 10px;
-            padding: 8px 12px;
+        .card-thumb::before {
+            content: "";
+            display: block;
+            padding-top: 56.25%;
+            /* 16:9 */
+        }
+
+        .card-thumb img {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            /* cobre o espaço sem distorcer */
+            display: block;
+        }
+
+
+        .card-content {
+            padding: 10px;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .card-title {
+            font-size: 16px;
+            margin: 0;
+            color: #1a1a1a;
+        }
+
+        .card-date {
+            font-size: 12px;
+            color: #666;
+            margin: 0;
+        }
+
+        .card-summary {
+            font-size: 13px;
+            color: #333;
+            line-height: 1.4;
+            margin: 0;
+            display: -webkit-box;
+            -webkit-line-clamp: 3;
+            /* limita a 3 linhas */
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+            min-height: 54px;
+            /* reserva espaço para 3 linhas */
+        }
+
+        .card-actions {
+            margin-top: auto;
+            display: flex;
+        }
+
+        .card-button {
+            width: 100%;
+            padding: 10px 12px;
             background: #007acc;
             color: #fff;
             border: none;
             border-radius: 6px;
+            font-weight: 600;
             cursor: pointer;
-            width: 100%;
+            transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
         }
 
-        .card-news button:hover {
-            background: #005fa3;
+        .card-button:hover {
+            background: #0063a6;
+            transform: translateY(-1px);
+            box-shadow: 0 6px 10px rgba(0, 0, 0, 0.15);
+        }
+
+        /* Estado vazio */
+        .secao-news p {
+            margin: 12px 0 0 0;
+            color: #666;
+            font-size: 14px;
         }
     </style>
 </head>
 
 <body>
-
     <header>
         <h1>Newsletters Radar SIOPE</h1>
     </header>
@@ -153,7 +223,7 @@
 
         <h2>Newsletters Disponíveis</h2>
 
-        <!-- Aqui vamos inserir o carrossel de newsletters -->
+        <!-- Carrosséis serão injetados aqui -->
         <div id="lista-basicas"></div>
         <div id="lista-premium"></div>
     </div>
@@ -163,10 +233,9 @@
     <script src="https://www.gstatic.com/firebasejs/10.0.0/firebase-firestore-compat.js"></script>
     <script src="js/firebase-init.js"></script>
 
-    <!-- Script da página -->
+    <!-- Scripts da página -->
     <script src="js/site.js"></script>
     <script src="js/newsletters.js"></script>
-
 </body>
 
 </html>
