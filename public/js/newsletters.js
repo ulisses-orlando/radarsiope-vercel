@@ -108,6 +108,14 @@ function criarCardNewsletter(dados) {
   // Somente "Premium" mostra blocos
   const mostrarBlocos = classificacao === "Premium";
 
+  // ✔️ HTML dos blocos (somente se Premium)
+  const blocosHTML = mostrarBlocos
+    ? `
+      <div class="blocos-assinantes">
+
+      </div>
+    `
+    : "";
 
   card.innerHTML = `
     <h3>${titulo || "Sem título"}</h3>
