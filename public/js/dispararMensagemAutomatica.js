@@ -41,7 +41,3 @@ async function dispararMensagemAutomatica(momento, usuario) {
   }
 }
 
-// Função auxiliar para placeholders
-function aplicarPlaceholders(template, dados) {
-  return template.replace(/{{(\w+)}}/g, (_, chave) => dados[chave] || "");
-}

@@ -1,13 +1,7 @@
 /* ======================
    CONFIG FIREBASE
    ====================== */
-const firebaseConfig = {
-  apiKey: "AIzaSyDcS4nneXnN8Cdb-S_cQukwaguLXJYbQ1U",
-  authDomain: "radarsiope.firebaseapp.com",
-  projectId: "radarsiope"
-};
-firebase.initializeApp(firebaseConfig);
-const db = firebase.firestore();
+const db = window.db;
 
 
 let filtroAvaliacao = "todos";
@@ -659,6 +653,25 @@ async function abrirModalNewsletter(docId = null, isEdit = false) {
     const blocos = payload.blocos || [];
 
     if (!validarNewsletter(htmlNewsletter, blocos)) return;
+
+    if (!validarPlaceholders(htmlNewsletter)) {
+      // interrompe o processo se houver placeholders inválidos
+      return;
+    }
+
+    const htmlNewsletterCompleta = payload['conteudo_html_completo'] || "";
+
+    if (!validarNewsletter(htmlNewsletterCompleta, blocos)) return;
+
+    if (!validarPlaceholders(htmlNewsletterCompleta)) {
+      // interrompe o processo se houver placeholders inválidos
+      return;
+    }
+
+    const inputData = document.getElementById("data_publicacao");
+    // payload.data_publicacao = inputData?.value ? firebase.firestore.Timestamp.fromDate(new Date(inputData.value)) : null;
+    payload.data_publicacao = dateStringToLocalTimestamp(inputData?.value);
+
 
     const ref = db.collection('newsletters');
     if (isEdit && docId) {
@@ -2485,14 +2498,34 @@ function fecharModalTema() {
 
 async function carregarrespostas_automaticas() {
   const container = document.getElementById("respostas_automaticas");
-  container.innerHTML = `<h2>✉️ Respostas Automáticas</h2><div id="lista-respostas"></div><div id="form-resposta-container" style="margin-top:30px"></div>`;
+  container.innerHTML = ""; // limpa
 
-  // Botão para novo cadastro
+  // Cabeçalho
+  const header = document.createElement("div");
+  header.style.display = "flex";
+  header.style.justifyContent = "space-between";
+  header.style.alignItems = "center";
+
+  const titulo = document.createElement("h2");
+  titulo.innerText = "✉️ Respostas Automáticas";
+
   const novoBtn = document.createElement("button");
   novoBtn.innerText = "➕ Nova Resposta";
-  novoBtn.style.marginTop = "20px";
   novoBtn.onclick = () => editarResposta(null);
-  container.appendChild(novoBtn);
+
+  header.appendChild(titulo);
+  header.appendChild(novoBtn);
+  container.appendChild(header);
+
+  // Lista e form
+  const lista = document.createElement("div");
+  lista.id = "lista-respostas";
+  container.appendChild(lista);
+
+  const formContainer = document.createElement("div");
+  formContainer.id = "form-resposta-container";
+  formContainer.style.marginTop = "30px";
+  container.appendChild(formContainer);
 
   const snap = await db.collection("respostas_automaticas").get();
   const respostas = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
@@ -2539,6 +2572,7 @@ async function carregarrespostas_automaticas() {
 }
 
 async function editarResposta(id) {
+  console.log('123');
   const modal = document.getElementById("modalrespostaauto");
   const body = document.getElementById("modalrespostaauto-body");
 
@@ -2831,6 +2865,7 @@ async function carregarUsuariosComFiltro() {
         <span class="icon-btn" title="Pagamentos" onclick="abrirSubcolecao('${doc.id}','pagamentos')">💳</span>
         <span class="icon-btn" title="Preferências Newsletter" onclick="abrirSubcolecao('${doc.id}','preferencias_newsletter')">📰</span>
         <span class="icon-btn" title="Visão Geral" onclick="mostrarVisaoGeral('${doc.id}')">👁️</span>
+        <span class="icon-btn" title="Enviar e-mail" onclick="abrirModalEnvioManual('${doc.id}')">📤</span>
       </td>`;
 
     tbody.appendChild(tr);
@@ -2872,12 +2907,12 @@ async function contarUsuariosComFiltro() {
   const filtrarSemValor = document.getElementById('filtro-semvalor').checked;
   const filtrarSolicitacoes = document.getElementById('filtro-solicitacoes').checked;
   const termoBusca = document.getElementById('busca-usuarios').value.trim().toLowerCase();
-
   const barra = document.getElementById('barra-progresso');
+
   barra.style.display = 'block';
   barra.value = 0;
 
-  let query = firebase.firestore().collection('usuarios');
+  let query = db.collection('usuarios');
 
   if (termoBusca) {
     query = query
@@ -2968,7 +3003,7 @@ function abrirPainelGestao() {
 
 async function carregarResumoUsuarios(periodoDias = 30) {
   const dataMinima = getDataMinima(periodoDias);
-  const usuariosRef = firebase.firestore().collection('usuarios');
+  const usuariosRef = db.collection('usuarios');
 
   let ativos = 0;
   let inativos = 0;
@@ -3503,13 +3538,13 @@ async function abrirModalTemplateNewsletter(docId = null, isEdit = false, dadosP
             "#1976d2";
 
       htmlBlocos += `
-    <div style="border:2px dashed ${cor}; padding:10px; margin:15px 0; border-radius:6px;">
-      <div style="font-size:12px; color:${cor}; margin-bottom:5px;">
-        <strong>Bloco ${i + 1}</strong> — acesso: ${b.acesso}
-      </div>
-      ${b.html || ""}
-    </div>
-  `;
+        <div style="border:2px dashed ${cor}; padding:10px; margin:15px 0; border-radius:6px;">
+          <div style="font-size:12px; color:${cor}; margin-bottom:5px;">
+            <strong>Bloco ${i + 1}</strong> — acesso: ${b.acesso}
+          </div>
+          ${b.html || ""}
+        </div>
+      `;
     });
 
     // ✅ Se o template tiver {{blocos}}, substitui
@@ -3518,6 +3553,11 @@ async function abrirModalTemplateNewsletter(docId = null, isEdit = false, dadosP
     } else {
       // ✅ Caso contrário, adiciona no final
       htmlFinal = htmlBase + "\n" + htmlBlocos;
+    }
+
+    if (!validarPlaceholders(htmlFinal)) {
+      // interrompe o processo se houver placeholders inválidos
+      return;
     }
 
     // ✅ Aplica placeholders
@@ -3575,6 +3615,11 @@ async function abrirModalTemplateNewsletter(docId = null, isEdit = false, dadosP
       return;
     }
 
+    if (!validarPlaceholders(htmlTemplate)) {
+      // interrompe o processo se houver placeholders inválidos
+      return;
+    }
+
     if (isEdit && docId) {
       await db.collection('templates_newsletter').doc(docId).set(payload, { merge: true });
     } else {
@@ -3627,6 +3672,10 @@ function previewSegmentado(tipo) {
     htmlFinal = htmlBase + "\n" + htmlBlocos;
   }
 
+  if (!validarPlaceholders(htmlFinal)) {
+    // interrompe o processo se houver placeholders inválidos
+    return;
+  }
   const iframe = document.getElementById('iframe-html-preview');
   iframe.srcdoc = htmlFinal;
 

@@ -87,15 +87,33 @@ function generateDomainSelect(name, optionsArray, value) {
   });
   wrap.appendChild(select); return wrap;
 }
+
 function generateDateInput(name, dateVal) {
-  const wrap = document.createElement('div'); wrap.className = 'field';
-  const label = document.createElement('label'); label.innerText = name; wrap.appendChild(label);
-  const input = document.createElement('input'); input.type = 'date'; input.dataset.fieldName = name;
-  if (dateVal instanceof Date) input.value = dateVal.toISOString().slice(0, 10);
-  else if (typeof dateVal === 'string' && /^\d{4}-\d{2}-\d{2}/.test(dateVal)) input.value = dateVal.slice(0, 10);
-  else input.value = '';
-  wrap.appendChild(input); return wrap;
+  const wrap = document.createElement('div');
+  wrap.className = 'field';
+
+  const label = document.createElement('label');
+  label.innerText = name;
+  wrap.appendChild(label);
+
+  const input = document.createElement('input');
+  input.type = 'date';
+  input.id = name;                 // 🔹 agora tem id
+  input.dataset.fieldName = name;
+
+  if (dateVal instanceof Date) {
+    input.value = dateVal.toISOString().slice(0, 10);
+  } else if (typeof dateVal === 'string' && /^\d{4}-\d{2}-\d{2}/.test(dateVal)) {
+    input.value = dateVal.slice(0, 10);
+  } else {
+    input.value = '';
+  }
+
+  wrap.appendChild(input);
+  return wrap;
 }
+
+
 function generatePasswordField(fieldName, value = "") {
   const wrapper = document.createElement("div");
   wrapper.className = "field";
@@ -772,6 +790,11 @@ async function abrirModalEnvioManual(usuarioId, solicitacaoId, dadosSolicitacao)
     // 1) substitui placeholders
     const htmlBase = aplicarPlaceholders(textarea.value, dadosCompletos);
 
+    if (!validarPlaceholders(textarea.value)) {
+      // interrompe o processo se houver placeholders inválidos
+      return;
+    }
+
     // 2) aplica rastreamento
     const mensagemHtml = aplicarRastreamento(
       htmlBase,
@@ -785,7 +808,12 @@ async function abrirModalEnvioManual(usuarioId, solicitacaoId, dadosSolicitacao)
     const assunto = document.getElementById("assunto-email").value || "Resposta à sua solicitação";
 
     if (!email) {
-      mostrarMensagem("Solicitação não possui e-mail.");
+      mostrarMensagem("Mensagem sem e-mail de destino.");
+      return;
+    }
+
+    if (!assunto) {
+      mostrarMensagem("Mensagem sem assunto.");
       return;
     }
 
@@ -797,22 +825,38 @@ async function abrirModalEnvioManual(usuarioId, solicitacaoId, dadosSolicitacao)
       });
 
       // Atualiza status da solicitação (somente se estiver no contexto de usuário + solicitação)
-      if (usuarioId && solicitacaoId) {
-        await db.collection("usuarios")
+      if (usuarioId) {
+        const solicitacoesRef = db.collection("usuarios")
           .doc(usuarioId)
-          .collection("solicitacoes")
-          .doc(solicitacaoId)
-          .set({
+          .collection("solicitacoes");
+
+        if (solicitacaoId) {
+          // Atualiza solicitação existente
+          await solicitacoesRef.doc(solicitacaoId).set({
             status: "enviada",
             data_envio: new Date(),
             resposta_utilizada: select.value,
             resposta_html_enviada: mensagemHtml
           }, { merge: true });
-
-        abrirSubcolecao(usuarioId, "solicitacoes");
+        } else {
+          // Cria nova solicitação
+          await solicitacoesRef.add({
+            status: "atendida",
+            data_envio: new Date(),
+            resposta_utilizada: select.value,
+            resposta_html_enviada: mensagemHtml,
+            assunto: assunto,
+            mensagem: mensagemHtml,
+            tipo: "envio_manual_admin"
+          });
+        }
       }
 
       mostrarMensagem("E-mail enviado com sucesso!");
+
+      if (solicitacaoId) {
+        abrirSubcolecao(usuarioId, "solicitacoes");
+      }
 
       // Preenche campo de resultado no modal de leads, se estiver visível
       const resultadoCampo = document.getElementById("resultado-contato-lead");
@@ -831,6 +875,11 @@ async function abrirModalEnvioManual(usuarioId, solicitacaoId, dadosSolicitacao)
 
   document.getElementById("btn-preview-email").onclick = () => {
     const rawHTML = textarea.value;
+
+    if (!validarPlaceholders(rawHTML)) {
+      // interrompe o processo se houver placeholders inválidos
+      return;
+    }
 
     // 1) substitui placeholders
     const htmlBase = aplicarPlaceholders(rawHTML, dadosCompletos);
@@ -1327,7 +1376,7 @@ async function mostrarVisaoGeral(userId) {
   let dataCadastro = "";
 
   try {
-    const doc = await firebase.firestore().collection("usuarios").doc(userId).get();
+    const doc = await db.collection("usuarios").doc(userId).get();
     if (doc.exists) {
       const dados = doc.data();
       nomeUsuario = dados.nome || userId;
@@ -1371,7 +1420,7 @@ async function mostrarVisaoGeral(userId) {
 
   for (const sub of subcolecoes) {
     try {
-      const snap = await firebase.firestore().collection(`usuarios/${userId}/${sub}`).get();
+      const snap = await db.collection(`usuarios/${userId}/${sub}`).get();
       const dadosSubcolecao = [];
 
       html += `
@@ -1436,7 +1485,7 @@ async function mostrarVisaoGeral(userId) {
                 // 🔍 Substituir id_edicao por dados da newsletter
                 if (campo === "id_edicao" && typeof valor === "string") {
                   try {
-                    const newsletterSnap = await firebase.firestore().collection("newsletters").doc(valor).get();
+                    const newsletterSnap = await db.collection("newsletters").doc(valor).get();
                     if (newsletterSnap.exists) {
                       const newsletter = newsletterSnap.data();
                       valor = `${newsletter.tipo || ""} – ${newsletter.titulo || ""} (Edição ${newsletter.edicao || ""})`;
@@ -1485,7 +1534,7 @@ function toggleSubcolecao(sub) {
 }
 
 function exportarSubcolecao(sub, userId) {
-  firebase.firestore().collection(`usuarios/${userId}/${sub}`).get().then(snap => {
+  db.collection(`usuarios/${userId}/${sub}`).get().then(snap => {
     const dados = [];
     snap.forEach(doc => {
       dados.push({ id: doc.id, ...doc.data() });

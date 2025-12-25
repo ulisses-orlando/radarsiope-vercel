@@ -365,10 +365,10 @@ function prepararEnvioNewsletter(newsletterId) {
 }
 
 function selecionarTodosEnvioFinalLeads(chkMaster) {
-  const todos = document.querySelectorAll("#tabela-preview-envio .chk-envio-final");
-  for (const chk of todos) {
-    chk.checked = chkMaster.checked;
-  }
+    const todos = document.querySelectorAll("#tabela-preview-envio .chk-envio-final");
+    for (const chk of todos) {
+        chk.checked = chkMaster.checked;
+    }
 }
 
 async function gerarPreviaEnvio() {
@@ -1150,7 +1150,7 @@ async function confirmarPrevia(newsletterId, filtros) {
         enviados: 0,
         erros: 0,
         abertos: 0,
-        data_envio: firebase.firestore.Timestamp.now(),
+        //data_envio: firebase.firestore.Timestamp.now(),
         tamanho_lote: destinatarios.length
     });
 
@@ -1738,12 +1738,16 @@ async function listarTodosOsLotes() {
 
         const dataGeracao = lote.data_geracao?.toDate ? lote.data_geracao.toDate() : null;
         const dataEnvio = lote.data_envio?.toDate ? lote.data_envio.toDate() : null;
-        const ultimoEnvio = mapaUltimoEnvio[loteId] || dataEnvio || dataGeracao;
+        const ultimoEnvio = mapaUltimoEnvio[loteId] || dataEnvio;
 
         return { docId: loteId, lote, reenvios, dataGeracao, dataEnvio, ultimoEnvio };
     });
 
-    lotesComDados.sort((a, b) => b.ultimoEnvio - a.ultimoEnvio);
+    if (filtroDataInicio || filtroDataFim) {
+        lotesComDados.sort((a, b) => b.ultimoEnvio - a.ultimoEnvio);
+    } else {
+        lotesComDados.sort((a, b) => b.lote.numero_lote - a.lote.numero_lote);
+    }
 
     corpo.innerHTML = lotesComDados.length === 0
         ? "<tr><td colspan='12'>Nenhum lote encontrado com os filtros aplicados.</td></tr>"
