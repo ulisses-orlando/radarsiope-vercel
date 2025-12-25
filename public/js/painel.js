@@ -1,6 +1,7 @@
 // Estado global de filtro
 let filtroStatusSolicitacoes = "todos";
-
+let solicitacaoEmEdicao = { usuarioId: null, solicitacaoId: null };
+ 
 // 🔐 Validação de sessão baseada no localStorage
 document.addEventListener("DOMContentLoaded", () => {
   const usuario = JSON.parse(localStorage.getItem("usuarioLogado"));
@@ -307,11 +308,12 @@ function carregarHistoricoSolicitacoes(usuarioId) {
   const container = document.getElementById("historico-solicitacoes");
   container.innerHTML = "";
 
-  const tipos = ["consultoria", "treinamento", "newsletters", "outros"];
+  // Inclui o novo tipo
+  const tipos = ["consultoria", "treinamento", "newsletters", "outros", "envio_manual_admin"];
   const colunas = {};
   tipos.forEach(tipo => { colunas[tipo] = []; });
 
-  // ✅ Inicializa contadores aqui
+  // ✅ Inicializa contadores
   const contadores = { pendente: 0, aberta: 0, atendida: 0, cancelada: 0 };
 
   db.collection("usuarios")
@@ -327,7 +329,7 @@ function carregarHistoricoSolicitacoes(usuarioId) {
 
       snapshot.forEach(doc => {
         const s = doc.data();
-        const tipo = s.tipo?.toLowerCase() || "outros";
+        let tipo = s.tipo?.toLowerCase() || "outros";
         const status = s.status?.toLowerCase() || "pendente";
 
         // ✅ Atualiza contadores
@@ -335,39 +337,59 @@ function carregarHistoricoSolicitacoes(usuarioId) {
 
         if (filtroStatusSolicitacoes !== "todos" && status !== filtroStatusSolicitacoes) return;
 
-        let cor = "#999", icone = "❔";
-        if (status === "pendente") { cor = "#ffc107"; icone = "⏳"; }
-        else if (status === "aberta") { cor = "#17a2b8"; icone = "📤"; }
-        else if (status === "atendida") { cor = "#28a745"; icone = "✅"; }
-        else if (status === "cancelada") { cor = "#dc3545"; icone = "❌"; }
+        // Renderização diferenciada para envio manual admin
+        if (tipo === "envio_manual_admin") {
+          const mensagemCurta = (s.mensagem || s.resposta_html_enviada || "")
+            .substring(0, 200); // mostra só os primeiros 200 caracteres
 
-        const respostaHtml = (status === "atendida" || status === "cancelada") && s.resposta
-          ? `<div style="margin-top:6px; background:#f1f1f1; padding:8px; border-radius:4px;">
-              <strong>💡 Resposta do atendimento:</strong><br>${s.resposta}
-              ${!s.avaliacao ? `
-                <div style="margin-top:8px;">
-                  <span style="margin-right:10px;">Avaliação:</span>
-                  <button onclick="avaliarSolicitacao('${usuarioId}', '${doc.id}', 'positivo')">👍</button>
-                  <button onclick="avaliarSolicitacao('${usuarioId}', '${doc.id}', 'negativo')">👎</button>
-                </div>` : `
-                <div style="margin-top:8px; color:#555;">
-                  ✅ Você avaliou como: <strong>${s.avaliacao === "positivo" ? "👍 Positivo" : "👎 Negativo"}</strong>
-                </div>`}
-            </div>`
-          : "";
+          const html = `
+            <div class="item-solicitacao" style="border-left-color:#007acc;">
+              <strong>📧 Mensagem enviada pela administração</strong><br>
+              <div style="margin-top:6px; background:#f1f1f1; padding:8px; border-radius:4px; max-height:120px; overflow:hidden;" id="msg-${doc.id}">
+                <strong>Assunto:</strong> ${s.assunto || "-"}<br>
+                <strong>Mensagem:</strong><br>${mensagemCurta}...
+              </div>
+              <div style="margin-top:4px;">
+                <button id="btn-expandir-${doc.id}" class="btn-expandir"
+                  onclick="expandirMensagem('${doc.id}', '${encodeURIComponent(s.mensagem || s.resposta_html_enviada || "")}')">
+                  Expandir
+                </button>
+              </div>
+              <small>${formatarData(s.data_envio || s.data_solicitacao)} — Status: 
+                <span style="color:#007acc; font-weight:bold;">${s.status || "enviada"}</span>
+              </small>
+            </div>
+            `;
+          colunas[tipo].push(html);
+        }
+        else {
+          // Mantém a lógica atual para os outros tipos
+          let cor = "#999", icone = "❔";
+          if (status === "pendente") { cor = "#ffc107"; icone = "⏳"; }
+          else if (status === "aberta") { cor = "#17a2b8"; icone = "📤"; }
+          else if (status === "atendida") { cor = "#28a745"; icone = "✅"; }
+          else if (status === "cancelada") { cor = "#dc3545"; icone = "❌"; }
 
-        const html = `
-          <div class="item-solicitacao" style="border-left-color:${cor};">
-            <strong>${icone} ${tipo}</strong><br>
-            ${s.descricao}<br>
-            <small>${formatarData(s.data_solicitacao)} — Status: <span style="color:${cor}; font-weight:bold;">${s.status}</span></small><br>
-            ${status === "aberta" ? `<button onclick="cancelarSolicitacao('${usuarioId}', '${doc.id}')">Cancelar</button>` : ""}
-            ${status === "pendente" ? `<button onclick="editarSolicitacao('${usuarioId}', '${doc.id}', '${s.descricao.replace(/'/g, "\\'")}')">✏️ Editar</button>` : ""}
-            ${respostaHtml}
-          </div>
-        `;
+          const respostaHtml = (status === "atendida" || status === "cancelada") && s.resposta
+            ? `<div style="margin-top:6px; background:#f1f1f1; padding:8px; border-radius:4px;">
+                <strong>💡 Resposta do atendimento:</strong><br>${s.resposta}
+              </div>`
+            : "";
 
-        colunas[tipo]?.push(html);
+          const html = `
+            <div class="item-solicitacao" style="border-left-color:${cor};">
+              <strong>${icone} ${tipo}</strong><br>
+              ${s.descricao}<br>
+              <small>${formatarData(s.data_solicitacao)} — Status: 
+                <span style="color:${cor}; font-weight:bold;">${s.status}</span>
+              </small><br>
+              ${status === "aberta" ? `<button onclick="cancelarSolicitacao('${usuarioId}', '${doc.id}')">Cancelar</button>` : ""}
+              ${status === "pendente" ? `<button onclick="editarSolicitacao('${usuarioId}', '${doc.id}', '${s.descricao.replace(/'/g, "\\'")}')">✏️ Editar</button>` : ""}
+              ${respostaHtml}
+            </div>
+          `;
+          colunas[tipo]?.push(html);
+        }
       });
 
       // ✅ Atualiza botões de filtro com contadores
@@ -381,9 +403,10 @@ function carregarHistoricoSolicitacoes(usuarioId) {
 
       // Montar colunas
       tipos.forEach(tipo => {
+        const titulo = tipo === "envio_manual_admin" ? "Envios da Administração" : tipo.charAt(0).toUpperCase() + tipo.slice(1);
         container.innerHTML += `
           <div class="coluna-solicitacoes">
-            <h4>${tipo.charAt(0).toUpperCase() + tipo.slice(1)}</h4>
+            <h4>${titulo}</h4>
             ${colunas[tipo].join("") || "<p style='text-align:center;'>Nenhuma solicitação</p>"}
           </div>
         `;
@@ -393,6 +416,27 @@ function carregarHistoricoSolicitacoes(usuarioId) {
       console.error("Erro ao carregar histórico de solicitações:", error);
       container.innerHTML = "<p>Erro ao carregar histórico.</p>";
     });
+}
+
+function expandirMensagem(id, mensagemCompleta) {
+  const div = document.getElementById("msg-" + id);
+  const btn = document.getElementById("btn-expandir-" + id);
+
+  if (div.dataset.expandido === "true") {
+    // volta para versão curta
+    div.innerHTML = div.dataset.curta;
+    div.style.maxHeight = "120px";
+    btn.textContent = "Expandir";
+    div.dataset.expandido = "false";
+  } else {
+    // mostra versão completa
+    const texto = decodeURIComponent(mensagemCompleta);
+    div.dataset.curta = div.innerHTML; // guarda versão curta
+    div.innerHTML = `<strong>Mensagem completa:</strong><br>${texto}`;
+    div.style.maxHeight = "none";
+    btn.textContent = "Recolher";
+    div.dataset.expandido = "true";
+  }
 }
 
 function cancelarSolicitacao(usuarioId, solicitacaoId) {

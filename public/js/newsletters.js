@@ -96,42 +96,52 @@ function montarCarrossel(titulo, lista, container, tipoSecao) {
 }
 
 // Cria o card de cada newsletter dentro do carrossel
+// Cria o card de cada newsletter dentro do carrossel
 function criarCardNewsletter(dados) {
-  const { id, titulo, classificacao, data_publicacao, assinantes, aberturas } = dados;
+  const {
+    id,
+    titulo,
+    classificacao,
+    data_publicacao,
+    imagem_url,
+    resumo
+  } = dados;
 
   const card = document.createElement("div");
   card.className = "card-news";
 
   const dataFormatada = formatarData(data_publicacao);
 
-  // ✔️ Regra correta baseada no Firestore:
-  // Somente "Premium" mostra blocos
-  const mostrarBlocos = classificacao === "Premium";
+  // Imagem de capa (fallback simples)
+  const imgSrc = imagem_url || "https://via.placeholder.com/400x225?text=Newsletter";
 
-  // ✔️ HTML dos blocos (somente se Premium)
-  const blocosHTML = mostrarBlocos
-    ? `
-      <div class="blocos-assinantes">
+  // Texto do botão (ajustado ao tipo)
+  const textoBotao = classificacao === "Premium" ? "Conhecer edição" : "Ler agora";
 
-      </div>
-    `
-    : "";
-
+  // HTML do card
   card.innerHTML = `
-    <h3>${titulo || "Sem título"}</h3>
-    <p><strong>Classificação:</strong> ${classificacao || "-"}</p>
-    ${dataFormatada ? `<p><strong>Data:</strong> ${dataFormatada}</p>` : ""}
-    ${blocosHTML}
-    <button type="button">Visualizar</button>
+    <div class="card-thumb">
+      <img src="${imgSrc}" alt="Capa da newsletter" loading="lazy">
+    </div>
+    <div class="card-content">
+      <h3 class="card-title">${titulo || "Sem título"}</h3>
+      ${dataFormatada ? `<p class="card-date"><strong>Publicado:</strong> ${dataFormatada}</p>` : ""}
+      ${resumo ? `<p class="card-summary">${resumo}</p>` : ""}
+      <div class="card-actions">
+        <button type="button" class="card-button">${textoBotao}</button>
+      </div>
+    </div>
   `;
 
-  const botao = card.querySelector("button");
+  // Clique do botão
+  const botao = card.querySelector(".card-button");
   botao.addEventListener("click", () => {
     abrirNewsletterSite(id, classificacao);
   });
 
   return card;
 }
+
 
 // Formata data_publicacao (Timestamp ou string)
 function formatarData(valor) {

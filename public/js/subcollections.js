@@ -843,11 +843,12 @@ async function abrirModalEnvioManual(usuarioId, solicitacaoId, dadosSolicitacao)
           await solicitacoesRef.add({
             status: "atendida",
             data_envio: new Date(),
+            data_solicitacao: new Date(),
             resposta_utilizada: select.value,
             resposta_html_enviada: mensagemHtml,
             assunto: assunto,
             mensagem: mensagemHtml,
-            tipo: "envio_manual_admin"
+            tipo: " "
           });
         }
       }

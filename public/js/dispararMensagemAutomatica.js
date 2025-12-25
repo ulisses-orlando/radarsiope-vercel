@@ -23,7 +23,7 @@ async function dispararMensagemAutomatica(momento, usuario) {
       const mensagemHtml = aplicarPlaceholders(msg.mensagem_html, usuario);
 
       // 4. Chamar API enviarEmail.js
-      await fetch("https://radarsiope.com/api/enviarEmail", {
+      await fetch("/api/enviarEmail", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

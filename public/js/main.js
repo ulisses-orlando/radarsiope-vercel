@@ -315,6 +315,47 @@ async function abrirModalNewsletter(docId = null, isEdit = false) {
   col1.appendChild(generateTextField('edicao', data.edicao));
   col1.appendChild(generateTextField('titulo', data.titulo));
 
+  // Campo Resumo (textarea curto)
+  const resumoField = document.createElement('textarea');
+  resumoField.rows = 3;
+  resumoField.style.width = "100%";
+  resumoField.style.marginTop = "10px";
+  resumoField.dataset.fieldName = "resumo";
+  resumoField.placeholder = "Resumo curto (máx. 200 caracteres)";
+  resumoField.value = data.resumo || "";
+  col1.appendChild(resumoField);
+
+  // Campo de URL da imagem destacada
+  const imagemField = generateTextField(
+    'imagem_url',
+    data.imagem_url || '',
+    'URL da imagem destacada (para carrossel)'
+  );
+  col1.appendChild(imagemField);
+
+  // Pré-visualização da imagem
+  const previewImg = document.createElement('img');
+  previewImg.id = "preview-imagem-newsletter";
+  previewImg.src = data.imagem_url || '';
+  previewImg.style.maxWidth = "100%";
+  previewImg.style.marginTop = "10px";
+  previewImg.style.border = "1px solid #ccc";
+  previewImg.style.borderRadius = "4px";
+  previewImg.style.display = data.imagem_url ? "block" : "none";
+  col1.appendChild(previewImg);
+
+  // Atualiza preview quando o campo muda
+  imagemField.oninput = () => {
+    const url = imagemField.value.trim();
+    if (url) {
+      previewImg.src = url;
+      previewImg.style.display = "block";
+    } else {
+      previewImg.style.display = "none";
+    }
+  };
+
+
   const tiposSnap = await db.collection("tipo_newsletters").get();
   const tiposArr = tiposSnap.docs.map(doc => doc.data().nome).filter(Boolean);
   col1.appendChild(generateDomainSelect("tipo", tiposArr, data.tipo));
@@ -671,7 +712,6 @@ async function abrirModalNewsletter(docId = null, isEdit = false) {
     const inputData = document.getElementById("data_publicacao");
     // payload.data_publicacao = inputData?.value ? firebase.firestore.Timestamp.fromDate(new Date(inputData.value)) : null;
     payload.data_publicacao = dateStringToLocalTimestamp(inputData?.value);
-
 
     const ref = db.collection('newsletters');
     if (isEdit && docId) {
