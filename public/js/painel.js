@@ -1,7 +1,7 @@
 // Estado global de filtro
 let filtroStatusSolicitacoes = "todos";
 let solicitacaoEmEdicao = { usuarioId: null, solicitacaoId: null };
- 
+
 // 🔐 Validação de sessão baseada no localStorage
 document.addEventListener("DOMContentLoaded", () => {
   const usuario = JSON.parse(localStorage.getItem("usuarioLogado"));
@@ -211,63 +211,106 @@ function carregarPagamentos(usuarioId) {
 
 
 // 📚 Biblioteca Técnica
-function carregarBibliotecaTecnica(usuarioId, email) {
+async function carregarBibliotecaTecnica(usuarioId, email) {
   const container = document.getElementById("biblioteca-tecnica");
 
-  db.collection("usuarios")
-    .doc(usuarioId)
-    .collection("assinaturas")
-    .get()
-    .then(snapshot => {
-      const tipos = [];
-      snapshot.forEach(doc => {
-        const assinatura = doc.data();
-        if (assinatura.tipo_newsletter && assinatura.status === "ativa") {
-          tipos.push(assinatura.tipo_newsletter);
-        }
-      });
+  try {
+    // Busca assinaturas ativas do usuário
+    const assinaturasSnap = await db.collection("usuarios")
+      .doc(usuarioId)
+      .collection("assinaturas")
+      .get();
 
-      const tiposValidos = tipos.filter(t => t !== undefined && t !== null);
-
-      if (tiposValidos.length === 0) {
-        container.innerHTML = "<p>Você não possui acesso a newsletters no momento.</p>";
-        return;
+    const tipos = [];
+    assinaturasSnap.forEach(doc => {
+      const assinatura = doc.data();
+      if (assinatura.tipo_newsletter && assinatura.status === "ativo") {
+        tipos.push(assinatura.tipo_newsletter);
       }
-
-      db.collection("newsletters")
-        .where("tipo", "in", tiposValidos)
-        .orderBy("edicao", "desc")
-        .get()
-        .then(newsSnapshot => {
-          if (newsSnapshot.empty) {
-            container.innerHTML = "<p>Nenhuma newsletter encontrada.</p>";
-            return;
-          }
-
-          // Cria o grid
-          container.innerHTML = `<div class="lista-newsletters" id="lista-newsletters"></div>`;
-          const grid = document.getElementById("lista-newsletters");
-          grid.innerHTML = newsSnapshot.docs.map(doc => {
-            const n = doc.data();
-            return `
-              <div class="newsletter-card">
-                ${n.imagem_capa ? `<img src="${n.imagem_capa}" alt="Capa da newsletter" style="width:100%;border-radius:6px;margin-bottom:10px;">` : ""}
-                <h4>${n.titulo || "Newsletter"}</h4>
-                <p>Edição ${n.edicao || "-"} · ${n.tipo || ""}</p>
-                <div class="acoes">
-                  <button onclick="abrirNewsletter('${doc.id}')">Ver newsletter</button>
-                </div>
-              </div>
-            `;
-          }).join("");
-
-        });
-    })
-    .catch(error => {
-      console.error("Erro ao carregar biblioteca técnica:", error);
-      container.innerHTML = "<p>Erro ao carregar biblioteca técnica.</p>";
     });
+
+    const tiposValidos = tipos.filter(t => t);
+
+    // Se não houver assinaturas, ainda assim vamos mostrar as básicas
+    if (tiposValidos.length === 0) {
+      container.innerHTML = "<p>Você não possui newsletters premium no momento, mas pode acessar as básicas abaixo.</p>";
+    }
+
+    // Busca newsletters da assinatura (somente Premium)
+    let premiumNews = [];
+    if (tiposValidos.length > 0) {
+      const premiumSnap = await db.collection("newsletters")
+        .where("tipo", "in", tiposValidos)
+        .where("classificacao", "==", "Premium") // 🔑 garante que só premium entram
+        .orderBy("edicao", "desc")
+        .get();
+
+      premiumNews = premiumSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    }
+
+    // Busca newsletters básicas
+    const basicasSnap = await db.collection("newsletters")
+      .where("classificacao", "==", "Básica")
+      .orderBy("data_publicacao", "desc")
+      .get();
+
+    const basicasNews = basicasSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+    // Monta HTML
+    container.innerHTML = "";
+
+    if (premiumNews.length) {
+      container.innerHTML += `<div class="bloco"><h2>📚 Minhas Newsletters Premium</h2><div class="lista-newsletters">${premiumNews.map(criarCardNewsletter).join("")}</div></div>`;
+    }
+
+    if (basicasNews.length) {
+      container.innerHTML += `<div class="bloco"><h2>📖 Newsletters Básicas</h2><div class="lista-newsletters">${basicasNews.map(criarCardNewsletter).join("")}</div></div>`;
+    }
+
+    if (!premiumNews.length && !basicasNews.length) {
+      container.innerHTML = "<p>Nenhuma newsletter encontrada.</p>";
+    }
+
+  } catch (error) {
+    console.error("Erro ao carregar biblioteca técnica:", error);
+    container.innerHTML = "<p>Erro ao carregar biblioteca técnica.</p>";
+  }
 }
+
+// Função para criar card com novo visual
+function criarCardNewsletter(n) {
+  const dataFormatada = formatarData(n.data_publicacao);
+  const imgSrc = n.imagem_url || n.imagem_capa || "https://via.placeholder.com/400x225?text=Newsletter";
+  const resumo = n.resumo || "";
+
+  return `
+    <div class="newsletter-card">
+      <div class="card-thumb">
+        <img src="${imgSrc}" alt="Capa da newsletter">
+      </div>
+      <div class="card-content">
+        <h3 class="card-title">${n.titulo || "Newsletter"}</h3>
+        ${dataFormatada ? `<p class="card-date"><strong>Publicado:</strong> ${dataFormatada}</p>` : ""}
+        ${resumo ? `<p class="card-summary">${resumo}</p>` : ""}
+        <div class="card-actions">
+          <button onclick="abrirNewsletter('${n.id}')">Visualizar</button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+// Formata data_publicacao
+function formatarData(valor) {
+  if (!valor) return "";
+  if (typeof valor === "string") return valor;
+  if (valor.seconds) {
+    const dt = new Date(valor.seconds * 1000);
+    return dt.toLocaleDateString("pt-BR");
+  }
+  return "";
+}
+
 
 // 💬 Suporte
 document.getElementById("btn-enviar-suporte").addEventListener("click", () => {
