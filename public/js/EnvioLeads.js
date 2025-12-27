@@ -828,8 +828,6 @@ async function gerarPreviaEnvioUsuarios() {
     const corpo = document.querySelector("#tabela-preview-envio tbody");
     const cabecalho = document.querySelector("#tabela-preview-envio thead tr");
 
-    // Cabeçalho consistente
-    // Cabeçalho consistente com checkbox master
     cabecalho.innerHTML = `
         <th>
             <input type="checkbox" id="chk-master-preview"
@@ -844,22 +842,21 @@ async function gerarPreviaEnvioUsuarios() {
         <th>Interesses</th>
         <th class="col-pagamento">Em dia?</th>
         <th class="col-enviado">Newsletter enviada?</th>
-        `;
+    `;
 
     corpo.innerHTML = "<tr><td colspan='8'>Gerando prévia...</td></tr>";
 
-    // Coleta os usuários selecionados na tabela de usuários
     const selecionados = Array.from(document.querySelectorAll(".chk-usuario-envio:checked"))
         .map(chk => {
             const tr = chk.closest("tr");
             return {
-                usuarioId: tr.dataset.usuarioId,
-                assinaturaId: tr.dataset.assinaturaId,
+                id: tr.dataset.usuarioId || null,
+                assinaturaId: tr.dataset.assinaturaId || null,
                 nome: tr.children[1]?.innerText.trim() || "",
                 perfil: tr.dataset.perfil || tr.children[2]?.innerText.trim() || "",
                 email: tr.children[3]?.innerText.trim() || "",
                 emDia: tr.dataset.emDia === "true",
-                tipo: "usuarios"
+                tipo: "usuarios"   // 🔥 campo adicionado
             };
         });
 
@@ -868,7 +865,6 @@ async function gerarPreviaEnvioUsuarios() {
         aplicarFiltroPreviewEnvio();
         return;
     }
-
     // Verifica status de envio para cada usuário/assinatura em paralelo
     const enviadosMap = {};
     await Promise.all(selecionados.map(async (u) => {
@@ -968,34 +964,32 @@ async function gerarPreviaEnvioLeads() {
 
     let linhas = "";
 
-    // 🔑 Seleciona apenas os leads marcados
     const selecionados = Array.from(document.querySelectorAll(".chk-lead-envio:checked"))
         .map(chk => {
             const tr = chk.closest("tr");
             return {
-                leadId: tr.dataset.leadId,
-                nome: tr.children[1].innerText,
-                email: tr.children[2].innerText,
+                id: tr.dataset.leadId || null,
+                nome: tr.children[1].innerText || "",
+                email: tr.children[2].innerText || "",
                 interesses: tr.children[4].innerText.split(",").map(i => i.trim()).filter(i => i),
-                tipo: "leads"
+                tipo: "leads"   // 🔥 campo adicionado
             };
         });
 
-    // 🔑 Monta prévia apenas com os selecionados
     for (const lead of selecionados) {
         const compativel = verificarCompatibilidadeNewsletter(lead, newsletterSelecionada);
 
         linhas += `
-      <tr data-lead-id="${lead.leadId}" data-newsletter-id="${newsletterSelecionada.id}">
-        <td><input type="checkbox" class="chk-envio-final" checked /></td>
-        <td>${lead.nome}</td>
-        <td>${lead.email}</td>
-        <td>${newsletterSelecionada.titulo}</td>
-        <td>${lead.interesses.join(", ")}</td>
-        <td>${compativel ? "✅" : "❌"}</td>
-        <td>Não</td>
-      </tr>
-    `;
+          <tr data-lead-id="${lead.id}" data-newsletter-id="${newsletterSelecionada.id}" data-tipo="leads">
+            <td><input type="checkbox" class="chk-envio-final" checked /></td>
+            <td>${lead.nome}</td>
+            <td>${lead.email}</td>
+            <td>${newsletterSelecionada.titulo}</td>
+            <td>${lead.interesses.join(", ")}</td>
+            <td>${compativel ? "✅" : "❌"}</td>
+            <td>Não</td>
+          </tr>
+        `;
     }
 
     corpo.innerHTML = linhas || "<tr><td colspan='7'>Nenhum lead selecionado para prévia.</td></tr>";
@@ -1124,12 +1118,12 @@ async function confirmarPrevia(newsletterId, filtros) {
         .map(chk => chk.closest("tr"));
 
     const destinatarios = linhasSelecionadas.map(tr => {
-        const nome = tr.children[1].innerText;
-        const email = tr.children[3].innerText;
-        const tipo = tr.dataset.tipo;  // 🔥 usa o tipo salvo na prévia
+        const nome = tr.children[1]?.innerText || "";
+        const email = tr.children[3]?.innerText || "";
+        const tipo = tr.dataset.tipo;
 
         return {
-            id: tipo === "leads" ? tr.dataset.leadId : tr.dataset.usuarioId,
+            id: tipo === "leads" ? (tr.dataset.leadId || null) : (tr.dataset.usuarioId || null),
             nome,
             email,
             tipo,
@@ -1141,7 +1135,6 @@ async function confirmarPrevia(newsletterId, filtros) {
         mostrarMensagem("Nenhum destinatário selecionado para envio.");
         return;
     }
-
     // Criação da campanha
     const envioRef = db.collection("newsletters").doc(newsletterId).collection("envios").doc();
     const envioId = envioRef.id;
@@ -1154,8 +1147,8 @@ async function confirmarPrevia(newsletterId, filtros) {
         enviados: 0,
         erros: 0,
         abertos: 0,
-        //data_envio: firebase.firestore.Timestamp.now(),
-        tamanho_lote: destinatarios.length
+        tamanho_lote: destinatarios.length,
+        data_geracao: firebase.firestore.Timestamp.now()
     });
 
     // 🔎 Busca o último número de lote global
@@ -1182,7 +1175,8 @@ async function confirmarPrevia(newsletterId, filtros) {
             enviados: 0,
             erros: 0,
             abertos: 0,
-            destinatarios: chunk
+            destinatarios: chunk,
+            data_geracao: firebase.firestore.Timestamp.now()
         });
 
         // Cria o índice global em lotes_gerais
