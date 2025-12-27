@@ -915,7 +915,7 @@ async function gerarPreviaEnvioUsuarios() {
         tr.dataset.assinaturaId = u.assinaturaId;
         tr.dataset.newsletterId = newsletterSelecionada.id;
         tr.dataset.perfil = u.perfil || "";
-
+        tr.dataset.tipo = "usuarios";
         tr.dataset.statusEnvio = statusEnvio;
 
         tr.innerHTML = `
@@ -1133,7 +1133,7 @@ async function confirmarPrevia(newsletterId, filtros) {
             nome,
             email,
             tipo,
-            ...(tipo === "usuarios" && { assinaturaId: tr.dataset.assinaturaId })
+            assinaturaId: tipo === "usuarios" ? (tr.dataset.assinaturaId || null) : null
         };
     });
 
