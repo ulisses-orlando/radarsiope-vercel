@@ -828,7 +828,6 @@ async function gerarPreviaEnvioUsuarios() {
     const corpo = document.querySelector("#tabela-preview-envio tbody");
     const cabecalho = document.querySelector("#tabela-preview-envio thead tr");
 
-    // Cabeçalho consistente
     cabecalho.innerHTML = `
         <th>
             <input type="checkbox" id="chk-master-preview"
@@ -851,18 +850,20 @@ async function gerarPreviaEnvioUsuarios() {
     const selecionados = Array.from(document.querySelectorAll(".chk-usuario-envio:checked"))
         .map(chk => {
             const tr = chk.closest("tr");
+            // log rápido para depuração
+            console.log('dataset linha usuario (coleta):', tr.dataset);
+
             return {
-                id: tr.dataset.usuarioId ?? null,
+                usuarioId: tr.dataset.usuarioId ?? null,      // <-- padronizado para usuarioId
                 assinaturaId: tr.dataset.assinaturaId ?? null,
                 nome: tr.children[1]?.innerText.trim() || "",
                 perfil: tr.dataset.perfil || tr.children[2]?.innerText.trim() || "",
                 email: tr.children[3]?.innerText.trim() || "",
                 emDia: tr.dataset.emDia === "true",
-                tipo: "usuarios"   // 🔥 campo adicionado
+                tipo: "usuarios"
             };
         });
 
-    // 👉 Log para validar os dados antes de salvar
     console.log("Destinatários (Usuários) selecionados:", selecionados);
 
     if (selecionados.length === 0) {
@@ -870,13 +871,14 @@ async function gerarPreviaEnvioUsuarios() {
         aplicarFiltroPreviewEnvio();
         return;
     }
+
     // Verifica status de envio para cada usuário/assinatura em paralelo
     const enviadosMap = {};
     await Promise.all(selecionados.map(async (u) => {
         try {
             const snapEnvio = await db
                 .collection("usuarios")
-                .doc(u.usuarioId)
+                .doc(u.usuarioId)                          // usa usuarioId consistentemente
                 .collection("assinaturas")
                 .doc(u.assinaturaId)
                 .collection("envios")
@@ -902,8 +904,6 @@ async function gerarPreviaEnvioUsuarios() {
     const frag = document.createDocumentFragment();
 
     for (const u of selecionados) {
-
-
         const key = `${u.usuarioId}|${u.assinaturaId}`;
         const statusEnvio = enviadosMap[key];
         const enviada = statusEnvio === "enviado";
@@ -912,12 +912,12 @@ async function gerarPreviaEnvioUsuarios() {
         const statusTexto = enviada ? "Sim" : (erroEnvio ? "Erro ao enviar" : "Não");
 
         const tr = document.createElement("tr");
-        tr.dataset.usuarioId = u.usuarioId;
-        tr.dataset.assinaturaId = u.assinaturaId;
+        tr.dataset.usuarioId = u.usuarioId ?? "";          // grava valor correto no dataset
+        tr.dataset.assinaturaId = u.assinaturaId ?? "";
         tr.dataset.newsletterId = newsletterSelecionada.id;
         tr.dataset.perfil = u.perfil || "";
         tr.dataset.tipo = "usuarios";
-        tr.dataset.statusEnvio = statusEnvio;
+        tr.dataset.statusEnvio = statusEnvio || "nao-enviado";
 
         tr.innerHTML = `
             <td><input type="checkbox" class="chk-envio-final" ${precisaEnviar ? "checked" : ""} /></td>
@@ -956,7 +956,6 @@ async function gerarPreviaEnvioUsuarios() {
 
     mostrarAba("secao-preview-envio");
 }
-
 
 async function gerarPreviaEnvioLeads() {
     if (!newsletterSelecionada) {
