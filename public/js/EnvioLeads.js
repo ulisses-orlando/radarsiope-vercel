@@ -1077,38 +1077,6 @@ async function processarEmLotes(tarefas, limiteParalelo = 5, delayMs = 600) {
     return resultados;
 }
 
-/**
- * Função principal de envio de newsletters (todos os lotes gerados)
- * @param {string} newsletterId - ID da newsletter
- * @param {string} envioId - ID do envio atual
- */
-async function enviarNewsletters(newsletterId, envioId) {
-    try {
-        const lotesSnap = await db.collection("newsletters")
-            .doc(newsletterId)
-            .collection("envios")
-            .doc(envioId)
-            .collection("lotes")
-            .get();
-
-        if (lotesSnap.empty) {
-            mostrarMensagem("❌ Nenhum lote encontrado para envio.");
-            return;
-        }
-
-        for (const loteDoc of lotesSnap.docs) {
-            const loteId = loteDoc.id;
-            await enviarLoteIndividual(newsletterId, envioId, loteId);
-        }
-
-        mostrarMensagem("✅ Todos os lotes foram enviados com sucesso!");
-    } catch (err) {
-        console.error("Erro ao enviar newsletters:", err);
-        mostrarMensagem("❌ Erro ao enviar newsletters.");
-    }
-}
-
-
 function abrirAbaOrientacoes() {
     mostrarAba("secao-orientacoes");
 }
@@ -1301,6 +1269,7 @@ async function listarLotesEnvio(newsletterId, envioId) {
 
 async function enviarLoteIndividual(newsletterId, envioId, loteId) {
     try {
+        console.log('enviarLoteIndividual chamado', { newsletterId, envioId, loteId });
         const loteRef = db.collection("newsletters")
             .doc(newsletterId)
             .collection("envios")
