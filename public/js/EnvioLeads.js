@@ -25,7 +25,8 @@ async function listarLeadsComPreferencias() {
             email: lead.email || "",
             perfil: lead.perfil || "",
             interesses: Array.isArray(lead.interesses) ? lead.interesses : [],
-            status: lead.status || ""
+            status: lead.status || "",
+            tipo: "leads"
         });
 
         linhas += `
@@ -749,7 +750,8 @@ async function listarUsuariosComAssinaturas(newsletterId) {
             email: usuario.email || "",
             assinaturaId,
             assinatura_status: assinatura.status,
-            emDia
+            emDia,
+            tipo: "usuarios"
         });
 
         linhas += `
@@ -856,7 +858,8 @@ async function gerarPreviaEnvioUsuarios() {
                 nome: tr.children[1]?.innerText.trim() || "",
                 perfil: tr.dataset.perfil || tr.children[2]?.innerText.trim() || "",
                 email: tr.children[3]?.innerText.trim() || "",
-                emDia: tr.dataset.emDia === "true"
+                emDia: tr.dataset.emDia === "true",
+                tipo: "usuarios"
             };
         });
 
@@ -973,7 +976,8 @@ async function gerarPreviaEnvioLeads() {
                 leadId: tr.dataset.leadId,
                 nome: tr.children[1].innerText,
                 email: tr.children[2].innerText,
-                interesses: tr.children[4].innerText.split(",").map(i => i.trim()).filter(i => i)
+                interesses: tr.children[4].innerText.split(",").map(i => i.trim()).filter(i => i),
+                tipo: "leads"
             };
         });
 
@@ -1122,7 +1126,7 @@ async function confirmarPrevia(newsletterId, filtros) {
     const destinatarios = linhasSelecionadas.map(tr => {
         const nome = tr.children[1].innerText;
         const email = tr.children[3].innerText;
-        const tipo = tipoDestinatarioSelecionado;
+        const tipo = tr.dataset.tipo;  // 🔥 usa o tipo salvo na prévia
 
         return {
             id: tipo === "leads" ? tr.dataset.leadId : tr.dataset.usuarioId,
@@ -1334,7 +1338,11 @@ async function enviarLoteIndividual(newsletterId, envioId, loteId) {
         let enviados = 0;
 
         for (const dest of destinatarios) {
-            const tipo = dest.tipo || (dest.assinaturaId ? "usuarios" : "leads");
+            const tipo = dest.tipo;
+            if (!tipo) {
+                console.warn("Destinatário sem tipo definido:", dest);
+                continue; // evita misturar envios
+            }
 
             // 🔹 Identificador consistente para logs
             const emailDest = (dest.email || "").trim();
@@ -2031,33 +2039,37 @@ async function verDestinatariosLoteUnificado(loteId) {
 
         const dadosPromises = destinatarios.map(async d => {
             try {
-                if (d.tipo === "leads" || (!d.tipo && !d.assinaturaId)) {
-                    // 🔹 Leads: interesses vêm do array
+                if (d.tipo === "leads") {
+                    // 🔹 Leads: dados vêm da coleção "leads"
                     const leadDoc = await db.collection("leads").doc(d.id).get();
                     if (leadDoc.exists) {
                         const leadData = leadDoc.data();
                         return {
                             perfil: leadData.perfil || "-",
                             email: leadData.email || d.email || "-",
-                            tipo: "lead"
+                            tipo: "leads"
                         };
                     }
-                } else {
-                    // 🔹 Usuários: interesses vêm da subcoleção preferencias_newsletter
+                } else if (d.tipo === "usuarios") {
+                    // 🔹 Usuários: dados vêm da coleção "usuarios"
                     const usuarioDoc = await db.collection("usuarios").doc(d.id).get();
                     if (usuarioDoc.exists) {
                         const usuarioData = usuarioDoc.data();
                         return {
                             perfil: usuarioData.tipo_perfil || "-",
                             email: usuarioData.email || d.email || "-",
-                            tipo: "usuario"
+                            tipo: "usuarios"
                         };
                     }
+                } else {
+                    // 🔹 Caso inesperado
+                    console.warn("Destinatário com tipo desconhecido:", d);
+                    return { perfil: "-", email: d.email || "-", tipo: "desconhecido" };
                 }
             } catch (err) {
                 console.warn(`⚠️ Não foi possível obter dados para ${d.id}`, err);
+                return { perfil: "-", email: d.email || "-", tipo: "erro" };
             }
-            return { perfil: "-", email: d.email || "-", tipo: "desconhecido" };
         });
 
         const dados = await Promise.all(dadosPromises);
