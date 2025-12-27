@@ -828,6 +828,7 @@ async function gerarPreviaEnvioUsuarios() {
     const corpo = document.querySelector("#tabela-preview-envio tbody");
     const cabecalho = document.querySelector("#tabela-preview-envio thead tr");
 
+    // Cabeçalho consistente
     cabecalho.innerHTML = `
         <th>
             <input type="checkbox" id="chk-master-preview"
@@ -846,12 +847,13 @@ async function gerarPreviaEnvioUsuarios() {
 
     corpo.innerHTML = "<tr><td colspan='8'>Gerando prévia...</td></tr>";
 
+    // Coleta os usuários selecionados na tabela de usuários
     const selecionados = Array.from(document.querySelectorAll(".chk-usuario-envio:checked"))
         .map(chk => {
             const tr = chk.closest("tr");
             return {
-                id: tr.dataset.usuarioId || null,
-                assinaturaId: tr.dataset.assinaturaId || null,
+                id: tr.dataset.usuarioId ?? null,
+                assinaturaId: tr.dataset.assinaturaId ?? null,
                 nome: tr.children[1]?.innerText.trim() || "",
                 perfil: tr.dataset.perfil || tr.children[2]?.innerText.trim() || "",
                 email: tr.children[3]?.innerText.trim() || "",
@@ -859,6 +861,9 @@ async function gerarPreviaEnvioUsuarios() {
                 tipo: "usuarios"   // 🔥 campo adicionado
             };
         });
+
+    // 👉 Log para validar os dados antes de salvar
+    console.log("Destinatários (Usuários) selecionados:", selecionados);
 
     if (selecionados.length === 0) {
         corpo.innerHTML = "<tr><td colspan='8'>Nenhum usuário selecionado para prévia.</td></tr>";
@@ -964,23 +969,32 @@ async function gerarPreviaEnvioLeads() {
 
     let linhas = "";
 
+    // 🔑 Seleciona apenas os leads marcados
     const selecionados = Array.from(document.querySelectorAll(".chk-lead-envio:checked"))
         .map(chk => {
             const tr = chk.closest("tr");
             return {
-                id: tr.dataset.leadId || null,
-                nome: tr.children[1].innerText || "",
-                email: tr.children[2].innerText || "",
-                interesses: tr.children[4].innerText.split(",").map(i => i.trim()).filter(i => i),
+                id: tr.dataset.leadId ?? null,   // 🔥 garante que nunca seja undefined
+                nome: tr.children[1]?.innerText || "",
+                email: tr.children[2]?.innerText || "",
+                interesses: tr.children[4]?.innerText
+                    ? tr.children[4].innerText.split(",").map(i => i.trim()).filter(i => i)
+                    : [],
                 tipo: "leads"   // 🔥 campo adicionado
             };
         });
 
+    // 👉 Log para validar os dados antes de salvar
+    console.log("Destinatários (Leads) selecionados:", selecionados);
+
+    // 🔑 Monta prévia apenas com os selecionados
     for (const lead of selecionados) {
         const compativel = verificarCompatibilidadeNewsletter(lead, newsletterSelecionada);
 
         linhas += `
-          <tr data-lead-id="${lead.id}" data-newsletter-id="${newsletterSelecionada.id}" data-tipo="leads">
+          <tr data-lead-id="${lead.id}" 
+              data-newsletter-id="${newsletterSelecionada.id}" 
+              data-tipo="leads">
             <td><input type="checkbox" class="chk-envio-final" checked /></td>
             <td>${lead.nome}</td>
             <td>${lead.email}</td>
@@ -995,6 +1009,7 @@ async function gerarPreviaEnvioLeads() {
     corpo.innerHTML = linhas || "<tr><td colspan='7'>Nenhum lead selecionado para prévia.</td></tr>";
     mostrarAba("secao-preview-envio");
 }
+
 
 function voltarParaEnvio() {
 
@@ -1123,18 +1138,22 @@ async function confirmarPrevia(newsletterId, filtros) {
         const tipo = tr.dataset.tipo;
 
         return {
-            id: tipo === "leads" ? (tr.dataset.leadId || null) : (tr.dataset.usuarioId || null),
-            nome,
-            email,
+            id: tipo === "leads" ? (tr.dataset.leadId ?? null) : (tr.dataset.usuarioId ?? null),
+            nome: nome || "",
+            email: email || "",
             tipo,
-            assinaturaId: tipo === "usuarios" ? (tr.dataset.assinaturaId || null) : null
+            assinaturaId: tipo === "usuarios" ? (tr.dataset.assinaturaId ?? null) : null
         };
     });
+
+    // 👉 Log para validar os dados antes de salvar
+    console.log("Destinatários selecionados para lote:", destinatarios);
 
     if (destinatarios.length === 0) {
         mostrarMensagem("Nenhum destinatário selecionado para envio.");
         return;
     }
+
     // Criação da campanha
     const envioRef = db.collection("newsletters").doc(newsletterId).collection("envios").doc();
     const envioId = envioRef.id;
@@ -1204,6 +1223,7 @@ async function confirmarPrevia(newsletterId, filtros) {
 
     mostrarAba("secao-lotes-envio");
 }
+
 
 
 async function listarLotesEnvio(newsletterId, envioId) {
@@ -2034,7 +2054,7 @@ async function verDestinatariosLoteUnificado(loteId) {
         const dadosPromises = destinatarios.map(async d => {
             try {
                 if (d.tipo === "leads") {
-                    // 🔹 Leads: dados vêm da coleção "leads"
+                    // 🔹 Leads
                     const leadDoc = await db.collection("leads").doc(d.id).get();
                     if (leadDoc.exists) {
                         const leadData = leadDoc.data();
@@ -2045,7 +2065,7 @@ async function verDestinatariosLoteUnificado(loteId) {
                         };
                     }
                 } else if (d.tipo === "usuarios") {
-                    // 🔹 Usuários: dados vêm da coleção "usuarios"
+                    // 🔹 Usuários
                     const usuarioDoc = await db.collection("usuarios").doc(d.id).get();
                     if (usuarioDoc.exists) {
                         const usuarioData = usuarioDoc.data();
@@ -2071,18 +2091,15 @@ async function verDestinatariosLoteUnificado(loteId) {
         let linhas = "";
         destinatarios.forEach((d, i) => {
             const info = dados[i];
-            let statusColuna = "-";
-
             linhas += `
-                    <tr>
-                    <td>${d.nome || "-"}</td>
-                    <td>${info.perfil}</td>
-                    <td>${info.email}</td>
-                    <td>${d.enviado ? "Sim" : "Não"}</td>
-                    </tr>
-                `;
+                <tr>
+                  <td>${d.nome || "-"}</td>
+                  <td>${info.perfil}</td>
+                  <td>${info.email}</td>
+                  <td>${d.enviado ? "Sim" : "Não"}</td>
+                </tr>
+            `;
         });
-
 
         corpo.innerHTML = linhas;
         mostrarAba("secao-preview-envio");
