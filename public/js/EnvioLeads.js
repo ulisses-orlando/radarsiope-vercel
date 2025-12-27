@@ -1126,102 +1126,120 @@ function abrirAbaOrientacoes() {
 }
 
 async function confirmarPrevia(newsletterId, filtros) {
-    const tamanhoLote = parseInt(document.getElementById("tamanho-lote").value) || 100;
+    try {
+        const linhasSelecionadas = Array.from(document.querySelectorAll(".chk-envio-final:checked"))
+            .map(chk => chk.closest("tr"));
 
-    const linhasSelecionadas = Array.from(document.querySelectorAll(".chk-envio-final:checked"))
-        .map(chk => chk.closest("tr"));
+        if (linhasSelecionadas.length === 0) {
+            mostrarMensagem("Nenhum destinatário selecionado.");
+            return;
+        }
 
-    const destinatarios = linhasSelecionadas.map(tr => {
-        const nome = tr.children[1]?.innerText || "";
-        const email = tr.children[3]?.innerText || "";
-        const tipo = tr.dataset.tipo;
+        const destinatarios = linhasSelecionadas.map(tr => {
+            const tipo = tr.dataset.tipo || "";
+            let nome = "";
+            let email = "";
+            let perfil = tr.dataset.perfil ?? null;
+            let interesses = [];
 
-        return {
-            id: tipo === "leads" ? (tr.dataset.leadId ?? null) : (tr.dataset.usuarioId ?? null),
-            nome: nome || "",
-            email: email || "",
-            tipo,
-            assinaturaId: tipo === "usuarios" ? (tr.dataset.assinaturaId ?? null) : null
-        };
-    });
+            if (tipo === "leads") {
+                nome = (tr.children[1]?.innerText || "").trim();
+                email = (tr.children[2]?.innerText || "").trim();
+                if (tr.children[4]?.innerText) {
+                    interesses = tr.children[4].innerText.split(",").map(s => s.trim()).filter(Boolean);
+                }
+            } else if (tipo === "usuarios") {
+                nome = (tr.children[1]?.innerText || "").trim();
+                email = (tr.children[3]?.innerText || "").trim();
+                // pega valor bruto preferindo dataset.perfil, senão a célula; evita mistura de ?? e ||
+                let perfilRaw = tr.dataset.perfil ?? tr.children[2]?.innerText ?? null;
 
-    // 👉 Log para validar os dados antes de salvar
-    console.log("Destinatários selecionados para lote:", destinatarios);
+                // normaliza: trim e converte string vazia para null
+                perfil = perfilRaw ? perfilRaw.toString().trim() : null;
+            } else {
+                nome = (tr.children[1]?.innerText || "").trim();
+                email = (tr.children[2]?.innerText || "").trim();
+            }
 
-    if (destinatarios.length === 0) {
-        mostrarMensagem("Nenhum destinatário selecionado para envio.");
-        return;
-    }
-
-    // Criação da campanha
-    const envioRef = db.collection("newsletters").doc(newsletterId).collection("envios").doc();
-    const envioId = envioRef.id;
-
-    await envioRef.set({
-        status: "pendente",
-        tipo: filtros.tipo,
-        total_destinatarios: destinatarios.length,
-        total_lotes: Math.ceil(destinatarios.length / tamanhoLote),
-        enviados: 0,
-        erros: 0,
-        abertos: 0,
-        tamanho_lote: destinatarios.length,
-        data_geracao: firebase.firestore.Timestamp.now()
-    });
-
-    // 🔎 Busca o último número de lote global
-    const ultimoLoteSnap = await db.collection("lotes_gerais")
-        .orderBy("numero_lote", "desc")
-        .limit(1)
-        .get();
-
-    let ultimoNumeroGlobal = 0;
-    if (!ultimoLoteSnap.empty) {
-        ultimoNumeroGlobal = ultimoLoteSnap.docs[0].data().numero_lote || 0;
-    }
-
-    // Criação dos lotes sequenciais
-    let numero = ultimoNumeroGlobal + 1;
-    for (let i = 0; i < destinatarios.length; i += tamanhoLote) {
-        const chunk = destinatarios.slice(i, i + tamanhoLote);
-
-        // Cria o lote dentro do envio
-        const loteRef = await envioRef.collection("lotes").add({
-            numero_lote: numero,
-            status: "pendente",
-            quantidade: chunk.length,
-            enviados: 0,
-            erros: 0,
-            abertos: 0,
-            destinatarios: chunk,
-            data_geracao: firebase.firestore.Timestamp.now()
+            return {
+                id: tr.dataset.leadId ?? tr.dataset.usuarioId ?? tr.dataset.id ?? null,
+                leadId: tr.dataset.leadId ?? null,
+                usuarioId: tr.dataset.usuarioId ?? null,
+                nome,
+                email,
+                tipo,
+                assinaturaId: tr.dataset.assinaturaId ?? null,
+                perfil,
+                interesses
+            };
         });
 
-        // Cria o índice global em lotes_gerais
-        await db.collection("lotes_gerais").add({
-            newsletterId: newsletterSelecionada.id,
-            envioId: envioId,
-            loteId: loteRef.id,
-            titulo: newsletterSelecionada.titulo,
-            edicao: newsletterSelecionada.edicao || newsletterSelecionada.id,
-            data_geracao: firebase.firestore.Timestamp.now(),
-            numero_lote: numero,
-            tipo: filtros.tipo,
-            status: "pendente",
-            quantidade: chunk.length,
-            enviados: 0,
-            erros: 0,
-            abertos: 0
-        });
+        console.log("Destinatários coletados em confirmarPrevia:", destinatarios);
 
-        numero++;
+        const tamanhoLote = parseInt(document.getElementById("tamanho-lote")?.value || "100", 10);
+        const chunks = [];
+        for (let i = 0; i < destinatarios.length; i += tamanhoLote) {
+            chunks.push(destinatarios.slice(i, i + tamanhoLote));
+        }
+
+        // Verifique se 'db' está definido no escopo. Ajuste se você já tem um envio existente.
+        if (typeof db === "undefined") {
+            throw new Error("Variável 'db' não encontrada. Inicialize o Firestore antes de chamar confirmarPrevia.");
+        }
+
+        // Cria um novo documento de envio (ou ajuste para usar envioId existente)
+        const envioRef = db.collection("newsletters").doc(newsletterId).collection("envios").doc();
+        await envioRef.set({ criado_em: firebase?.firestore?.Timestamp?.now ? firebase.firestore.Timestamp.now() : new Date() });
+
+        let numero = 1;
+        for (const chunk of chunks) {
+            // detecta undefined
+            chunk.forEach((d, idx) => {
+                Object.keys(d).forEach(k => {
+                    if (d[k] === undefined) {
+                        console.warn(`Chunk item ${idx} campo undefined:`, k, d);
+                    }
+                });
+            });
+
+            const chunkSanitizado = chunk.map(d => {
+                const id = d.id ?? d.leadId ?? d.usuarioId ?? null;
+                return {
+                    id,
+                    leadId: d.leadId ?? null,
+                    usuarioId: d.usuarioId ?? null,
+                    nome: d.nome ?? "",
+                    email: d.email ?? "",
+                    tipo: d.tipo ?? "leads",
+                    assinaturaId: d.assinaturaId ?? null,
+                    perfil: d.perfil ?? null,
+                    interesses: Array.isArray(d.interesses) ? d.interesses : (d.interesses ?? []),
+                    statusEnvio: d.statusEnvio ?? null
+                };
+            });
+
+            console.log("Chunk sanitizado antes de gravar:", chunkSanitizado);
+
+            await envioRef.collection("lotes").add({
+                numero_lote: numero++,
+                status: "pendente",
+                quantidade: chunkSanitizado.length,
+                enviados: 0,
+                erros: 0,
+                abertos: 0,
+                destinatarios: chunkSanitizado,
+                data_geracao: firebase?.firestore?.Timestamp?.now ? firebase.firestore.Timestamp.now() : new Date()
+            });
+        }
+
+        mostrarMensagem("Lotes gerados com sucesso.");
+        mostrarAba("secao-lotes-envio");
+    } catch (err) {
+        console.error("Erro em confirmarPrevia:", err);
+        mostrarMensagem("Erro ao gerar lotes. Veja console para detalhes.");
     }
-
-    mostrarMensagem(`Campanha criada com ${destinatarios.length} destinatários em ${numero - ultimoNumeroGlobal - 1} novos lotes.`);
-    await listarLotesEnvio(newsletterId, envioId);
-
-    mostrarAba("secao-lotes-envio");
 }
+
 
 
 
