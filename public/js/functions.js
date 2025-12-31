@@ -374,3 +374,73 @@ async function inserirCamposUfMunicipio(container, ufPadrao = "", municipioPadra
     return { cod_uf, cod_municipio, nome_municipio };
   };
 }
+// parseia entrada numérica (aceita "1.234,56" ou "1234.56")
+function parseNumberInput(raw) {
+  if (raw === null || raw === undefined) return null;
+  const s = String(raw).trim();
+  if (s === '') return null;
+  // remove espaços, símbolos de moeda, mantém apenas dígitos e separador decimal
+  const cleaned = s.replace(/\s+/g, '').replace(/R\$\s?/, '').replace(/\./g, '').replace(',', '.');
+  const n = Number(cleaned);
+  return Number.isFinite(n) ? n : null;
+}
+
+// valida valor e qtde de parcelas
+function validateValorEParcelas({ valorRaw, parcelasRaw, minValor = 0, maxValor = 1000000, minParcelas = 1, maxParcelas = 120 }) {
+  const errors = {};
+  const valor = parseNumberInput(valorRaw);
+  const parcelas = parseNumberInput(parcelasRaw);
+
+  // VALIDA valor
+  if (valor === null) {
+    errors.valor = 'Valor inválido. Use apenas números.';
+  } else if (valor < minValor) {
+    errors.valor = `Valor deve ser maior ou igual a ${minValor}.`;
+  } else if (valor > maxValor) {
+    errors.valor = `Valor muito alto. Máx ${maxValor}.`;
+  } else {
+    // limitar a 2 casas decimais
+    const cents = Math.round(valor * 100);
+    if (Math.abs(cents / 100 - valor) > 0) {
+      errors.valor = 'Valor deve ter no máximo 2 casas decimais.';
+    }
+  }
+
+  // VALIDA parcelas (se preenchido)
+  if (parcelasRaw !== '' && parcelasRaw !== null && parcelasRaw !== undefined) {
+    if (parcelas === null) {
+      errors.qtde_parcelas = 'Parcelas inválidas. Use um número inteiro.';
+    } else if (!Number.isInteger(parcelas)) {
+      errors.qtde_parcelas = 'Parcelas devem ser número inteiro.';
+    } else if (parcelas < minParcelas || parcelas > maxParcelas) {
+      errors.qtde_parcelas = `Parcelas devem estar entre ${minParcelas} e ${maxParcelas}.`;
+    }
+  }
+
+  return { valid: Object.keys(errors).length === 0, errors, parsed: { valor, qtde_parcelas: parcelas } };
+}
+
+// mostra erros inline próximos aos campos (procura spans com id error-<campo>)
+function showFieldErrors(errors) {
+  Object.keys(errors).forEach(field => {
+    const span = document.getElementById(`error-${field}`);
+    if (span) {
+      span.textContent = errors[field];
+      span.style.display = 'block';
+    } else {
+      console.warn('Erro de validação (sem span):', field, errors[field]);
+    }
+  });
+}
+
+// limpa mensagens de erro
+function clearFieldErrors(fieldNames = []) {
+  if (!fieldNames.length) {
+    document.querySelectorAll('[id^="error-"]').forEach(s => { s.textContent = ''; s.style.display = 'none'; });
+    return;
+  }
+  fieldNames.forEach(name => {
+    const span = document.getElementById(`error-${name}`);
+    if (span) { span.textContent = ''; span.style.display = 'none'; }
+  });
+}

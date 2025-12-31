@@ -243,37 +243,6 @@ function confirmarExclusaoUsuario(id, nome) {
 }
 
 /* ======================
-   MODAL PLANOS
-   ====================== */
-async function abrirModalPlano(id, editar = false) {
-  const body = document.getElementById('modal-edit-body'); body.innerHTML = '';
-  document.getElementById('modal-edit-title').innerText = editar ? 'Editar Plano' : 'Novo Plano';
-  document.getElementById("modal-edit-save").style.display = "inline-block";
-
-  let dados = {};
-  if (editar) {
-    const doc = await db.collection('planos').doc(id).get();
-    dados = doc.data();
-  }
-
-  body.appendChild(generateTextField('nome', dados.nome));
-  body.appendChild(generateTextArea('descricao', dados.descricao));
-  body.appendChild(generateTextField('qtde_parcelas', dados.qtde_parcelas));
-  body.appendChild(generateDomainSelect('tipo', ['consultoria', 'assinatura', 'capacitação'], dados.tipo));
-  body.appendChild(generateTextField('valor', dados.valor));
-  body.appendChild(generateDomainSelect('status', ['ativo', 'inativo'], dados.status));
-
-  openModal('modal-edit-overlay');
-  document.getElementById('modal-edit-save').onclick = async () => {
-    const fields = body.querySelectorAll('[data-field-name]');
-    let data = {}; fields.forEach(f => data[f.dataset.fieldName] = f.value);
-    if (editar) await db.collection('planos').doc(id).update(data);
-    else await db.collection('planos').add(data);
-    closeModal('modal-edit-overlay'); carregarPlanos();
-  };
-}
-
-/* ======================
    MODAL NEWSLETTERS
    ====================== */
 async function abrirModalNewsletter(docId = null, isEdit = false) {
@@ -2372,12 +2341,6 @@ function filtrarUsuarios() {
   });
 }
 
-function filtrarPlanos() {
-  const filtro = document.getElementById('busca-planos').value.toLowerCase();
-  document.querySelectorAll('#lista-planos tr').forEach(tr => {
-    tr.style.display = tr.innerText.toLowerCase().includes(filtro) ? '' : 'none';
-  });
-}
 
 async function carregarTemas_noticias() {
   const snap = await db.collection("temas_noticias").orderBy("prioridade").get();
@@ -2489,39 +2452,6 @@ async function salvarTema(id) {
 
   fecharModalTema();
   carregarTemas_noticias();
-}
-
-
-/* ====================
-   CRUD PLANOS
-   ==================== */
-async function carregarPlanos() {
-  const tbody = document.getElementById('lista-planos'); tbody.innerHTML = '';
-  const snap = await db.collection('planos').get();
-  snap.forEach(doc => {
-    const d = doc.data();
-    const valorFmt = d.valor ? Number(d.valor).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : '';
-    const statusFmt = d.status || '--';
-    const tr = document.createElement('tr');
-    tr.innerHTML = `
-      <td>${d.nome || ''}</td>
-      <td>${d.descricao || ''}</td>
-      <td>${d.qtde_parcelas || ''}</td>
-      <td>${d.tipo || ''}</td>
-      <td>${valorFmt}</td>
-      <td>${statusFmt}</td>
-      <td>
-        <span class="icon-btn" title="Editar" onclick="abrirModalPlano('${doc.id}',true)">✏️</span>
-        <span class="icon-btn" title="Excluir" onclick="confirmarExclusaoPlano('${doc.id}','${(d.nome || '').replace(/'/g, "\\'")}')">🗑️</span>
-      </td>`;
-    tbody.appendChild(tr);
-  });
-}
-function confirmarExclusaoPlano(id, nome) {
-  abrirConfirmacao(`Deseja excluir o plano "${nome}"?`, async () => {
-    await db.collection('planos').doc(id).delete();
-    carregarPlanos();
-  });
 }
 
 function confirmarexcluirTema(id, nome) {
@@ -3504,6 +3434,25 @@ async function abrirModalTemplateNewsletter(docId = null, isEdit = false, dadosP
   ta.value = data.html_base || '';
   body.appendChild(ta);
 
+  const btnGerarHtml = document.createElement('button');
+  btnGerarHtml.type = 'button';
+  btnGerarHtml.innerText = '🛠️ Gerar HTML';
+  btnGerarHtml.style.marginLeft = '8px';
+  btnGerarHtml.onclick = () => {
+    try {
+      const campo = document.getElementById('campo-html-template');
+      if (!campo) return mostrarMensagem('Campo de HTML não encontrado.');
+      const convertido = converterTextoParaHtml(campo.value);
+      campo.value = convertido;
+      mostrarMensagem('HTML gerado e sanitizado.');
+    } catch (e) {
+      console.error('Erro ao gerar HTML:', e);
+      mostrarMensagem('Erro ao gerar HTML. Veja console.');
+    }
+  };
+  body.appendChild(btnGerarHtml);
+
+
   // 🔹 Seção NOVA: blocos de conteúdo
   const tituloBlocos = document.createElement('h4');
   tituloBlocos.innerText = "Blocos de conteúdo (opcional)";
@@ -3535,6 +3484,12 @@ async function abrirModalTemplateNewsletter(docId = null, isEdit = false, dadosP
   containerBlocos.style.maxHeight = "300px";
   containerBlocos.style.overflowY = "auto";
   body.appendChild(containerBlocos);
+
+  // inicializa drag & drop (garante que o listener seja registrado apenas uma vez)
+  if (typeof initBlocosDragAndDrop === 'function') {
+    initBlocosDragAndDrop();
+  }
+
 
   // Se já existirem blocos no template, renderiza
   if (Array.isArray(data.blocos) && data.blocos.length > 0) {
@@ -3635,41 +3590,73 @@ async function abrirModalTemplateNewsletter(docId = null, isEdit = false, dadosP
 
   // Botão de salvar
   document.getElementById('modal-edit-save').onclick = async () => {
-    const payload = {};
-    body.querySelectorAll('[data-field-name]').forEach(el => {
-      payload[el.dataset.fieldName] = el.type === 'checkbox' ? el.checked : el.value;
-    });
+    try {
+      // coleta campos do modal (ignora explicitamente 'versoes' se existir)
+      const payload = {};
+      const body = document.getElementById('modal-edit-body');
 
-    // 🔹 Coleta blocos (nova parte)
-    payload.blocos = coletarBlocosNewsletter();
+      body.querySelectorAll('[data-field-name]').forEach(el => {
+        const name = el.dataset.fieldName;
+        if (name === 'versoes') return; // NÃO incluir versoes no payload
+        payload[name] = el.type === 'checkbox' ? el.checked : el.value;
+      });
 
-    if (!isEdit || !data.criado_em) {
-      payload.criado_em = new Date();
+      // coleta blocos já normalizados
+      const blocosBrutos = coletarBlocosNewsletter() || [];
+
+      // sanitiza html_base
+      payload.html_base = sanitizeHtml(payload.html_base || "");
+
+      // valida placeholders no html_base
+      if (!validarPlaceholders(payload.html_base)) return;
+
+      const placeholdersPermitidos = null;
+      if (!validarPlaceholdersNoTemplate(payload.html_base, placeholdersPermitidos)) return;
+
+      // normaliza e sanitiza blocos
+      payload.blocos = blocosBrutos.map((b, i) => {
+        const id = b.id || generateUUID();
+        const ordem = Number.isFinite(b.ordem) ? b.ordem : i;
+        const titulo = (b.titulo || "").toString().trim();
+        const acesso = ['todos', 'leads', 'assinantes'].includes(b.acesso) ? b.acesso : 'todos';
+        const htmlSanitizado = sanitizeHtml(b.html || "");
+
+        if (!validarPlaceholders(htmlSanitizado)) {
+          throw new Error(`Placeholders inválidos no bloco "${titulo || id}"`);
+        }
+        if (!validarPlaceholdersNoTemplate(htmlSanitizado, placeholdersPermitidos)) {
+          throw new Error(`Placeholders não permitidos no bloco "${titulo || id}"`);
+        }
+
+        return { id, ordem, titulo, acesso, html: htmlSanitizado };
+      });
+
+      // metadados
+      const agora = firebase && firebase.firestore && firebase.firestore.Timestamp
+        ? firebase.firestore.Timestamp.now()
+        : new Date();
+
+      if (!payload.criado_em) payload.criado_em = agora;
+      payload.atualizado_em = agora;
+
+      const usuarioLogado = JSON.parse(localStorage.getItem("usuarioLogado") || "null");
+      if (usuarioLogado?.email) payload.atualizado_por = usuarioLogado.email;
+
+      const ref = db.collection('templates_newsletter');
+      if (isEdit && docId) {
+        await ref.doc(docId).set(payload, { merge: true });
+      } else {
+        await ref.add(payload);
+      }
+
+      mostrarMensagem('✅ Template salvo com sucesso.');
+      closeModal('modal-edit-overlay');
+      carregarTemplatesNewsletter();
+    } catch (err) {
+      console.error('Erro ao salvar template:', err);
+      mostrarMensagem('❌ Erro ao salvar template. Veja console para detalhes.');
     }
-
-    const htmlTemplate = payload['html_base'] || "";
-    const blocos = payload.blocos || [];
-
-    // ✅ Validação correta para TEMPLATE
-    if (!validarTemplate(htmlTemplate, blocos)) {
-      return;
-    }
-
-    if (!validarPlaceholders(htmlTemplate)) {
-      // interrompe o processo se houver placeholders inválidos
-      return;
-    }
-
-    if (isEdit && docId) {
-      await db.collection('templates_newsletter').doc(docId).set(payload, { merge: true });
-    } else {
-      await db.collection('templates_newsletter').add(payload);
-    }
-
-    closeModal('modal-edit-overlay');
-    carregarTemplatesNewsletter();
   };
-
   openModal('modal-edit-overlay');
 }
 
@@ -3722,7 +3709,7 @@ function previewSegmentado(tipo) {
   openModal('modal-html-preview');
 }
 
-
+/*
 function adicionarBlocoNewsletter(bloco = {}, index = null) {
   const container = document.getElementById("container-blocos-newsletter");
   if (!container) return;
@@ -3788,7 +3775,7 @@ function adicionarBlocoNewsletter(bloco = {}, index = null) {
 
   container.appendChild(wrapper);
 }
-
+*/
 function coletarBlocosNewsletter() {
   const container = document.getElementById("container-blocos-newsletter");
   if (!container) return [];
@@ -3896,7 +3883,76 @@ function generateCheckboxField(fieldName, label = '', checked = false) {
   return wrapper;
 }
 
+/* ======================
+   MODAL PLANOS
+   ====================== 
 
+async function carregarPlanos() {
+  const tbody = document.getElementById('lista-planos'); tbody.innerHTML = '';
+  const snap = await db.collection('planos').get();
+  snap.forEach(doc => {
+    const d = doc.data();
+    const valorFmt = d.valor ? Number(d.valor).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : '';
+    const statusFmt = d.status || '--';
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${d.nome || ''}</td>
+      <td>${d.descricao || ''}</td>
+      <td>${d.qtde_parcelas || ''}</td>
+      <td>${d.tipo || ''}</td>
+      <td>${valorFmt}</td>
+      <td>${statusFmt}</td>
+      <td>
+        <span class="icon-btn" title="Editar" onclick="abrirModalPlano('${doc.id}',true)">✏️</span>
+        <span class="icon-btn" title="Excluir" onclick="confirmarExclusaoPlano('${doc.id}','${(d.nome || '').replace(/'/g, "\\'")}')">🗑️</span>
+      </td>`;
+    tbody.appendChild(tr);
+  });
+}
+
+function confirmarExclusaoPlano(id, nome) {
+  abrirConfirmacao(`Deseja excluir o plano "${nome}"?`, async () => {
+    await db.collection('planos').doc(id).delete();
+    carregarPlanos();
+  });
+} 
+
+
+async function abrirModalPlano(id, editar = false) {
+  const body = document.getElementById('modal-edit-body'); body.innerHTML = '';
+  document.getElementById('modal-edit-title').innerText = editar ? 'Editar Plano' : 'Novo Plano';
+  document.getElementById("modal-edit-save").style.display = "inline-block";
+
+  let dados = {};
+  if (editar) {
+    const doc = await db.collection('planos').doc(id).get();
+    dados = doc.data();
+  }
+
+  body.appendChild(generateTextField('nome', dados.nome));
+  body.appendChild(generateTextArea('descricao', dados.descricao));
+  body.appendChild(generateTextField('qtde_parcelas', dados.qtde_parcelas));
+  body.appendChild(generateDomainSelect('tipo', ['consultoria', 'assinatura', 'capacitação'], dados.tipo));
+  body.appendChild(generateTextField('valor', dados.valor));
+  body.appendChild(generateDomainSelect('status', ['ativo', 'inativo'], dados.status));
+
+  openModal('modal-edit-overlay');
+  document.getElementById('modal-edit-save').onclick = async () => {
+    const fields = body.querySelectorAll('[data-field-name]');
+    let data = {}; fields.forEach(f => data[f.dataset.fieldName] = f.value);
+    if (editar) await db.collection('planos').doc(id).update(data);
+    else await db.collection('planos').add(data);
+    closeModal('modal-edit-overlay'); carregarPlanos();
+  };
+}
+
+function filtrarPlanos() {
+  const filtro = document.getElementById('busca-planos').value.toLowerCase();
+  document.querySelectorAll('#lista-planos tr').forEach(tr => {
+    tr.style.display = tr.innerText.toLowerCase().includes(filtro) ? '' : 'none';
+  });
+} 
+ */
 /* ======================
    EXPORTAR GLOBAL
    ====================== */

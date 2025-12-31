@@ -105,56 +105,160 @@ function formatarValor(valor) {
 
 
 // 📄 Minhas Assinaturas
-function carregarAssinaturas(usuarioId) {
+async function carregarAssinaturas(usuarioId) {
   const container = document.getElementById("minhas-assinaturas");
+  if (!container) return;
 
-  db.collection("usuarios")
-    .doc(usuarioId)
-    .collection("assinaturas")
-    .get()
-    .then(snapshot => {
-      if (snapshot.empty) {
-        container.innerHTML = "<p>Você não possui assinaturas registradas.</p>";
-        return;
+  try {
+    const assinaturasSnap = await db
+      .collection("usuarios")
+      .doc(usuarioId)
+      .collection("assinaturas")
+      .get();
+
+    if (assinaturasSnap.empty) {
+      container.innerHTML = "<p>Você não possui assinaturas registradas.</p>";
+      return;
+    }
+
+    // coletar ids únicos de planos
+    const planoIdsSet = new Set();
+    assinaturasSnap.forEach(doc => {
+      const a = doc.data();
+      if (a && a.plano_id) planoIdsSet.add(String(a.plano_id));
+    });
+    const planoIds = Array.from(planoIdsSet);
+
+    // buscar documentos de planos (paralelo)
+    const planosMap = {};
+    if (planoIds.length) {
+      const planosPromises = planoIds.map(id =>
+        db.collection("planos").doc(id).get().then(d => ({ id, doc: d }))
+      );
+      const planosResults = await Promise.all(planosPromises);
+      planosResults.forEach(({ id, doc }) => {
+        planosMap[id] = (doc && doc.exists) ? doc.data() : null;
+      });
+    }
+
+    // função utilitária para formatar badge de envio
+    const badgeForEnvio = (env) => {
+      const data = env.data_envio ? (env.data_envio.toDate ? env.data_envio.toDate() : new Date(env.data_envio)) : null;
+      const dataLabel = data ? formatarData(data) : '-';
+      const title = data ? data.toLocaleString() : '';
+      const status = (env.status || '').toLowerCase();
+
+      let bg = '#f0f0f0';
+      let color = '#333';
+      if (status === 'enviado' || status === 'entregue') { bg = '#e6ffed'; color = '#1b7a3a'; }
+      else if (status === 'falha' || status === 'erro') { bg = '#ffecec'; color = '#b02a37'; }
+      else if (status === 'pendente') { bg = '#fff7e6'; color = '#8a5a00'; }
+      else if (status === 'processando') { bg = '#eef6ff'; color = '#0b5ed7'; }
+
+      // badge compacto: mostra data curta e um ponto/color para status
+      return `<span class="envio-badge" title="${title}" style="
+                display:inline-block;
+                padding:4px 6px;
+                margin:3px 6px 3px 0;
+                font-size:12px;
+                border-radius:6px;
+                background:${bg};
+                color:${color};
+                border:1px solid rgba(0,0,0,0.06);
+                white-space:nowrap;
+                ">
+                ${dataLabel}
+              </span>`;
+    };
+
+    // montar HTML das assinaturas com envios
+    let html = '';
+
+    // Para performance: buscar envios em paralelo por assinatura (limit)
+    const assinaturasDocs = assinaturasSnap.docs;
+    const enviosPromises = assinaturasDocs.map(doc =>
+      db.collection('usuarios').doc(usuarioId)
+        .collection('assinaturas').doc(doc.id)
+        .collection('envios')
+        .orderBy('data_envio', 'desc') // pega os mais recentes
+        .limit(200) // limite razoável; ajuste conforme necessidade
+        .get()
+        .then(s => ({ assinaturaId: doc.id, snap: s, data: doc.data() }))
+    );
+
+    const enviosResults = await Promise.all(enviosPromises);
+
+    // transformar em mapa por assinaturaId para fácil acesso
+    const enviosMap = {};
+    enviosResults.forEach(r => {
+      // r.snap.docs está em ordem desc (mais recente primeiro) — inverter para ordem cronológica (antigo -> novo)
+      const docs = r.snap.docs.slice().reverse();
+      enviosMap[r.assinaturaId] = docs.map(d => d.data());
+    });
+
+    assinaturasDocs.forEach(doc => {
+      const a = doc.data();
+      const status = (a.status || '').toLowerCase();
+      let cor = "#999";
+      let icone = "❔";
+
+      if (status === "ativo") {
+        cor = "#28a745";
+        icone = "✅";
+      } else if (status === "cancelado") {
+        cor = "#dc3545";
+        icone = "❌";
+      } else if (status === "pendente") {
+        cor = "#ffc107";
+        icone = "⏳";
+      } else if (status === "cancelamento_solicitado") {
+        cor = "#17a2b8";
+        icone = "📤";
       }
 
-      let html = "";
-      snapshot.forEach(doc => {
-        const a = doc.data();
-        const status = a.status.toLowerCase();
-        let cor = "#999";
-        let icone = "❔";
+      const planoId = a.plano_id ? String(a.plano_id) : "";
+      const plano = planoId ? planosMap[planoId] : null;
+      const descricaoPlano = plano && plano.descricao ? plano.descricao : (planoId ? `Plano ${planoId}` : "Plano não informado");
 
-        if (status === "ativo") {
-          cor = "#28a745";
-          icone = "✅";
-        } else if (status === "cancelado") {
-          cor = "#dc3545";
-          icone = "❌";
-        } else if (status === "pendente") {
-          cor = "#ffc107";
-          icone = "⏳";
-        } else if (status === "cancelamento_solicitado") {
-          cor = "#17a2b8";
-          icone = "📤";
-        }
+      // envios para esta assinatura (pode ser vazio)
+      const envios = enviosMap[doc.id] || [];
 
-        html += `
-          <div class="assinatura" style="border-left: 6px solid ${cor}; padding-left: 10px; margin-bottom: 15px;">
-            <strong>${a.tipo_newsletter}</strong> — Plano ${a.plano_id}<br>
-            Início: ${formatarData(a.data_inicio)} — Status: <span style="color:${cor}; font-weight:bold;">${icone} ${a.status}</span><br>
-            ${status === "ativo" ? `<button onclick="solicitarCancelamento('${usuarioId}', '${doc.id}')">Solicitar cancelamento</button>` : ""}
+      // montar blocos de envios compactos (vários por linha)
+      const enviosHtml = envios.length
+        ? `<div class="envios-lista" style="margin-top:8px; display:flex; flex-wrap:wrap; align-items:center;">
+             ${envios.map(e => badgeForEnvio(e)).join('')}
+           </div>
+           <div style="font-size:12px;color:#666;margin-top:6px;">Total de envios: ${envios.length}</div>`
+        : `<div style="font-size:12px;color:#666;margin-top:8px;">Nenhum envio registrado.</div>`;
+
+      html += `
+        <div class="assinatura" style="border-left: 6px solid ${cor}; padding:10px 10px 12px 10px; margin-bottom: 15px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;">
+            <div style="flex:1">
+              <strong style="display:block">${a.tipo_newsletter || ''}</strong>
+              <div style="font-style:italic;color:#333;margin-top:4px;">${descricaoPlano}</div>
+              <div style="font-size:13px;color:#666;margin-top:6px;">
+                Vigência: ${formatarData(a.data_inicio)} a ${formatarData(a.data_fim)}
+              </div>
+            </div>
+            <div style="text-align:right;min-width:120px;">
+              <div style="color:${cor};font-weight:700;">${icone} ${a.status || ''}</div>
+            </div>
           </div>
-        `;
-      });
 
-      container.innerHTML = html;
-    })
-    .catch(error => {
-      console.error("Erro ao carregar assinaturas:", error);
-      container.innerHTML = "<p>Erro ao carregar suas assinaturas.</p>";
+          ${enviosHtml}
+        </div>
+      `;
     });
+
+    // estilos adicionais (apenas se quiser garantir aparência)
+    container.innerHTML = html;
+  } catch (error) {
+    console.error("Erro ao carregar assinaturas:", error);
+    container.innerHTML = "<p>Erro ao carregar suas assinaturas.</p>";
+  }
 }
+
 
 
 // 💳 Pagamentos
@@ -278,17 +382,17 @@ async function carregarBibliotecaTecnica(usuarioId, email) {
 }
 
 // Função para criar card com novo visual
+// Função para criar card com novo visual (substituir a existente)
 function criarCardNewsletter(n) {
   const dataFormatada = formatarData(n.data_publicacao);
   const imgSrc = n.imagem_url || n.imagem_capa || "https://via.placeholder.com/400x225?text=Newsletter";
   const resumo = n.resumo || "";
 
   return `
-    <div class="newsletter-card">
-      <div class="card-thumb">
-        <img src="${imgSrc}" alt="Capa da newsletter">
-      </div>
-      <div class="card-content">
+    <article class="newsletter-card" data-id="${n.id}">
+      <!-- imagem com classe 'thumb' para o CSS aplicar restrições -->
+      <img class="thumb" src="${imgSrc}" alt="Capa da newsletter ${(n.titulo || '')}" />
+      <div class="conteudo">
         <h3 class="card-title">${n.titulo || "Newsletter"}</h3>
         ${dataFormatada ? `<p class="card-date"><strong>Publicado:</strong> ${dataFormatada}</p>` : ""}
         ${resumo ? `<p class="card-summary">${resumo}</p>` : ""}
@@ -296,9 +400,10 @@ function criarCardNewsletter(n) {
           <button onclick="abrirNewsletter('${n.id}')">Visualizar</button>
         </div>
       </div>
-    </div>
+    </article>
   `;
 }
+
 
 // Formata data_publicacao
 function formatarData(valor) {
@@ -497,26 +602,6 @@ function cancelarSolicitacao(usuarioId, solicitacaoId) {
     .catch(error => {
       console.error("Erro ao cancelar solicitação:", error);
       mostrarMensagem("Erro ao cancelar a solicitação.");
-    });
-}
-
-
-// 🚫 Cancelamento de assinatura
-function solicitarCancelamento(usuarioId, assinaturaId) {
-  if (!confirm("Deseja realmente solicitar o cancelamento desta assinatura?")) return;
-
-  db.collection("usuarios")
-    .doc(usuarioId)
-    .collection("assinaturas")
-    .doc(assinaturaId)
-    .update({ status: "cancelamento_solicitado" })
-    .then(() => {
-      mostrarMensagem("Cancelamento solicitado com sucesso.");
-      carregarAssinaturas(usuarioId);
-    })
-    .catch(error => {
-      console.error("Erro ao solicitar cancelamento:", error);
-      mostrarMensagem("Erro ao solicitar cancelamento.");
     });
 }
 
