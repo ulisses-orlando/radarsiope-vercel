@@ -2,385 +2,720 @@
 <html lang="pt-BR">
 
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>RadarSiope - Painel do Assinante</title>
-  <link rel="stylesheet" href="style.css" />
 
   <style>
+    :root {
+      --bg: #f6f7fb;
+      --card: #ffffff;
+      --muted: #6b7280;
+      --accent: #007acc;
+      --accent-600: #005f99;
+      --danger: #d9534f;
+      --radius: 10px;
+      --gap: 16px;
+      font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+    }
+
+    * {
+      box-sizing: border-box
+    }
+
+    html,
+    body {
+      height: 100%
+    }
+
     body {
       margin: 0;
-      font-family: sans-serif;
-      background: #f4f4f4;
+      background: var(--bg);
+      color: #111827;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      line-height: 1.45;
+      font-size: 15px;
     }
 
     header {
-      background: #007acc;
-      color: white;
-      padding: 16px;
+      background: linear-gradient(90deg, var(--accent), #0a84d6);
+      color: #fff;
+      padding: 14px 20px;
       display: flex;
-      justify-content: space-between;
       align-items: center;
+      justify-content: space-between;
+      gap: 12px;
     }
 
     header h1 {
       margin: 0;
-      font-size: 1.4em;
-    }
-
-    .painel {
+      font-size: 1.15rem;
       display: flex;
-      min-height: 100vh;
+      align-items: center;
+      gap: 10px
     }
 
+    #usuario-info {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 6px
+    }
+
+    #nome-usuario {
+      font-weight: 600
+    }
+
+    .container {
+      display: flex;
+      min-height: calc(100vh - 64px);
+    }
+
+    /* NAV */
     nav {
-      width: 220px;
-      background: #fff;
-      border-right: 1px solid #ccc;
+      width: 260px;
+      background: var(--card);
+      border-right: 1px solid rgba(15, 23, 42, 0.04);
       padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
     }
 
-    nav ul {
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 6px;
+    }
+
+    .menu {
       list-style: none;
       padding: 0;
       margin: 0;
-    }
-
-    nav li {
-      margin-bottom: 12px;
-    }
-
-    nav a {
-      text-decoration: none;
-      color: #2c3e50;
-      font-weight: bold;
-    }
-
-    main {
-      flex: 1;
-      padding: 30px;
-    }
-
-    .bloco {
-      background: #fff;
-      padding: 20px;
-      border-radius: 8px;
-      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
-      margin-bottom: 20px;
-    }
-
-    .bloco h2 {
-      margin-top: 0;
-      color: #007acc;
-    }
-
-    .notificacao {
-      margin-top: 8px;
-      padding: 10px;
-      background: #eaf6ff;
-      border-left: 4px solid #007acc;
-      border-radius: 4px;
-    }
-
-    #btn-logout {
-      margin-top: 5px;
-      padding: 6px 12px;
-      background-color: #d9534f;
-      color: white;
-      border: none;
-      border-radius: 4px;
-      cursor: pointer;
-    }
-
-    #btn-logout:hover {
-      background-color: #c9302c;
-    }
-
-    textarea {
-      width: 100%;
-      height: 80px;
-      margin-top: 10px;
-      padding: 10px;
-      border-radius: 4px;
-      border: 1px solid #ccc;
-      resize: vertical;
-    }
-
-    button {
-      margin-top: 10px;
-      padding: 8px 16px;
-      background-color: #007acc;
-      color: white;
-      border: none;
-      border-radius: 4px;
-      cursor: pointer;
-    }
-
-    button:hover {
-      background-color: #005f99;
-    }
-
-    .modal-overlay {
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      background: rgba(0, 0, 0, 0.5);
-      display: none;
-      /* inicia oculta */
-      align-items: center;
-      justify-content: center;
-      z-index: 999;
-    }
-
-    .modal-content {
-      background: #fff;
-      padding: 20px;
-      border-radius: 8px;
-      width: 90%;
-      max-width: 500px;
-      box-shadow: 0 0 10px rgba(0, 0, 0, 0.3);
-    }
-
-    .grid-solicitacoes {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-      gap: 20px;
-    }
-
-    .coluna-solicitacoes {
-      background: #f9f9f9;
-      padding: 10px;
-      border-radius: 6px;
-    }
-
-    .coluna-solicitacoes h4 {
-      margin-top: 0;
-      text-align: center;
-      font-size: 16px;
-      color: #333;
-    }
-
-    .item-solicitacao {
-      border-left: 6px solid #ccc;
-      padding-left: 10px;
-      margin-bottom: 15px;
-      background: #fff;
-      border-radius: 4px;
-      box-shadow: 0 0 4px rgba(0, 0, 0, 0.05);
-    }
-
-    .lista-newsletters {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-      gap: 16px;
-    }
-
-    .newsletter-card {
-      background: #fff;
-      border: 1px solid #e5e7eb;
-      border-radius: 8px;
-      padding: 12px;
-      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
-    }
-
-    .newsletter-card h4 {
-      margin: 0 0 6px;
-      font-size: 16px;
-      line-height: 1.3;
-      color: #111827;
-    }
-
-    .newsletter-card p {
-      margin: 0 0 10px;
-      font-size: 13px;
-      color: #6b7280;
-    }
-
-    .newsletter-card .acoes {
       display: flex;
+      flex-direction: column;
       gap: 8px;
     }
 
-    .newsletter-card button {
-      padding: 8px 10px;
-      font-size: 13px;
-      border: 1px solid #d1d5db;
-      border-radius: 6px;
-      background: #f9fafb;
-      cursor: pointer;
-    }
-
-    .newsletter-card button:hover {
-      background: #eef2ff;
-      border-color: #c7d2fe;
-    }
-
-    .newsletter-card img {
-      display: block;
-      max-width: 100%;
-      height: auto;
-      border-radius: 6px;
-    }
-
-    .newsletter-card .acoes {
-      margin-top: 10px;
-      text-align: center;
-    }
-
-    .newsletter-card button {
-      padding: 8px 14px;
-      font-size: 14px;
+    .menu button {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      width: 100%;
+      text-align: left;
+      padding: 10px 12px;
+      border-radius: 8px;
       border: none;
-      border-radius: 6px;
-      background: #007acc;
+      background: transparent;
+      cursor: pointer;
+      color: #0f172a;
+      font-weight: 600;
+      transition: background .12s, color .12s;
+    }
+
+    .menu button:hover {
+      background: rgba(2, 6, 23, 0.04)
+    }
+
+    .menu button[aria-current="true"] {
+      background: linear-gradient(90deg, rgba(0, 122, 204, 0.12), rgba(2, 6, 23, 0.02));
+      color: var(--accent);
+      box-shadow: 0 1px 0 rgba(2, 6, 23, 0.03) inset;
+    }
+
+    /* Mobile menu toggle */
+    .nav-footer {
+      margin-top: auto;
+      display: flex;
+      gap: 8px;
+      align-items: center
+    }
+
+    .btn-logout {
+      padding: 8px 12px;
+      border-radius: 8px;
+      border: none;
+      background: var(--danger);
       color: #fff;
       cursor: pointer;
     }
 
-    .newsletter-card button:hover {
-      background: #005f99;
+    /* MAIN */
+    main {
+      flex: 1;
+      padding: 28px;
+      min-height: 100%;
     }
 
-    .btn-expandir {
-      background: none;
-      border: none;
-      color: #007acc;
-      font-size: 12px;
-      cursor: pointer;
+    .section {
+      display: none;
+      background: var(--card);
+      padding: 20px;
+      border-radius: var(--radius);
+      box-shadow: 0 6px 18px rgba(15, 23, 42, 0.06);
+    }
+
+    .section.active {
+      display: block
+    }
+
+    .section h2 {
+      margin-top: 0;
+      color: var(--accent);
+      font-size: 1.05rem
+    }
+
+    /* Grid utilities */
+    .grid-solicitacoes {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 12px;
+      margin-top: 12px;
+    }
+
+    .card {
+      background: #fff;
+      padding: 12px;
+      border-radius: 8px;
+      border: 1px solid rgba(15, 23, 42, 0.04);
+      box-shadow: 0 1px 4px rgba(2, 6, 23, 0.03);
+    }
+
+    /* Newsletter cards: image on top, info below */
+    .lista-newsletters {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 14px;
+    }
+
+    .newsletter-card {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
       padding: 0;
-      text-decoration: underline;
+      border-radius: 8px;
+      background: #fff;
+      border: 1px solid rgba(15, 23, 42, 0.04);
+      overflow: hidden;
+      box-shadow: 0 1px 6px rgba(2, 6, 23, 0.04);
+      min-height: 0;
     }
 
-    .btn-expandir:hover {
-      color: #005f99;
-      text-decoration: none;
+    /* Thumb: use natural dimensions but protect with max-height */
+    .newsletter-card img.thumb {
+      width: 100%;
+      height: auto;
+      display: block;
+      object-fit: cover;
+      border-radius: 6px 6px 0 0;
+      max-height: 90px;
+      /* compact final value; change to 80px if you want even smaller */
+    }
+
+    /* Content area below image */
+    .newsletter-card .conteudo {
+      padding: 8px 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .newsletter-card h3,
+    .newsletter-card h4,
+    .newsletter-card .card-title {
+      margin: 0;
+      margin-bottom: 4px;
+      font-size: 0.95rem;
+      line-height: 1.08;
+      font-weight: 600;
+      color: #0f172a;
+    }
+
+    .meta {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      color: var(--muted);
+      font-size: 0.82rem;
+      margin: 0;
+    }
+
+    .meta .classificacao {
+      display: inline-flex;
+      gap: 6px;
+      align-items: center;
+      background: rgba(0, 122, 204, 0.06);
+      color: var(--accent);
+      padding: 4px 8px;
+      border-radius: 999px;
+      font-weight: 600;
+      font-size: 0.82rem;
+    }
+
+    .meta .data {
+      color: var(--muted);
+      font-size: 0.82rem;
+    }
+
+    .card-summary {
+      margin: 0;
+      color: var(--muted);
+      font-size: 0.9rem;
+      line-height: 1.15;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      /* limit to 2 lines */
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .acoes-card {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 6px;
+      margin-top: 6px;
+    }
+
+    .acoes-card .btn-ver {
+      padding: 6px 10px;
+      border-radius: 8px;
+      border: none;
+      background: var(--accent);
+      color: #fff;
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 0.88rem;
+    }
+
+    .acoes-card .btn-ver:hover {
+      background: var(--accent-600)
+    }
+
+    /* Modal */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(2, 6, 23, 0.5);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 1200
+    }
+
+    .modal-overlay.show {
+      display: flex
+    }
+
+    .modal-content {
+      width: 100%;
+      max-width: 560px;
+      background: #fff;
+      padding: 18px;
+      border-radius: 10px;
+      box-shadow: 0 10px 30px rgba(2, 6, 23, 0.2)
+    }
+
+    /* Responsive */
+    @media (max-width:900px) {
+      nav {
+        position: fixed;
+        left: 0;
+        top: 64px;
+        bottom: 0;
+        width: 260px;
+        transform: translateX(-110%);
+        transition: transform .22s;
+        z-index: 1100
+      }
+
+      nav.open {
+        transform: translateX(0)
+      }
+
+      .container {
+        padding-top: 12px
+      }
+
+      .menu-toggle {
+        display: inline-flex
+      }
+
+      main {
+        padding: 18px
+      }
+    }
+
+    @media (min-width:901px) {
+      .menu-toggle {
+        display: none
+      }
+    }
+
+    @media (max-width:600px) {
+      .newsletter-card img.thumb {
+        max-height: 80px
+      }
+
+      .newsletter-card .conteudo {
+        padding: 8px
+      }
+    }
+
+    /* Ensure compactness overrides other styles if needed */
+    .lista-newsletters .newsletter-card {
+      gap: 6px !important;
+    }
+
+    .lista-newsletters .newsletter-card img.thumb {
+      max-height: 90px !important;
+    }
+
+    .lista-newsletters .newsletter-card .conteudo {
+      padding: 8px 10px !important;
+      gap: 6px !important;
+    }
+
+    .lista-newsletters .newsletter-card .card-summary {
+      -webkit-line-clamp: 2 !important;
+    }
+
+    button:focus {
+      outline: 3px solid rgba(0, 122, 204, 0.18);
+      outline-offset: 2px
+    }
+
+    /* Formulário de suporte: empilha label + controle verticalmente */
+    #bloco-suporte form,
+    #bloco-suporte .form-row {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      width: 100%;
+      max-width: 720px;
+      /* mantém limite visual, ajuste se necessário */
+    }
+
+    /* Garante que labels ocupem linha própria e controles tenham largura total */
+    #bloco-suporte label {
+      display: block;
+      font-weight: 600;
+      margin-bottom: 2px;
+      color: #0f172a;
+    }
+
+    #bloco-suporte select,
+    #bloco-suporte textarea,
+    #bloco-suporte input {
+      width: 100%;
+      box-sizing: border-box;
+      padding: 8px 10px;
+      border-radius: 8px;
+      border: 1px solid rgba(15, 23, 42, 0.08);
+      font-size: 0.95rem;
+      background: #fff;
+    }
+
+    /* Espaçamento entre os dois blocos (Tipos e Descrição) */
+    #bloco-suporte .form-row+.form-row {
+      margin-top: 10px;
+    }
+
+    /* Botão de envio alinhado e compacto */
+    #bloco-suporte .actions {
+      margin-top: 10px;
+      display: flex;
+      gap: 8px;
+      align-items: center;
     }
   </style>
 </head>
 
 <body>
   <header>
-    <h1>📊 Painel do Assinante</h1>
-    <div id="usuario-info" style="text-align: right; margin: 20px;">
-      <span id="nome-usuario" style="font-weight: bold;"></span><br>
-      <button id="btn-logout">Sair</button>
+    <h1>📊 RadarSiope Painel do Assinante</h1>
+    <div id="usuario-info">
+      <div id="nome-usuario" aria-live="polite" style="font-weight:700">Usuário</div>
+      <div style="display:flex;gap:8px;margin-top:6px">
+        <button id="menu-toggle" class="menu-toggle" aria-expanded="false" aria-controls="main-nav"
+          style="padding:8px 10px;border-radius:8px;border:none;background:rgba(255,255,255,0.12);color:#fff;cursor:pointer">Menu</button>
+        <button id="btn-logout" class="btn-logout">Sair</button>
+      </div>
     </div>
   </header>
 
-  <div class="painel">
-    <nav>
-      <ul>
-        <li><a href="#bloco-assinaturas">📄 Minhas Assinaturas</a></li>
-        <li><a href="#bloco-pagamentos">💳 Pagamentos</a></li>
-        <li><a href="#bloco-biblioteca">📚 Minhas Newsletters</a></li>
-        <li><a href="#bloco-newsletters">📰 Newsletters</a></li> <!-- novo link -->
-        <li><a href="#bloco-suporte">💬 Suporte</a></li>
-        <li><a href="#bloco-perfil">⚙️ Perfil</a></li>
+  <div class="container">
+    <nav id="main-nav" aria-label="Navegação principal">
+      <div class="brand">
+        <strong>Área do Assinante</strong>
+      </div>
+
+      <ul class="menu" role="menu">
+        <li role="none"><button role="menuitem" data-target="bloco-assinaturas" aria-current="true">📄 Minhas
+            Assinaturas</button></li>
+        <li role="none"><button role="menuitem" data-target="bloco-pagamentos">💳 Pagamentos</button></li>
+        <li role="none"><button role="menuitem" data-target="bloco-biblioteca">📚 Minhas Newsletters</button></li>
+        <li role="none"><button role="menuitem" data-target="bloco-suporte">💬 Suporte</button></li>
+        <li role="none"><button role="menuitem" data-target="bloco-perfil">⚙️ Perfil</button></li>
       </ul>
+
+      <div class="nav-footer">
+        <small style="color:var(--muted)">RadarSiope</small>
+      </div>
     </nav>
 
     <main>
-      <section class="bloco" id="bloco-assinaturas" aria-labelledby="titulo-assinaturas">
+      <section id="bloco-assinaturas" class="section active" aria-labelledby="titulo-assinaturas">
         <h2 id="titulo-assinaturas">📄 Minhas Assinaturas</h2>
-        <div id="minhas-assinaturas">Carregando...</div>
+        <div id="minhas-assinaturas" class="card">Carregando...</div>
       </section>
 
-      <section class="bloco" id="bloco-pagamentos" aria-labelledby="titulo-pagamentos">
+      <section id="bloco-pagamentos" class="section" aria-labelledby="titulo-pagamentos">
         <h2 id="titulo-pagamentos">💳 Pagamentos</h2>
-        <div id="meus-pagamentos">Carregando...</div>
+        <div id="meus-pagamentos" class="card">Carregando...</div>
       </section>
 
-      <section class="bloco" id="bloco-biblioteca" aria-labelledby="titulo-biblioteca">
+      <section id="bloco-biblioteca" class="section" aria-labelledby="titulo-biblioteca">
         <h2 id="titulo-biblioteca">📚 Minhas Newsletters</h2>
-        <div id="biblioteca-tecnica">Carregando...</div>
+        <div id="biblioteca-tecnica" class="card">Carregando...</div>
       </section>
 
-      <section class="bloco" id="bloco-suporte" aria-labelledby="titulo-suporte">
+      <<section id="bloco-suporte" class="section" aria-labelledby="titulo-suporte">
         <h2 id="titulo-suporte">💬 Suporte</h2>
 
-        <label for="tipo-suporte">Tipo:</label>
-        <select id="tipo-suporte" style="margin-bottom: 12px;">
-          <option value="treinamento">Treinamento</option>
-          <option value="consultoria">Consultoria</option>
-          <option value="newsletters">Newsletters</option>
-          <option value="outros">Outros</option>
-        </select>
+        <div id="form-suporte">
+          <div class="form-row">
+            <label for="tipo-suporte">Tipo</label>
+            <select id="tipo-suporte" name="tipo-suporte">
+              <option value="treinamento">Treinamento</option>
+              <option value="consultoria">Consultoria</option>
+              <option value="newsletters">Newsletters</option>
+              <option value="sugestao de tema">Sugestão de tema para newsletter</option>
+              <option value="cancelamento">Solicitar cancelamento de assinatura (informe os dados da assinatura abaixo)</option>
+              <option value="outros">Outros</option>
+            </select>
+          </div>
 
-        <label for="mensagem-suporte">Descrição:</label>
-        <textarea id="mensagem-suporte" placeholder="Descreva sua solicitação..."></textarea>
-        <button id="btn-enviar-suporte">Enviar solicitação</button>
+          <div class="form-row">
+            <label for="mensagem-suporte">Descrição</label>
+            <textarea id="mensagem-suporte" name="mensagem-suporte" rows="5"
+              placeholder="Descreva sua solicitação..."></textarea>
+          </div>
 
-        <h3 style="margin-top: 30px;">📜 Histórico de solicitações</h3>
-        <div id="filtros-solicitacoes" style="margin-bottom: 10px;">
-          <button onclick="filtrarSolicitacoes('todos')">Todos</button>
-          <button onclick="filtrarSolicitacoes('pendente')">Pendente</button>
-          <button onclick="filtrarSolicitacoes('aberta')">Aberta</button>
-          <button onclick="filtrarSolicitacoes('atendida')">Atendida</button>
-          <button onclick="filtrarSolicitacoes('cancelada')">Cancelada</button>
+          <div class="actions">
+            <button id="btn-enviar-suporte"
+              style="background:var(--accent);color:#fff;padding:10px 14px;border-radius:8px;border:none">Enviar
+              solicitação</button>
+            <div id="suporte-feedback" style="margin-left:8px;color:var(--muted)"></div>
+          </div>
         </div>
 
-        <div id="historico-solicitacoes" class="grid-solicitacoes">
-          <!-- Conteúdo dinâmico -->
+
+
+        <h3 style="margin-top:24px">📜 Histórico de solicitações</h3>
+        <div id="filtros-solicitacoes" style="margin-bottom:10px;display:flex;gap:8px;flex-wrap:wrap">
+          <button data-filter="todos">Todos</button>
+          <button data-filter="pendente">Pendente</button>
+          <button data-filter="aberta">Aberta</button>
+          <button data-filter="atendida">Atendida</button>
+          <button data-filter="cancelada">Cancelada</button>
         </div>
 
-        <div id="suporte-feedback" style="margin-top: 12px;"></div>
-      </section>
+        <div id="historico-solicitacoes" class="grid-solicitacoes"></div>
+        <div id="suporte-feedback" style="margin-top:12px"></div>
+        </section>
 
-      <section class="bloco" id="bloco-perfil" aria-labelledby="titulo-perfil">
-        <h2 id="titulo-perfil">⚙️ Perfil</h2>
-        <div id="perfil-dados">
-          <!-- Opcional: dados básicos do perfil exibidos aqui -->
-        </div>
-      </section>
+        <!-- Início: bloco Perfil (substitua o conteúdo atual de #bloco-perfil) -->
+        <section id="bloco-perfil" class="section" aria-labelledby="titulo-perfil">
+          <h2 id="titulo-perfil">⚙️ Perfil</h2>
+
+          <div id="perfil-dados" class="card">
+            <form id="perfil-form" autocomplete="off" novalidate>
+              <div style="display:flex;flex-direction:column;gap:10px;max-width:720px">
+                <!-- CPF (readonly) -->
+                <div>
+                  <label for="perfil-cpf" style="font-weight:600">CPF</label>
+                  <input id="perfil-cpf" name="cpf" type="text" readonly
+                    style="width:100%;padding:8px;border-radius:8px;border:1px solid rgba(15,23,42,0.08);background:#f3f4f6" />
+                </div>
+
+                <!-- Nome -->
+                <div>
+                  <label for="perfil-nome" style="font-weight:600">Nome</label>
+                  <input id="perfil-nome" name="nome" type="text" required
+                    style="width:100%;padding:8px;border-radius:8px;border:1px solid rgba(15,23,42,0.08)" />
+                </div>
+
+                <!-- E-mail -->
+                <div>
+                  <label for="perfil-email" style="font-weight:600">E‑mail</label>
+                  <input id="perfil-email" name="email" type="email" required
+                    style="width:100%;padding:8px;border-radius:8px;border:1px solid rgba(15,23,42,0.08)" />
+                </div>
+
+                <!-- Telefone -->
+                <div>
+                  <label for="perfil-telefone" style="font-weight:600">Telefone</label>
+                  <input id="perfil-telefone" name="telefone" type="tel"
+                    style="width:100%;padding:8px;border-radius:8px;border:1px solid rgba(15,23,42,0.08)" />
+                </div>
+
+                <!-- UF e Município (container preenchido por inserirCamposUfMunicipio) -->
+                <div id="perfil-uf-municipio"></div>
+
+                <!-- Preferência de contato -->
+                <div>
+                  <label for="perfil-preferencia" style="font-weight:600">Preferência de contato</label>
+                  <select id="perfil-preferencia" name="preferencia_contato"
+                    style="width:100%;padding:8px;border-radius:8px;border:1px solid rgba(15,23,42,0.08)">
+                    <option value="">Selecione...</option>
+                    <option value="E-mail">E-mail</option>
+                    <option value="WhatsApp">WhatsApp</option>
+                    <option value="Ligação">Ligação</option>
+                  </select>
+                </div>
+
+                <!-- Perfil profissional -->
+                <div>
+                  <label for="perfil-perfil" style="font-weight:600">Perfil</label>
+                  <select id="perfil-perfil" name="perfil"
+                    style="width:100%;padding:8px;border-radius:8px;border:1px solid rgba(15,23,42,0.08)">
+                    <option value="">Selecione...</option>
+                    <option value="secretario">Secretário</option>
+                    <option value="tecnico">Técnico</option>
+                    <option value="contador">Contador</option>
+                    <option value="pesquisador">Pesquisador</option>
+                    <option value="cacs">CACS</option>
+                    <option value="cidadao">Cidadão</option>
+                  </select>
+                </div>
+
+                <!-- Interesses (container preenchido por carregarTiposNewsletterParaPerfil) -->
+                <div>
+                  <label style="font-weight:600">Interesses</label>
+                  <div id="perfil-interesses" style="margin-top:6px"></div>
+                </div>
+
+                <!-- Ações -->
+                <div style="display:flex;gap:8px;align-items:center">
+                  <button id="perfil-salvar" type="button"
+                    style="background:var(--accent);color:#fff;padding:10px 14px;border-radius:8px;border:none">Salvar</button>
+                  <div id="perfil-status" style="color:var(--muted)"></div>
+                </div>
+              </div>
+            </form>
+          </div>
+        </section>
+        <script src="js/functions.js"></script>
+        <script src="js/perfil.js"></script>
     </main>
   </div>
 
-
-  <!-- Modal edição de solicitação (acessível) -->
+  <!-- Modal edição de solicitação -->
   <div id="modal-editar-solicitacao" class="modal-overlay" role="dialog" aria-modal="true"
-    aria-labelledby="titulo-modal-editar" style="display:none;">
-    <div class="modal-content">
+    aria-labelledby="titulo-modal-editar">
+    <div class="modal-content" role="document">
       <h3 id="titulo-modal-editar">✏️ Editar Solicitação</h3>
-      <label for="nova-descricao">Nova descrição:</label>
-      <textarea id="nova-descricao" rows="4" style="width:100%;"></textarea>
-      <div style="margin-top:10px; text-align:right;">
-        <button onclick="salvarEdicaoSolicitacao()">💾 Salvar</button>
-        <button onclick="fecharModalEdicao()">❌ Cancelar</button>
+      <label for="nova-descricao">Nova descrição</label>
+      <textarea id="nova-descricao" rows="4" style="width:100%"></textarea>
+      <div style="margin-top:10px;text-align:right">
+        <button id="salvar-edicao"
+          style="background:var(--accent);color:#fff;padding:8px 12px;border-radius:8px;border:none">💾 Salvar</button>
+        <button id="fechar-edicao"
+          style="margin-left:8px;padding:8px 12px;border-radius:8px;border:1px solid #ddd;background:#fff">❌
+          Cancelar</button>
       </div>
     </div>
   </div>
 
-  <script>
-    // Exibe nome e perfil no header
-    document.addEventListener("DOMContentLoaded", () => {
-      const dados = JSON.parse(localStorage.getItem("usuarioLogado"));
-      if (dados) {
-        const nome = dados.nome || dados.email || "Usuário";
-        const nomeEl = document.getElementById("nome-usuario");
-        if (nomeEl) {
-          nomeEl.textContent = nome;
-
-          const perfilSpan = document.createElement("span");
-          perfilSpan.textContent = ` (${dados.tipo_perfil || "indefinido"})`;
-          perfilSpan.style.fontWeight = "normal";
-          perfilSpan.style.fontSize = "0.9em";
-          nomeEl.appendChild(perfilSpan);
-        }
-      }
-    });
-  </script>
-
-  <!-- Firebase SDK versão compatível com navegador -->
+  <!-- Scripts externos mantidos -->
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
-
-  <!-- Inicialização personalizada -->
   <script src="js/firebase-init.js"></script>
 
-  <!-- Script principal do painel -->
+  <!-- Navegação e comportamento local -->
+  <script>
+    (function () {
+      const menu = document.querySelectorAll('.menu button[data-target]');
+      const sections = document.querySelectorAll('.section');
+      const menuToggle = document.getElementById('menu-toggle');
+      const nav = document.getElementById('main-nav');
+      const modal = document.getElementById('modal-editar-solicitacao');
+      let lastFocused = null;
+
+      function showSection(id, pushState = true) {
+        sections.forEach(s => s.classList.toggle('active', s.id === id));
+        menu.forEach(btn => {
+          const isActive = btn.dataset.target === id;
+          btn.setAttribute('aria-current', isActive ? 'true' : 'false');
+        });
+        document.dispatchEvent(new CustomEvent('section:shown', { detail: { id } }));
+        if (pushState) history.replaceState(null, '', '#' + id);
+        if (window.innerWidth <= 900) nav.classList.remove('open'), menuToggle.setAttribute('aria-expanded', 'false');
+      }
+
+      menu.forEach(btn => {
+        btn.addEventListener('click', () => showSection(btn.dataset.target));
+      });
+
+      document.addEventListener('DOMContentLoaded', () => {
+        const hash = location.hash.replace('#', '');
+        const initial = hash && document.getElementById(hash) ? hash : 'bloco-assinaturas';
+        showSection(initial, false);
+
+        try {
+          const dados = JSON.parse(localStorage.getItem('usuarioLogado') || 'null');
+          if (dados) {
+            const nome = dados.nome || dados.email || 'Usuário';
+            const el = document.getElementById('nome-usuario');
+            el.textContent = nome + (dados.tipo_perfil ? ' (' + dados.tipo_perfil + ')' : '');
+          }
+        } catch (e) { }
+      });
+
+      menuToggle && menuToggle.addEventListener('click', () => {
+        const open = nav.classList.toggle('open');
+        menuToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+      });
+
+      function openModal() {
+        lastFocused = document.activeElement;
+        modal.classList.add('show');
+        modal.querySelector('textarea')?.focus();
+      }
+      function closeModal() {
+        modal.classList.remove('show');
+        lastFocused?.focus();
+      }
+      document.getElementById('fechar-edicao').addEventListener('click', closeModal);
+      document.getElementById('salvar-edicao').addEventListener('click', () => {
+        const newText = document.getElementById('nova-descricao').value;
+        document.dispatchEvent(new CustomEvent('solicitacao:edit:save', { detail: { text: newText } }));
+        closeModal();
+      });
+
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && modal.classList.contains('show')) closeModal();
+      });
+
+      // helper to open newsletter viewer (integration point)
+      window.visualizarNewsletter = function (id) {
+        document.dispatchEvent(new CustomEvent('newsletter:view', { detail: { id } }));
+      };
+
+      window.RadarSiopeUI = {
+        showSection,
+        openModal,
+        closeModal
+      };
+    })();
+  </script>
+
+  <!-- Seus scripts principais -->
   <script src="js/functions.js"></script>
   <script src="js/painel.js"></script>
 </body>

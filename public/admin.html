@@ -535,7 +535,7 @@
       <button onclick="abrirTab('newsletters')">📰 Newsletters</button>
       <button onclick="abrirTab('template_newsletters')">📰 Templates de Newsletters</button>
       <button onclick="abrirTab('tipo-newsletters')">📂 Tipo de Newsletters</button>
-      <button onclick="abrirTab('planos')">📑 Planos</button>
+      <button onclick="abrirTab('planos')">📑 Planos</button> 
       <button onclick="abrirTab('respostas_automaticas')">✉️ Respostas Automáticas</button>
       <button onclick="abrirTab('aba-temas')">🗞️ Notícias</button>
     </div>
@@ -1173,7 +1173,7 @@
     </section>
 
     <!-- PLANOS -->
-    <section id="planos" class="card">
+ <section id="planos" class="card">
       <div style="display:flex;justify-content:space-between;align-items:center">
         <div>
           <h3 style="margin:0">📑 Planos</h3>
@@ -1198,6 +1198,7 @@
         <tbody id="lista-planos"></tbody>
       </table>
     </section>
+    
 
     <section id="secao-backlog" class="card">
       <div style="display:flex; justify-content:space-between; align-items:center">
@@ -1961,11 +1962,16 @@
     style="margin-top:30px; background:#fff; padding:20px; border-radius:8px; border:1px solid #ccc;"></div>
 
   <!-- seus scripts (main.js deve conter firebase.initializeApp e db) -->
+   <script src="js/planos.js"></script>
   <script src="js/main.js"></script>
   <script src="js/subcollections.js"></script>
   <script src="js/site.js"></script>
   <script src="js/functions.js"></script>
   <script src="js/mailer.js"></script>
+  
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/2.4.0/purify.min.js"></script>
+  <script src="js/TemplatesNewsletter.js"></script>
 
   <script>
     //    function closeModal(id) { document.getElementById(id).classList.remove('show'); document.getElementById(id).setAttribute('aria-hidden', 'true'); }

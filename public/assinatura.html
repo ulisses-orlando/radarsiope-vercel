@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8" />
+    <title>Assinatura – Radar SIOPE</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="stylesheet" href="css/capturaLead.css" />
+</head>
+<style>
+    /* Estilo específico para o checkbox de aceite */
+    label.aceite-termos {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        /* espaço entre checkbox e texto */
+        cursor: pointer;
+        user-select: none;
+    }
+
+    /* Garante que o input não seja deslocado por regras globais */
+    label.aceite-termos input[type="checkbox"] {
+        order: 0;
+        margin: 0;
+        width: 16px;
+        height: 16px;
+        flex: 0 0 auto;
+    }
+
+    /* Texto do label */
+    label.aceite-termos span {
+        display: inline-block;
+        line-height: 1;
+        color: inherit;
+    }
+
+    /* Grid responsivo para os cartões de plano */
+    #planos-cards {
+        display: grid;
+        gap: 12px;
+        grid-template-columns: repeat(1, 1fr);
+        /* mobile por padrão */
+        margin-top: 8px;
+    }
+
+    /* 2 colunas em telas médias */
+    @media (min-width: 600px) {
+        #planos-cards {
+            grid-template-columns: repeat(2, 1fr);
+        }
+    }
+
+    /* 3 colunas em telas maiores */
+    @media (min-width: 1000px) {
+        #planos-cards {
+            grid-template-columns: repeat(3, 1fr);
+        }
+    }
+
+    /* Estilo do cartão */
+    .plano-card {
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        border: 1px solid #e0e0e0;
+        border-radius: 8px;
+        padding: 12px;
+        background: #ffffff;
+        transition: box-shadow 160ms ease, transform 160ms ease;
+        cursor: pointer;
+        min-height: 110px;
+    }
+
+    /* Hover / foco */
+    .plano-card:hover,
+    .plano-card:focus-within {
+        box-shadow: 0 6px 18px rgba(20, 20, 20, 0.08);
+        transform: translateY(-4px);
+    }
+
+    /* Cabeçalho do cartão: título e preço */
+    .plano-card .plano-top {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+    }
+
+    /* Título */
+    .plano-card .plano-titulo {
+        font-weight: 700;
+        font-size: 15px;
+        color: #222;
+    }
+
+    /* Preço destacado */
+    .plano-card .plano-preco {
+        font-weight: 700;
+        color: #0a66c2;
+        font-size: 14px;
+        white-space: nowrap;
+    }
+
+    /* Descrição com truncamento */
+    .plano-card .plano-descricao {
+        margin-top: 8px;
+        color: #555;
+        font-size: 13px;
+        line-height: 1.3;
+        display: -webkit-box;
+        -webkit-line-clamp: 3;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+    }
+
+    /* Input radio escondido visualmente mas acessível */
+    .plano-card input[type="radio"] {
+        position: absolute;
+        opacity: 0;
+        pointer-events: none;
+    }
+
+    /* Indicador visual quando selecionado */
+    .plano-card input[type="radio"]:checked+.plano-content {
+        outline: 2px solid #0a66c2;
+        outline-offset: 2px;
+    }
+
+    /* Estrutura interna para permitir o seletor + .plano-content funcionar */
+    .plano-card .plano-content {
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+    }
+
+    /* Badge ou nota inferior */
+    .plano-card .plano-note {
+        margin-top: 10px;
+        font-size: 12px;
+        color: #777;
+    }
+</style>
+
+<body>
+    <div class="container">
+        <h2>🔒 Assinatura / Contratação</h2>
+        <p>Confirme seus dados e escolha os tipos de newsletter que deseja assinar.</p>
+
+        <form id="form-assinatura">
+            <!-- hidden planId vindo da query string ?planId=... -->
+            <input type="hidden" id="planId" />
+
+            <label>Nome:</label>
+            <input type="text" id="nome" required />
+            <span id="error-nome" class="field-error" style="display:none;color:#b00020;font-size:12px"></span>
+
+            <label>E-mail:</label>
+            <input type="email" id="email" required />
+            <span id="error-email" class="field-error" style="display:none;color:#b00020;font-size:12px"></span>
+
+            <label>Telefone:</label>
+            <input type="tel" id="telefone" />
+            <span id="error-telefone" class="field-error" style="display:none;color:#b00020;font-size:12px"></span>
+
+            <div id="campo-uf-municipio"></div>
+
+            <label>Como prefere ser contatado?</label>
+            <select id="preferencia-contato">
+                <option value="">Selecione...</option>
+                <option value="E-mail">📧 E-mail</option>
+                <option value="WhatsApp">🟢 WhatsApp</option>
+                <option value="Ligação">📞 Ligação</option>
+            </select>
+
+            <label>Qual o seu Perfil?</label>
+            <select id="perfil">
+                <option value="">Selecione...</option>
+                <option value="secretario">Secretário</option>
+                <option value="tecnico">Técnico</option>
+                <option value="contador">Contador</option>
+                <option value="pesquisador">Pesquisador</option>
+                <option value="cacs">CACS</option>
+                <option value="cidadao">Cidadão</option>
+            </select>
+
+            <label>Mensagem / Observações (opcional):</label>
+            <textarea id="mensagem" rows="3"></textarea>
+
+            <div id="campo-newsletters"></div>
+
+            <label>Forma de pagamento</label>
+            <select id="forma-pagamento">
+                <option value="cartao">Cartão</option>
+                <option value="boleto">Boleto</option>
+                <option value="pix">PIX</option>
+            </select>
+
+            <label>Parcelas (se aplicável)</label>
+            <input type="number" id="parcelas" min="1" max="120" />
+
+            <label>Cupom (opcional)</label>
+            <input type="text" id="cupom" />
+
+            <div style="margin-top:12px">
+                <label for="aceita-termos" class="aceite-termos">
+                    <input id="aceita-termos" type="checkbox" />
+                    <span>Aceito os termos</span>
+                </label>
+                <span id="error-aceita_termos" class="field-error"
+                    style="display:none;color:#b00020;font-size:12px"></span>
+            </div>
+
+            <div id="preview-breakdown"
+                style="margin-top:12px;background:#fafafa;padding:10px;border-radius:6px;display:none">
+                <strong>Resumo</strong>
+                <div id="preview-items" style="margin-top:8px"></div>
+                <div id="preview-total" style="margin-top:8px;font-weight:700"></div>
+            </div>
+
+            <button type="submit" id="btn-assinar" style="margin-top:12px">Confirmar e Pagar</button>
+            <p id="status-envio"></p>
+        </form>
+    </div>
+
+    <!-- Modal de confirmação simples -->
+    <div id="modalConfirmacao"
+        style="display:none;position:fixed;inset:0;align-items:center;justify-content:center;background:rgba(0,0,0,0.4)">
+        <div style="background:#fff;padding:20px;border-radius:8px;max-width:480px">
+            <h3>Obrigado!</h3>
+            <p id="modal-msg">Processando seu pedido...</p>
+            <button onclick="document.getElementById('modalConfirmacao').style.display='none'">Fechar</button>
+        </div>
+    </div>
+
+    <!-- Firebase -->
+    <script src="https://www.gstatic.com/firebasejs/10.0.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.0.0/firebase-firestore-compat.js"></script>
+    <script src="js/firebase-init.js"></script>
+
+    <!-- Funções utilitárias existentes -->
+    <script src="js/functions.js"></script>
+
+    <!-- Lógica de assinatura (cole o JS abaixo em js/assinatura.js) -->
+    <script src="js/assinatura.js"></script>
+</body>
+
+</html>
+
+<!-- links para chamar o formulario
+http://127.0.0.1:5500/public/assinatura.html?planId=plano1&leadId=Jo7QOWUrfT16MmGYRlwX&origem=newsletter_janeiro -->
