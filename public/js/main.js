@@ -510,7 +510,7 @@ async function abrirModalNewsletter(docId = null, isEdit = false) {
   };
   botoesExtrasWrap.appendChild(btnPixel);
 
-  // CLICK
+  /* // CLICK
   const btnClick = document.createElement('button');
   btnClick.innerText = '➕ Click';
   btnClick.onclick = () => {
@@ -535,7 +535,7 @@ async function abrirModalNewsletter(docId = null, isEdit = false) {
     }
   };
   botoesExtrasWrap.appendChild(btnClick);
-
+ */
   // DESCADASTRAMENTO
   const btnDescadastramento = document.createElement('button');
   btnDescadastramento.innerText = '➕ Descadastramento';
@@ -561,11 +561,11 @@ async function abrirModalNewsletter(docId = null, isEdit = false) {
 
   // Token
   const btnToken = document.createElement('button');
-  btnToken.innerText = '➕ Token';
+  btnToken.innerText = '➕ Token/click';
   btnToken.onclick = () => {
     const texto = `
 <p style="font-size:12px; color:#888; margin-top:30px">
-  👉 <a href="https://radarsiope-vercel.vercel.app/verNewsletterComToken.html?nid={{newsletterId}}&env={{envioId}}&uid={{destinatarioId}}&assinaturaId={{assinaturaId}}&token={{token}}">
+  👉 <a href="https://www.radarsiope.com.br/verNewsletterComToken.html?nid={{newsletterId}}&env={{envioId}}&uid={{destinatarioId}}&assinaturaId={{assinaturaId}}&token={{token}}">
     Acessar edição completa
   </a>
 </p>
@@ -574,7 +574,7 @@ async function abrirModalNewsletter(docId = null, isEdit = false) {
     if (!ta.value.includes("Acessar edição completa")) {
       ta.value += "\n" + texto;
     } else {
-      mostrarMensagem("O link de token já está incluído.");
+      mostrarMensagem("O link de click/token já está incluído.");
     }
   };
   botoesExtrasWrap.appendChild(btnToken);
@@ -1095,12 +1095,12 @@ function validarHtmlEmail(html, blocos = []) {
   // -----------------------------
   // 6. Link de click dentro da tabela e existência
   // -----------------------------
-  if (!html.includes("api.radarsiope.com.br/api/click")) {
-    erros.push("O HTML não contém o link de rastreamento de clique.");
+  if (!html.includes("https://www.radarsiope.com.br/verNewsletterComToken.html")) {
+    erros.push("O HTML não contém o link de rastreamento de clique/token.");
   } else if (idxTableClose !== -1) {
-    const clickPos = html.indexOf("api.radarsiope.com.br/api/click");
+    const clickPos = html.indexOf("https://www.radarsiope.com.br/verNewsletterComToken.html");
     if (clickPos > idxTableClose) {
-      erros.push("O link de rastreamento de clique está fora da tabela principal.");
+      erros.push("O link de rastreamento de clique/token está fora da tabela principal.");
     }
   }
 
