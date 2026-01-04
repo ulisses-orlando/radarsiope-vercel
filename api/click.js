@@ -74,13 +74,11 @@ export default async function handler(req, res) {
       ultimoCliqueEm: new Date()
     }, { merge: true });
 
-    // Resposta simples confirmando registro (sem redirecionamento) 
-    return res.status(200).json({ ok: true, message: "Clique registrado" }); 
   } catch (e) { 
     console.error("Erro ao registrar clique:", e); 
     // Retornamos erro sem redirecionar 
     return res.status(500).json({ ok: false, message: "Erro ao registrar clique" }); 
   }
-  // return res.redirect(destino);
+  return res.redirect(destino);
 }
 
