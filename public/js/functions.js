@@ -107,7 +107,7 @@ function validarPlaceholders(template) {
 
   // Placeholders que devem ser ignorados na validação (fora do escopo da newsletter)
   const excecoes = [
-    "newsletterid", "envioid", "destinatarioid", "interesseid"
+    "newsletterid", "envioid", "destinatarioid", "assinaturaid", "interesseid"
   ];
 
   // Captura todos os placeholders usados no template
