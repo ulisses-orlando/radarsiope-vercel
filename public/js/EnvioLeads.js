@@ -1269,7 +1269,6 @@ async function listarLotesEnvio(newsletterId, envioId) {
 
 async function enviarLoteIndividual(newsletterId, envioId, loteId) {
     try {
-        console.log('enviarLoteIndividual chamado', { newsletterId, envioId, loteId });
         const loteRef = db.collection("newsletters")
             .doc(newsletterId)
             .collection("envios")
