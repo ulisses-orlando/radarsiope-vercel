@@ -1327,12 +1327,21 @@ async function enviarLoteIndividual(newsletterId, envioId, loteId) {
                 segmento
             );
 
+            
+            // Gera token de acesso e data de expiração
+            const token = gerarTokenAcesso();
+            const expiraEm = firebase.firestore.Timestamp.fromDate(
+                new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) // expira em 30 dias
+            );
+
             // Aplica rastreamento
             const htmlFinal = aplicarRastreamento(
                 htmlMontado,
                 envioId,
                 idDest,
-                newsletterId
+                newsletterId,
+                assinaturaId = dest.assinaturaId || null,
+                token
             );
 
 
@@ -1367,10 +1376,6 @@ async function enviarLoteIndividual(newsletterId, envioId, loteId) {
                 enviados++;
 
                 // Registro do envio
-                const token = gerarTokenAcesso();
-                const expiraEm = firebase.firestore.Timestamp.fromDate(
-                    new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) // expira em 30 dias
-                );
 
                 if (tipo === "leads") {
                     await db.collection("leads").doc(idDest).collection("envios").add({
@@ -1501,7 +1506,8 @@ function montarHtmlNewsletterParaEnvio(newsletter, dados, segmento = null) {
     return htmlFinal;
 }
 
-function aplicarRastreamento(htmlBase, envioId, destinatarioId, newsletterId) {
+/* function aplicarRastreamento(htmlBase, envioId, destinatarioId, newsletterId) {
+ 
     // 1) Inserir pixel de abertura
     const pixelTag = `
     <img src="https://api.radarsiope.com.br/api/pixel?envioId=${encodeURIComponent(envioId)}&destinatarioId=${encodeURIComponent(destinatarioId)}&newsletterId=${encodeURIComponent(newsletterId)}"
@@ -1514,8 +1520,68 @@ function aplicarRastreamento(htmlBase, envioId, destinatarioId, newsletterId) {
         const urlTrack = `https://api.radarsiope.com.br/api/click?envioId=${encodeURIComponent(envioId)}&destinatarioId=${encodeURIComponent(destinatarioId)}&newsletterId=${encodeURIComponent(newsletterId)}&url=${encodeURIComponent(urlDestino)}`;
         return `href="${urlTrack}"`;
     });
-
+ 
     return htmlComPixel;
+
+*/
+
+function aplicarRastreamento(htmlBase, envioId, destinatarioId, newsletterId, assinaturaId, token) {
+    // 1) Pixel (uma vez)
+    const hasPixel = /api\/pixel\?/i.test(htmlBase);
+    const pixel = `<img src="https://api.radarsiope.com.br/api/pixel?envioId=${encodeURIComponent(envioId)}&destinatarioId=${encodeURIComponent(destinatarioId)}&newsletterId=${encodeURIComponent(newsletterId)}" width="1" height="1" style="display:none" alt="" />`;
+    let html = hasPixel ? htmlBase : htmlBase + pixel;
+
+    // 2) Monta qs e gera d (Base64 + encodeURIComponent)
+    const parts = [
+        `nid=${newsletterId || ''}`,
+        `env=${envioId || ''}`,
+        `uid=${destinatarioId || ''}`
+    ];
+    if (assinaturaId) parts.push(`assinaturaId=${assinaturaId}`);
+    if (token) parts.push(`token=${token}`);
+    const qs = parts.join('&');
+
+    let b64;
+    try {
+        if (typeof Buffer !== 'undefined' && typeof Buffer.from === 'function') {
+            b64 = Buffer.from(qs).toString('base64');
+        } else {
+            b64 = btoa(qs);
+        }
+    } catch (e) {
+        b64 = encodeURIComponent(qs);
+    }
+    const encodedD = encodeURIComponent(b64);
+    const hrefOfuscado = `https://www.radarsiope.com.br/verNewsletterComToken.html?d=${encodedD}`;
+
+    // 3) Substitui o primeiro link de visualização por ?d=ENCODED
+    html = html.replace(/href="([^"]*verNewsletterComToken\.html[^"]*)"/i, () => `href="${hrefOfuscado}"`);
+
+    // 4) Reescreve outros links para o redirecionador, preservando casos especiais
+    html = html.replace(/href="([^"]+)"/g, (m, href) => {
+        const u = String(href).trim();
+        const lower = u.toLowerCase();
+
+        if (
+            lower.startsWith('mailto:') ||
+            lower.startsWith('tel:') ||
+            lower.startsWith('javascript:') ||
+            lower.startsWith('#') ||
+            /descadastramento\.html/i.test(u) ||
+            /vernewslettercomtoken\.html/i.test(u) ||
+            /\/api\/click/i.test(u)
+        ) {
+            return `href="${u}"`;
+        }
+
+        let destino = u;
+        try { destino = decodeURIComponent(u); } catch (e) { destino = u; }
+
+        const track = `https://api.radarsiope.com.br/api/click?envioId=${encodeURIComponent(envioId)}&destinatarioId=${encodeURIComponent(destinatarioId)}&newsletterId=${encodeURIComponent(newsletterId)}&url=${encodeURIComponent(destino)}`;
+        return `href="${track}"`;
+    });
+
+    return html;
 }
 
 

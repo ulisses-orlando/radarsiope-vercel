@@ -492,7 +492,7 @@ async function abrirModalNewsletter(docId = null, isEdit = false) {
       });
   };
   botoesExtrasWrap.appendChild(btnCopiar);
-
+  /*
   // PIXEL
   const btnPixel = document.createElement('button');
   btnPixel.innerText = '➕ Pixel';
@@ -510,7 +510,7 @@ async function abrirModalNewsletter(docId = null, isEdit = false) {
   };
   botoesExtrasWrap.appendChild(btnPixel);
 
-  /* // CLICK
+ // CLICK
   const btnClick = document.createElement('button');
   btnClick.innerText = '➕ Click';
   btnClick.onclick = () => {
@@ -563,13 +563,20 @@ async function abrirModalNewsletter(docId = null, isEdit = false) {
   const btnToken = document.createElement('button');
   btnToken.innerText = '➕ Token/click';
   btnToken.onclick = () => {
-    const texto = `
-<p style="font-size:12px; color:#888; margin-top:30px">
-  👉 <a href="https://www.radarsiope.com.br/verNewsletterComToken.html?nid={{newsletterId}}&env={{envioId}}&uid={{destinatarioId}}&assinaturaId={{assinaturaId}}&token={{token}}">
-    Acessar edição completa
-  </a>
-</p>
-`;
+  const texto = `
+    <p style="font-size:12px; color:#888; margin-top:30px">
+      👉 <a href="https://www.radarsiope.com.br/verNewsletterComToken.html?d=ENCODED"
+        Acessar edição completa
+      </a>
+    </p>
+    `;
+/*         const texto = `
+    <p style="font-size:12px; color:#888; margin-top:30px">
+      👉 <a href="https://www.radarsiope.com.br/verNewsletterComToken.html?nid={{newsletterId}}&env={{envioId}}&uid={{destinatarioId}}&assinaturaId={{assinaturaId}}&token={{token}}">
+        Acessar edição completa
+      </a>
+    </p>
+    `; */
 
     if (!ta.value.includes("Acessar edição completa")) {
       ta.value += "\n" + texto;
@@ -1083,7 +1090,7 @@ function validarHtmlEmail(html, blocos = []) {
   // -----------------------------
   // 5. Pixel dentro da tabela e existência
   // -----------------------------
-  if (!html.includes("api.radarsiope.com.br/api/pixel")) {
+/*   if (!html.includes("api.radarsiope.com.br/api/pixel")) {
     erros.push("O HTML não contém o pixel de rastreamento.");
   } else if (idxTableClose !== -1) {
     const pixelPos = html.indexOf("api.radarsiope.com.br/api/pixel");
@@ -1091,7 +1098,7 @@ function validarHtmlEmail(html, blocos = []) {
       erros.push("O pixel de rastreamento está fora da tabela principal.");
     }
   }
-
+ */
   // -----------------------------
   // 6. Link de click dentro da tabela e existência
   // -----------------------------
