@@ -1327,7 +1327,7 @@ async function enviarLoteIndividual(newsletterId, envioId, loteId) {
                 segmento
             );
 
-            
+
             // Gera token de acesso e data de expiração
             const token = gerarTokenAcesso();
             const expiraEm = firebase.firestore.Timestamp.fromDate(
@@ -1527,9 +1527,15 @@ function montarHtmlNewsletterParaEnvio(newsletter, dados, segmento = null) {
 
 function aplicarRastreamento(htmlBase, envioId, destinatarioId, newsletterId, assinaturaId, token) {
     // 1) Pixel (uma vez)
-    const hasPixel = /api\/pixel\?/i.test(htmlBase);
-    const pixel = `<img src="https://api.radarsiope.com.br/api/pixel?envioId=${encodeURIComponent(envioId)}&destinatarioId=${encodeURIComponent(destinatarioId)}&newsletterId=${encodeURIComponent(newsletterId)}" width="1" height="1" style="display:none" alt="" />`;
-    let html = hasPixel ? htmlBase : htmlBase + pixel;
+    const pixelTag = `
+            <img src="https://api.radarsiope.com.br/api/pixel?envioId=${encodeURIComponent(envioId)}&destinatarioId=${encodeURIComponent(destinatarioId)}&newsletterId=${encodeURIComponent(newsletterId)}"
+                width="1" height="1" style="display:none;" alt="" />
+        `;
+    let html = htmlBase + pixelTag;
+
+    /*     const hasPixel = /api\/pixel\?/i.test(htmlBase);
+        const pixel = `<img src="https://api.radarsiope.com.br/api/pixel?envioId=${encodeURIComponent(envioId)}&destinatarioId=${encodeURIComponent(destinatarioId)}&newsletterId=${encodeURIComponent(newsletterId)}" width="1" height="1" style="display:none" alt="" />`;
+        let html = hasPixel ? htmlBase : htmlBase + pixel; */
 
     // 2) Monta qs e gera d (Base64 + encodeURIComponent)
     const parts = [
