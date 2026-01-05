@@ -1327,25 +1327,65 @@ async function enviarLoteIndividual(newsletterId, envioId, loteId) {
                 segmento
             );
 
-
-            // Gera token de acesso e data de expiração
-            const token = gerarTokenAcesso();
-            const expiraEm = firebase.firestore.Timestamp.fromDate(
-                new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) // expira em 30 dias
-            );
-
-            // Aplica rastreamento
-            const htmlFinal = aplicarRastreamento(
-                htmlMontado,
-                envioId,
-                idDest,
-                newsletterId,
-                assinaturaId = dest.assinaturaId || null,
-                token
-            );
-
-
             try {
+                // Gera token de acesso e data de expiração antes da inserção
+                const token = gerarTokenAcesso();
+                const expiraEm = firebase.firestore.Timestamp.fromDate(
+                    new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) // 30 dias
+                );
+
+                let envioRef;
+
+                if (tipo === "leads") {
+                    envioRef = await db
+                        .collection("leads")
+                        .doc(idDest)
+                        .collection("envios")
+                        .add({
+                            newsletter_id: newsletterId,
+                            data_envio: firebase.firestore.Timestamp.now(),
+                            status: "enviado",
+                            destinatarioId: idDest,
+                            token_acesso: token,
+                            expira_em: expiraEm,
+                            ultimo_acesso: null,
+                            acessos_totais: 0
+                        });
+                } else {
+                    envioRef = await db
+                        .collection("usuarios")
+                        .doc(idDest)
+                        .collection("assinaturas")
+                        .doc(dest.assinaturaId)
+                        .collection("envios")
+                        .add({
+                            newsletter_id: newsletterId,
+                            data_envio: firebase.firestore.Timestamp.now(),
+                            status: "enviado",
+                            destinatarioId: idDest,
+                            assinaturaId: dest.assinaturaId,
+                            token_acesso: token,
+                            expira_em: expiraEm,
+                            ultimo_acesso: null,
+                            acessos_totais: 0
+                        });
+                }
+
+                // Obtem o id do envio criado
+                const envioId = envioRef.id;
+
+                // Define assinaturaId para passar à função (null se não existir)
+                const assinaturaId = dest && dest.assinaturaId ? dest.assinaturaId : null;
+
+                // Aplica rastreamento usando o envioId obtido
+                const htmlFinal = aplicarRastreamento(
+                    htmlMontado,
+                    envioId,
+                    idDest,
+                    newsletterId,
+                    assinaturaId,
+                    token
+                );
 
                 // 🔹 Endpoint SES no backend
                 const response = await fetch("https://api.radarsiope.com.br/api/sendViaSES", {
@@ -1375,34 +1415,7 @@ async function enviarLoteIndividual(newsletterId, envioId, loteId) {
 
                 enviados++;
 
-                // Registro do envio
 
-                if (tipo === "leads") {
-                    await db.collection("leads").doc(idDest).collection("envios").add({
-                        newsletter_id: newsletterId,
-                        data_envio: firebase.firestore.Timestamp.now(),
-                        status: "enviado",
-                        destinatarioId: idDest,
-                        token_acesso: token,
-                        expira_em: expiraEm,
-                        ultimo_acesso: null,
-                        acessos_totais: 0
-                    });
-                } else {
-                    await db.collection("usuarios").doc(idDest)
-                        .collection("assinaturas").doc(dest.assinaturaId)
-                        .collection("envios").add({
-                            newsletter_id: newsletterId,
-                            data_envio: firebase.firestore.Timestamp.now(),
-                            status: "enviado",
-                            destinatarioId: idDest,
-                            assinaturaId: dest.assinaturaId, // 🔥 incluímos para facilitar validação
-                            token_acesso: token,
-                            expira_em: expiraEm,
-                            ultimo_acesso: null,
-                            acessos_totais: 0
-                        });
-                }
             } catch (err) {
                 console.error(`❌ Falha ao enviar para ${identificador}`, err);
 
