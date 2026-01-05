@@ -1126,9 +1126,9 @@ function validarHtmlEmail(html, blocos = []) {
   // -----------------------------
   // 8. Placeholder de token
   // -----------------------------
-  if (!html.includes("{{token}}")) {
+/*   if (!html.includes("{{token}}")) {
     erros.push("O HTML não contém o placeholder {{token}}.");
-  }
+  } */
 
   // -----------------------------
   // 9. Verifica tags <tr> mal fechadas
