@@ -565,7 +565,7 @@ async function abrirModalNewsletter(docId = null, isEdit = false) {
   btnToken.onclick = () => {
   const texto = `
     <p style="font-size:12px; color:#888; margin-top:30px">
-      👉 <a href="https://www.radarsiope.com.br/verNewsletterComToken.html?d=ENCODED"
+      👉 <a href="https://www.radarsiope.com.br/verNewsletterComToken.html?d=ENCODED">
         Acessar edição completa
       </a>
     </p>
