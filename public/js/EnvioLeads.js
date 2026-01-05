@@ -1552,7 +1552,7 @@ function aplicarRastreamento(htmlBase, envioId, destinatarioId, newsletterId, as
         b64 = encodeURIComponent(qs);
     }
     const encodedD = encodeURIComponent(b64);
-    const hrefOfuscado = `https://www.radarsiope.com.br/verNewsletterComToken.html?d=${encodedD}`;
+    const hrefOfuscado = `https://api.radarsiope.com.br/verNewsletterComToken.html?d=${encodedD}`;
 
     // 3) Substitui o primeiro link de visualização por ?d=ENCODED
     html = html.replace(/href="([^"]*verNewsletterComToken\.html[^"]*)"/i, () => `href="${hrefOfuscado}"`);
