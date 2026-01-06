@@ -203,7 +203,7 @@ async function VerNewsletterComToken() {
             container.innerHTML = `
                         <div style="font-family: Arial, sans-serif; color:#222; line-height:1.5; max-width:640px;">
                         <p style="font-weight:700; margin:0 0 8px 0;">
-                            Atenção: Edição exclusiva para: <span style="font-weight:600;">${dados.nome}</span>
+                            Atenção: Edição exclusiva para: <span style="font-weight:600;">${destinatario.nome}</span>
                         </p>
 
                         <p style="margin:8px 0;">
