@@ -141,37 +141,41 @@
         tituloEl.style.display = "none";
 
         // 🔹 Carrega o HTML
-        let html = d.html_conteudo || "<p>Conteúdo não disponível.</p>";
+        let htmlBase = d.html_conteudo || "<p>Conteúdo não disponível.</p>";
 
-        // 🔹 Substitui placeholders básicos
-        html = html.replace(/{{data_publicacao}}/g, formatarDataFirestore(d.data_publicacao));
-        html = html.replace(/{{edicao}}/g, d.edicao || "");
-        html = html.replace(/{{titulo}}/g, d.titulo || "");
+        const blocos = d.blocos || [];
 
-        // 🔹 Remove placeholders pessoais no acesso público
-        html = html.replace(/{{nome}}/g, "");
-        html = html.replace(/{{email}}/g, "");
+        let htmlBlocos = "";
 
-        // 🔹 Remove "Olá ," se ficar vazio
-        html = html.replace(/Olá\s*,/g, "Olá");
+        // ✅ Monta blocos filtrados por segmento
+        if (blocos.length > 0) {
+          blocos.forEach(b => {
+            // Filtra por segmento (lead/assinante)
+            if (segmento && b.acesso !== "todos" && b.acesso !== "leads") return;
 
-        // 🔹 Remove "Olá ()" se existir
-        html = html.replace(/Olá\s*\(\s*\)/g, "Olá");
+            htmlBlocos += b.html || "";
+          });
+        }
 
-        // Remove parênteses vazios com QUALQUER tipo de espaço
-        html = html.replace(/\(\s*?\)/g, "");
+        let htmlFinal = "";
 
-        // Remove parênteses vazios com espaços invisíveis (NBSP, etc.)
-        html = html.replace(/\(\s*?\u00A0*?\)/g, "");
+        if (blocos.length === 0) {
+          // ✅ Sem blocos → usa apenas o HTML base
+          htmlFinal = htmlBase;
+        } else {
+          // ✅ Com blocos → insere no {{blocos}} ou no final
+          if (htmlBase.includes("{{blocos}}")) {
+            htmlFinal = htmlBase.replace("{{blocos}}", htmlBlocos);
+          } else {
+            htmlFinal = htmlBase + "\n" + htmlBlocos;
+          }
+        }
 
-        // Remove "()" grudado em vírgula
-        html = html.replace(/\(\s*?\),/g, "");
-
-        // Remove vírgula sobrando após remover os parênteses
-        html = html.replace(/,\s*</g, "<");
+        // ✅ Aplica placeholders reais do destinatário
+        htmlFinal = aplicarPlaceholders(htmlFinal, d);
 
         // 🔹 Renderiza
-        conteudoEl.innerHTML = html;
+        conteudoEl.innerHTML = htmlFinal;
 
       }).catch(err => {
         tituloEl.innerText = "Erro ao carregar";
