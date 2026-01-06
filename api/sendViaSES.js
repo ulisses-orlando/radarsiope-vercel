@@ -32,7 +32,7 @@ export default async function handler(req, res) {
   }
 
   const params = {
-    Source: "contato@radarsiope.com.br",
+    Source: '"Radar SIOPE - Newsletter" <contato@radarsiope.com.br>',
     Destination: { ToAddresses: [email] },
     Message: {
       Subject: { Charset: "UTF-8", Data: assunto || "Radar SIOPE - Newsletter" },
@@ -58,5 +58,4 @@ export default async function handler(req, res) {
     });
   }
 }
-
 
