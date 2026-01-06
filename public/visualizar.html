@@ -147,11 +147,12 @@
 
         let htmlBlocos = "";
 
-        // ✅ Monta blocos filtrados por segmento
+        // ✅ Monta blocos filtrados por segmento leads
+        let segmento = "leads";
         if (blocos.length > 0) {
           blocos.forEach(b => {
             // Filtra por segmento (lead/assinante)
-            if (segmento && b.acesso !== "todos" && b.acesso !== "leads") return;
+            if (segmento && b.acesso !== "todos" && b.acesso !== segmento) return;
 
             htmlBlocos += b.html || "";
           });
