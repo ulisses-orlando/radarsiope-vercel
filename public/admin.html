@@ -535,7 +535,8 @@
       <button onclick="abrirTab('newsletters')">📰 Newsletters</button>
       <button onclick="abrirTab('template_newsletters')">📰 Templates de Newsletters</button>
       <button onclick="abrirTab('tipo-newsletters')">📂 Tipo de Newsletters</button>
-      <button onclick="abrirTab('planos')">📑 Planos</button> 
+      <button onclick="abrirTab('planos')">📑 Planos</button>
+      <button onclick="abrirTab('cupons')">📑 Cupons</button>
       <button onclick="abrirTab('respostas_automaticas')">✉️ Respostas Automáticas</button>
       <button onclick="abrirTab('aba-temas')">🗞️ Notícias</button>
     </div>
@@ -1169,11 +1170,36 @@
 
         <div id="tabela-interacoes" style="margin-top: 20px;"></div>
       </div>
+    </section>
 
+    <!-- CUPONS -->
+    <section id="cupons" class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div>
+          <h3 style="margin:0">📑 Cupons</h3>
+        </div>
+        <div><button onclick="abrirModalCupom()">➕ Novo Plano</button></div>
+      </div>
+      <div style="margin-top:10px">
+        <input type="text" id="busca-cupons" placeholder="Buscar cupom..." onkeyup="filtrarCupons()">
+      </div>
+      <table style="margin-top:10px">
+        <thead>
+          <tr>
+            <th>Codigo</th>
+            <th>Tipo</th>
+            <th>Valor</th>
+            <th>Status</th>
+            <th>Expira em</th>
+            <th>Ações</th>
+          </tr>
+        </thead>
+        <tbody id="lista-cupom"></tbody>
+      </table>
     </section>
 
     <!-- PLANOS -->
- <section id="planos" class="card">
+    <section id="planos" class="card">
       <div style="display:flex;justify-content:space-between;align-items:center">
         <div>
           <h3 style="margin:0">📑 Planos</h3>
@@ -1198,7 +1224,7 @@
         <tbody id="lista-planos"></tbody>
       </table>
     </section>
-    
+
 
     <section id="secao-backlog" class="card">
       <div style="display:flex; justify-content:space-between; align-items:center">
@@ -1962,13 +1988,14 @@
     style="margin-top:30px; background:#fff; padding:20px; border-radius:8px; border:1px solid #ccc;"></div>
 
   <!-- seus scripts (main.js deve conter firebase.initializeApp e db) -->
-   <script src="js/planos.js"></script>
+  <script src="js/planos.js"></script>
+  <script src="js/cupons.js"></script>
   <script src="js/main.js"></script>
   <script src="js/subcollections.js"></script>
   <script src="js/site.js"></script>
   <script src="js/functions.js"></script>
   <script src="js/mailer.js"></script>
-  
+
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/2.4.0/purify.min.js"></script>
   <script src="js/TemplatesNewsletter.js"></script>
@@ -2049,6 +2076,7 @@
       // carrega conteúdo da aba
       //      if (tabId === 'usuarios') carregarUsuariosComFiltro();
       if (tabId === 'planos') carregarPlanos();
+      else if (tabId === 'cupons') carregarCupons();
       else if (tabId === 'newsletters') {
         preencherFiltroTipoNewsletter(document.getElementById("filtro-tipo-news"));
         carregarNewsletters();

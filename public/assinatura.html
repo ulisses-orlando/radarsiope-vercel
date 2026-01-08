@@ -139,6 +139,42 @@
         font-size: 12px;
         color: #777;
     }
+
+    /* Cartão não deve cortar conteúdo expandido */
+    .plano-card {
+        overflow: visible;
+    }
+
+    /* Descrição: respeita quebras de linha do Firestore e aplica clamp */
+    .plano-descricao {
+        margin-top: 8px;
+        color: #555;
+        font-size: 13px;
+        line-height: 1.4;
+        white-space: pre-line;
+        /* respeita \n do banco */
+        display: -webkit-box;
+        /* necessário para line-clamp */
+        -webkit-box-orient: vertical;
+        -webkit-line-clamp: 2;
+        /* mostra só 2 linhas */
+        overflow: hidden;
+
+        /* Fallback para navegadores sem -webkit-line-clamp (ex.: Firefox) */
+        max-height: calc(2 * 1.4em);
+    }
+
+    /* Ao passar o mouse ou focar, remover o clamp e liberar o texto */
+    .plano-card:hover .plano-descricao,
+    .plano-card:focus-within .plano-descricao {
+        -webkit-line-clamp: unset;
+        /* WebKit */
+        max-height: none;
+        /* Fallback */
+        overflow: visible;
+        white-space: normal;
+        /* libera layout normal */
+    }
 </style>
 
 <body>
@@ -195,16 +231,22 @@
                 <option value="pix">PIX</option>
             </select>
 
-            <label>Parcelas (se aplicável)</label>
-            <input type="number" id="parcelas" min="1" max="120" />
+            <label for="parcelas">Parcelas</label>
+            <select id="parcelas"></select>
+            <span id="error-parcelas" class="field-error" style="display:none;color:#b00020;font-size:12px"></span>
 
-            <label>Cupom (opcional)</label>
-            <input type="text" id="cupom" />
+            <label for="cupom">Cupom (opcional)</label>
+            <div style="display:flex;gap:8px;align-items:center">
+                <input type="text" id="cupom" placeholder="Digite seu cupom">
+                <button type="button" id="aplicar-cupom">Aplicar</button>
+            </div>
+            <span id="error-cupom" class="field-error" style="display:none;color:#b00020;font-size:12px"></span>
 
-            <div style="margin-top:12px">
-                <label for="aceita-termos" class="aceite-termos">
-                    <input id="aceita-termos" type="checkbox" />
-                    <span>Aceito os termos</span>
+            <div style="margin-top:12px; padding:10px; background:#f9f9f9; border-radius:6px;">
+                <strong>📜 Termos da Assinatura RadarSiope</strong>
+                <label for="aceita-termos" class="aceite-termos" style="display:flex;align-items:center;gap:8px;">
+                    <input id="aceita-termos" type="checkbox" required />
+                    <span>Li e concordo com os Termos da Assinatura <a href="https://www.radarsiope.com.br/termos" target="_blank">Radar Siope</a></span>
                 </label>
                 <span id="error-aceita_termos" class="field-error"
                     style="display:none;color:#b00020;font-size:12px"></span>
@@ -212,7 +254,10 @@
 
             <div id="preview-breakdown"
                 style="margin-top:12px;background:#fafafa;padding:10px;border-radius:6px;display:none">
-                <strong>Resumo</strong>
+                <strong>📊 Resumo da sua assinatura RadarSiope</strong>
+                <p style="margin:6px 0;color:#555;font-size:14px">
+                    Confira abaixo os valores e descontos aplicados.
+                </p>
                 <div id="preview-items" style="margin-top:8px"></div>
                 <div id="preview-total" style="margin-top:8px;font-weight:700"></div>
             </div>
