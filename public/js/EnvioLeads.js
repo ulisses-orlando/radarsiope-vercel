@@ -1255,6 +1255,7 @@ async function listarLotesEnvio(newsletterId, envioId) {
         <td>
             <button onclick="verDestinatariosLoteUnificado('${loteId}')">👥 Ver Destinatários</button>
             <button onclick="enviarLoteIndividual('${newsletterId}', '${envioId}', '${loteId}')">📤 Enviar Newsletter</button>
+            <button onclick="enviarLoteEmMassa('${lote.newsletterId}', '${lote.envioId}', '${lote.loteId}')">🚀 Enviar Newsletter em massa</button>
             ${reenvios.length > 0
                 ? `<button onclick="verHistoricoEnvios('${newsletterId}', '${envioId}', '${loteId}')">📜 Ver Reenvios (${reenvios.length})</button>`
                 : `<button disabled title='Sem reenvios registrados'>📜 Ver Reenvios</button>`}
@@ -1829,6 +1830,7 @@ async function listarTodosOsLotes() {
                 <td>
                     <button onclick="verDestinatariosLoteUnificado('${lote.loteId}')">👥 Ver Destinatários</button>
                     <button onclick="enviarLoteIndividual('${lote.newsletterId}', '${lote.envioId}', '${lote.loteId}')">📤 Enviar Newsletter</button>
+                    <button onclick="enviarLoteEmMassa('${lote.newsletterId}', '${lote.envioId}', '${lote.loteId}')">🚀 Enviar Newsletter em massa</button>
                   ${reenvios.length > 0
                     ? `<button onclick="verHistoricoEnvios('${lote.newsletterId}', '${lote.envioId}', '${docId}')">📜 Ver Reenvios (${reenvios.length})</button>`
                     : `<button disabled title='Sem reenvios registrados'>📜 Ver Reenvios</button>`}
@@ -2140,3 +2142,143 @@ async function verDestinatariosLoteUnificado(loteId) {
         corpo.innerHTML = "<tr><td colspan='6'>Erro ao carregar destinatários.</td></tr>";
     }
 }
+
+async function enviarLoteEmMassa(newsletterId, envioId, loteId) {
+    const loteRef = db.collection("newsletters")
+        .doc(newsletterId).collection("envios")
+        .doc(envioId).collection("lotes").doc(loteId);
+
+    const loteSnap = await loteRef.get();
+    if (!loteSnap.exists) throw new Error("Lote não encontrado");
+
+    const lote = loteSnap.data();
+    const newsletterSnap = await db.collection("newsletters").doc(newsletterId).get();
+    const newsletter = newsletterSnap.data();
+
+    const destinatarios = lote.destinatarios || [];
+    const payloadEmails = [];
+
+    for (const dest of destinatarios) {
+        const idDest = dest.id;
+        const assinaturaId = dest.assinaturaId || null;
+        const token = gerarTokenAcesso();
+        const expiraEm = firebase.firestore.Timestamp.fromDate(
+            new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+        );
+
+        // cria registro inicial no Firestore
+        const envioRef = await db.collection(dest.tipo === "leads" ? "leads" : "usuarios")
+            .doc(idDest)
+            .collection(dest.tipo === "leads" ? "envios" : "assinaturas")
+            .doc(dest.tipo === "leads" ? undefined : assinaturaId)
+            .collection("envios")
+            .add({
+                newsletter_id: newsletterId,
+                data_envio: firebase.firestore.Timestamp.now(),
+                status: "pendente",
+                destinatarioId: idDest,
+                assinaturaId,
+                token_acesso: token,
+                expira_em: expiraEm
+            });
+
+        const htmlMontado = montarHtmlNewsletterParaEnvio(newsletter, dest, dest.tipo);
+        const htmlFinal = aplicarRastreamento(htmlMontado, envioRef.id, idDest, newsletterId, assinaturaId, token);
+
+        payloadEmails.push({
+            nome: dest.nome,
+            email: dest.email,
+            mensagemHtml: htmlFinal,
+            assunto: newsletter.titulo || "Newsletter Radar SIOPE",
+            envioId: envioRef.id,
+            destinatarioId: idDest,        
+            tipo: dest.tipo || "leads",    
+            assinaturaId: assinaturaId    
+        });
+
+    }
+
+    // envia payload em massa para backend
+    const response = await fetch("https://api.radarsiope.com.br/api/sendBatchViaSES", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ newsletterId, envioId, loteId, emails: payloadEmails })
+    });
+
+    const result = await response.json();
+    return result; // log de retorno do backend
+}
+
+async function atualizarRetornoSES(newsletterId, envioId, loteId, logResultados) {
+    try {
+        const loteRef = db.collection("newsletters")
+            .doc(newsletterId).collection("envios")
+            .doc(envioId).collection("lotes").doc(loteId);
+
+        // Atualiza cada destinatário
+        let enviados = 0;
+        for (const r of logResultados) {
+            const { envioId: envioRegistroId, ok, error } = r;
+            const status = ok ? "enviado" : "erro";
+
+            await loteRef.collection("envios").doc(envioRegistroId).update({
+                status,
+                erro: error || null,
+                data_envio: firebase.firestore.Timestamp.now()
+            });
+
+            if (ok) enviados++;
+        }
+
+        const total = logResultados.length;
+        const statusLote = enviados === total ? "completo" : "parcial";
+
+        // Atualiza o lote
+        await loteRef.update({
+            enviados,
+            status: statusLote,
+            data_envio: firebase.firestore.Timestamp.now()
+        });
+
+        // Atualiza envios_log
+        const usuarioLogado = JSON.parse(localStorage.getItem("usuarioLogado"));
+        const feitoPor = usuarioLogado?.nome || usuarioLogado?.email || "Desconhecido";
+
+        await loteRef.collection("envios_log").add({
+            data_envio: firebase.firestore.Timestamp.now(),
+            quantidade: total,
+            enviados,
+            origem: "manual",
+            operador: feitoPor,
+            status: statusLote
+        });
+
+        // Atualiza lotes_gerais
+        const loteGeralSnap = await db.collection("lotes_gerais")
+            .where("loteId", "==", loteId)
+            .where("envioId", "==", envioId)
+            .limit(1)
+            .get();
+
+        if (!loteGeralSnap.empty) {
+            const loteGeralRef = loteGeralSnap.docs[0].ref;
+            await loteGeralRef.update({
+                enviados,
+                status: statusLote,
+                data_envio: firebase.firestore.Timestamp.now()
+            });
+        }
+
+        // Atualiza newsletter como enviada/publicada
+        await db.collection("newsletters").doc(newsletterId).update({
+            enviada: true,
+            data_publicacao: firebase.firestore.Timestamp.now()
+        });
+
+        mostrarMensagem(`✅ Lote ${loteId} atualizado: ${enviados}/${total} enviados (${statusLote}).`);
+    } catch (err) {
+        console.error("Erro ao atualizar retorno SES:", err);
+        mostrarMensagem("❌ Erro ao atualizar retorno SES.");
+    }
+}
+

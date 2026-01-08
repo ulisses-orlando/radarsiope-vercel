@@ -26,7 +26,7 @@ function parsePlanPrice(plan) {
   if (plan.valor !== undefined && plan.valor !== null) {
     const n = Number(plan.valor);
     if (!isNaN(n)) return n;
-    const normalized = String(plan.valor).replace(/\./g,'').replace(',', '.');
+    const normalized = String(plan.valor).replace(/\./g, '').replace(',', '.');
     const n2 = Number(normalized);
     if (!isNaN(n2)) return n2;
   }
@@ -50,6 +50,26 @@ async function carregarPlano(planId) {
     console.error('Erro ao carregar plano:', err);
     return null;
   }
+}
+
+// ----------------------------- 
+// // Atualizar campo parcelas como <select> 
+// // ----------------------------- 
+function atualizarCampoParcelas(plan) {
+  const parcelasEl = document.getElementById('parcelas');
+  if (!parcelasEl) return;
+  const maxParcelas = plan.qtde_parcelas || 1;
+  // limpar opções anteriores 
+  parcelasEl.innerHTML = '';
+  // gerar opções de 1 até maxParcelas 
+  for (let i = 1; i <= maxParcelas; i++) {
+    const opt = document.createElement('option');
+    opt.value = i;
+    opt.textContent = `${i}x`;
+    parcelasEl.appendChild(opt);
+  }
+  // valor inicial = 1 
+  parcelasEl.value = "1";
 }
 
 // -----------------------------
@@ -113,7 +133,7 @@ async function carregarListaPlanos(containerId = 'planos-lista') {
     // renderizar planos de assinatura no formato do cartão
     cardsWrap.innerHTML = planos.map(p => {
       const titulo = p.nome || p.id;
-      const preco = (p.valor !== undefined && p.valor !== null) ? Number(p.valor).toLocaleString('pt-BR',{style:'currency',currency:'BRL'}) : '—';
+      const preco = (p.valor !== undefined && p.valor !== null) ? Number(p.valor).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : '—';
       const descricao = p.descricao ? `<div class="plano-descricao">${p.descricao}</div>` : `<div class="plano-descricao"></div>`;
       const note = (Array.isArray(p.tipos_inclusos) && p.tipos_inclusos.length) ? `<div class="plano-note">${p.tipos_inclusos.length} tipos incluídos</div>` : '';
       // cada label envolve o input e o conteúdo para manter área clicável
@@ -145,6 +165,7 @@ async function carregarListaPlanos(containerId = 'planos-lista') {
         window._currentPlan = plan;
         const planIdEl = document.getElementById('planId');
         if (planIdEl) planIdEl.value = selectedId;
+        atualizarCampoParcelas(plan);
         await carregarTiposNewsletterParaAssinatura('campo-newsletters', Array.isArray(plan.tipos_inclusos) ? plan.tipos_inclusos : []);
         atualizarPreview();
       }
@@ -198,16 +219,16 @@ async function carregarTiposNewsletterParaAssinatura(containerId = 'campo-newsle
     container.innerHTML = `<label>Selecione o(s) seu(s) interesse(s)</label>
       <div id="grupo-newsletters" class="caixa-interesses duas-colunas">
         ${tipos.map(t => {
-          const checked = planFixado ? (window._currentPlan.tipos_inclusos.map(String).includes(String(t.id))) : preselected.includes(t.id);
-          const disabledAttr = planFixado ? 'disabled' : '';
-          return `
+      const checked = planFixado ? (window._currentPlan.tipos_inclusos.map(String).includes(String(t.id))) : preselected.includes(t.id);
+      const disabledAttr = planFixado ? 'disabled' : '';
+      return `
             <label class="item-interesse">
               <input type="checkbox" value="${t.id}" id="tipo-${t.id}" ${checked ? 'checked' : ''} ${disabledAttr}>
               <span class="icone"></span>
               <span class="texto">${t.nome || t.id}</span>
             </label>
           `;
-        }).join("")}
+    }).join("")}
       </div>
       ${!planFixado ? '<div style="margin-top:8px"><button type="button" id="btn-selecionar-todos">Selecionar tudo</button></div>' : '<div style="margin-top:8px;color:#666;font-size:13px">Tipos definidos pelo plano</div>'}
       `;
@@ -244,11 +265,43 @@ async function carregarTiposNewsletterParaAssinatura(containerId = 'campo-newsle
   }
 }
 
+// Função auxiliar para validar cupom no Firestore
+async function validarCupom(codigo) {
+  if (!codigo) return null;
+  try {
+    const snap = await db.collection('cupons')
+      .where('codigo', '==', codigo)
+      .limit(1)
+      .get();
+    if (snap.empty) {
+      mostrarMensagem('Cupom não encontrado.');
+      return null;
+    }
+    const cupom = snap.docs[0].data();
 
-// -----------------------------
-// Cálculo de preview (exibe todos os tipos marcados; regras de cobrança aplicadas)
-// -----------------------------
-function calcularPreview(plan, tiposSelecionados = [], cupom = '') {
+    // checar status
+    if (!cupom.status || cupom.status !== 'ativo') {
+      mostrarMensagem('Cupom inativo.');
+      return null;
+    }
+
+    // checar validade por data
+    if (cupom.expira_em && cupom.expira_em.toDate() < new Date()) {
+      mostrarMensagem('Cupom expirado.');
+      return null;
+    }
+
+    return cupom;
+  } catch (err) {
+    console.error('Erro ao validar cupom:', err);
+    mostrarMensagem('Erro ao validar cupom. Veja console.');
+    return null;
+  }
+}
+
+
+// calcularPreview: monta items e aplica regras de cobrança + cupom
+async function calcularPreview(plan, tiposSelecionados = [], cupomCodigo = '') {
   const tiposInclusos = Array.isArray(plan && plan.tipos_inclusos ? plan.tipos_inclusos : []) ? plan.tipos_inclusos.map(String) : [];
   const bundles = Array.isArray(plan && plan.bundles ? plan.bundles : []) ? plan.bundles : [];
   const allowMulti = !!(plan && plan.allow_multi_select);
@@ -267,7 +320,7 @@ function calcularPreview(plan, tiposSelecionados = [], cupom = '') {
 
   let total = 0;
   if (allowMulti) {
-    total = items.reduce((s,i) => s + (Number(i.price) || 0), 0);
+    total = items.reduce((s, i) => s + (Number(i.price) || 0), 0);
   } else {
     const naoIncluidos = items.filter(i => !i.included);
     if (naoIncluidos.length > 0) {
@@ -279,6 +332,7 @@ function calcularPreview(plan, tiposSelecionados = [], cupom = '') {
     }
   }
 
+  // aplicar bundles
   bundles.forEach(bundle => {
     if (!Array.isArray(bundle.types) || bundle.types.length === 0) return;
     const match = bundle.types.every(t => tipos.includes(t));
@@ -293,16 +347,47 @@ function calcularPreview(plan, tiposSelecionados = [], cupom = '') {
     }
   });
 
+  // capturar total antes do cupom
+  const totalAntesDoCupom = total;
+
+  let cupomData = null;
+
+  // aplicar cupom
+  if (cupomCodigo) {
+    cupomData = await validarCupom(cupomCodigo);
+    if (cupomData) {
+      if (cupomData.tipo === 'percentual') {
+        const pct = Number(cupomData.valor) || 0;
+        const desconto = totalAntesDoCupom * (pct / 100);
+        total -= desconto;
+        mostrarMensagem(`Cupom aplicado: ${cupomCodigo} (-${pct}% = ${desconto.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })})`);
+      } else if (cupomData.tipo === 'fixo') {
+        const desconto = Number(cupomData.valor) || 0;
+        total -= desconto;
+        mostrarMensagem(`Cupom aplicado: ${cupomCodigo} (-${desconto.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })})`);
+      }
+    }
+  }
+
   const totalNormalized = Math.max(0, total);
   const amountCentavos = Math.round(totalNormalized * 100);
 
-  return { items, total: totalNormalized, amountCentavos, allowMulti, pricePerTipo, basePrice };
+  return {
+    items,
+    total: totalNormalized,
+    amountCentavos,
+    allowMulti,
+    pricePerTipo,
+    basePrice,
+    baseTotal: totalAntesDoCupom, // valor original antes do cupom
+    cupomData // dados do cupom se válido
+  };
 }
 
 // -----------------------------
 // Render do preview no DOM
 // -----------------------------
-function atualizarPreview() {
+async function atualizarPreview() {
   const previewWrap = document.getElementById('preview-breakdown');
   const itemsWrap = document.getElementById('preview-items');
   const totalWrap = document.getElementById('preview-total');
@@ -314,13 +399,9 @@ function atualizarPreview() {
 
   const checks = document.querySelectorAll('#grupo-newsletters input[type="checkbox"]:checked');
   const tiposSelecionados = Array.from(checks).map(cb => cb.value);
+
   const cupom = document.getElementById('cupom') ? document.getElementById('cupom').value.trim() : '';
-
-  const preview = calcularPreview(window._currentPlan, tiposSelecionados, cupom);
-
-  console.debug('atualizarPreview -> plan:', window._currentPlan);
-  console.debug('atualizarPreview -> tiposSelecionados:', tiposSelecionados);
-  console.debug('atualizarPreview -> preview:', preview);
+  const preview = await calcularPreview(window._currentPlan, tiposSelecionados, cupom);
 
   if (!tiposSelecionados.length) {
     if (previewWrap) previewWrap.style.display = 'none';
@@ -333,7 +414,7 @@ function atualizarPreview() {
   if (itemsWrap) {
     itemsWrap.innerHTML = preview.items.map(it => {
       const nomeTipo = it.tipoNome || (document.querySelector(`#tipo-${it.tipoId} + .texto`)?.textContent) || it.tipoId;
-      const precoTexto = it.included ? 'Incluído' : (it.price.toLocaleString('pt-BR',{style:'currency',currency:'BRL'}));
+      const precoTexto = it.included ? 'Incluído' : (it.price.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }));
       return `<div style="display:flex;justify-content:space-between;margin-bottom:4px">
                 <div style="flex:1">${nomeTipo}</div>
                 <div style="margin-left:12px">${precoTexto}</div>
@@ -341,9 +422,43 @@ function atualizarPreview() {
     }).join('');
   }
 
-  if (totalWrap) totalWrap.innerHTML = `<strong>Total: ${ (preview.total).toLocaleString('pt-BR',{style:'currency',currency:'BRL'}) }</strong>`;
+  if (totalWrap) {
+    const total = preview.total;
+    const parcelasEl = document.getElementById('parcelas');
+    const numParcelas = parcelasEl ? parseInt(parcelasEl.value, 10) || 1 : 1;
+    const valorParcela = total / numParcelas;
+
+    let textoResumo = '';
+
+    // valor original sempre mostrado
+    textoResumo += `Valor original: ${preview.baseTotal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}<br>`;
+
+    // se cupom aplicado
+    if (preview.cupomData) {
+      if (preview.cupomData.tipo === 'percentual') {
+        const pct = Number(preview.cupomData.valor) || 0;
+        const desconto = (preview.baseTotal * pct / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+        textoResumo += `Cupom ${preview.cupomData.codigo} aplicado: (-${pct}% = ${desconto})<br>`;
+      } else if (preview.cupomData.tipo === 'fixo') {
+        const desconto = Number(preview.cupomData.valor).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+        textoResumo += `Cupom ${preview.cupomData.codigo} aplicado: (-${desconto})<br>`;
+      }
+    }
+
+    // total final
+    textoResumo += `Total final: ${total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} em ${numParcelas} parcela${numParcelas > 1 ? 's' : ''} de ${valorParcela.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`;
+
+    totalWrap.innerHTML = `<strong>${textoResumo}</strong>`;
+  }
 
   return preview;
+}
+
+// quando o usuário selecionar um plano
+function onPlanoSelecionado(planId) {
+  window._currentPlanId = planId;
+  aplicarCupomBtn.disabled = false; // libera botão
+  atualizarPreview();
 }
 
 // -----------------------------
@@ -385,6 +500,65 @@ async function upsertUsuario({ nome, email, telefone, perfil, mensagem, preferen
     }
   } catch (err) {
     console.error('Erro no upsertUsuario:', err);
+    throw err;
+  }
+}
+
+async function registrarAssinatura(userId, payload, preview) {
+  try {
+    const assinaturaData = {
+      planId: payload.planId,
+      tipos_selecionados: payload.tipos_selecionados,
+      cupom: payload.cupom || null,
+      forma_pagamento: payload.forma_pagamento,
+      parcelas: payload.parcelas,
+      origem: payload.origem || null,
+      valor_original: preview.baseTotal,
+      valor_final: preview.total,
+      desconto: preview.baseTotal - preview.total,
+      status: 'pendente_pagamento',
+      createdAt: firebase.firestore.FieldValue.serverTimestamp()
+    };
+
+    await db.collection('usuarios')
+      .doc(userId)
+      .collection('assinaturas')
+      .add(assinaturaData);
+
+    console.log('Assinatura registrada com sucesso');
+  } catch (err) {
+    console.error('Erro ao registrar assinatura:', err);
+    throw err;
+  }
+}
+
+async function gerarParcelasAssinatura(userId, assinaturaId, valorTotal, numParcelas, metodoPagamento, dataPrimeiroVencimento) {
+  try {
+    const valorParcela = valorTotal / numParcelas;
+    const pagamentosRef = db.collection('usuarios')
+      .doc(userId)
+      .collection('assinaturas')
+      .doc(assinaturaId)
+      .collection('pagamentos');
+
+    for (let i = 0; i < numParcelas; i++) {
+      const vencimento = new Date(dataPrimeiroVencimento);
+      vencimento.setMonth(vencimento.getMonth() + i); // cada parcela no mês seguinte
+
+      await pagamentosRef.add({
+        numero_parcela: i + 1,
+        valor: valorParcela,
+        metodo_pagamento: metodoPagamento,
+        data_vencimento: vencimento,
+        data_pagamento: null,
+        status: 'pendente',
+        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+      });
+    }
+
+    console.log(`Parcelas geradas para assinatura ${assinaturaId}`);
+  } catch (err) {
+    console.error('Erro ao gerar parcelas da assinatura:', err);
     throw err;
   }
 }
@@ -478,14 +652,14 @@ async function processarEnvioAssinatura(e) {
   const checks = document.querySelectorAll('#grupo-newsletters input[type="checkbox"]:checked');
   const tiposSelecionados = Array.from(checks).map(cb => cb.value);
 
-  if (nome.length < 3) { showFormError('nome','Nome deve ter pelo menos 3 caracteres.'); return; }
-  if (!validarEmail(email)) { showFormError('email','E-mail inválido.'); return; }
+  if (nome.length < 3) { showFormError('nome', 'Nome deve ter pelo menos 3 caracteres.'); return; }
+  if (!validarEmail(email)) { showFormError('email', 'E-mail inválido.'); return; }
   if (telefone) {
     const telefoneNumerico = telefone.replace(/\D/g, "");
-    if (telefoneNumerico.length < 10 || !validarTelefoneFormato(telefone)) { showFormError('telefone','Telefone inválido.'); return; }
+    if (telefoneNumerico.length < 10 || !validarTelefoneFormato(telefone)) { showFormError('telefone', 'Telefone inválido.'); return; }
   }
   if (!tiposSelecionados.length) { if (status) status.innerText = "⚠️ Selecione pelo menos um interesse."; return; }
-  if (!aceita) { showFormError('aceita_termos','Você precisa aceitar os termos.'); return; }
+  if (!aceita) { showFormError('aceita_termos', 'Você precisa aceitar os termos.'); return; }
 
   // Obter UF / Município — usar API do helper (capturaLead.js)
   let dadosUf = null;
@@ -527,6 +701,19 @@ async function processarEnvioAssinatura(e) {
       origem
     };
 
+    // 🔹 grava assinatura na subcoleção
+    await registrarAssinatura(userId, payload, preview);
+
+    await gerarParcelasAssinatura(
+      userId,
+      assinaturaId,
+      preview.total,          // valor final da assinatura
+      payload.parcelas || 1,  // número de parcelas
+      payload.forma_pagamento,
+      new Date()              // data da primeira parcela (pode ser hoje ou ajustada)
+    );
+    
+    // 🔹 chamar backend para criar order + pagamento
     const backendResp = await createOrderBackend(payload);
 
     if (backendResp.redirectUrl) {
@@ -562,7 +749,7 @@ async function processarEnvioAssinatura(e) {
 // Validação / UI helpers
 // -----------------------------
 function clearFormErrors() {
-  document.querySelectorAll('#form-assinatura .field-error').forEach(s => { s.textContent=''; s.style.display='none'; });
+  document.querySelectorAll('#form-assinatura .field-error').forEach(s => { s.textContent = ''; s.style.display = 'none'; });
 }
 function showFormError(id, msg) {
   const el = document.getElementById('error-' + id);
@@ -572,6 +759,19 @@ function showFormError(id, msg) {
 function showGlobalMessage(msg, color = '#000') {
   const status = document.getElementById('status-envio');
   if (status) { status.innerText = msg; status.style.color = color; }
+}
+
+async function atualizarEstadoBotaoCupom() {
+  const aplicarCupomBtn = document.getElementById('aplicar-cupom');
+  const cupomEl = document.getElementById('cupom');
+  if (!aplicarCupomBtn || !cupomEl) return;
+
+  const codigo = cupomEl.value.trim();
+  const planoSelecionado = !!window._currentPlanId;
+
+  if (planoSelecionado && codigo) {
+    const cupomData = await validarCupom(codigo);
+  }
 }
 
 // -----------------------------
@@ -624,6 +824,7 @@ async function initAssinatura() {
       return;
     }
     window._currentPlan = plan;
+    atualizarCampoParcelas(plan);
     const preselected = Array.isArray(plan.tipos_inclusos) ? plan.tipos_inclusos : [];
     await carregarTiposNewsletterParaAssinatura('campo-newsletters', preselected);
     atualizarPreview();
@@ -638,11 +839,52 @@ async function initAssinatura() {
 
   // listeners e bindings
   const cupomEl = document.getElementById('cupom');
-  if (cupomEl) cupomEl.addEventListener('blur', atualizarPreview);
+  if (cupomEl) {
+    cupomEl.addEventListener('input', atualizarEstadoBotaoCupom);
+  }
+
+  // Botão aplicar cupom → sempre habilitado
+  const aplicarCupomBtn = document.getElementById('aplicar-cupom');
+  if (aplicarCupomBtn) {
+    aplicarCupomBtn.addEventListener('click', async () => {
+      const cupomEl = document.getElementById('cupom');
+      const codigo = cupomEl ? cupomEl.value.trim() : '';
+
+      console.log('Cupom digitado:', codigo); // debug
+
+      if (!window._currentPlan) {
+        mostrarMensagem('Selecione um plano antes de aplicar o cupom.');
+        return;
+      }
+
+      if (!codigo || codigo.length === 0) {
+        mostrarMensagem('Digite um código de cupom.');
+        return;
+      }
+
+      const cupomData = await validarCupom(codigo);
+      if (!cupomData) {
+        mostrarMensagem('Cupom inválido, inativo ou expirado.');
+        return;
+      }
+
+      atualizarPreview();
+    });
+  }
+
   const formaEl = document.getElementById('forma-pagamento');
   if (formaEl) formaEl.addEventListener('change', atualizarPreview);
   const form = document.getElementById('form-assinatura');
   if (form) form.addEventListener('submit', processarEnvioAssinatura);
+  const parcelasEl = document.getElementById('parcelas');
+  if (parcelasEl) {
+    parcelasEl.addEventListener('change', atualizarPreview);
+  }
+
+  // Carregar plano inicial se já houver 
+  if (window._currentPlanId) {
+    onPlanoSelecionado(window._currentPlanId);
+  }
 }
 
 // inicializa automaticamente

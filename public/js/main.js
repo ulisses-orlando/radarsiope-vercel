@@ -578,7 +578,7 @@ async function abrirModalNewsletter(docId = null, isEdit = false) {
     </p>
     `; */
 
-    if (!ta.value.includes("Acessar edição completa")) {
+    if (!ta.value.includes("https://www.radarsiope.com.br/verNewsletterComToken.html")) {
       ta.value += "\n" + texto;
     } else {
       mostrarMensagem("O link de click/token já está incluído.");
