@@ -5,6 +5,15 @@ import admin from "firebase-admin";
 
 const router = express.Router();
 
+// CORS middleware (manual)
+router.use((req, res, next) => {
+  res.setHeader("Access-Control-Allow-Origin", "https://radarsiope-vercel.vercel.app");
+  res.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+  if (req.method === "OPTIONS") return res.status(204).end();
+  next();
+});
+
 // Inicializa SES
 const ses = new SESClient({
   region: process.env.AWS_REGION || "us-east-1"
