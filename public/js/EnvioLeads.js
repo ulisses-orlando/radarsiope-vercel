@@ -1255,7 +1255,7 @@ async function listarLotesEnvio(newsletterId, envioId) {
         <td>
             <button onclick="verDestinatariosLoteUnificado('${loteId}')">👥 Ver Destinatários</button>
             <button onclick="enviarLoteIndividual('${newsletterId}', '${envioId}', '${loteId}')">📤 Enviar Newsletter</button>
-            <button onclick="enviarLoteEmMassa('${newsletterId}', '${envioId}', '${loteId}')">🚀 Enviar Newsletter em massa</button>
+            <button onclick="enviarLoteEmMassa('${newsletterId}', '${envioId}', '${loteId}', '${lote.tipo}')">🚀 Enviar Newsletter em massa</button>
             ${reenvios.length > 0
                 ? `<button onclick="verHistoricoEnvios('${newsletterId}', '${envioId}', '${loteId}')">📜 Ver Reenvios (${reenvios.length})</button>`
                 : `<button disabled title='Sem reenvios registrados'>📜 Ver Reenvios</button>`}
@@ -1830,7 +1830,7 @@ async function listarTodosOsLotes() {
                 <td>
                     <button onclick="verDestinatariosLoteUnificado('${lote.loteId}')">👥 Ver Destinatários</button>
                     <button onclick="enviarLoteIndividual('${lote.newsletterId}', '${lote.envioId}', '${lote.loteId}')">📤 Enviar Newsletter</button>
-                    <button onclick="enviarLoteEmMassa('${lote.newsletterId}', '${lote.envioId}', '${lote.loteId}')">🚀 Enviar Newsletter em massa</button>
+                    <button onclick="enviarLoteEmMassa('${lote.newsletterId}', '${lote.envioId}', '${lote.loteId}', '${lote.tipo}')">🚀 Enviar Newsletter em massa</button>
                   ${reenvios.length > 0
                     ? `<button onclick="verHistoricoEnvios('${lote.newsletterId}', '${lote.envioId}', '${docId}')">📜 Ver Reenvios (${reenvios.length})</button>`
                     : `<button disabled title='Sem reenvios registrados'>📜 Ver Reenvios</button>`}
@@ -2143,7 +2143,7 @@ async function verDestinatariosLoteUnificado(loteId) {
     }
 }
 
-async function enviarLoteEmMassa(newsletterId, envioId, loteId) {
+async function enviarLoteEmMassa(newsletterId, envioId, loteId, tipo) {
     const loteRef = db.collection("newsletters")
         .doc(newsletterId).collection("envios")
         .doc(envioId).collection("lotes").doc(loteId);
@@ -2171,25 +2171,47 @@ async function enviarLoteEmMassa(newsletterId, envioId, loteId) {
             new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
         );
 
-        // cria registro inicial no Firestore
-        const envioRef = await db.collection(dest.tipo === "leads" ? "leads" : "usuarios")
-            .doc(idDest)
-            .collection(dest.tipo === "leads" ? "envios" : "assinaturas")
-            .doc(dest.tipo === "leads" ? undefined : assinaturaId)
-            .collection("envios")
-            .add({
-                newsletter_id: newsletterId,
-                data_envio: firebase.firestore.Timestamp.now(),
-                status: "pendente",
-                destinatarioId: idDest,
-                assinaturaId,
-                token_acesso: token,
-                expira_em: expiraEm
-            });
-console.log("Registro de envio criado com ID:", envioRef.id);
+        let envioRef;
+
+        if (tipo === "leads") {
+            envioRef = await db
+                .collection("leads")
+                .doc(idDest)
+                .collection("envios")
+                .add({
+                    newsletter_id: newsletterId,
+                    data_envio: firebase.firestore.Timestamp.now(),
+                    status: "pendente",
+                    destinatarioId: idDest,
+                    token_acesso: token,
+                    expira_em: expiraEm,
+                    ultimo_acesso: null,
+                    acessos_totais: 0
+                });
+        } else {
+            envioRef = await db
+                .collection("usuarios")
+                .doc(idDest)
+                .collection("assinaturas")
+                .doc(dest.assinaturaId)
+                .collection("envios")
+                .add({
+                    newsletter_id: newsletterId,
+                    data_envio: firebase.firestore.Timestamp.now(),
+                    status: "pendente",
+                    destinatarioId: idDest,
+                    assinaturaId: dest.assinaturaId,
+                    token_acesso: token,
+                    expira_em: expiraEm,
+                    ultimo_acesso: null,
+                    acessos_totais: 0
+                });
+        }
+
+        console.log("Registro de envio criado com ID:", envioRef.id);
         const htmlMontado = montarHtmlNewsletterParaEnvio(newsletter, dest, dest.tipo);
         const htmlFinal = aplicarRastreamento(htmlMontado, envioRef.id, idDest, newsletterId, assinaturaId, token);
-console.log("HTML final montado para envio.", htmlFinal);
+        console.log("HTML final montado para envio.", htmlFinal);
         payloadEmails.push({
             nome: dest.nome,
             email: dest.email,
@@ -2202,16 +2224,16 @@ console.log("HTML final montado para envio.", htmlFinal);
         });
 
     }
-console.log("Payload de emails preparado:", payloadEmails);
+    console.log("Payload de emails preparado:", payloadEmails);
     // envia payload em massa para backend
     const response = await fetch("https://api.radarsiope.com.br/api/sendBatchViaSES", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ newsletterId, envioId, loteId, emails: payloadEmails })
     });
-console.log("Resposta recebida do backend:", response);
+    console.log("Resposta recebida do backend:", response);
     const result = await response.json();
-console.log("Resultado do backend processado:", result);
+    console.log("Resultado do backend processado:", result);
     return result; // log de retorno do backend
 }
 
