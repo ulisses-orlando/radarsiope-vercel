@@ -1255,7 +1255,7 @@ async function listarLotesEnvio(newsletterId, envioId) {
         <td>
             <button onclick="verDestinatariosLoteUnificado('${loteId}')">👥 Ver Destinatários</button>
             <button onclick="enviarLoteIndividual('${newsletterId}', '${envioId}', '${loteId}')">📤 Enviar Newsletter</button>
-            <button onclick="enviarLoteEmMassa('${newsletterId}', '${envioId}', '${loteId}', '${lote.tipo}')">🚀 Enviar Newsletter em massa</button>
+            <button onclick="enviarLoteEmMassa('${newsletterId}', '${envioId}', '${loteId}', '${doc.tipo}')">🚀 Enviar Newsletter em massa</button>
             ${reenvios.length > 0
                 ? `<button onclick="verHistoricoEnvios('${newsletterId}', '${envioId}', '${loteId}')">📜 Ver Reenvios (${reenvios.length})</button>`
                 : `<button disabled title='Sem reenvios registrados'>📜 Ver Reenvios</button>`}
@@ -2164,9 +2164,7 @@ async function enviarLoteEmMassa(newsletterId, envioId, loteId, tipo) {
     for (const dest of destinatarios) {
         const idDest = dest.id;
         const assinaturaId = dest.assinaturaId || null;
-        console.log("Preparando envio para:", idDest, "Tipo:", dest.tipo, "AssinaturaId:", assinaturaId);
         const token = gerarTokenAcesso();
-        console.log("Token gerado:", token);
         const expiraEm = firebase.firestore.Timestamp.fromDate(
             new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
         );
@@ -2208,10 +2206,9 @@ async function enviarLoteEmMassa(newsletterId, envioId, loteId, tipo) {
                 });
         }
 
-        console.log("Registro de envio criado com ID:", envioRef.id);
         const htmlMontado = montarHtmlNewsletterParaEnvio(newsletter, dest, dest.tipo);
         const htmlFinal = aplicarRastreamento(htmlMontado, envioRef.id, idDest, newsletterId, assinaturaId, token);
-        console.log("HTML final montado para envio.", htmlFinal);
+
         payloadEmails.push({
             nome: dest.nome,
             email: dest.email,
@@ -2224,16 +2221,15 @@ async function enviarLoteEmMassa(newsletterId, envioId, loteId, tipo) {
         });
 
     }
-    console.log("Payload de emails preparado:", payloadEmails);
+
     // envia payload em massa para backend
     const response = await fetch("https://api.radarsiope.com.br/api/sendBatchViaSES", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ newsletterId, envioId, loteId, emails: payloadEmails })
     });
-    console.log("Resposta recebida do backend:", response);
+
     const result = await response.json();
-    console.log("Resultado do backend processado:", result);
     return result; // log de retorno do backend
 }
 
