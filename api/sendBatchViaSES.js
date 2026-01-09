@@ -9,9 +9,7 @@ const router = express.Router();
 router.use((req, res, next) => {
   res.setHeader("Access-Control-Allow-Origin", "https://radarsiope-vercel.vercel.app");
   res.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
-  // se precisar enviar cookies, habilite a linha abaixo e não use '*'
-  // res.setHeader("Access-Control-Allow-Credentials", "true");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, x-admin-token");
   if (req.method === "OPTIONS") {
     return res.status(204).end();
   }
@@ -23,161 +21,540 @@ const ses = new SESClient({
   region: process.env.AWS_REGION || "us-east-1"
 });
 
-// Inicializa Firestore Admin (use credenciais do ambiente / service account)
+// Inicializa Firestore Admin
 if (!admin.apps.length) {
   try {
     admin.initializeApp({
       credential: admin.credential.applicationDefault()
     });
-    console.info({ event: 'admin.init', message: 'Admin SDK inicializado' });
+    console.info("Admin SDK inicializado");
   } catch (err) {
-    console.error({ event: 'admin.init.error', name: err.name, message: err.message, stack: err.stack });
+    console.error("Erro inicializando Admin SDK:", err);
     throw err;
   }
 }
 const db = admin.firestore();
 
+/**
+ * Atualiza retorno do SES no servidor.
+ * Atualiza:
+ * - newsletters/{newsletterId}/envios/{envioId}/lotes/{loteId}/envios/{envioRegistroId}
+ * - newsletters/{newsletterId}/envios/{envioId}/lotes/{loteId}
+ * - newsletters/{newsletterId}/envios/{envioId}/lotes/{loteId}/envios_log
+ * - lotes_gerais (onde loteId/envioId correspondem)
+ * - newsletters/{newsletterId} (marcar enviada)
+ * - leads/{destId}/envios/{envioRegistroId}
+ * - usuarios/{destId}/assinaturas/{assinaturaId}/envios/{envioRegistroId}
+ */
+async function atualizarRetornoSES_servidor(newsletterId, envioId, loteId, resultadosLog, operador = "Sistema") {
+  try {
+    const loteRef = db.collection("newsletters")
+      .doc(newsletterId).collection("envios")
+      .doc(envioId).collection("lotes").doc(loteId);
+
+    const agora = admin.firestore.Timestamp.now();
+    let enviados = 0;
+    const loteBatch = db.batch();
+
+    for (const r of resultadosLog) {
+      const { envioId: envioRegistroId, ok, error, messageId, destinatarioId, assinaturaId } = r;
+      const status = ok ? "enviado" : "erro";
+      const envioDocRef = loteRef.collection("envios").doc(envioRegistroId);
+
+      // Atualiza documento do envio dentro do lote
+      loteBatch.set(envioDocRef, {
+        status,
+        erro: error || null,
+        data_envio: agora,
+        sesMessageId: messageId || null
+      }, { merge: true });
+
+      // Atualiza também em leads/{id}/envios/{envioRegistroId}
+      if (destinatarioId) {
+        try {
+          const leadRef = db.collection("leads").doc(destinatarioId).collection("envios").doc(envioRegistroId);
+          loteBatch.set(leadRef, {
+            status,
+            erro: error || null,
+            data_envio: agora,
+            sesMessageId: messageId || null
+          }, { merge: true });
+        } catch (err) {
+          console.warn("Falha ao preparar update em leads:", err.message);
+        }
+
+        // Atualiza em usuarios/{id}/assinaturas/{assinaturaId}/envios/{envioRegistroId}
+        if (assinaturaId) {
+          try {
+            const usuarioAssinRef = db.collection("usuarios")
+              .doc(destinatarioId)
+              .collection("assinaturas")
+              .doc(assinaturaId)
+              .collection("envios")
+              .doc(envioRegistroId);
+            loteBatch.set(usuarioAssinRef, {
+              status,
+              erro: error || null,
+              data_envio: agora,
+              sesMessageId: messageId || null
+            }, { merge: true });
+          } catch (err) {
+            console.warn("Falha ao preparar update em usuarios/assinaturas:", err.message);
+          }
+        }
+      }
+
+      if (ok) enviados++;
+    }
+
+    // Atualiza o documento do lote
+    loteBatch.set(loteRef, {
+      enviados,
+      status: enviados === resultadosLog.length ? "completo" : "parcial",
+      data_envio: agora
+    }, { merge: true });
+
+    // Commit das atualizações em lote
+    await loteBatch.commit();
+
+    // Grava um registro em envios_log (fora do batch para timestamp único)
+    await loteRef.collection("envios_log").add({
+      data_envio: agora,
+      quantidade: resultadosLog.length,
+      enviados,
+      origem: "manual",
+      operador,
+      status: enviados === resultadosLog.length ? "completo" : "parcial"
+    });
+
+    // Atualiza lotes_gerais (se existir)
+    try {
+      const loteGeralSnap = await db.collection("lotes_gerais")
+        .where("loteId", "==", loteId)
+        .where("envioId", "==", envioId)
+        .limit(1)
+        .get();
+
+      if (!loteGeralSnap.empty) {
+        const loteGeralRef = loteGeralSnap.docs[0].ref;
+        await loteGeralRef.update({
+          enviados,
+          status: enviados === resultadosLog.length ? "completo" : "parcial",
+          data_envio: agora
+        });
+      }
+    } catch (err) {
+      console.warn("Falha ao atualizar lotes_gerais:", err.message);
+    }
+
+    // Marca newsletter como enviada/publicada
+    try {
+      await db.collection("newsletters").doc(newsletterId).update({
+        enviada: true,
+        data_publicacao: agora
+      });
+    } catch (err) {
+      console.warn("Falha ao atualizar newsletter:", err.message);
+    }
+
+    return { ok: true, enviados, total: resultadosLog.length };
+  } catch (err) {
+    console.error("Erro atualizarRetornoSES_servidor:", err);
+    return { ok: false, error: err.message };
+  }
+}
+
+/**
+ * Função que envia um e-mail via SES e retorna resultado.
+ * Retorna objeto { ok, messageId?, error? }
+ */
+async function enviarEmailSES(item, emailRemetente, replyTo) {
+  try {
+    const params = {
+      Source: emailRemetente,
+      Destination: { ToAddresses: [item.email] },
+      Message: {
+        Body: { Html: { Charset: "UTF-8", Data: item.mensagemHtml } },
+        Subject: { Charset: "UTF-8", Data: item.assunto }
+      },
+      ReplyToAddresses: [replyTo]
+    };
+
+    const resp = await ses.send(new SendEmailCommand(params));
+    const sesMessageId = resp?.MessageId || null;
+    return { ok: true, messageId: sesMessageId };
+  } catch (err) {
+    return { ok: false, error: err.message || String(err) };
+  }
+}
+
+/**
+ * Rota principal de envio em lote via SES.
+ * Suporta:
+ * - POST /api/sendBatchViaSES  (envio direto com payload emails: [])
+ * - POST /api/sendBatchViaSES  com { action: "processarLote", newsletterId, envioId, loteId } para processar um lote existente
+ *
+ * Observação: para action "processarLote" o backend lê os envios do lote e processa apenas envios que ainda não têm sesMessageId e não estão com status "enviado".
+ * Proteção: se ADMIN_TOKEN estiver definido, exige header x-admin-token com o mesmo valor para ações administrativas (processarLote).
+ */
 router.post("/api/sendBatchViaSES", async (req, res) => {
   const requestId = `${Date.now()}-${Math.random().toString(36).slice(2,8)}`;
-  console.info({ requestId, event: 'sendBatch.start', ts: new Date().toISOString() });
+  console.info({ requestId, evento: 'envioLote.inicio', ts: new Date().toISOString() });
 
   try {
     // validação de variáveis de ambiente essenciais
-    const sourceEmail = process.env.SES_SOURCE_EMAIL;
-    const replyToEmail = process.env.SES_REPLY_TO || process.env.SES_SOURCE_EMAIL;
+    const emailRemetente = process.env.SES_SOURCE_EMAIL;
+    const replyTo = process.env.SES_REPLY_TO || process.env.SES_SOURCE_EMAIL;
+    const taxa = Number(process.env.SES_RATE_LIMIT || 14); // e-mails por segundo
+    const adminToken = process.env.ADMIN_TOKEN || null;
 
-    if (!sourceEmail) {
-      console.error({ requestId, event: 'missing.env', var: 'SES_SOURCE_EMAIL' });
-      return res.status(500).json({ ok: false, error: 'Server misconfiguration: SES_SOURCE_EMAIL not set' });
+    if (!emailRemetente) {
+      console.error({ requestId, evento: 'missing.env', var: 'SES_SOURCE_EMAIL' });
+      return res.status(500).json({ ok: false, error: 'Configuração do servidor incorreta: SES_SOURCE_EMAIL não definida' });
     }
 
-    const { newsletterId, envioId, loteId, emails } = req.body;
+    const body = req.body || {};
+
+    // Se action === "processarLote", processa lote existente
+    if (body.action === "processarLote") {
+      // valida token se configurado
+      if (adminToken && req.headers['x-admin-token'] !== adminToken) {
+        return res.status(403).json({ ok: false, error: 'Token admin inválido' });
+      }
+
+      const { newsletterId, envioId, loteId } = body;
+      if (!newsletterId || !envioId || !loteId) {
+        return res.status(400).json({ ok: false, error: 'Parâmetros inválidos para processar lote' });
+      }
+
+      // Lê envios do lote e monta payload apenas com envios que não têm sesMessageId e não estão enviados
+      const loteRef = db.collection("newsletters").doc(newsletterId)
+        .collection("envios").doc(envioId)
+        .collection("lotes").doc(loteId);
+
+      const enviosSnap = await loteRef.collection("envios").get();
+      if (enviosSnap.empty) {
+        return res.json({ ok: true, results: [], message: 'Nenhum envio encontrado no lote' });
+      }
+
+      const emailsParaEnviar = [];
+      enviosSnap.forEach(doc => {
+        const d = doc.data();
+        const status = d.status || null;
+        const sesMessageId = d.sesMessageId || null;
+        if (!sesMessageId && status !== "enviado") {
+          // espera que o documento do envio contenha nome, email e mensagemHtml e assunto
+          emailsParaEnviar.push({
+            nome: d.nome || d.destinatarioNome || null,
+            email: d.email,
+            mensagemHtml: d.mensagemHtml || d.html || '',
+            assunto: d.assunto || d.titulo || 'Newsletter',
+            envioId: doc.id,
+            destinatarioId: d.destinatarioId || null,
+            assinaturaId: d.assinaturaId || null
+          });
+        }
+      });
+
+      if (!emailsParaEnviar.length) {
+        return res.json({ ok: true, results: [], message: 'Nenhum envio pendente para processar neste lote' });
+      }
+
+      // Envia em batches respeitando taxa
+      const resultados = [];
+      let batch = [];
+      for (const item of emailsParaEnviar) {
+        batch.push(item);
+        if (batch.length >= taxa) {
+          await Promise.all(batch.map(async it => {
+            const r = await enviarEmailSES(it, emailRemetente, replyTo);
+            resultados.push({ envioId: it.envioId, ok: r.ok, messageId: r.messageId || null, error: r.error || null, destinatarioId: it.destinatarioId || null, assinaturaId: it.assinaturaId || null });
+            // grava sesMessageId imediato em envios_log do lote (se houver messageId)
+            if (r.ok && r.messageId) {
+              try {
+                const caminhoLoteEnvio = `newsletters/${newsletterId}/envios/${envioId}/lotes/${loteId}/envios_log/${it.envioId}`;
+                await db.doc(caminhoLoteEnvio).set({ sesMessageId: r.messageId }, { merge: true });
+              } catch (err) {
+                console.warn("Falha ao gravar sesMessageId no envios_log do lote:", err.message);
+              }
+            }
+          }));
+          batch = [];
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+      }
+      if (batch.length > 0) {
+        await Promise.all(batch.map(async it => {
+          const r = await enviarEmailSES(it, emailRemetente, replyTo);
+          resultados.push({ envioId: it.envioId, ok: r.ok, messageId: r.messageId || null, error: r.error || null, destinatarioId: it.destinatarioId || null, assinaturaId: it.assinaturaId || null });
+          if (r.ok && r.messageId) {
+            try {
+              const caminhoLoteEnvio = `newsletters/${newsletterId}/envios/${envioId}/lotes/${loteId}/envios_log/${it.envioId}`;
+              await db.doc(caminhoLoteEnvio).set({ sesMessageId: r.messageId }, { merge: true });
+            } catch (err) {
+              console.warn("Falha ao gravar sesMessageId no envios_log do lote:", err.message);
+            }
+          }
+        }));
+      }
+
+      // Atualiza retorno imediato no Firestore
+      try {
+        const operador = req.headers['x-admin-operator'] || body.operador || "Sistema";
+        await atualizarRetornoSES_servidor(newsletterId, envioId, loteId, resultados, operador);
+      } catch (err) {
+        console.warn("Falha ao atualizar retorno após processar lote:", err.message);
+      }
+
+      return res.json({ ok: true, results: resultados });
+    }
+
+    // Caso padrão: envio direto com payload emails: []
+    const { newsletterId, envioId, loteId, emails } = body;
     if (!emails || !Array.isArray(emails)) {
-      console.warn({ requestId, event: 'sendBatch.invalidPayload', detail: 'emails missing or not array' });
       return res.status(400).json({ ok: false, error: "Payload inválido: emails esperado" });
     }
 
-    const results = [];
-    const RATE_LIMIT = Number(process.env.SES_RATE_LIMIT || 14); // e-mails por segundo
-    let batch = [];
+    const resultados = [];
+    let loteEnvio = [];
 
-    // Função que envia um e-mail e grava sesMessageId com fallback
-    async function sendEmail(e) {
-      const logBase = { requestId, event: 'sendEmail', email: e.email, envioId: e.envioId, destinatarioId: e.destinatarioId || null };
-      console.debug({ ...logBase, message: 'sendEmail.start' });
-
-      try {
-        const params = {
-          Source: sourceEmail, // ex: "Radar SIOPE - Newsletter" <contato@radarsiope.com.br>
-          Destination: { ToAddresses: [e.email] },
-          Message: {
-            Body: { Html: { Charset: "UTF-8", Data: e.mensagemHtml } },
-            Subject: { Charset: "UTF-8", Data: e.assunto }
-          },
-          ReplyToAddresses: [replyToEmail]
-        };
-
-        console.debug({ ...logBase, event: 'ses.send.call', source: sourceEmail });
-
-        // envia e captura resposta do SES
-        const resp = await ses.send(new SendEmailCommand(params));
-        const sesMessageId = resp?.MessageId || null;
-        console.info({ ...logBase, event: 'ses.send.success', messageId: sesMessageId });
-
-        // 1) grava no caminho do lote (envios_log) — usa set merge para não sobrescrever
-        if (sesMessageId && newsletterId && envioId && loteId && e.envioId) {
-          const loteEnvioDocPath = `newsletters/${newsletterId}/envios/${envioId}/lotes/${loteId}/envios_log/${e.envioId}`;
+    // Função interna para enviar e gravar sesMessageId em fallback
+    async function enviarERegistrar(item) {
+      const r = await enviarEmailSES(item, emailRemetente, replyTo);
+      if (r.ok) {
+        // grava sesMessageId no envios_log do lote se possível
+        if (r.messageId && newsletterId && envioId && loteId && item.envioId) {
           try {
-            console.debug({ ...logBase, event: 'firestore.set', path: loteEnvioDocPath });
-            await db.doc(loteEnvioDocPath).set({ sesMessageId }, { merge: true });
-            console.info({ ...logBase, event: 'firestore.set.success', path: loteEnvioDocPath });
+            const caminhoLoteEnvio = `newsletters/${newsletterId}/envios/${envioId}/lotes/${loteId}/envios_log/${item.envioId}`;
+            await db.doc(caminhoLoteEnvio).set({ sesMessageId: r.messageId }, { merge: true });
           } catch (err) {
-            console.warn({ ...logBase, event: 'firestore.set.error', path: loteEnvioDocPath, name: err.name, code: err.code, message: err.message });
+            console.warn("Falha ao gravar sesMessageId no envios_log do lote:", err.message);
           }
         }
 
-        // 2) grava no documento original do envio (fallbacks) se tiver destinatarioId
-        if (sesMessageId && e.destinatarioId) {
-          const destId = e.destinatarioId;
-
-          // tentativa 1: leads/{id}/envios/{envioDoc}
-          const leadsPath = `leads/${destId}/envios/${e.envioId}`;
+        // grava no documento original do envio (fallbacks) se tiver destinatarioId
+        if (r.messageId && item.destinatarioId) {
+          const destId = item.destinatarioId;
           try {
-            console.debug({ ...logBase, event: 'firestore.set', path: leadsPath });
-            await db.doc(leadsPath).set({ sesMessageId }, { merge: true });
-            console.info({ ...logBase, event: 'firestore.set.success', path: leadsPath });
+            const leadsPath = `leads/${destId}/envios/${item.envioId}`;
+            await db.doc(leadsPath).set({ sesMessageId: r.messageId }, { merge: true });
           } catch (err) {
-            console.warn({ ...logBase, event: 'firestore.set.error', path: leadsPath, name: err.name, code: err.code, message: err.message });
-
-            // tentativa 2: usuarios/{id}/assinaturas/{assinaturaId}/envios/{envioDoc}
-            if (e.assinaturaId) {
-              const usuariosPath = `usuarios/${destId}/assinaturas/${e.assinaturaId}/envios/${e.envioId}`;
+            console.warn(`Falha ao gravar em leads/${destId}/envios/${item.envioId}:`, err.message);
+            if (item.assinaturaId) {
               try {
-                console.debug({ ...logBase, event: 'firestore.set', path: usuariosPath });
-                await db.doc(usuariosPath).set({ sesMessageId }, { merge: true });
-                console.info({ ...logBase, event: 'firestore.set.success', path: usuariosPath });
+                const usuariosPath = `usuarios/${destId}/assinaturas/${item.assinaturaId}/envios/${item.envioId}`;
+                await db.doc(usuariosPath).set({ sesMessageId: r.messageId }, { merge: true });
               } catch (err2) {
-                console.warn({ ...logBase, event: 'firestore.set.error', path: usuariosPath, name: err2.name, code: err2.code, message: err2.message });
+                console.warn(`Falha ao gravar em usuarios/...:`, err2.message);
               }
             } else {
-              // tentativa 3: collectionGroup('envios') por newsletter + destinatarioId
               try {
-                console.debug({ ...logBase, event: 'firestore.collectionGroup.query', newsletterId, destId });
                 const q = db.collectionGroup("envios")
                   .where("newsletter_id", "==", newsletterId)
                   .where("destinatarioId", "==", destId)
                   .limit(5);
                 const snap = await q.get();
-                console.debug({ ...logBase, event: 'firestore.collectionGroup.result', size: snap.size });
                 if (!snap.empty) {
                   const ops = [];
-                  snap.forEach(doc => {
-                    ops.push(doc.ref.set({ sesMessageId }, { merge: true }));
-                    console.debug({ ...logBase, event: 'firestore.collectionGroup.update', docPath: doc.ref.path });
-                  });
+                  snap.forEach(doc => ops.push(doc.ref.set({ sesMessageId: r.messageId }, { merge: true })));
                   await Promise.all(ops);
-                  console.info({ ...logBase, event: 'firestore.collectionGroup.update.success', updated: ops.length });
-                } else {
-                  console.warn({ ...logBase, event: 'firestore.collectionGroup.empty', message: 'Nenhum doc encontrado para fallback' });
                 }
               } catch (err3) {
-                console.warn({ ...logBase, event: 'firestore.collectionGroup.error', name: err3.name, code: err3.code, message: err3.message, stack: err3.stack });
+                console.warn("Erro no fallback collectionGroup:", err3.message);
               }
             }
           }
         }
-
-        // push resultado com messageId para rastreio
-        results.push({ envioId: e.envioId, ok: true, messageId: sesMessageId });
-      } catch (err) {
-        console.error({ requestId, event: 'sendEmail.error', email: e.email, name: err.name, code: err.code, message: err.message, stack: err.stack });
-        results.push({ envioId: e.envioId, ok: false, error: err.message, code: err.code || null });
       }
+      return { envioId: item.envioId, ok: r.ok, messageId: r.messageId || null, error: r.error || null, destinatarioId: item.destinatarioId || null, assinaturaId: item.assinaturaId || null };
     }
 
-    // Envio em batches respeitando RATE_LIMIT
-    for (const email of emails) {
-      batch.push(email);
-
-      if (batch.length >= RATE_LIMIT) {
-        console.info({ requestId, event: 'batch.send', batchSize: batch.length });
-        await Promise.all(batch.map(sendEmail));
-        batch = [];
-        // aguarda 1 segundo antes de continuar para respeitar taxa
+    // Envio em batches respeitando taxa
+    for (const e of emails) {
+      loteEnvio.push(e);
+      if (loteEnvio.length >= taxa) {
+        await Promise.all(loteEnvio.map(enviarERegistrar));
+        loteEnvio = [];
         await new Promise(resolve => setTimeout(resolve, 1000));
       }
     }
-
-    // envia o restante
-    if (batch.length > 0) {
-      console.info({ requestId, event: 'batch.send.final', batchSize: batch.length });
-      await Promise.all(batch.map(sendEmail));
+    if (loteEnvio.length > 0) {
+      await Promise.all(loteEnvio.map(enviarERegistrar));
     }
 
-    console.info({ requestId, event: 'sendBatch.end', resultsCount: results.length });
-    return res.json({ ok: true, results });
+    // Após envio, atualiza retorno imediato no Firestore (se newsletterId/envioId/loteId foram fornecidos)
+    try {
+      const operador = req.user?.email || body.operador || "Sistema";
+      if (newsletterId && envioId && loteId) {
+        await atualizarRetornoSES_servidor(newsletterId, envioId, loteId, resultados, operador);
+      }
+    } catch (err) {
+      console.warn("Falha ao atualizar retorno após envio em massa:", err.message);
+    }
+
+    return res.json({ ok: true, results: resultados });
   } catch (err) {
-    console.error({ requestId, event: 'sendBatch.error', name: err.name, code: err.code, message: err.message, stack: err.stack });
+    console.error({ requestId, evento: 'envioLote.erro', nome: err.name, mensagem: err.message, stack: err.stack });
+    return res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+/**
+ * Função servidor para verificar e atualizar status de lotes pendentes (simples).
+ * Varre lotes com status pendente/parcial e atualiza envios que já têm sesMessageId ou erro.
+ */
+async function atualizarStatusLotesPendentes_servidor(hours = 24, limit = 50, operador = "Sistema") {
+  try {
+    const corte = new Date(Date.now() - Number(hours) * 3600 * 1000);
+    const now = admin.firestore.Timestamp.now();
+
+    // Busca lotes com status pendente ou parcial
+    const snapLotes = await db.collectionGroup("lotes")
+      .where("status", "in", ["pendente", "parcial"])
+      .limit(Number(limit))
+      .get();
+
+    const resultadosLotes = [];
+
+    for (const loteDoc of snapLotes.docs) {
+      const loteRef = loteDoc.ref;
+      const loteData = loteDoc.data();
+      const enviosSnap = await loteRef.collection("envios").get();
+      if (enviosSnap.empty) {
+        resultadosLotes.push({ lotePath: loteRef.path, atualizadoEnvios: 0, motivo: "sem envios" });
+        continue;
+      }
+
+      let enviadosCount = 0;
+      let atualizadosCount = 0;
+      const batch = db.batch();
+
+      for (const envioDoc of enviosSnap.docs) {
+        const envioRef = envioDoc.ref;
+        const d = envioDoc.data();
+        const statusAtual = d.status || null;
+        const sesMessageId = d.sesMessageId || null;
+        const erro = d.erro || null;
+
+        const updates = {};
+        let precisaAtualizar = false;
+
+        if (sesMessageId && statusAtual !== "enviado") {
+          updates.status = "enviado";
+          updates.data_envio = now;
+          updates.sesMessageId = sesMessageId;
+          precisaAtualizar = true;
+          enviadosCount++;
+        } else if (erro && statusAtual !== "erro") {
+          updates.status = "erro";
+          updates.erro = erro;
+          updates.data_envio = now;
+          precisaAtualizar = true;
+        } else if (statusAtual === "enviado") {
+          enviadosCount++;
+        }
+
+        if (precisaAtualizar) {
+          batch.set(envioRef, updates, { merge: true });
+          atualizadosCount++;
+        }
+      }
+
+      const totalEnvios = enviosSnap.size;
+      const statusLote = enviadosCount === totalEnvios ? "completo" : (enviadosCount > 0 ? "parcial" : loteData.status || "pendente");
+
+      batch.set(loteRef, {
+        enviados: enviadosCount,
+        status: statusLote,
+        data_envio: now
+      }, { merge: true });
+
+      await batch.commit();
+
+      // Grava um registro em envios_log
+      await loteRef.collection("envios_log").add({
+        data_envio: now,
+        quantidade: totalEnvios,
+        enviados: enviadosCount,
+        origem: "verificacao_manual",
+        operador,
+        status: statusLote
+      });
+
+      // Atualiza lotes_gerais e newsletter se possível
+      try {
+        const partes = loteRef.path.split('/');
+        let newsletterId = null, envioId = null, loteId = null;
+        if (partes.length >= 6 && partes[0] === "newsletters") {
+          newsletterId = partes[1];
+          envioId = partes[3];
+          loteId = partes[5];
+        }
+
+        if (loteId && envioId) {
+          const loteGeralSnap = await db.collection("lotes_gerais")
+            .where("loteId", "==", loteId)
+            .where("envioId", "==", envioId)
+            .limit(1)
+            .get();
+
+          if (!loteGeralSnap.empty) {
+            const loteGeralRef = loteGeralSnap.docs[0].ref;
+            await loteGeralRef.update({
+              enviados: enviadosCount,
+              status: statusLote,
+              data_envio: now
+            });
+          }
+
+          if (newsletterId) {
+            await db.collection("newsletters").doc(newsletterId).update({
+              enviada: true,
+              data_publicacao: now
+            });
+          }
+        }
+      } catch (err) {
+        console.warn("Falha ao atualizar lotes_gerais/newsletter para lote:", loteRef.path, err.message);
+      }
+
+      resultadosLotes.push({
+        lotePath: loteRef.path,
+        totalEnvios,
+        enviados: enviadosCount,
+        atualizados: atualizadosCount,
+        statusLote
+      });
+    }
+
+    return { ok: true, verificados: resultadosLotes.length, detalhes: resultadosLotes };
+  } catch (err) {
+    console.error("Erro atualizarStatusLotesPendentes_servidor:", err);
+    return { ok: false, error: err.message };
+  }
+}
+
+// Rota de verificação sob demanda (reaproveita o mesmo arquivo)
+// GET /api/verificarLotesPendentes?hours=24&limit=50
+router.get("/api/verificarLotesPendentes", async (req, res) => {
+  try {
+    // valida token admin se configurado
+    const adminToken = process.env.ADMIN_TOKEN || null;
+    if (adminToken && req.headers['x-admin-token'] !== adminToken) {
+      return res.status(403).json({ ok: false, error: 'Token admin inválido' });
+    }
+
+    const horas = Number(req.query.hours || 24);
+    const limite = Number(req.query.limit || 50);
+    const operador = req.headers['x-admin-operator'] || req.query.operador || "Sistema";
+
+    const resultado = await atualizarStatusLotesPendentes_servidor(horas, limite, operador);
+    if (!resultado.ok) {
+      return res.status(500).json(resultado);
+    }
+    return res.json({ ok: true, verificados: resultado.verificados, detalhes: resultado.detalhes });
+  } catch (err) {
+    console.error("Erro rota verificarLotesPendentes:", err);
     return res.status(500).json({ ok: false, error: err.message });
   }
 });
