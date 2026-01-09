@@ -523,6 +523,7 @@
     <button onclick="abrirTab('leads')">📥 Leads Capturados</button>
     <button onclick="abrirTab('auditoria')">🕵️ Auditoria Leads</button>
     <button onclick="abrirEnvioNewsletterLeads()">📮 Enviar Newsletters</button>
+    <button onclick="executarVerificacao()">📮 Verificar lotes pendentes - atualizar status</button>
     <button onclick="abrirPainelGestao()">🗞️ Painel</button>
 
     <div style="margin-top:12px">
@@ -609,6 +610,150 @@
           </tbody>
         </table>
       </section>
+
+      <!-- Verificação de lotes pendentes de atualização de status -->
+      <section id="secao-lotes_pendentes" style="margin-top:30px">
+        <div id="modal-verificar-lotes" class="modal" style="display:none;">
+          <div class="modal-content">
+            <header class="modal-header">
+              <h3>Verificar lotes pendentes</h3>
+              <button class="modal-close" id="fechar-modal-verificar">×</button>
+            </header>
+
+            <form id="form-verificar-lotes" class="crud-form" onsubmit="return false;">
+              <div class="form-row">
+                <label for="verificar-hours">Horas (corte)</label>
+                <input id="verificar-hours" name="hours" type="number" min="1" value="24" />
+              </div>
+
+              <div class="form-row">
+                <label for="verificar-limit">Limite de lotes</label>
+                <input id="verificar-limit" name="limit" type="number" min="1" value="50" />
+              </div>
+
+              <div class="form-row">
+                <label for="verificar-token">Token admin (opcional)</label>
+                <input id="verificar-token" name="token" type="text" placeholder="x-admin-token (se configurado)" />
+                <small class="hint">Se a rota exigir token, cole-o aqui. Caso contrário, deixe vazio.</small>
+              </div>
+
+              <div class="form-actions">
+                <button type="button" id="btn-executar-verificacao">Executar verificação</button>
+                <button type="button" class="btn-secondary" id="btn-fechar-modal">Fechar</button>
+              </div>
+            </form>
+
+            <section id="verificar-resultados" class="modal-results" style="margin-top:12px;">
+              <div id="verificar-status" style="margin-bottom:8px;"></div>
+              <div id="verificar-lista"></div>
+            </section>
+          </div>
+        </div>
+
+        <!-- estilos mínimos (ajuste conforme seu CSS) -->
+        <style>
+          .modal {
+            position: fixed;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(0, 0, 0, 0.4);
+            z-index: 9999;
+          }
+
+          .modal-content {
+            background: #fff;
+            padding: 18px;
+            width: 820px;
+            max-width: 98%;
+            border-radius: 6px;
+            box-shadow: 0 6px 24px rgba(0, 0, 0, 0.2);
+          }
+
+          .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+          }
+
+          .modal-close {
+            background: transparent;
+            border: 0;
+            font-size: 20px;
+            cursor: pointer;
+          }
+
+          .form-row {
+            margin-bottom: 10px;
+            display: flex;
+            flex-direction: column;
+          }
+
+          .form-row label {
+            font-weight: 600;
+            margin-bottom: 6px;
+          }
+
+          .form-actions {
+            display: flex;
+            gap: 8px;
+            margin-top: 8px;
+          }
+
+          .btn-secondary {
+            background: #eee;
+            border: 1px solid #ccc;
+            padding: 8px 12px;
+            cursor: pointer;
+          }
+
+          #verificar-lista {
+            max-height: 420px;
+            overflow: auto;
+            border-top: 1px solid #eee;
+            padding-top: 8px;
+            margin-top: 8px;
+          }
+
+          .lote-card {
+            border: 1px solid #ddd;
+            padding: 8px;
+            margin-bottom: 8px;
+            border-radius: 4px;
+            background: #fafafa;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+          }
+
+          .lote-meta {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+          }
+
+          .lote-actions {
+            display: flex;
+            gap: 8px;
+          }
+
+          .lote-card pre {
+            white-space: pre-wrap;
+            word-break: break-word;
+            font-size: 13px;
+            margin: 0;
+          }
+
+          .small-muted {
+            color: #666;
+            font-size: 13px;
+          }
+        </style>
+
+      </section>
+
 
       <!-- Seção de envio para Leads -->
       <section id="secao-envio-leads" style="display:none; margin-top:30px">
@@ -1995,7 +2140,8 @@
   <script src="js/site.js"></script>
   <script src="js/functions.js"></script>
   <script src="js/mailer.js"></script>
-
+  <script src="js/verificarLotesPendentes.js"></script>
+  
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/2.4.0/purify.min.js"></script>
   <script src="js/TemplatesNewsletter.js"></script>
