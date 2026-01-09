@@ -1255,7 +1255,7 @@ async function listarLotesEnvio(newsletterId, envioId) {
         <td>
             <button onclick="verDestinatariosLoteUnificado('${loteId}')">👥 Ver Destinatários</button>
             <button onclick="enviarLoteIndividual('${newsletterId}', '${envioId}', '${loteId}')">📤 Enviar Newsletter</button>
-            <button onclick="enviarLoteEmMassa('${lote.newsletterId}', '${lote.envioId}', '${lote.loteId}')">🚀 Enviar Newsletter em massa</button>
+            <button onclick="enviarLoteEmMassa('${newsletterId}', '${envioId}', '${loteId}')">🚀 Enviar Newsletter em massa</button>
             ${reenvios.length > 0
                 ? `<button onclick="verHistoricoEnvios('${newsletterId}', '${envioId}', '${loteId}')">📜 Ver Reenvios (${reenvios.length})</button>`
                 : `<button disabled title='Sem reenvios registrados'>📜 Ver Reenvios</button>`}
@@ -2149,7 +2149,10 @@ async function enviarLoteEmMassa(newsletterId, envioId, loteId) {
         .doc(envioId).collection("lotes").doc(loteId);
 
     const loteSnap = await loteRef.get();
-    if (!loteSnap.exists) throw new Error("Lote não encontrado");
+    if (!loteSnap.exists) {
+        mostrarMensagem("❌ Lote não encontrado.");
+        return;
+    }
 
     const lote = loteSnap.data();
     const newsletterSnap = await db.collection("newsletters").doc(newsletterId).get();
@@ -2191,9 +2194,9 @@ async function enviarLoteEmMassa(newsletterId, envioId, loteId) {
             mensagemHtml: htmlFinal,
             assunto: newsletter.titulo || "Newsletter Radar SIOPE",
             envioId: envioRef.id,
-            destinatarioId: idDest,        
-            tipo: dest.tipo || "leads",    
-            assinaturaId: assinaturaId    
+            destinatarioId: idDest,
+            tipo: dest.tipo || "leads",
+            assinaturaId: assinaturaId
         });
 
     }
