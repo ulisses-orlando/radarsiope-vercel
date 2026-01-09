@@ -5,12 +5,16 @@ import admin from "firebase-admin";
 
 const router = express.Router();
 
-// CORS middleware (manual)
+// CORS middleware (permite chamadas do front em Vercel)
 router.use((req, res, next) => {
   res.setHeader("Access-Control-Allow-Origin", "https://radarsiope-vercel.vercel.app");
   res.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
-  if (req.method === "OPTIONS") return res.status(204).end();
+  // se precisar enviar cookies, habilite a linha abaixo e não use '*'
+  // res.setHeader("Access-Control-Allow-Credentials", "true");
+  if (req.method === "OPTIONS") {
+    return res.status(204).end();
+  }
   next();
 });
 
@@ -38,6 +42,15 @@ router.post("/api/sendBatchViaSES", async (req, res) => {
   console.info({ requestId, event: 'sendBatch.start', ts: new Date().toISOString() });
 
   try {
+    // validação de variáveis de ambiente essenciais
+    const sourceEmail = process.env.SES_SOURCE_EMAIL;
+    const replyToEmail = process.env.SES_REPLY_TO || process.env.SES_SOURCE_EMAIL;
+
+    if (!sourceEmail) {
+      console.error({ requestId, event: 'missing.env', var: 'SES_SOURCE_EMAIL' });
+      return res.status(500).json({ ok: false, error: 'Server misconfiguration: SES_SOURCE_EMAIL not set' });
+    }
+
     const { newsletterId, envioId, loteId, emails } = req.body;
     if (!emails || !Array.isArray(emails)) {
       console.warn({ requestId, event: 'sendBatch.invalidPayload', detail: 'emails missing or not array' });
@@ -55,15 +68,16 @@ router.post("/api/sendBatchViaSES", async (req, res) => {
 
       try {
         const params = {
+          Source: sourceEmail, // ex: "Radar SIOPE - Newsletter" <contato@radarsiope.com.br>
           Destination: { ToAddresses: [e.email] },
           Message: {
             Body: { Html: { Charset: "UTF-8", Data: e.mensagemHtml } },
             Subject: { Charset: "UTF-8", Data: e.assunto }
           },
-          Source: process.env.SES_SOURCE_EMAIL
+          ReplyToAddresses: [replyToEmail]
         };
 
-        console.debug({ ...logBase, event: 'ses.send.call', source: process.env.SES_SOURCE_EMAIL });
+        console.debug({ ...logBase, event: 'ses.send.call', source: sourceEmail });
 
         // envia e captura resposta do SES
         const resp = await ses.send(new SendEmailCommand(params));
