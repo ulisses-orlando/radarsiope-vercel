@@ -2210,7 +2210,7 @@ async function enviarLoteEmMassa(newsletterId, envioId, loteId, tipo) {
 
         const htmlMontado = montarHtmlNewsletterParaEnvio(newsletter, {
             nome: dest.nome,
-            email: emailDest,
+            email: dest.email,
             edicao: newsletter.edicao,
             tipo: newsletter.tipo,
             titulo: newsletter.titulo,
