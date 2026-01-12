@@ -508,6 +508,7 @@
 
   <!-- Inicialização do Firebase -->
   <script src="js/firebase-init.js"></script>
+  <script src="js/verificarLotesPendentes.js" defer></script>
 
   <aside id="sidebar" aria-label="Menu">
     <hr style="margin: 30px 0;">
@@ -523,7 +524,7 @@
     <button onclick="abrirTab('leads')">📥 Leads Capturados</button>
     <button onclick="abrirTab('auditoria')">🕵️ Auditoria Leads</button>
     <button onclick="abrirEnvioNewsletterLeads()">📮 Enviar Newsletters</button>
-    <button onclick="executarVerificacao()">📮 Verificar lotes pendentes - atualizar status</button>
+    <button onclick="abrirModalVerificarLotes(event)">📮 Verificar lotes pendentes - atualizar status</button>
     <button onclick="abrirPainelGestao()">🗞️ Painel</button>
 
     <div style="margin-top:12px">
@@ -2140,8 +2141,8 @@
   <script src="js/site.js"></script>
   <script src="js/functions.js"></script>
   <script src="js/mailer.js"></script>
-  <script src="js/verificarLotesPendentes.js"></script>
   
+
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/2.4.0/purify.min.js"></script>
   <script src="js/TemplatesNewsletter.js"></script>
