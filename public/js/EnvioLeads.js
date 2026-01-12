@@ -2208,7 +2208,7 @@ async function enviarLoteEmMassa(newsletterId, envioId, loteId, tipo) {
 
         const htmlMontado = montarHtmlNewsletterParaEnvio(newsletter, dest, dest.tipo);
         const htmlFinal = aplicarRastreamento(htmlMontado, envioRef.id, idDest, newsletterId, assinaturaId, token);
-console.log("HTML FINAL:", htmlFinal);
+        console.log("HTML FINAL:", htmlFinal);
         payloadEmails.push({
             nome: dest.nome,
             email: dest.email,
@@ -2230,6 +2230,7 @@ console.log("HTML FINAL:", htmlFinal);
     });
 
     const result = await response.json();
+    mostrarMensagem(`✅ Lote nº ${numeroLote} enviado com sucesso!`);
     return result; // log de retorno do backend
 }
 
