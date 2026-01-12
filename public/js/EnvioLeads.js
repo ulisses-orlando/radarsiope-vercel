@@ -1232,6 +1232,7 @@ async function listarLotesEnvio(newsletterId, envioId) {
     for (const doc of snap.docs) {
         const lote = doc.data();
         const loteId = doc.id;
+        const tipo = doc.tipo;
         const reenvios = mapaReenvios[loteId] || [];
 
         const dataGeracao = lote.data_geracao?.toDate ? lote.data_geracao.toDate() : null;
@@ -1255,7 +1256,7 @@ async function listarLotesEnvio(newsletterId, envioId) {
         <td>
             <button onclick="verDestinatariosLoteUnificado('${loteId}')">👥 Ver Destinatários</button>
             <button onclick="enviarLoteIndividual('${newsletterId}', '${envioId}', '${loteId}')">📤 Enviar Newsletter</button>
-            <button onclick="enviarLoteEmMassa('${newsletterId}', '${envioId}', '${loteId}', '${doc.tipo}')">🚀 Enviar Newsletter em massa</button>
+            <button onclick="enviarLoteEmMassa('${newsletterId}', '${envioId}', '${loteId}', '${tipo}')">🚀 Enviar Newsletter em massa</button>
             ${reenvios.length > 0
                 ? `<button onclick="verHistoricoEnvios('${newsletterId}', '${envioId}', '${loteId}')">📜 Ver Reenvios (${reenvios.length})</button>`
                 : `<button disabled title='Sem reenvios registrados'>📜 Ver Reenvios</button>`}
@@ -2171,7 +2172,7 @@ console.log("Assinatura ID 2:", assinaturaId);
         );
 
         let envioRef;
-
+console.log("Tipo do destinatário:", tipo);
         if (tipo === "leads") {
 console.log("Criando envio para lead:", idDest);
             envioRef = await db
