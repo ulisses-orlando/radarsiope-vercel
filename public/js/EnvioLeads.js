@@ -1513,11 +1513,11 @@ function montarHtmlNewsletterParaEnvio(newsletter, dados, segmento = null) {
             htmlFinal = htmlBase + "\n" + htmlBlocos;
         }
     }
-        console.log("HTML FINAL antes:", htmlFinal);
+    console.log("HTML FINAL antes:", htmlFinal);
 
     // ✅ Aplica placeholders reais do destinatário
     htmlFinal = aplicarPlaceholders(htmlFinal, dados);
-        console.log("HTML FINAL depois:", htmlFinal);
+    console.log("HTML FINAL depois:", htmlFinal);
 
     return htmlFinal;
 }
@@ -2208,9 +2208,18 @@ async function enviarLoteEmMassa(newsletterId, envioId, loteId, tipo) {
                 });
         }
 
-        const htmlMontado = montarHtmlNewsletterParaEnvio(newsletter, dest, dest.tipo);
+        const htmlMontado = montarHtmlNewsletterParaEnvio(newsletter, {
+            nome: dest.nome,
+            email: emailDest,
+            edicao: newsletter.edicao,
+            tipo: newsletter.tipo,
+            titulo: newsletter.titulo,
+            data_publicacao: newsletter.data_publicacao,
+            newsletterId
+        }, dest.tipo);
+
         const htmlFinal = aplicarRastreamento(htmlMontado, envioRef.id, idDest, newsletterId, assinaturaId, token);
-        console.log("HTML FINAL:", htmlFinal);
+
         payloadEmails.push({
             nome: dest.nome,
             email: dest.email,
