@@ -2208,7 +2208,7 @@ console.log("Criando envio para usuário:", idDest, "Assinatura ID:", dest.assin
                     acessos_totais: 0
                 });
         }
-
+console.log("Envio criado com ID:", envioRef.id);
         const htmlMontado = montarHtmlNewsletterParaEnvio(newsletter, {
             nome: dest.nome,
             email: dest.email,
@@ -2218,7 +2218,7 @@ console.log("Criando envio para usuário:", idDest, "Assinatura ID:", dest.assin
             data_publicacao: newsletter.data_publicacao,
             newsletterId
         }, dest.tipo);
-
+console.log("HTML montado para destinatário:", dest.email);
         const htmlFinal = aplicarRastreamento(htmlMontado, envioRef.id, idDest, newsletterId, assinaturaId, token);
 console.log("Payload para envio em massa 1: ", payloadEmails);
         payloadEmails.push({
