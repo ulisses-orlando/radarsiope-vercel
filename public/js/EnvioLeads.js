@@ -2208,7 +2208,7 @@ async function enviarLoteEmMassa(newsletterId, envioId, loteId, tipo) {
 
         const htmlMontado = montarHtmlNewsletterParaEnvio(newsletter, dest, dest.tipo);
         const htmlFinal = aplicarRastreamento(htmlMontado, envioRef.id, idDest, newsletterId, assinaturaId, token);
-
+console.log("HTML FINAL:", htmlFinal);
         payloadEmails.push({
             nome: dest.nome,
             email: dest.email,
