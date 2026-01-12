@@ -2153,7 +2153,7 @@ async function enviarLoteEmMassa(newsletterId, envioId, loteId, tipo) {
         mostrarMensagem("❌ Lote não encontrado.");
         return;
     }
-
+console.log("Lote encontrado:", loteSnap.id);
     const lote = loteSnap.data();
     const newsletterSnap = await db.collection("newsletters").doc(newsletterId).get();
     const newsletter = newsletterSnap.data();
@@ -2163,7 +2163,9 @@ async function enviarLoteEmMassa(newsletterId, envioId, loteId, tipo) {
 
     for (const dest of destinatarios) {
         const idDest = dest.id;
+console.log("Assinatura ID 1:", assinaturaId); 
         const assinaturaId = dest.assinaturaId || null;
+console.log("Assinatura ID 2:", assinaturaId);        
         const token = gerarTokenAcesso();
         const expiraEm = firebase.firestore.Timestamp.fromDate(
             new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
@@ -2172,6 +2174,7 @@ async function enviarLoteEmMassa(newsletterId, envioId, loteId, tipo) {
         let envioRef;
 
         if (tipo === "leads") {
+console.log("Criando envio para lead:", idDest);
             envioRef = await db
                 .collection("leads")
                 .doc(idDest)
@@ -2187,6 +2190,7 @@ async function enviarLoteEmMassa(newsletterId, envioId, loteId, tipo) {
                     acessos_totais: 0
                 });
         } else {
+console.log("Criando envio para usuário:", idDest, "Assinatura ID:", dest.assinaturaId);
             envioRef = await db
                 .collection("usuarios")
                 .doc(idDest)
