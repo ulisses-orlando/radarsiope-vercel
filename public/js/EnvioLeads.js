@@ -1513,9 +1513,11 @@ function montarHtmlNewsletterParaEnvio(newsletter, dados, segmento = null) {
             htmlFinal = htmlBase + "\n" + htmlBlocos;
         }
     }
+        console.log("HTML FINAL antes:", htmlFinal);
 
     // ✅ Aplica placeholders reais do destinatário
     htmlFinal = aplicarPlaceholders(htmlFinal, dados);
+        console.log("HTML FINAL depois:", htmlFinal);
 
     return htmlFinal;
 }
@@ -2230,7 +2232,7 @@ async function enviarLoteEmMassa(newsletterId, envioId, loteId, tipo) {
     });
 
     const result = await response.json();
-    mostrarMensagem(`✅ Lote nº ${numeroLote} enviado com sucesso!`);
+    mostrarMensagem(`✅ Lote nº ${lote.numero_lote} enviado com sucesso!`);
     return result; // log de retorno do backend
 }
 
