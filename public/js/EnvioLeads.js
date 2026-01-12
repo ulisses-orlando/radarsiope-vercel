@@ -1513,12 +1513,10 @@ function montarHtmlNewsletterParaEnvio(newsletter, dados, segmento = null) {
             htmlFinal = htmlBase + "\n" + htmlBlocos;
         }
     }
-    console.log("HTML FINAL antes:", htmlFinal);
-
+    
     // ✅ Aplica placeholders reais do destinatário
     htmlFinal = aplicarPlaceholders(htmlFinal, dados);
-    console.log("HTML FINAL depois:", htmlFinal);
-
+    
     return htmlFinal;
 }
 
@@ -2232,15 +2230,16 @@ async function enviarLoteEmMassa(newsletterId, envioId, loteId, tipo) {
         });
 
     }
-
+console.log("Payload para envio em massa:", payloadEmails);
     // envia payload em massa para backend
     const response = await fetch("https://api.radarsiope.com.br/api/sendBatchViaSES", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ newsletterId, envioId, loteId, emails: payloadEmails })
     });
-
+console.log("Resposta do backend:", response);
     const result = await response.json();
+console.log("Resultado do envio em massa:", result);
     mostrarMensagem(`✅ Lote nº ${lote.numero_lote} enviado com sucesso!`);
     return result; // log de retorno do backend
 }
