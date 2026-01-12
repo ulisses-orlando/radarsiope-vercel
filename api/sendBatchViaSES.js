@@ -179,7 +179,7 @@ async function enviarEmailSES(item, emailRemetente, replyTo) {
       },
       ReplyToAddresses: [replyTo]
     };
-console.log("Enviando email para:", item.email, "Mensagem:", item.mensagemHtml);
+
     const resp = await ses.send(new SendEmailCommand(params));
     const sesMessageId = resp?.MessageId || null;
     return { ok: true, messageId: sesMessageId };
