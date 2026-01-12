@@ -2217,7 +2217,7 @@ async function enviarLoteEmMassa(newsletterId, envioId, loteId, tipo) {
         }, dest.tipo);
 
         const htmlFinal = aplicarRastreamento(htmlMontado, envioRef.id, idDest, newsletterId, assinaturaId, token);
-
+console.log("Payload para envio em massa 1: ", payloadEmails);
         payloadEmails.push({
             nome: dest.nome,
             email: dest.email,
@@ -2230,7 +2230,7 @@ async function enviarLoteEmMassa(newsletterId, envioId, loteId, tipo) {
         });
 
     }
-console.log("Payload para envio em massa:", payloadEmails);
+console.log("Payload para envio em massa 2: ", payloadEmails);
     // envia payload em massa para backend
     const response = await fetch("https://api.radarsiope.com.br/api/sendBatchViaSES", {
         method: "POST",
