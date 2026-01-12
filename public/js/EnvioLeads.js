@@ -2163,7 +2163,6 @@ console.log("Lote encontrado:", loteSnap.id);
 
     for (const dest of destinatarios) {
         const idDest = dest.id;
-console.log("Assinatura ID 1:", assinaturaId); 
         const assinaturaId = dest.assinaturaId || null;
 console.log("Assinatura ID 2:", assinaturaId);        
         const token = gerarTokenAcesso();
