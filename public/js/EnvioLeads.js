@@ -1233,19 +1233,8 @@ async function listarLotesEnvio(newsletterId, envioId) {
         const lote = doc.data();
         const loteId = doc.id;
 
-        const loteSnap = await db.collection("lotes_gerais")
-            .where("loteId", "==", loteId)
-            .limit(1)
-            .get();
 
-        if (loteSnap.empty) {
-            mostrarMensagem("❌ Lote não encontrado.");
-            return;
-        }
-console.log("lote: ", loteSnap.numero_lote);
-console.log("tipo: ", loteSnap.tipo);
-
-        const tipo = loteSnap.tipo;
+        const tipo = query.tipo;
 
         const reenvios = mapaReenvios[loteId] || [];
 
@@ -1270,7 +1259,7 @@ console.log("tipo: ", loteSnap.tipo);
         <td>
             <button onclick="verDestinatariosLoteUnificado('${loteId}')">👥 Ver Destinatários</button>
             <button onclick="enviarLoteIndividual('${newsletterId}', '${envioId}', '${loteId}')">📤 Enviar Newsletter</button>
-            <button onclick="enviarLoteEmMassa('${newsletterId}', '${envioId}', '${loteId}', '${tipo}')">🚀 Enviar Newsletter em massa</button>
+            <button onclick="enviarLoteEmMassa('${newsletterId}', '${envioId}', '${loteId}', '${tipoDestinatarioSelecionado}')">🚀 Enviar Newsletter em massa</button>
             ${reenvios.length > 0
                 ? `<button onclick="verHistoricoEnvios('${newsletterId}', '${envioId}', '${loteId}')">📜 Ver Reenvios (${reenvios.length})</button>`
                 : `<button disabled title='Sem reenvios registrados'>📜 Ver Reenvios</button>`}
@@ -2168,10 +2157,7 @@ async function enviarLoteEmMassa(newsletterId, envioId, loteId, tipo) {
         mostrarMensagem("❌ Lote não encontrado.");
         return;
     }
-    console.log("Lote encontrado:", loteSnap.numero_lote);
-
-    tipo_destinatario = loteSnap.tipo || tipo;
-
+    console.log("Lote encontrado:", loteRef.numero_lote);
 
     const lote = loteSnap.data();
     const newsletterSnap = await db.collection("newsletters").doc(newsletterId).get();
@@ -2190,8 +2176,9 @@ async function enviarLoteEmMassa(newsletterId, envioId, loteId, tipo) {
         );
 
         let envioRef;
-        console.log("Tipo do destinatário:", tipo_destinatario);
-        if (tipo_destinatario === "leads") {
+
+        console.log("Tipo do destinatário:", tipo);
+        if (tipo === "leads") {
             console.log("Criando envio para lead:", idDest);
             envioRef = await db
                 .collection("leads")
