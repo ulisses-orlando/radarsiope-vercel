@@ -170,23 +170,30 @@ async function atualizarRetornoSES_servidor(newsletterId, envioId, loteId, resul
  */
 async function enviarEmailSES(item, emailRemetente, replyTo) {
   try {
+    // Se emailRemetente já estiver no formato "Nome <email@dominio>"
+    const isFormatted = typeof emailRemetente === "string" && /<.+@.+>/.test(emailRemetente);
+    const displayName = "Radar SIOPE - Newsletter";
+    const source = isFormatted ? emailRemetente : `${displayName} <${emailRemetente}>`;
+
     const params = {
-      Source: emailRemetente,
+      Source: source,
       Destination: { ToAddresses: [item.email] },
       Message: {
         Body: { Html: { Charset: "UTF-8", Data: item.mensagemHtml } },
         Subject: { Charset: "UTF-8", Data: item.assunto }
       },
-      ReplyToAddresses: [replyTo]
+      ReplyToAddresses: replyTo ? [replyTo] : []
     };
 
     const resp = await ses.send(new SendEmailCommand(params));
     const sesMessageId = resp?.MessageId || null;
     return { ok: true, messageId: sesMessageId };
   } catch (err) {
+    console.error("Erro enviarEmailSES:", err);
     return { ok: false, error: err.message || String(err) };
   }
 }
+
 
 /**
  * Rota principal de envio em lote via SES.
