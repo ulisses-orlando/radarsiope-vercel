@@ -222,13 +222,13 @@ function aplicarPlaceholders(template, dados) {
   const interesse = dados.interesse || "(sem interesse)";
   const interesseId = dados.interesseId || "(sem interesseId)";
   const token = dados.token_acesso || "(sem token)";
-console.log("Dados para placeholders:", dados);
+
   let dataFormatada = "";
   if (dados.data_publicacao) {
     const dataObj = dados.data_publicacao.toDate?.() || dados.data_publicacao;
     dataFormatada = formatDateBR(dataObj);
   }
-console.log("Data formatada:", dataFormatada);
+
   return template
     .replace(/{{nome}}/gi, nome)
     .replace(/{{email}}/gi, email)

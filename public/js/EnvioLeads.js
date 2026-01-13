@@ -1519,12 +1519,7 @@ function montarHtmlNewsletterParaEnvio(newsletter, dados, segmento = null) {
     }
 
     // ✅ Aplica placeholders reais do destinatário
-console.log("Dados para placeholders:", dados);
-console.log("HTML antes de aplicar placeholders:", htmlFinal);    
     htmlFinal = aplicarPlaceholders(htmlFinal, dados);
-console.log("HTML depois de aplicar placeholders:", htmlFinal);    
-
-
     return htmlFinal;
 }
 
