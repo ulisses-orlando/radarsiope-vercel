@@ -2157,7 +2157,6 @@ async function enviarLoteEmMassa(newsletterId, envioId, loteId, tipo) {
         mostrarMensagem("❌ Lote não encontrado.");
         return;
     }
-    console.log("Lote encontrado:", loteRef.numero_lote);
 
     const lote = loteSnap.data();
     const newsletterSnap = await db.collection("newsletters").doc(newsletterId).get();
@@ -2169,7 +2168,6 @@ async function enviarLoteEmMassa(newsletterId, envioId, loteId, tipo) {
     for (const dest of destinatarios) {
         const idDest = dest.id;
         const assinaturaId = dest.assinaturaId || null;
-        console.log("Assinatura ID 2:", assinaturaId);
         const token = gerarTokenAcesso();
         const expiraEm = firebase.firestore.Timestamp.fromDate(
             new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
@@ -2177,9 +2175,7 @@ async function enviarLoteEmMassa(newsletterId, envioId, loteId, tipo) {
 
         let envioRef;
 
-        console.log("Tipo do destinatário:", tipo);
         if (tipo === "leads") {
-            console.log("Criando envio para lead:", idDest);
             envioRef = await db
                 .collection("leads")
                 .doc(idDest)
@@ -2195,7 +2191,6 @@ async function enviarLoteEmMassa(newsletterId, envioId, loteId, tipo) {
                     acessos_totais: 0
                 });
         } else {
-            console.log("Criando envio para usuário:", idDest, "Assinatura ID:", dest.assinaturaId);
             envioRef = await db
                 .collection("usuarios")
                 .doc(idDest)
@@ -2214,7 +2209,6 @@ async function enviarLoteEmMassa(newsletterId, envioId, loteId, tipo) {
                     acessos_totais: 0
                 });
         }
-        console.log("Envio criado com ID:", envioRef.id);
         const htmlMontado = montarHtmlNewsletterParaEnvio(newsletter, {
             nome: dest.nome,
             email: dest.email,
@@ -2224,9 +2218,7 @@ async function enviarLoteEmMassa(newsletterId, envioId, loteId, tipo) {
             data_publicacao: newsletter.data_publicacao,
             newsletterId
         }, dest.tipo);
-        console.log("HTML montado para destinatário:", dest.email);
         const htmlFinal = aplicarRastreamento(htmlMontado, envioRef.id, idDest, newsletterId, assinaturaId, token);
-        console.log("Payload para envio em massa 1: ", payloadEmails);
         payloadEmails.push({
             nome: dest.nome,
             email: dest.email,
@@ -2239,16 +2231,14 @@ async function enviarLoteEmMassa(newsletterId, envioId, loteId, tipo) {
         });
 
     }
-    console.log("Payload para envio em massa 2: ", payloadEmails);
     // envia payload em massa para backend
     const response = await fetch("https://api.radarsiope.com.br/api/sendBatchViaSES", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ newsletterId, envioId, loteId, emails: payloadEmails })
     });
-    console.log("Resposta do backend:", response);
+
     const result = await response.json();
-    console.log("Resultado do envio em massa:", result);
     mostrarMensagem(`✅ Lote nº ${lote.numero_lote} enviado com sucesso!`);
     return result; // log de retorno do backend
 }
