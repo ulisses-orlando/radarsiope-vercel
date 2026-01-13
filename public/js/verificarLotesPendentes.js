@@ -639,7 +639,6 @@
             });
         }
 
-        console.log('verificarLotesPendentes: eventos ligados');
     }
 
     if (document.readyState === 'loading') {
@@ -689,7 +688,6 @@
       .lote-card pre { white-space: pre-wrap; word-break: break-word; }
     `;
         document.head.appendChild(style);
-        console.log('verificarLotesPendentes: estilos persistentes aplicados');
     } catch (e) {
         console.warn('Erro ao injetar estilos persistentes:', e);
     }
