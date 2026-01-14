@@ -188,7 +188,8 @@
         detalhesHtml.innerHTML = `
     <div><strong>Newsletter:</strong> ${newsTitle}</div>
     <div><strong>Edição / Envio:</strong> ${edicao} (${escapeHtml(item.envioId || '')})</div>
-    <div><strong>Data de envio:</strong> ${escapeHtml(dataEnvioStr)}</div>
+    <div><strong>Data de geração:</strong> ${escapeHtml(dataEnvioStr)}</div>
+    <div><strong>Tipo:</strong> ${item.tipo}</div>
     <div><strong>Lote:</strong> ${escapeHtml(String(item.numero_lote || item.loteId || ''))} (${escapeHtml(item.lotePath || '')})</div>
     <div style="margin-top:8px;"><strong>Total envios:</strong> ${totalDisplay}</div>
   `;
@@ -215,9 +216,9 @@
         } else {
             const linhas = item.amostra.map(a => {
                 const id = a.id || '';
-                const status = a.status || a.st || '';
+                const nome = a.nome || a.st || '';
                 const email = a.email || a.to || a.destinatario || '';
-                return `- ${id} | ${status} | ${email}`;
+                return `ID: ${id} | nome: ${nome} | email: ${email}`;
             });
             amostraPre.textContent = linhas.join('\n');
         }
@@ -271,103 +272,113 @@
         const statusEl = document.getElementById('verificar-status');
         const btnExecutar = document.getElementById('btn-executar-verificacao');
 
-        if (!lista || !statusEl || !btnExecutar) {
-            return;
-        }
+        if (!lista || !statusEl || !btnExecutar) return;
 
-        // limpa UI e bloqueia botão
         lista.innerHTML = '';
         statusEl.textContent = 'Executando verificação...';
         btnExecutar.disabled = true;
 
         try {
-            // 1) buscar lotes gerais pendentes
             const lotesSnap = await db.collection('lotes_gerais').where('status', '==', 'pendente').get();
-
             const detalhes = [];
 
             for (const loteDoc of lotesSnap.docs) {
                 try {
                     const loteData = loteDoc.data() || {};
-                    const loteId = loteDoc.id;
+                    const loteGeraisId = loteDoc.id;
                     const numero_lote = loteData.numero_lote || null;
-                    const tipo = loteData.tipo || null; // 'leads' | 'usuarios' expected
+                    const tipo = loteData.tipo || null;
                     const envioId = loteData.envioId || loteData.envioID || loteData.envio || null;
                     const newsletterId = loteData.newsletterId || loteData.newsletter || null;
+                    const newsletterTitleFromLote = loteData.titulo || loteData.title || null;
+                    const edicaoFromLote = loteData.edicao || loteData.edition || null;
 
-                    // 2) buscar envio no caminho apropriado conforme tipo
-                    let envioDoc = null;
-                    let envioDataObj = null;
+                    // --- localizar o documento real do lote usando numero_lote ---
+                    let loteRealDoc = null;
+                    let loteRealData = null;
                     try {
-                        if (tipo === 'leads' && envioId) {
-                            envioDoc = await db.collection('leads').doc('envios').collection('docs').doc(envioId).get().catch(() => null);
-                            // NOTE: se sua estrutura for leads/envios/{envioId} sem subcoleção 'docs', ajuste para:
-                            // envioDoc = await db.collection('leads').doc('envios').collection('...')...
-                            // Para robustez, tentamos dois caminhos abaixo se o primeiro for nulo.
-                            if (!envioDoc || !envioDoc.exists) {
-                                // fallback: leads/envios/{envioId}
-                                envioDoc = await db.collection('leads').doc('envios').get().catch(() => null);
+                        if (newsletterId && envioId && numero_lote != null) {
+                            const lotesRef = db
+                                .collection('newsletters')
+                                .doc(newsletterId)
+                                .collection('envios')
+                                .doc(envioId)
+                                .collection('lotes');
+
+                            // procura por numero_lote igual ao número do lote
+                            const q = await lotesRef.where('numero_lote', '==', numero_lote).limit(1).get();
+                            if (!q.empty) {
+                                loteRealDoc = q.docs[0];
+                                loteRealData = loteRealDoc.data() || {};
+                            } else {
+                                console.warn(`Lote real não encontrado por numero_lote=${numero_lote} em newsletters/${newsletterId}/envios/${envioId}/lotes`);
                             }
-                        } else if (tipo === 'usuarios' && envioId) {
-                            // caminho: usuarios/assinaturas/envios/{envioId}
-                            envioDoc = await db.collection('usuarios').doc('assinaturas').collection('envios').doc(envioId).get().catch(() => null);
-                            if (!envioDoc || !envioDoc.exists) {
-                                // fallback: usuarios/assinaturas/{some}/envios/{envioId} not known; try direct path
-                                envioDoc = await db.collection('usuarios').doc('assinaturas').doc('envios').collection('docs').doc(envioId).get().catch(() => null);
-                            }
-                        } else if (envioId) {
-                            // fallback genérico: tenta newsletters/envios/{envioId}
-                            envioDoc = await db.collection('newsletters').doc(newsletterId || 'unknown').collection('envios').doc(envioId).get().catch(() => null);
+                        } else {
+                            console.warn(`Dados insuficientes para localizar lote real: newsletterId=${newsletterId}, envioId=${envioId}, numero_lote=${numero_lote}`);
                         }
-                    } catch (e) {
-                        envioDoc = null;
+                    } catch (errFind) {
+                        console.warn('Erro ao buscar lote real por numero_lote:', errFind);
+                        loteRealDoc = null;
+                        loteRealData = null;
                     }
 
-                    if (envioDoc && envioDoc.exists) {
-                        envioDataObj = envioDoc.data() || {};
-                    }
+                    // título/edição: prioriza lotes_gerais
+                    let newsletterTitle = newsletterTitleFromLote;
+                    let edicao = edicaoFromLote;
 
-                    // 3) buscar newsletter (se newsletterId presente) para pegar edicao/titulo
-                    let newsletterTitle = null;
-                    let edicao = null;
-                    if (newsletterId) {
-                        try {
-                            const newsDoc = await db.collection('newsletters').doc(newsletterId).get();
-                            if (newsDoc && newsDoc.exists) {
-                                const nd = newsDoc.data() || {};
-                                newsletterTitle = nd.titulo || nd.title || nd.name || null;
-                                edicao = nd.edicao || nd.edition || null;
-                            }
-                        } catch (e) {
-                            newsletterTitle = null;
-                            edicao = null;
-                        }
-                    }
-
-                    // se edicao não veio da newsletter, tenta do envio
-                    if (!edicao && envioDataObj) {
-                        edicao = envioDataObj.edicao || envioDataObj.edition || null;
-                    }
-
-                    // 4) tentar ler amostra de envios dentro do lote (se houver subcoleção)
+                    // montar amostra a partir do campo array 'destinatarios' do lote real
                     let amostra = [];
                     try {
-                        const amostraSnap = await loteDoc.ref.collection('envios').limit(5).get();
-                        if (!amostraSnap.empty) {
-                            amostra = amostraSnap.docs.map(d => Object.assign({ id: d.id }, d.data()));
-                        } else if (envioDoc && envioDoc.exists) {
-                            // se não há subcoleção, incluir o envioDoc como amostra única
-                            amostra = [{ id: envioDoc.id, ...(envioDataObj || {}) }];
+                        const loteDestArray = (loteRealData && (loteRealData.destinatarios || loteRealData.destinatario)) || null;
+                        if (Array.isArray(loteDestArray) && loteDestArray.length) {
+                            amostra = loteDestArray.slice(0, 5).map((d, idx) => ({
+                                id: d.id || d.envioId || `dest-${idx}`,
+                                nome: d.nome || d.name || null,
+                                email: d.email || null,
+                                tipo: d.tipo || null,
+                                raw: d
+                            }));
+                        } else {
+                            // fallback leve: tentar subcoleção envios/envios_log dentro do loteRealDoc (se existir)
+                            /*                             if (loteRealDoc) {
+                                                            const snapEnvios = await loteRealDoc.ref.collection('envios').limit(5).get();
+                                                            if (!snapEnvios.empty) {
+                                                                amostra = snapEnvios.docs.map(d => Object.assign({ id: d.id }, d.data()));
+                                                            } else {
+                                                                const snapEnviosLog = await loteRealDoc.ref.collection('envios_log').limit(5).get();
+                                                                if (!snapEnviosLog.empty) {
+                                                                    amostra = snapEnviosLog.docs.map(d => Object.assign({ id: d.id }, d.data()));
+                                                                }
+                                                            }
+                                                        } */
                         }
-                    } catch (e) {
+                    } catch (errAmostra) {
+                        console.warn('Erro ao montar amostra:', errAmostra);
                         amostra = [];
                     }
 
-                    const envioData = envioDataObj && envioDataObj.data_envio ? (envioDataObj.data_envio.toDate ? envioDataObj.data_envio.toDate() : new Date(envioDataObj.data_envio)) : null;
+                    // totalEnvios: prioriza campos do lotes_gerais, senão usa tamanho do array do lote real
+                    let totalEnvios = null;
+                    if (typeof loteData.total === 'number') {
+                        totalEnvios = loteData.total;
+                    } else if (Array.isArray(loteData.destinatarios)) {
+                        totalEnvios = loteData.destinatarios.length;
+                    } else if (loteRealData && Array.isArray(loteRealData.destinatarios)) {
+                        totalEnvios = loteRealData.destinatarios.length;
+                    } else if (typeof loteData.enviados === 'number') {
+                        totalEnvios = loteData.enviados;
+                    } else if (amostra.length) {
+                        totalEnvios = amostra.length;
+                    }
+
+                    // data do envio (prioriza lotes_gerais)
+                    const envioData = (loteData.data_geracao && loteData.data_geracao.toDate) ? loteData.data_geracao.toDate() :
+                        (loteData.data_geracao ? new Date(loteData.data_geracao) : null);
 
                     const item = {
-                        loteId,
-                        lotePath: loteDoc.ref.path,
+                        loteGeraisId,
+                        loteId: loteRealDoc ? loteRealDoc.id : loteGeraisId, // se não achou, usa id de lotes_gerais
+                        lotePath: loteRealDoc ? loteRealDoc.ref.path : loteDoc.ref.path,
                         numero_lote,
                         tipo,
                         envioId,
@@ -376,13 +387,13 @@
                         edicao,
                         envioData,
                         status: loteData.status,
-                        totalEnvios: (loteData.total !== undefined && loteData.total !== null) ? loteData.total : (loteData.enviados !== undefined ? loteData.enviados : (amostra.length ? amostra.length : null)),
+                        totalEnvios,
                         amostra
                     };
 
                     detalhes.push(item);
                 } catch (errItem) {
-                    // ignora item com problema e continua
+                    console.warn('Erro processando lote_gerais:', loteDoc.id, errItem);
                     continue;
                 }
             } // fim loop lotes_gerais
@@ -401,7 +412,6 @@
             }
             lista.appendChild(frag);
 
-            // garante layout visível (se modal estiver aberto)
             applyModalLayout();
         } catch (err) {
             statusEl.innerHTML = `<strong style="color:crimson">Erro:</strong> ${err.message || String(err)}`;
@@ -410,176 +420,156 @@
         }
     }
 
-
     /* ======================
        Atualizar status de um lote (client-side, batched writes)
        ====================== */
     async function atualizarStatusLoteCliente(item) {
-        // item: objeto completo gerado por carregarLotesPendentes
         if (!item || !item.loteId) throw new Error('Item de lote inválido');
 
-        // referências
-        const loteGeralRef = db.collection('lotes_gerais').doc(item.loteId);
         const now = firebase.firestore.Timestamp.now();
+        const loteGeralRef = db.collection('lotes_gerais').doc(item.loteId);
+        const sesCol = 'SES_NOTIFICACOES'; // ajuste se sua coleção tiver outro nome
 
-        // 1) tenta ler subcoleção envios dentro do lote (se existir)
-        let enviosInLoteSnap = null;
-        try {
-            enviosInLoteSnap = await loteGeralRef.collection('envios').get();
-        } catch (e) {
-            enviosInLoteSnap = null;
+        // destinatarios já deve vir em item (array de objetos { id, email, nome, tipo, ... })
+        const destinatarios = Array.isArray(item.destinatarios) ? item.destinatarios : [];
+        if (!destinatarios.length) {
+            // marca como pendente e retorna
+            await loteGeralRef.set({ status: 'pendente', data_atualizacao: now }, { merge: true });
+            return { enviadosCount: 0, totalEnvios: 0, note: 'destinatarios vazio' };
         }
 
-        // 2) prepara batch para atualizações
+        // batch para atualizações
         let batch = db.batch();
         let writes = 0;
+        const MAX_WRITES_BEFORE_COMMIT = 450;
+        const flushIfNeeded = async () => {
+            if (writes >= MAX_WRITES_BEFORE_COMMIT) {
+                await batch.commit();
+                batch = db.batch();
+                writes = 0;
+            }
+        };
+
         let enviadosCount = 0;
-        let totalEnvios = 0;
+        const totalEnvios = destinatarios.length;
 
-        if (enviosInLoteSnap && !enviosInLoteSnap.empty) {
-            // atualiza cada envio dentro do lote
-            totalEnvios = enviosInLoteSnap.size;
-            for (const envioDoc of enviosInLoteSnap.docs) {
-                const d = envioDoc.data() || {};
-                const envioRef = loteGeralRef.collection('envios').doc(envioDoc.id);
-                const statusAtual = d.status || null;
-                const sesMessageId = d.sesMessageId || null;
-                const erro = d.erro || null;
-
-                if (sesMessageId && statusAtual !== 'enviado') {
-                    batch.set(envioRef, { status: 'enviado', data_envio: now, sesMessageId }, { merge: true });
-                    writes++; enviadosCount++;
-                } else if (erro && statusAtual !== 'erro') {
-                    batch.set(envioRef, { status: 'erro', erro, data_envio: now }, { merge: true });
-                    writes++;
-                } else if (statusAtual === 'enviado') {
-                    enviadosCount++;
-                }
-
-                if (writes >= 450) {
-                    await batch.commit();
-                    batch = db.batch();
-                    writes = 0;
-                }
-            }
-        } else {
-            // não há subcoleção: atualiza o envio único no caminho conforme tipo
-            if (item.tipo === 'leads' && item.envioId) {
-                // caminho provável: leads/envios/{envioId}
-                const envioRef = db.collection('leads').doc('envios').collection('docs').doc(item.envioId);
-                // tenta atualizar o envio (se existir)
-                try {
-                    const envioSnap = await envioRef.get();
-                    if (envioSnap && envioSnap.exists) {
-                        const d = envioSnap.data() || {};
-                        const statusAtual = d.status || null;
-                        const sesMessageId = d.sesMessageId || null;
-                        const erro = d.erro || null;
-                        if (sesMessageId && statusAtual !== 'enviado') {
-                            batch.set(envioRef, { status: 'enviado', data_envio: now, sesMessageId }, { merge: true });
-                            writes++; enviadosCount++;
-                        } else if (erro && statusAtual !== 'erro') {
-                            batch.set(envioRef, { status: 'erro', erro, data_envio: now }, { merge: true });
-                            writes++;
-                        } else if (statusAtual === 'enviado') {
-                            enviadosCount++;
-                        }
-                        totalEnvios = 1;
-                    }
-                } catch (e) {
-                    // fallback: tentar caminho alternativo leads/envios/{envioId}
-                    try {
-                        const altRef = db.collection('leads').doc('envios').doc(item.envioId);
-                        const altSnap = await altRef.get();
-                        if (altSnap && altSnap.exists) {
-                            const d = altSnap.data() || {};
-                            const statusAtual = d.status || null;
-                            const sesMessageId = d.sesMessageId || null;
-                            const erro = d.erro || null;
-                            if (sesMessageId && statusAtual !== 'enviado') {
-                                batch.set(altRef, { status: 'enviado', data_envio: now, sesMessageId }, { merge: true });
-                                writes++; enviadosCount++;
-                            } else if (erro && statusAtual !== 'erro') {
-                                batch.set(altRef, { status: 'erro', erro, data_envio: now }, { merge: true });
-                                writes++;
-                            } else if (statusAtual === 'enviado') {
-                                enviadosCount++;
-                            }
-                            totalEnvios = 1;
-                        }
-                    } catch (e2) { /* ignora */ }
-                }
-            } else if (item.tipo === 'usuarios' && item.envioId) {
-                // caminho: usuarios/assinaturas/envios/{envioId}
-                const envioRef = db.collection('usuarios').doc('assinaturas').collection('envios').doc(item.envioId);
-                try {
-                    const envioSnap = await envioRef.get();
-                    if (envioSnap && envioSnap.exists) {
-                        const d = envioSnap.data() || {};
-                        const statusAtual = d.status || null;
-                        const sesMessageId = d.sesMessageId || null;
-                        const erro = d.erro || null;
-                        if (sesMessageId && statusAtual !== 'enviado') {
-                            batch.set(envioRef, { status: 'enviado', data_envio: now, sesMessageId }, { merge: true });
-                            writes++; enviadosCount++;
-                        } else if (erro && statusAtual !== 'erro') {
-                            batch.set(envioRef, { status: 'erro', erro, data_envio: now }, { merge: true });
-                            writes++;
-                        } else if (statusAtual === 'enviado') {
-                            enviadosCount++;
-                        }
-                        totalEnvios = 1;
-                    }
-                } catch (e) { /* ignora */ }
-            } else {
-                // tipo desconhecido: tenta atualizar newsletter envio se possível
-                if (item.newsletterId && item.envioId) {
-                    const envioRef = db.collection('newsletters').doc(item.newsletterId).collection('envios').doc(item.envioId);
-                    try {
-                        const envioSnap = await envioRef.get();
-                        if (envioSnap && envioSnap.exists) {
-                            const d = envioSnap.data() || {};
-                            const statusAtual = d.status || null;
-                            const sesMessageId = d.sesMessageId || null;
-                            const erro = d.erro || null;
-                            if (sesMessageId && statusAtual !== 'enviado') {
-                                batch.set(envioRef, { status: 'enviado', data_envio: now, sesMessageId }, { merge: true });
-                                writes++; enviadosCount++;
-                            } else if (erro && statusAtual !== 'erro') {
-                                batch.set(envioRef, { status: 'erro', erro, data_envio: now }, { merge: true });
-                                writes++;
-                            } else if (statusAtual === 'enviado') {
-                                enviadosCount++;
-                            }
-                            totalEnvios = 1;
-                        }
-                    } catch (e) { /* ignora */ }
-                }
-            }
+        // Para reduzir leituras repetidas, vamos tentar buscar notificações por email em paralelo com limite
+        // (cada query usa array-contains em mail.destination). Para lotes muito grandes, considere outra estratégia.
+        const concurrency = 10; // número de queries paralelas
+        const chunks = [];
+        for (let i = 0; i < destinatarios.length; i += concurrency) {
+            chunks.push(destinatarios.slice(i, i + concurrency));
         }
 
-        // 3) atualizar documento de lote em newsletters (se existir)
+        for (const chunk of chunks) {
+            // executa queries paralelas para este chunk
+            const promises = chunk.map(async (dest) => {
+                const email = dest.email || null;
+                if (!email) return { dest, notif: null, error: 'sem email' };
+                try {
+                    const q = await db.collection(sesCol).where('mail.destination', 'array-contains', email).limit(1).get().catch(() => null);
+                    if (q && !q.empty) return { dest, notif: q.docs[0].data() || null };
+                    return { dest, notif: null };
+                } catch (e) {
+                    return { dest, notif: null, error: e.message || String(e) };
+                }
+            });
+
+            const results = await Promise.all(promises);
+
+            // processa resultados sequencialmente para aplicar updates em batch
+            for (const res of results) {
+                const dest = res.dest;
+                const notif = res.notif;
+                let novoStatus = 'pendente';
+                let erroMsg = null;
+
+                if (notif) {
+                    const nType = notif.notificationType || (notif.bounce ? 'Bounce' : (notif.complaint ? 'Complaint' : (notif.delivery ? 'Delivery' : null)));
+                    if (nType === 'Delivery') novoStatus = 'enviado';
+                    else if (nType === 'Bounce' || nType === 'Complaint') {
+                        novoStatus = 'erro';
+                        if (notif.bounce && notif.bounce.bounceType) erroMsg = notif.bounce.bounceType;
+                        else if (notif.complaint && notif.complaint.complaintFeedbackType) erroMsg = notif.complaint.complaintFeedbackType;
+                        else erroMsg = nType.toLowerCase();
+                    } else novoStatus = 'pendente';
+                } else {
+                    novoStatus = 'pendente';
+                }
+
+                // atualiza coleções conforme tipo
+                try {
+                    if (item.tipo === 'leads') {
+                        // caminho esperado: /leads/{leadId}/envios/{envioId}
+                        if (dest.id && item.envioId) {
+                            const leadEnvioRef = db.collection('leads').doc(dest.id).collection('envios').doc(item.envioId);
+                            const payload = { status: novoStatus };
+                            if (novoStatus === 'enviado') payload.data_envio = now;
+                            if (erroMsg) payload.erro = erroMsg;
+                            batch.set(leadEnvioRef, payload, { merge: true });
+                            writes++;
+                        } else if (dest.id) {
+                            // fallback: /leads/{leadId}
+                            const leadRef = db.collection('leads').doc(dest.id);
+                            const payload = { status: novoStatus };
+                            if (novoStatus === 'enviado') payload.data_envio = now;
+                            if (erroMsg) payload.erro = erroMsg;
+                            batch.set(leadRef, payload, { merge: true });
+                            writes++;
+                        }
+                    } else if (item.tipo === 'usuarios') {
+                        // caminho esperado: /usuarios/{userId}/assinaturas/{assinaturaId}/envios/{envioId}
+                        if (dest.id && dest.assinaturaId && item.envioId) {
+                            const userEnvioRef = db.collection('usuarios').doc(dest.id)
+                                .collection('assinaturas').doc(dest.assinaturaId)
+                                .collection('envios').doc(item.envioId);
+                            const payload = { status: novoStatus };
+                            if (novoStatus === 'enviado') payload.data_envio = now;
+                            if (erroMsg) payload.erro = erroMsg;
+                            batch.set(userEnvioRef, payload, { merge: true });
+                            writes++;
+                        } else if (dest.id) {
+                            // fallback simples: /usuarios/{userId}
+                            const userRef = db.collection('usuarios').doc(dest.id);
+                            const payload = { status: novoStatus };
+                            if (novoStatus === 'enviado') payload.data_envio = now;
+                            if (erroMsg) payload.erro = erroMsg;
+                            batch.set(userRef, payload, { merge: true });
+                            writes++;
+                        }
+                    } else {
+                        // tipo desconhecido: não atualiza coleções específicas
+                    }
+
+                    if (novoStatus === 'enviado') enviadosCount++;
+                    await flushIfNeeded();
+                } catch (e) {
+                    console.warn('Erro atualizando destinatario:', dest, e);
+                }
+            } // fim processamento chunk
+        } // fim chunks
+
+        // atualizar documento do lote em newsletters (se item.lotePath existir)
         try {
-            if (item.newsletterId && item.envioId) {
-                const loteRefInNewsletter = db.collection('newsletters').doc(item.newsletterId)
-                    .collection('envios').doc(item.envioId)
-                    .collection('lotes').doc(item.loteId);
-                // define status do lote com base em enviadosCount/totalEnvios
-                const statusLote = (totalEnvios && enviadosCount === totalEnvios) ? 'completo' : (enviadosCount > 0 ? 'parcial' : 'pendente');
-                batch.set(loteRefInNewsletter, { enviados: enviadosCount, status: statusLote, data_envio: now }, { merge: true });
+            const statusLote = (enviadosCount === totalEnvios) ? 'completo' : (enviadosCount > 0 ? 'parcial' : 'pendente');
+            if (item.lotePath) {
+                const loteRef = db.doc(item.lotePath);
+                batch.set(loteRef, { enviados: enviadosCount, status: statusLote, data_envio: now }, { merge: true });
                 writes++;
+                await flushIfNeeded();
             }
         } catch (e) {
-            // ignora se não existir
+            console.warn('Erro atualizando lote em newsletters (lotePath):', e);
         }
 
-        // 4) atualizar documento em lotes_gerais
+        // atualizar lotes_gerais
         try {
-            const statusLoteGeral = (totalEnvios && enviadosCount === totalEnvios) ? 'completo' : (enviadosCount > 0 ? 'parcial' : 'pendente');
+            const statusLoteGeral = (enviadosCount === totalEnvios) ? 'completo' : (enviadosCount > 0 ? 'parcial' : 'pendente');
             batch.set(loteGeralRef, { enviados: enviadosCount, status: statusLoteGeral, data_atualizacao: now }, { merge: true });
             writes++;
+            await flushIfNeeded();
         } catch (e) {
-            // ignora
+            console.warn('Erro atualizando lotes_gerais:', e);
         }
 
         // commit final
@@ -587,21 +577,20 @@
             await batch.commit();
         }
 
-        // 5) adicionar log de atualização (opcional)
+        // log simples (opcional)
         try {
             await loteGeralRef.collection('envios_log').add({
                 data_atualizacao: now,
                 enviados: enviadosCount,
                 quantidade: totalEnvios,
-                origem: 'verificacao_cliente',
-                status: (totalEnvios && enviadosCount === totalEnvios) ? 'completo' : (enviadosCount > 0 ? 'parcial' : 'pendente'),
-                operador: (firebase.auth && firebase.auth().currentUser && firebase.auth().currentUser.email) ? firebase.auth().currentUser.email : 'cliente'
+                origem: 'verificacao_ses_notificacoes',
+                status: (enviadosCount === totalEnvios) ? 'completo' : (enviadosCount > 0 ? 'parcial' : 'pendente'),
+                operador: (firebase.auth && firebase.auth().currentUser && firebase.auth().currentUser.email) ? firebase.auth().currentUser.email : 'sistema'
             });
         } catch (e) {
             // ignora falha de log
         }
 
-        // retorna resumo
         return { enviadosCount, totalEnvios };
     }
 
