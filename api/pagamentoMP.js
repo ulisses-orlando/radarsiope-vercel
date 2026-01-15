@@ -1,5 +1,4 @@
-// api/pagamentoMP.js (ESM - use com package.json "type": "module")
-import mercadopago from 'mercadopago';
+// api/pagamentoMP.js (ESM) - sem dependência mercadopago
 import admin from 'firebase-admin';
 
 // DEBUG: log inicial (não expõe segredos)
@@ -7,7 +6,8 @@ try {
   console.log('INICIANDO pagamentoMP - envs:', {
     MP_ACCESS_TOKEN: !!process.env.MP_ACCESS_TOKEN,
     MP_PUBLIC_KEY: !!process.env.MP_PUBLIC_KEY,
-    FIREBASE_SERVICE_ACCOUNT_JSON: !!process.env.FIREBASE_SERVICE_ACCOUNT_JSON
+    FIREBASE_SERVICE_ACCOUNT_JSON: !!process.env.FIREBASE_SERVICE_ACCOUNT_JSON,
+    MP_WEBHOOK_URL: !!process.env.MP_WEBHOOK_URL
   });
 } catch (e) {
   console.error('ERRO AO LOGAR ENV VARS', e);
@@ -29,13 +29,6 @@ if (!admin.apps.length) {
 }
 const db = admin.firestore();
 
-// Configurar Mercado Pago
-if (process.env.MP_ACCESS_TOKEN) {
-  mercadopago.configurations.setAccessToken(process.env.MP_ACCESS_TOKEN);
-} else {
-  console.warn('MP_ACCESS_TOKEN não definido');
-}
-
 // utilitários
 function montarExternalReference(userId, assinaturaId, pedidoId) {
   return `${userId}|${assinaturaId}|${pedidoId}`;
@@ -48,6 +41,28 @@ function parseExternalReference(externalRef) {
 }
 function json(res, status, payload) {
   res.status(status).setHeader('Content-Type', 'application/json').end(JSON.stringify(payload));
+}
+
+// helper para chamar API do Mercado Pago via fetch
+async function mpFetch(path, method = 'GET', body = null) {
+  const token = process.env.MP_ACCESS_TOKEN;
+  if (!token) throw new Error('MP_ACCESS_TOKEN não definido');
+  const base = 'https://api.mercadopago.com';
+  const url = `${base}${path}`;
+  const headers = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
+  const opts = { method, headers };
+  if (body) opts.body = JSON.stringify(body);
+  const resp = await fetch(url, opts);
+  const text = await resp.text();
+  let data = null;
+  try { data = text ? JSON.parse(text) : null; } catch (e) { data = text; }
+  if (!resp.ok) {
+    const err = new Error(`MP API ${resp.status} ${resp.statusText}`);
+    err.status = resp.status;
+    err.body = data;
+    throw err;
+  }
+  return data;
 }
 
 /**
@@ -137,7 +152,8 @@ export default async function handler(req, res) {
 
       const external_reference = montarExternalReference(userId, assinaturaId, novoPedidoRef.id);
 
-      const preference = {
+      // montar payload para Preference (Checkout Pro)
+      const preferencePayload = {
         items: [
           {
             id: novoPedidoRef.id,
@@ -158,19 +174,19 @@ export default async function handler(req, res) {
 
       let mpResp;
       try {
-        mpResp = await mercadopago.preferences.create(preference);
+        mpResp = await mpFetch('/checkout/preferences', 'POST', preferencePayload);
       } catch (err) {
         console.error('Erro ao criar preference no Mercado Pago:', err);
         await novoPedidoRef.set({ status: 'erro_mp', atualizadoEm: admin.firestore.FieldValue.serverTimestamp(), mpError: String(err) }, { merge: true });
-        return json(res, 500, { ok: false, message: 'Erro ao criar preferência no Mercado Pago' });
+        return json(res, 500, { ok: false, message: 'Erro ao criar preferência no Mercado Pago', detail: err.body || String(err) });
       }
 
-      const initPoint = mpResp.body.init_point || mpResp.body.sandbox_init_point || null;
+      const initPoint = mpResp.init_point || mpResp.sandbox_init_point || null;
 
       await novoPedidoRef.set({
-        mpPreferenceId: mpResp.body.id,
+        mpPreferenceId: mpResp.id,
         mpInitPoint: initPoint,
-        mpSandboxInitPoint: mpResp.body.sandbox_init_point || null,
+        mpSandboxInitPoint: mpResp.sandbox_init_point || null,
         external_reference,
         atualizadoEm: admin.firestore.FieldValue.serverTimestamp()
       }, { merge: true });
@@ -196,14 +212,11 @@ export default async function handler(req, res) {
       let mpData = null;
       try {
         if (topic === 'payment') {
-          const r = await mercadopago.payment.get(id);
-          mpData = r.body;
+          mpData = await mpFetch(`/v1/payments/${id}`, 'GET');
         } else if (topic === 'merchant_order') {
-          const r = await mercadopago.merchant_orders.get(id);
-          mpData = r.body;
+          mpData = await mpFetch(`/merchant_orders/${id}`, 'GET');
         } else {
-          const r = await mercadopago.payment.get(id).catch(() => null);
-          mpData = r ? r.body : null;
+          mpData = await mpFetch(`/v1/payments/${id}`, 'GET').catch(() => null);
         }
       } catch (err) {
         console.warn('Falha ao buscar recurso no Mercado Pago:', err);
@@ -320,6 +333,6 @@ export default async function handler(req, res) {
     return json(res, 400, { ok: false, message: 'Rota inválida. Use ?acao=criar-pedido ou envie webhook do MP.' });
   } catch (err) {
     console.error('Erro pagamentoMP:', err);
-    return json(res, 500, { ok: false, message: 'Erro interno' });
+    return json(res, 500, { ok: false, message: 'Erro interno', detail: String(err) });
   }
 }
