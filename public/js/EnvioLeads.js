@@ -2163,6 +2163,7 @@ async function enviarLoteEmMassa(newsletterId, envioId, loteId, tipo) {
 
     const destinatarios = lote.destinatarios || [];
     const payloadEmails = [];
+    let enviados = 0;
 
     for (const dest of destinatarios) {
         const idDest = dest.id;
@@ -2228,7 +2229,7 @@ async function enviarLoteEmMassa(newsletterId, envioId, loteId, tipo) {
             tipo: dest.tipo || "leads",
             assinaturaId: assinaturaId
         });
-
+        enviados++;
     }
     // envia payload em massa para backend
     const response = await fetch("https://api.radarsiope.com.br/api/sendBatchViaSES", {
