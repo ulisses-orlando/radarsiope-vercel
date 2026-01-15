@@ -504,30 +504,50 @@ async function upsertUsuario({ nome, email, telefone, perfil, mensagem, preferen
   }
 }
 
+/**
+ * Cria o documento de assinatura na subcoleção usuarios/{userId}/assinaturas
+ * Retorna o id do documento criado (assinaturaId)
+ *
+ * Parâmetros:
+ * - userId string
+ * - payload object { planId, tipos_selecionados, cupom, forma_pagamento, parcelas, origem, ... }
+ * - preview object retornado por calcularPreview (deve ser await)
+ *
+ * Observações:
+ * - grava campos de auditoria e valores calculados
+ * - retorna assinaturaId para uso posterior (geração de parcelas, criação de pedido no backend)
+ */
 async function registrarAssinatura(userId, payload, preview) {
+  if (!userId) throw new Error('userId é obrigatório');
+  if (!payload) throw new Error('payload é obrigatório');
+  if (!preview) throw new Error('preview é obrigatório');
+
   try {
     const assinaturaData = {
-      planId: payload.planId,
-      tipos_selecionados: payload.tipos_selecionados,
+      planId: payload.planId || null,
+      tipos_selecionados: Array.isArray(payload.tipos_selecionados) ? payload.tipos_selecionados : [],
       cupom: payload.cupom || null,
-      forma_pagamento: payload.forma_pagamento,
-      parcelas: payload.parcelas,
+      forma_pagamento: payload.forma_pagamento || null,
+      parcelas: typeof payload.parcelas === 'number' ? payload.parcelas : (payload.parcelas ? Number(payload.parcelas) : 1),
       origem: payload.origem || null,
-      valor_original: preview.baseTotal,
-      valor_final: preview.total,
-      desconto: preview.baseTotal - preview.total,
+      valor_original: typeof preview.baseTotal === 'number' ? preview.baseTotal : (preview.baseTotal ? Number(preview.baseTotal) : 0),
+      valor_final: typeof preview.total === 'number' ? preview.total : (preview.total ? Number(preview.total) : 0),
+      desconto: (typeof preview.baseTotal === 'number' && typeof preview.total === 'number') ? (preview.baseTotal - preview.total) : null,
       status: 'pendente_pagamento',
-      createdAt: firebase.firestore.FieldValue.serverTimestamp()
+      // campos opcionais para rastreabilidade
+      amountCentavos: typeof preview.amountCentavos === 'number' ? preview.amountCentavos : Math.round((preview.total || 0) * 100),
+      paymentProvider: null,
+      orderId: payload.orderId || null,
+      createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
     };
 
-    await db.collection('usuarios')
-      .doc(userId)
-      .collection('assinaturas')
-      .add(assinaturaData);
+    const ref = await db.collection('usuarios').doc(userId).collection('assinaturas').add(assinaturaData);
 
-    console.log('Assinatura registrada com sucesso');
+    // retorna o id do documento criado para uso posterior
+    return ref.id;
   } catch (err) {
-    console.error('Erro ao registrar assinatura:', err);
+    console.error('registrarAssinatura: erro ao criar assinatura', err);
     throw err;
   }
 }
@@ -563,22 +583,35 @@ async function gerarParcelasAssinatura(userId, assinaturaId, valorTotal, numParc
   }
 }
 
-// -----------------------------
-// Chamada ao backend para criar order + assinaturas
-// -----------------------------
+// chamada do front para criar pedido no backend (Checkout Pro)
 async function createOrderBackend(payload) {
-  const url = '/create-order';
-  const resp = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload)
-  });
-  if (!resp.ok) {
-    const txt = await resp.text();
-    throw new Error(`Erro create-order: ${resp.status} ${txt}`);
+  // payload esperado: { userId, assinaturaId, amountCentavos, descricao }
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 30000); // 30s timeout opcional
+
+  try {
+    const resp = await fetch('/api/pagamentoMP?acao=criar-pedido', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+      signal: controller.signal
+    });
+    clearTimeout(timeout);
+
+    if (!resp.ok) {
+      const txt = await resp.text().catch(() => '');
+      throw new Error(`Erro create-order: ${resp.status} ${txt}`);
+    }
+    const json = await resp.json().catch(() => null);
+    if (!json) throw new Error('Resposta inválida do servidor.');
+    return json; // { ok:true, redirectUrl, pedidoId }
+  } catch (err) {
+    clearTimeout(timeout);
+    // lançar para o caller tratar
+    throw err;
   }
-  return resp.json();
 }
+
 
 // -----------------------------
 // Prefill a partir de leadId (simplificado; UF/Mun tratados no init)
@@ -638,6 +671,7 @@ async function processarEnvioAssinatura(e) {
   clearFormErrors();
   if (status) { status.innerText = ''; status.style.color = 'black'; }
 
+  // --- validações (mantidas) ---
   const nome = document.getElementById('nome').value.trim();
   const email = document.getElementById('email').value.trim();
   const telefone = document.getElementById('telefone').value.trim();
@@ -676,9 +710,19 @@ async function processarEnvioAssinatura(e) {
     dadosUf = null;
   }
 
-  const preview = calcularPreview(window._currentPlan || {}, tiposSelecionados, cupom);
-  if (!preview) {
+  // calcular preview (IMPORTANTE: aguardar)
+  let preview;
+  try {
+    preview = await calcularPreview(window._currentPlan || {}, tiposSelecionados, cupom);
+  } catch (err) {
+    console.error('Erro ao calcular preview:', err);
     if (status) { status.innerText = "Erro ao calcular o valor. Tente novamente."; status.style.color = 'red'; }
+    return;
+  }
+
+  // checagem extra
+  if (!preview || typeof preview.amountCentavos !== 'number' || preview.amountCentavos <= 0) {
+    if (status) { status.innerText = "Valor inválido para pagamento."; status.style.color = 'red'; }
     return;
   }
 
@@ -686,49 +730,68 @@ async function processarEnvioAssinatura(e) {
   if (status) { status.innerText = "Processando..."; status.style.color = 'black'; }
 
   try {
+    // 1) upsert do usuário
     const userId = await upsertUsuario({
       nome, email, telefone, perfil, mensagem,
       preferencia, cod_uf: dadosUf ? dadosUf.cod_uf : null, cod_municipio: dadosUf ? dadosUf.cod_municipio : null, nome_municipio: dadosUf ? dadosUf.nome_municipio : null
     });
 
-    const payload = {
+    // payload básico para registrar assinatura localmente
+    const payloadAssin = {
       userId,
       planId: document.getElementById('planId').value || null,
       tipos_selecionados: tiposSelecionados,
       cupom: cupom || null,
       forma_pagamento: forma,
-      parcelas: parcelas ? Number(parcelas) : null,
+      parcelas: parcelas ? Number(parcelas) : 1,
       origem
     };
 
-    // 🔹 grava assinatura na subcoleção
-    await registrarAssinatura(userId, payload, preview);
+    // 2) registrar assinatura localmente e obter assinaturaId
+    const assinaturaId = await registrarAssinatura(userId, payloadAssin, preview);
+    if (!assinaturaId) {
+      throw new Error('Falha ao criar registro de assinatura local.');
+    }
 
-    await gerarParcelasAssinatura(
+    // 3) criar order no backend (incluir assinaturaId para rastreabilidade)
+    const backendPayload = {
       userId,
       assinaturaId,
-      preview.total,          // valor final da assinatura
-      payload.parcelas || 1,  // número de parcelas
-      payload.forma_pagamento,
-      new Date()              // data da primeira parcela (pode ser hoje ou ajustada)
-    );
-    
-    // 🔹 chamar backend para criar order + pagamento
-    const backendResp = await createOrderBackend(payload);
+      amountCentavos: preview.amountCentavos,
+      descricao: `Assinatura ${window._currentPlan ? window._currentPlan.nome || '' : ''}`
+    };
 
+    const backendResp = await createOrderBackend(backendPayload);
+
+    if (!backendResp || backendResp.ok === false) {
+      const msg = (backendResp && backendResp.message) ? backendResp.message : 'Erro ao criar pedido no servidor.';
+      throw new Error(msg);
+    }
+
+    // 4) opcional: salvar pedidoId localmente (use backendResp.pedidoId)
+    // Recomendação: o backend já gravou pedidos_mp; não é obrigatório que o cliente escreva novamente.
+    // Se quiser gravar localmente (ex.: exibir no painel), use pedidoId retornado:
+    if (backendResp.pedidoId) {
+      try {
+        // se suas regras permitirem, atualize a assinatura local com o pedidoId
+        await db.collection('usuarios').doc(userId).collection('assinaturas').doc(assinaturaId).set({ pedidoId: backendResp.pedidoId }, { merge: true });
+      } catch (err) {
+        console.warn('Não foi possível salvar pedidoId localmente (opcional):', err);
+      }
+    }
+
+    // 5) NÃO gerar parcelas no cliente antes do redirecionamento.
+    //    O ideal é que a geração de parcelas seja feita no backend ou após confirmação (webhook).
+    //    Se você optar por gerar no cliente, saiba que o redirecionamento pode interromper a execução.
+    //    Aqui eu removi a chamada a gerarParcelasAssinatura para evitar perda de execução.
+
+    // 6) redirecionamento / fluxo de pagamento conforme backend
     if (backendResp.redirectUrl) {
       window.location.href = backendResp.redirectUrl;
       return;
-    } else if (backendResp.clientSecret) {
-      mostrarMensagem && mostrarMensagem('Pagamento iniciado. Complete o formulário de pagamento.');
-      const modal = document.getElementById('modalConfirmacao');
-      if (modal) {
-        modal.style.display = 'flex';
-        const msg = document.getElementById('modal-msg');
-        if (msg) msg.textContent = 'Complete o pagamento no modal (fluxo integrado).';
-      }
-      return;
     } else {
+      // fallback: mostrar modal com instruções
+      mostrarMensagem && mostrarMensagem('Pedido criado. Aguardando confirmação.');
       const modal = document.getElementById('modalConfirmacao');
       if (modal) {
         modal.style.display = 'flex';
@@ -739,7 +802,7 @@ async function processarEnvioAssinatura(e) {
     }
   } catch (err) {
     console.error('Erro no processo de assinatura', err);
-    if (status) { status.innerText = 'Erro ao processar assinatura. Veja console.'; status.style.color = 'red'; }
+    if (status) { status.innerText = err.message || 'Erro ao processar assinatura. Veja console.'; status.style.color = 'red'; }
   } finally {
     botao.disabled = false;
   }
