@@ -1,31 +1,14 @@
 // api/pagamentoMP.js (ESM) - sem dependência mercadopago
-import admin from 'firebase-admin';
+import admin from "firebase-admin";
 
-// DEBUG: log inicial (não expõe segredos)
-try {
-  console.log('INICIANDO pagamentoMP - envs:', {
-    MP_ACCESS_TOKEN: !!process.env.MP_ACCESS_TOKEN,
-    MP_PUBLIC_KEY: !!process.env.MP_PUBLIC_KEY,
-    FIREBASE_SERVICE_ACCOUNT_JSON: !!process.env.FIREBASE_SERVICE_ACCOUNT_JSON,
-    MP_WEBHOOK_URL: !!process.env.MP_WEBHOOK_URL
-  });
-} catch (e) {
-  console.error('ERRO AO LOGAR ENV VARS', e);
-}
-
-// Inicializar Firebase Admin
 if (!admin.apps.length) {
-  const saJson = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
-  if (!saJson) {
-    console.error('FIREBASE_SERVICE_ACCOUNT_JSON não definido');
-  } else {
-    try {
-      const sa = JSON.parse(saJson);
-      admin.initializeApp({ credential: admin.credential.cert(sa) });
-    } catch (err) {
-      console.error('Erro ao parsear FIREBASE_SERVICE_ACCOUNT_JSON', err);
-    }
-  }
+  admin.initializeApp({
+    credential: admin.credential.cert({
+      projectId: process.env.FIREBASE_PROJECT_ID,
+      clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+      privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\\\n/g, '\n')
+    })
+  });
 }
 const db = admin.firestore();
 
