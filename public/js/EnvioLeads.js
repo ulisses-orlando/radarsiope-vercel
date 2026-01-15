@@ -2182,7 +2182,7 @@ async function enviarLoteEmMassa(newsletterId, envioId, loteId, tipo) {
                 .add({
                     newsletter_id: newsletterId,
                     data_envio: firebase.firestore.Timestamp.now(),
-                    status: "pendente",
+                    status: "enviado",
                     destinatarioId: idDest,
                     token_acesso: token,
                     expira_em: expiraEm,
@@ -2199,7 +2199,7 @@ async function enviarLoteEmMassa(newsletterId, envioId, loteId, tipo) {
                 .add({
                     newsletter_id: newsletterId,
                     data_envio: firebase.firestore.Timestamp.now(),
-                    status: "pendente",
+                    status: "enviado",
                     destinatarioId: idDest,
                     assinaturaId: dest.assinaturaId,
                     token_acesso: token,
@@ -2235,6 +2235,44 @@ async function enviarLoteEmMassa(newsletterId, envioId, loteId, tipo) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ newsletterId, envioId, loteId, emails: payloadEmails })
+    });
+
+    const usuarioLogado = JSON.parse(localStorage.getItem("usuarioLogado"));
+    const feitoPor = usuarioLogado?.nome || usuarioLogado?.email || "Desconhecido";
+
+    await loteRef.collection("envios_log").add({
+        data_envio: firebase.firestore.Timestamp.now(),
+        quantidade: destinatarios.length,
+        enviados,
+        origem: "manual",
+        operador: feitoPor,
+        status: enviados === destinatarios.length ? "completo" : "parcial"
+    });
+
+    await loteRef.update({
+        enviados,
+        status: enviados === destinatarios.length ? "completo" : "parcial",
+        data_envio: firebase.firestore.Timestamp.now()
+    });
+
+    const loteGeralSnap = await db.collection("lotes_gerais")
+        .where("loteId", "==", loteId)
+        .where("envioId", "==", envioId)
+        .limit(1)
+        .get();
+
+    if (!loteGeralSnap.empty) {
+        const loteGeralRef = loteGeralSnap.docs[0].ref;
+        await loteGeralRef.update({
+            enviados,
+            status: enviados === destinatarios.length ? "completo" : "parcial",
+            data_envio: firebase.firestore.Timestamp.now()
+        });
+    }
+    // 🔥 Marca a newsletter como enviada/publicada
+    await db.collection("newsletters").doc(newsletterId).update({
+        enviada: true,
+        data_publicacao: firebase.firestore.Timestamp.now()
     });
 
     const result = await response.json();
