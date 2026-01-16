@@ -139,30 +139,20 @@ export default async function handler(req, res) {
     console.log('WEBHOOK HEADERS:', req.headers);
     console.log('WEBHOOK RAW BODY:', rawBody);
 
-    // DEBUG IMEDIATO: confirmar execução e imprimir header de assinatura
-console.log('DEBUG PING: handler reached after rawBody read');
-
-try {
-  const headerKeys = Object.keys(req.headers || {});
-  console.log('DEBUG HEADER KEYS:', headerKeys.join(', '));
-  const sig = req.headers['x-signature'] || req.headers['signature'] || req.headers['x-hub-signature'] || req.headers['x-mercadopago-signature'];
-  console.log('DEBUG signature header raw:', sig || '(nenhum encontrado)');
-} catch (e) {
-  console.log('DEBUG erro ao logar headers:', String(e));
-}
-
-// Para evitar 401 enquanto investigamos, responder 200 temporariamente
-// REMOVA esta linha assim que confirmar os logs
-return res.status(200).json({ ok: true, debug: 'ping' });
-
-    // --- BEGIN: DEBUG FINAL EXAUSTIVO (substituir verificação atual temporariamente) ---
+    // --- BEGIN: Validação HMAC final (Mercado Pago) ---
     const secretRaw = process.env.MP_WEBHOOK_SECRET || '';
-    try {
-      const secretUtf8Buf = Buffer.from(secretRaw, 'utf8');
-      console.log('DEBUG secret utf8 len:', secretUtf8Buf.length, 'hex:', secretUtf8Buf.toString('hex').slice(0, 64), '...');
-    } catch (e) { console.log('DEBUG secret utf8: erro ao criar buffer', String(e)); }
+    if (!secretRaw) {
+      console.warn('MP_WEBHOOK_SECRET não configurado; rejeitando por segurança.');
+      return res.status(401).end('assinatura ausente');
+    }
 
-    const signatureHeader = req.headers['x-signature'] || req.headers['x-hub-signature'] || req.headers['x-mercadopago-signature'] || req.headers['x-hook-signature'] || req.headers['signature'] || '';
+    // extrair header de assinatura
+    const signatureHeader = req.headers['x-signature'] || req.headers['x-hub-signature'] || req.headers['x-mercadopago-signature'] || req.headers['x-hook-signature'] || req.headers['signature'];
+    if (!signatureHeader) {
+      console.warn('Nenhum header de assinatura encontrado; rejeitando por segurança.');
+      return res.status(401).end('assinatura ausente');
+    }
+
     let ts = '';
     let v1 = null;
     try {
@@ -175,74 +165,70 @@ return res.status(200).json({ ok: true, debug: 'ping' });
         if (key === 'ts') ts = val;
         if (key === 'v1') v1 = val;
       }
-    } catch (e) { console.warn('DEBUG parse signatureHeader err', String(e)); }
+    } catch (e) {
+      console.warn('Falha ao parsear header de assinatura:', e);
+    }
     if (!v1) {
       const m = String(signatureHeader).match(/([a-f0-9]{64})/i);
       if (m) v1 = m[1];
     }
-    console.log('DEBUG signatureHeader:', signatureHeader);
-    console.log('DEBUG ts:', ts);
-    console.log('DEBUG v1:', v1);
-    const raw = rawBody || '';
-
-    const seps = ['.', ':', '|', '', '\n', '\r\n'];
-    const payloadVariants = [];
-    for (const sep of seps) {
-      payloadVariants.push(`${ts}${sep}${raw}`);
-      payloadVariants.push(`${ts}${sep}${raw.trim()}`);
-      payloadVariants.push(`${ts}${sep}${raw.replace(/^\uFEFF/, '')}`);
+    if (!v1) {
+      console.warn('v1 não encontrado no header de assinatura; rejeitando.');
+      return res.status(401).end('assinatura inválida');
     }
-    payloadVariants.push(raw);
-    payloadVariants.push(raw.trim());
-    payloadVariants.push(raw.replace(/^\uFEFF/, ''));
 
-    const secretCandidates = [
-      { name: 'utf8', buf: (() => { try { return Buffer.from(secretRaw, 'utf8'); } catch (e) { return null; } })() },
+    const raw = rawBody || '';
+    const payloadCandidates = [`${ts}.${raw}`];
+
+    // também tentar ts em segundos (algumas integrações usam segundos)
+    const tsNum = Number(ts);
+    if (!Number.isNaN(tsNum)) payloadCandidates.push(`${Math.floor(tsNum / 1000)}.${raw}`);
+
+    // tentar também só o raw (fallback)
+    payloadCandidates.push(raw);
+
+    // tentar secret como hex primeiro (mais comum), depois utf8
+    const secretVariants = [
       { name: 'hex', buf: (() => { try { return Buffer.from(secretRaw, 'hex'); } catch (e) { return null; } })() },
-      { name: 'base64', buf: (() => { try { return Buffer.from(secretRaw, 'base64'); } catch (e) { return null; } })() },
-      { name: 'utf8_trim', buf: (() => { try { return Buffer.from(String(secretRaw).trim(), 'utf8'); } catch (e) { return null; } })() },
-      { name: 'hex_trim', buf: (() => { try { return Buffer.from(String(secretRaw).trim(), 'hex'); } catch (e) { return null; } })() }
+      { name: 'utf8', buf: Buffer.from(secretRaw, 'utf8') }
     ];
 
-    const extraCandidates = [];
-    for (const sc of secretCandidates) {
-      if (sc.buf) {
-        const rev = Buffer.from(sc.buf).reverse();
-        extraCandidates.push({ name: sc.name + '_reversed', buf: rev });
-      }
-    }
-    const allSecretCandidates = secretCandidates.concat(extraCandidates);
-    const uniqPayloads = Array.from(new Set(payloadVariants));
+    let valid = false;
+    let matchedInfo = null;
 
-    let found = null;
-    for (const payload of uniqPayloads) {
-      for (const sc of allSecretCandidates) {
-        if (!sc.buf) continue;
+    for (const payload of payloadCandidates) {
+      for (const sv of secretVariants) {
+        if (!sv.buf) continue;
         let computed;
         try {
-          computed = crypto.createHmac('sha256', sc.buf).update(payload).digest('hex');
+          computed = crypto.createHmac('sha256', sv.buf).update(payload).digest('hex');
         } catch (e) {
-          console.log('DEBUG HMAC err for', sc.name, String(e));
           continue;
         }
-        const match = (computed === v1);
-        console.log(`DEBUG try -> secretAs:${sc.name} payloadLen:${payload.length} computed:${computed} match:${match}`);
-        if (match) {
-          found = { secretAs: sc.name, payload, computed };
-          break;
+        // comparação segura apenas se comprimentos baterem
+        try {
+          if (v1.length === computed.length) {
+            if (crypto.timingSafeEqual(Buffer.from(v1, 'hex'), Buffer.from(computed, 'hex'))) {
+              valid = true;
+              matchedInfo = { secretAs: sv.name, payload, computed };
+              break;
+            }
+          }
+        } catch (e) {
+          // ignore e continue
         }
       }
-      if (found) break;
+      if (valid) break;
     }
 
-    if (!found) {
-      console.warn('DEBUG FINAL: nenhuma combinação bateu com v1. Veja os logs acima.');
-      return res.status(401).end('assinatura inválida (debug final)');
+    if (!valid) {
+      console.warn('Assinatura inválida: nenhuma combinação válida encontrada.');
+      return res.status(401).end('assinatura inválida');
     }
 
-    console.log('DEBUG MATCH FOUND:', found.secretAs, 'payloadLen:', found.payload.length, 'computed:', found.computed);
-    // continuar processamento normal do webhook
-    // --- END DEBUG FINAL EXAUSTIVO ---
+    // assinatura válida — prosseguir com processamento
+    console.log('ASSINATURA VALIDADA:', matchedInfo.secretAs, 'payloadLen:', matchedInfo.payload.length);
+    // --- END: Validação HMAC final ---
 
     const acao = (req.query && req.query.acao) ? String(req.query.acao) : null;
 
