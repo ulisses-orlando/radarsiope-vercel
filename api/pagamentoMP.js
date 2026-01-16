@@ -150,9 +150,9 @@ export default async function handler(req, res) {
 
     // verificar assinatura HMAC se MP_WEBHOOK_SECRET estiver configurado
     // --- verificar assinatura HMAC (Mercado Pago: header com ts=... , v1=...) ---
+    // assinatura HMAC (Mercado Pago: header no formato ts=...,v1=...)
     const secret = process.env.MP_WEBHOOK_SECRET || null;
     if (secret) {
-      // possíveis nomes de header que o Mercado Pago pode usar
       const signatureHeader = req.headers['x-signature'] || req.headers['x-hub-signature'] || req.headers['x-mercadopago-signature'] || req.headers['x-hook-signature'] || req.headers['signature'];
       console.log('HEADER DE ASSINATURA RECEBIDO:', signatureHeader || '(nenhum)');
 
@@ -178,9 +178,8 @@ export default async function handler(req, res) {
         console.warn('Falha ao parsear header de assinatura:', e);
       }
 
-      // se não vier no formato ts/v1, tentar aceitar só o valor hex (fallback)
+      // fallback: extrair hex se não vier no formato ts/v1
       if (!v1) {
-        // header pode ser "sha256=..." ou apenas o hex; tentar extrair o hex
         const m = String(signatureHeader).match(/([a-f0-9]{64})/i);
         if (m) v1 = m[1];
       }
@@ -190,21 +189,45 @@ export default async function handler(req, res) {
         return res.status(401).end('assinatura inválida');
       }
 
-      // se timestamp ausente, usar 0 (não ideal) — preferir rejeitar, mas logar para debug
       if (!ts) {
         console.warn('timestamp (ts) ausente no header de assinatura; prosseguindo com ts vazio para debug.');
         ts = '';
       }
 
-      // calcular HMAC sobre `${ts}.${rawBody}`
       const payloadToSign = `${ts}.${rawBody}`;
-      console.log('DEBUG payloadToSign (len):', payloadToSign.length, payloadToSign);
 
-      const computed = crypto.createHmac('sha256', secret).update(payloadToSign).digest('hex');
+      // calcular HMAC tratando secret como utf8 e como hex (alguns painéis fornecem hex)
+      const computedUtf8 = crypto.createHmac('sha256', Buffer.from(secret, 'utf8')).update(payloadToSign).digest('hex');
 
-      // comparação segura (constant-time)
-      const valid = (v1.length === computed.length) && crypto.timingSafeEqual(Buffer.from(v1, 'hex'), Buffer.from(computed, 'hex'));
-      console.log('ASSINATURA COMPUTADA:', computed, 'RECEBIDA(v1):', v1, 'VALIDA:', valid);
+      let computedHex = null;
+      try {
+        computedHex = crypto.createHmac('sha256', Buffer.from(secret, 'hex')).update(payloadToSign).digest('hex');
+      } catch (e) {
+        // se não for hex válido, manter null
+        computedHex = null;
+      }
+
+      console.log('DEBUG payloadToSign:', payloadToSign);
+      console.log('DEBUG computedUtf8:', computedUtf8);
+      console.log('DEBUG computedHex :', computedHex || '(não aplicável)');
+      console.log('DEBUG received v1  :', v1);
+
+      // escolher qual computed usar para validação
+      const candidateComputed = (computedHex && computedHex.length === v1.length) ? computedHex : computedUtf8;
+
+      // comparação segura (constant-time) apenas se comprimentos baterem
+      let valid = false;
+      try {
+        if (v1.length === candidateComputed.length) {
+          valid = crypto.timingSafeEqual(Buffer.from(v1, 'hex'), Buffer.from(candidateComputed, 'hex'));
+        } else {
+          valid = false;
+        }
+      } catch (e) {
+        valid = false;
+      }
+
+      console.log('ASSINATURA COMPUTADA:', candidateComputed, 'RECEBIDA(v1):', v1, 'VALIDA:', valid);
 
       if (!valid) return res.status(401).end('assinatura inválida');
     } else {
