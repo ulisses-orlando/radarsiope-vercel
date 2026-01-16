@@ -328,7 +328,6 @@ export default async function handler(req, res) {
 
     // --- BEGIN: DEBUG HMAC IMEDIATO (cole aqui, antes de qualquer validação) ---
     // debug-hmac-temporario.js (cole logo após obter rawBody)
-    const crypto = require('crypto');
 
     try {
       const signatureHeader = req.headers['x-signature'] || req.headers['x-hub-signature'] || req.headers['x-mercadopago-signature'] || req.headers['signature'] || '';
