@@ -149,18 +149,62 @@ export default async function handler(req, res) {
     }
 
     // verificar assinatura HMAC se MP_WEBHOOK_SECRET estiver configurado
+    // --- verificar assinatura HMAC (Mercado Pago: header com ts=... , v1=...) ---
     const secret = process.env.MP_WEBHOOK_SECRET || null;
     if (secret) {
-      const signatureHeader = req.headers['x-hub-signature'] || req.headers['x-signature'] || req.headers['x-mercadopago-signature'] || req.headers['x-hook-signature'] || req.headers['signature'];
+      // possíveis nomes de header que o Mercado Pago pode usar
+      const signatureHeader = req.headers['x-signature'] || req.headers['x-hub-signature'] || req.headers['x-mercadopago-signature'] || req.headers['x-hook-signature'] || req.headers['signature'];
       console.log('HEADER DE ASSINATURA RECEBIDO:', signatureHeader || '(nenhum)');
+
       if (!signatureHeader) {
         console.warn('Nenhum header de assinatura encontrado; rejeitando por segurança.');
         return res.status(401).end('assinatura ausente');
       }
-      const computed = crypto.createHmac('sha256', secret).update(rawBody).digest('hex');
-      const ok = signatureHeader === computed || signatureHeader === `sha256=${computed}` || signatureHeader.endsWith(computed);
-      console.log('ASSINATURA COMPUTADA:', computed, 'VALIDA:', ok);
-      if (!ok) return res.status(401).end('assinatura inválida');
+
+      // extrair ts e v1 do header no formato "ts=12345,v1=abcdef..."
+      let ts = null;
+      let v1 = null;
+      try {
+        const parts = String(signatureHeader).split(',');
+        for (const p of parts) {
+          const [k, v] = p.split('=');
+          if (!k || !v) continue;
+          const key = k.trim();
+          const val = v.trim();
+          if (key === 'ts') ts = val;
+          if (key === 'v1') v1 = val;
+        }
+      } catch (e) {
+        console.warn('Falha ao parsear header de assinatura:', e);
+      }
+
+      // se não vier no formato ts/v1, tentar aceitar só o valor hex (fallback)
+      if (!v1) {
+        // header pode ser "sha256=..." ou apenas o hex; tentar extrair o hex
+        const m = String(signatureHeader).match(/([a-f0-9]{64})/i);
+        if (m) v1 = m[1];
+      }
+
+      if (!v1) {
+        console.warn('v1 não encontrado no header de assinatura; rejeitando.');
+        return res.status(401).end('assinatura inválida');
+      }
+
+      // se timestamp ausente, usar 0 (não ideal) — preferir rejeitar, mas logar para debug
+      if (!ts) {
+        console.warn('timestamp (ts) ausente no header de assinatura; prosseguindo com ts vazio para debug.');
+        ts = '';
+      }
+
+      // calcular HMAC sobre `${ts}.${rawBody}`
+      const payloadToSign = `${ts}.${rawBody}`;
+      const computed = crypto.createHmac('sha256', secret).update(payloadToSign).digest('hex');
+
+      // comparação segura (constant-time)
+      const valid = (v1.length === computed.length) && crypto.timingSafeEqual(Buffer.from(v1, 'hex'), Buffer.from(computed, 'hex'));
+      console.log('ASSINATURA COMPUTADA:', computed, 'RECEBIDA(v1):', v1, 'VALIDA:', valid);
+
+      if (!valid) return res.status(401).end('assinatura inválida');
     } else {
       console.log('MP_WEBHOOK_SECRET não configurado; pulando verificação HMAC.');
     }
