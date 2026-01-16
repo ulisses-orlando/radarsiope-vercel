@@ -236,7 +236,14 @@ export default async function handler(req, res) {
 
     // Cole isto logo após ler rawBody (antes de qualquer validação que retorne)
     try {
-      const signatureHeader = req.headers['x-signature'] || req.headers['x-hub-signature'] || req.headers['x-mercadopago-signature'] || req.headers['signature'] || '';
+      // cole logo após obter rawBody
+
+      // cole logo após obter rawBody
+      const crypto = require('crypto');
+
+      const signatureHeader = req.headers['x-signature'] || req.headers['signature'] || req.headers['x-hub-signature'] || '';
+      console.log('DEBUG signatureHeader:', signatureHeader);
+
       const v1 = (function () {
         try {
           const parts = String(signatureHeader).split(',');
@@ -245,24 +252,44 @@ export default async function handler(req, res) {
             if (!k || !v) continue;
             if (k.trim() === 'v1') return v.trim();
           }
-          const m = String(signatureHeader).match(/([0-9a-fA-F]{64})/);
+          const m = String(signatureHeader).match(/([a-f0-9]{64})/i);
           return m ? m[1] : null;
         } catch (e) { return null; }
       })();
 
       const ts = (String(signatureHeader).match(/ts=([0-9]+)/) || [])[1] || '';
-      console.log('DEBUG signatureHeader:', signatureHeader);
-      console.log('DEBUG ts:', ts, 'DEBUG v1:', v1);
-
-      // rawBody info (bytes)
       const raw = rawBody == null ? '' : String(rawBody);
       const rawBuf = Buffer.from(raw, 'utf8');
-      console.log('DEBUG raw length chars:', raw.length, 'bytes:', rawBuf.length);
-      console.log('DEBUG raw hex (first 200 bytes):', rawBuf.slice(0, 200).toString('hex'));
-      console.log('DEBUG raw bytes (first 80):', Array.from(rawBuf.slice(0, 80)));
 
-      // secret as hex (não imprimir o valor, só o tamanho)
+      console.log('DEBUG ts from header:', ts);
+      console.log('DEBUG v1 from header:', v1);
+      console.log('DEBUG raw length chars:', raw.length, 'bytes:', rawBuf.length);
+      console.log('DEBUG raw hex (first 400 chars):', rawBuf.toString('hex').slice(0, 400));
+
+      // compute exact candidates and compare
+      const candidates = [
+        `${ts}.${raw}`,
+        `${Math.floor(Number(ts) / 1000)}.${raw}`,
+        raw,
+        raw.trim(),
+        `${ts}\n${raw}`
+      ];
+
       const secretHex = (process.env.MP_WEBHOOK_SECRET || '').trim();
+      let keyBuf = null;
+      try { keyBuf = Buffer.from(secretHex, 'hex'); } catch (e) { keyBuf = null; }
+
+      if (!keyBuf) {
+        console.log('DEBUG secretHex inválido para Buffer.from(..., "hex")');
+      } else {
+        for (let i = 0; i < candidates.length; i++) {
+          const p = candidates[i];
+          const computed = crypto.createHmac('sha256', keyBuf).update(p).digest('hex');
+          const match = v1 && computed.toLowerCase() === String(v1).toLowerCase();
+          console.log(`DEBUG COMPARE[${i}] match=${match} candidateLen=${p.length} computed=${computed}`);
+        }
+      }
+
       console.log('DEBUG secret length chars:', secretHex.length);
 
       // preparar candidatos de payload (mesmas variantes que testamos)
