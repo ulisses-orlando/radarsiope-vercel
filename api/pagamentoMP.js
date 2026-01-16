@@ -203,6 +203,7 @@ export default async function handler(req, res) {
     }
     // --- END: DEBUG HMAC IMEDIATO ---
     // --- BEGIN: Validação HMAC final (Mercado Pago) ---
+    // --- BEGIN: Validação HMAC robusta (tenta raw, JSON.stringify e canonical JSON) ---
     const secretRaw = process.env.MP_WEBHOOK_SECRET || '';
     if (!secretRaw) {
       console.warn('MP_WEBHOOK_SECRET não configurado; rejeitando por segurança.');
@@ -240,14 +241,48 @@ export default async function handler(req, res) {
     }
 
     const raw = rawBody || '';
-    const payloadCandidates = [`${ts}.${raw}`];
-    const tsNum = Number(ts);
-    if (!Number.isNaN(tsNum)) payloadCandidates.push(`${Math.floor(tsNum / 1000)}.${raw}`);
-    payloadCandidates.push(raw);
 
+    // helper: canonical JSON (sorted keys)
+    function canonicalJson(obj) {
+      if (obj === null || typeof obj !== 'object') return JSON.stringify(obj);
+      if (Array.isArray(obj)) return '[' + obj.map(canonicalJson).join(',') + ']';
+      const keys = Object.keys(obj).sort();
+      return '{' + keys.map(k => JSON.stringify(k) + ':' + canonicalJson(obj[k])).join(',') + '}';
+    }
+
+    // preparar variantes de payload a testar
+    const payloadCandidates = new Set();
+
+    // ts.ms + raw
+    payloadCandidates.add(`${ts}.${raw}`);
+    // ts.s + raw
+    const tsNum = Number(ts);
+    if (!Number.isNaN(tsNum)) payloadCandidates.add(`${Math.floor(tsNum / 1000)}.${raw}`);
+    // só raw e trimmed
+    payloadCandidates.add(raw);
+    payloadCandidates.add(raw.trim());
+    // raw com newline
+    payloadCandidates.add(`${ts}\n${raw}`);
+
+    // JSON.stringify(req.body) se parseou
+    try {
+      if (req.body) {
+        const jsonStr = JSON.stringify(req.body);
+        payloadCandidates.add(jsonStr);
+        payloadCandidates.add(jsonStr.trim());
+        // canonical JSON (ordenado)
+        payloadCandidates.add(canonicalJson(req.body));
+      }
+    } catch (e) { /* ignore */ }
+
+    // também testar raw sem BOM
+    payloadCandidates.add(raw.replace(/^\uFEFF/, ''));
+
+    // interpretações do secret: hex, utf8, base64
     const secretVariants = [
       { name: 'hex', buf: (() => { try { return Buffer.from(secretRaw, 'hex'); } catch (e) { return null; } })() },
-      { name: 'utf8', buf: Buffer.from(secretRaw, 'utf8') }
+      { name: 'utf8', buf: (() => { try { return Buffer.from(secretRaw, 'utf8'); } catch (e) { return null; } })() },
+      { name: 'base64', buf: (() => { try { return Buffer.from(secretRaw, 'base64'); } catch (e) { return null; } })() }
     ];
 
     let valid = false;
@@ -263,12 +298,10 @@ export default async function handler(req, res) {
           continue;
         }
         try {
-          if (v1.length === computed.length) {
-            if (crypto.timingSafeEqual(Buffer.from(v1, 'hex'), Buffer.from(computed, 'hex'))) {
-              valid = true;
-              matchedInfo = { secretAs: sv.name, payload, computed };
-              break;
-            }
+          if (v1.length === computed.length && crypto.timingSafeEqual(Buffer.from(v1, 'hex'), Buffer.from(computed, 'hex'))) {
+            valid = true;
+            matchedInfo = { secretAs: sv.name, payloadLen: payload.length };
+            break;
           }
         } catch (e) { /* ignore */ }
       }
@@ -276,12 +309,13 @@ export default async function handler(req, res) {
     }
 
     if (!valid) {
-      console.warn('Assinatura inválida: nenhuma combinação válida encontrada.');
+      console.warn('Assinatura inválida: nenhuma combinação encontrada (raw/json/canonical).');
       return res.status(401).end('assinatura inválida');
     }
 
-    console.log('ASSINATURA VALIDADA:', matchedInfo.secretAs, 'payloadLen:', matchedInfo.payload.length);
-    // --- END: Validação HMAC final ---
+    console.log('ASSINATURA VALIDADA:', matchedInfo.secretAs, 'payloadLen:', matchedInfo.payloadLen);
+    // --- END: Validação HMAC robusta ---
+
 
 
     const acao = (req.query && req.query.acao) ? String(req.query.acao) : null;
