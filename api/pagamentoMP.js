@@ -234,14 +234,104 @@ export default async function handler(req, res) {
       req.on('error', err => reject(err));
     });
 
+    // Cole isto logo após ler rawBody (antes de qualquer validação que retorne)
+    try {
+      const signatureHeader = req.headers['x-signature'] || req.headers['x-hub-signature'] || req.headers['x-mercadopago-signature'] || req.headers['signature'] || '';
+      const v1 = (function () {
+        try {
+          const parts = String(signatureHeader).split(',');
+          for (const p of parts) {
+            const [k, v] = p.split('=');
+            if (!k || !v) continue;
+            if (k.trim() === 'v1') return v.trim();
+          }
+          const m = String(signatureHeader).match(/([0-9a-fA-F]{64})/);
+          return m ? m[1] : null;
+        } catch (e) { return null; }
+      })();
+
+      const ts = (String(signatureHeader).match(/ts=([0-9]+)/) || [])[1] || '';
+      console.log('DEBUG signatureHeader:', signatureHeader);
+      console.log('DEBUG ts:', ts, 'DEBUG v1:', v1);
+
+      // rawBody info (bytes)
+      const raw = rawBody == null ? '' : String(rawBody);
+      const rawBuf = Buffer.from(raw, 'utf8');
+      console.log('DEBUG raw length chars:', raw.length, 'bytes:', rawBuf.length);
+      console.log('DEBUG raw hex (first 200 bytes):', rawBuf.slice(0, 200).toString('hex'));
+      console.log('DEBUG raw bytes (first 80):', Array.from(rawBuf.slice(0, 80)));
+
+      // secret as hex (não imprimir o valor, só o tamanho)
+      const secretHex = (process.env.MP_WEBHOOK_SECRET || '').trim();
+      console.log('DEBUG secret length chars:', secretHex.length);
+
+      // preparar candidatos de payload (mesmas variantes que testamos)
+      const payloadCandidates = [
+        `${ts}.${raw}`,
+        `${Math.floor(Number(ts) / 1000)}.${raw}`,
+        raw,
+        raw.trim(),
+        `${ts}\n${raw}`,
+        raw.replace(/^\uFEFF/, ''),            // sem BOM
+        raw.replace(/\r\n/g, '\n'),            // LF
+        raw.replace(/\r\n/g, '\r')             // CR
+      ];
+
+      // se for JSON, adicionar JSON.stringify e canonical
+      try {
+        const parsed = JSON.parse(raw);
+        payloadCandidates.push(JSON.stringify(parsed));
+        payloadCandidates.push(JSON.stringify(parsed).trim());
+        // canonical JSON simples (ordenar chaves)
+        const canonical = (obj => {
+          if (obj === null || typeof obj !== 'object') return JSON.stringify(obj);
+          if (Array.isArray(obj)) return '[' + obj.map(canonical).join(',') + ']';
+          const keys = Object.keys(obj).sort();
+          return '{' + keys.map(k => JSON.stringify(k) + ':' + canonical(obj[k])).join(',') + '}';
+        })(parsed);
+        payloadCandidates.push(canonical);
+        if (parsed.data) {
+          payloadCandidates.push(JSON.stringify(parsed.data));
+          if (parsed.data.id) payloadCandidates.push(String(parsed.data.id));
+        }
+        if (parsed.id) payloadCandidates.push(String(parsed.id));
+      } catch (e) { /* não é JSON */ }
+
+      // dedupe
+      const uniq = Array.from(new Set(payloadCandidates));
+
+      // calcular HMACs com secret interpretado como hex (32 bytes)
+      let keyBuf = null;
+      try { keyBuf = Buffer.from(secretHex, 'hex'); } catch (e) { keyBuf = null; }
+      if (!keyBuf) {
+        console.log('DEBUG: secretHex inválido para Buffer.from(..., "hex")');
+      } else {
+        console.log('DEBUG: secret interpreted as hex ->', keyBuf.length, 'bytes');
+        for (let i = 0; i < uniq.length; i++) {
+          const p = uniq[i];
+          try {
+            const computed = require('crypto').createHmac('sha256', keyBuf).update(p).digest('hex');
+            const match = (v1 && computed.toLowerCase() === String(v1).toLowerCase());
+            console.log(`DEBUG HMAC[${i}] len=${p.length} match=${match} -> ${computed}  label=${p.slice(0, 80).replace(/\n/g, '\\n')}`);
+          } catch (e) {
+            console.log('DEBUG HMAC error for candidate', i, String(e));
+          }
+        }
+      }
+    } catch (e) {
+      console.log('DEBUG fatal in local HMAC debug:', String(e));
+    }
+
+
     console.log('WEBHOOK HEADERS:', req.headers);
     console.log('WEBHOOK RAW BODY:', rawBody);
 
     // --- BEGIN: DEBUG HMAC IMEDIATO (cole aqui, antes de qualquer validação) ---
-    try {
-      const signatureHeader = req.headers['x-signature'] || req.headers['signature'] || req.headers['x-hub-signature'] || req.headers['x-mercadopago-signature'] || '';
-      console.log('DEBUG signatureHeader (raw):', signatureHeader);
+    // debug-hmac-temporario.js (cole logo após obter rawBody)
+    const crypto = require('crypto');
 
+    try {
+      const signatureHeader = req.headers['x-signature'] || req.headers['x-hub-signature'] || req.headers['x-mercadopago-signature'] || req.headers['signature'] || '';
       // extrair ts e v1
       let ts = '';
       let v1 = null;
@@ -260,39 +350,75 @@ export default async function handler(req, res) {
         const m = String(signatureHeader).match(/([a-f0-9]{64})/i);
         if (m) v1 = m[1];
       }
-      console.log('DEBUG ts:', ts, 'DEBUG v1:', v1);
 
-      const raw = rawBody || '';
+      const raw = rawBody == null ? '' : String(rawBody);
+      const rawBuf = Buffer.from(raw, 'utf8');
+
+      console.log('DEBUG signatureHeader:', signatureHeader);
+      console.log('DEBUG ts:', ts, 'DEBUG v1:', v1);
+      console.log('DEBUG raw length chars:', raw.length, 'bytes:', rawBuf.length);
+      console.log('DEBUG raw hex (first 200 bytes):', rawBuf.slice(0, 200).toString('hex'));
+
+      const secretHex = (process.env.MP_WEBHOOK_SECRET || '').trim();
+      console.log('DEBUG secret length chars:', secretHex.length);
+
+      // candidatos de payload (variações mais comuns)
       const payloads = [
         `${ts}.${raw}`,
         `${Math.floor(Number(ts) / 1000)}.${raw}`,
         raw,
         raw.trim(),
-        `${ts}\n${raw}`
+        `${ts}\n${raw}`,
+        raw.replace(/^\uFEFF/, ''),            // sem BOM
+        raw.replace(/\r\n/g, '\n'),            // LF
+        raw.replace(/\r\n/g, '\r')             // CR
       ];
 
-      const secretRaw = process.env.MP_WEBHOOK_SECRET || '';
-      console.log('DEBUG secret length (chars):', String(secretRaw).length);
+      // se for JSON, adicionar serializações úteis
+      try {
+        const parsed = JSON.parse(raw);
+        payloads.push(JSON.stringify(parsed));
+        payloads.push(JSON.stringify(parsed).trim());
+        // canonical JSON simples (ordenar chaves)
+        const canonical = (obj => {
+          if (obj === null || typeof obj !== 'object') return JSON.stringify(obj);
+          if (Array.isArray(obj)) return '[' + obj.map(canonical).join(',') + ']';
+          const keys = Object.keys(obj).sort();
+          return '{' + keys.map(k => JSON.stringify(k) + ':' + canonical(obj[k])).join(',') + '}';
+        })(parsed);
+        payloads.push(canonical);
+        if (parsed.data) {
+          payloads.push(JSON.stringify(parsed.data));
+          if (parsed.data.id) payloads.push(String(parsed.data.id));
+        }
+        if (parsed.id) payloads.push(String(parsed.id));
+      } catch (e) { /* não é JSON */ }
 
-      // calcular HMACs e logar — NÃO imprime o segredo
-      const tryModes = ['utf8', 'hex', 'base64'];
-      for (const mode of tryModes) {
-        let keyBuf = null;
-        try { keyBuf = Buffer.from(secretRaw, mode); } catch (e) { keyBuf = null; }
-        console.log(`DEBUG secret as ${mode}: buffer ${keyBuf ? keyBuf.length + ' bytes' : 'invalid'}`);
-        if (!keyBuf) continue;
-        for (const p of payloads) {
+      // dedupe
+      const uniq = Array.from(new Set(payloads));
+
+      // interpretar secret como hex (32 bytes) e calcular HMACs
+      let keyBuf = null;
+      try { keyBuf = Buffer.from(secretHex, 'hex'); } catch (e) { keyBuf = null; }
+      if (!keyBuf) {
+        console.log('DEBUG: secretHex inválido para Buffer.from(..., "hex")');
+      } else {
+        console.log('DEBUG: secret interpreted as hex ->', keyBuf.length, 'bytes');
+        for (let i = 0; i < uniq.length; i++) {
+          const p = uniq[i];
           try {
-            const h = crypto.createHmac('sha256', keyBuf).update(p).digest('hex');
-            console.log(`DEBUG HMAC mode=${mode} payloadLen=${p.length} -> ${h}`);
+            const computed = crypto.createHmac('sha256', keyBuf).update(p).digest('hex');
+            const match = (v1 && computed.toLowerCase() === String(v1).toLowerCase());
+            console.log(`DEBUG HMAC[${i}] match=${match} -> ${computed}  label=${p.slice(0, 120).replace(/\n/g, '\\n')}`);
           } catch (e) {
-            console.log('DEBUG HMAC error:', String(e));
+            console.log('DEBUG HMAC error for candidate', i, String(e));
           }
         }
       }
     } catch (e) {
-      console.log('DEBUG fatal error in HMAC debug:', String(e));
+      console.log('DEBUG fatal in local HMAC debug:', String(e));
     }
+
     // --- END: DEBUG HMAC IMEDIATO ---
 
     // responder 200 temporariamente para evitar reenvios enquanto depuramos
@@ -388,7 +514,7 @@ export default async function handler(req, res) {
     // assinatura válida — prosseguir com processamento
     console.log('ASSINATURA VALIDADA:', matchedInfo.secretAs, 'payloadLen:', matchedInfo.payload.length);
     // --- END: Validação HMAC final ---
-    
+
     // ... restante do processamento (criar-pedido, webhook handling, etc.) ...
   } catch (err) {
     console.error('Erro pagamentoMP:', err);
