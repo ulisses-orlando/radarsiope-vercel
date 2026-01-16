@@ -23,28 +23,16 @@ try {
 }
 
 // Inicializar Firebase Admin usando variáveis separadas (padrão do pixel.js)
-if (!admin.apps.length) {
-  const projectId = process.env.FIREBASE_PROJECT_ID || null;
-  const clientEmail = process.env.FIREBASE_CLIENT_EMAIL || null;
-  let privateKey = process.env.FIREBASE_PRIVATE_KEY || null;
+import admin from "firebase-admin";
 
-  if (!projectId || !clientEmail || !privateKey) {
-    console.error('Variáveis FIREBASE_PROJECT_ID / FIREBASE_CLIENT_EMAIL / FIREBASE_PRIVATE_KEY não definidas');
-  } else {
-    privateKey = privateKey.replace(/\\n/g, '\n');
-    try {
-      admin.initializeApp({
-        credential: admin.credential.cert({
-          projectId,
-          clientEmail,
-          privateKey
-        })
-      });
-      console.log('Firebase inicializado via env vars (projectId, clientEmail, privateKey)');
-    } catch (err) {
-      console.error('Erro ao inicializar Firebase com env vars:', err);
-    }
-  }
+if (!admin.apps.length) {
+  admin.initializeApp({
+    credential: admin.credential.cert({
+      projectId: process.env.FIREBASE_PROJECT_ID,
+      clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+      privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\\\n/g, '\n')
+    })
+  });
 }
 const db = admin.firestore();
 
