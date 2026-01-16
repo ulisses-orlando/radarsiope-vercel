@@ -150,11 +150,23 @@ export default async function handler(req, res) {
 
     // --- BEGIN: Validação HMAC do Mercado Pago (substituir bloco antigo) ---
     // DEBUG EXTENSO: testar múltiplas variantes de payload e interpretação do secret
+    // --- BEGIN: Verificação HMAC com tentativa de ts em ms e em s (substituir bloco antigo) ---
     const secret = process.env.MP_WEBHOOK_SECRET || '';
+    if (!secret) {
+      console.warn('MP_WEBHOOK_SECRET não configurado; rejeitando por segurança.');
+      return res.status(401).end('assinatura ausente');
+    }
+
+    // extrair header de assinatura
     const signatureHeader = req.headers['x-signature'] || req.headers['x-hub-signature'] || req.headers['x-mercadopago-signature'] || req.headers['x-hook-signature'] || req.headers['signature'];
+    if (!signatureHeader) {
+      console.warn('Nenhum header de assinatura encontrado; rejeitando por segurança.');
+      return res.status(401).end('assinatura ausente');
+    }
+
     let ts = '';
     let v1 = null;
-    if (signatureHeader) {
+    try {
       const parts = String(signatureHeader).split(',');
       for (const p of parts) {
         const [k, v] = p.split('=');
@@ -164,65 +176,72 @@ export default async function handler(req, res) {
         if (key === 'ts') ts = val;
         if (key === 'v1') v1 = val;
       }
-      if (!v1) {
-        const m = String(signatureHeader).match(/([a-f0-9]{64})/i);
-        if (m) v1 = m[1];
-      }
+    } catch (e) {
+      console.warn('Falha ao parsear header de assinatura:', e);
+    }
+    if (!v1) {
+      const m = String(signatureHeader).match(/([a-f0-9]{64})/i);
+      if (m) v1 = m[1];
+    }
+    if (!v1) {
+      console.warn('v1 não encontrado no header de assinatura; rejeitando.');
+      return res.status(401).end('assinatura inválida');
     }
 
-    const variants = [
-      `${ts}.${rawBody}`,
-      `${rawBody}`,
-      `${ts}\n${rawBody}`,
-      `${rawBody}\n`
+    // preparar variantes de payload: ts (ms), ts (s), só rawBody
+    const payloadVariants = [];
+    const raw = rawBody || '';
+    payloadVariants.push(`${ts}.${raw}`);
+    try {
+      const tsNum = Number(ts);
+      if (!Number.isNaN(tsNum)) {
+        payloadVariants.push(`${Math.floor(tsNum / 1000)}.${raw}`); // ts em segundos
+      }
+    } catch (e) { }
+    payloadVariants.push(raw);
+
+    // tentar secret como hex e como utf8
+    const secretVariants = [
+      { name: 'hex', buf: (() => { try { return Buffer.from(secret, 'hex'); } catch (e) { return null; } })() },
+      { name: 'utf8', buf: Buffer.from(secret, 'utf8') }
     ];
 
-    console.log('DEBUG signatureHeader:', signatureHeader);
-    console.log('DEBUG ts:', ts);
-    console.log('DEBUG v1:', v1);
-    console.log('DEBUG rawBody len:', rawBody.length, rawBody);
+    let matched = false;
+    let matchedInfo = null;
 
-    for (const payload of variants) {
-      // utf8 secret
-      let compUtf8 = null;
-      try { compUtf8 = crypto.createHmac('sha256', Buffer.from(secret, 'utf8')).update(payload).digest('hex'); } catch (e) { compUtf8 = `ERR:${String(e)}`; }
-      // hex secret
-      let compHex = null;
-      try { compHex = crypto.createHmac('sha256', Buffer.from(secret, 'hex')).update(payload).digest('hex'); } catch (e) { compHex = `ERR:${String(e)}`; }
-
-      console.log('DEBUG variant payload (len):', payload.length, payload);
-      console.log('DEBUG compUtf8:', compUtf8);
-      console.log('DEBUG compHex :', compHex);
-      if (v1) {
-        console.log('DEBUG matchUtf8:', compUtf8 === v1);
-        console.log('DEBUG matchHex :', compHex === v1);
+    for (const payload of payloadVariants) {
+      for (const sv of secretVariants) {
+        if (!sv.buf) continue;
+        let computed;
+        try {
+          computed = crypto.createHmac('sha256', sv.buf).update(payload).digest('hex');
+        } catch (e) {
+          console.log(`Erro ao calcular HMAC com secret as ${sv.name}:`, String(e));
+          continue;
+        }
+        const isMatch = (computed === v1);
+        console.log(`HMAC test -> secretAs:${sv.name} payloadLen:${payload.length} computed:${computed} match:${isMatch}`);
+        if (isMatch) {
+          matched = true;
+          matchedInfo = { secretAs: sv.name, payload, computed };
+          break;
+        }
       }
+      if (matched) break;
     }
 
-    // --- LOG EXTRA: listar chaves de header e imprimir possíveis nomes de assinatura ---
-try {
-  // lista curta das chaves de header recebidas (case-insensitive)
-  const headerKeys = Object.keys(req.headers || {});
-  console.log('HEADER KEYS RECEBIDAS:', headerKeys.join(', '));
-
-  // imprimir explicitamente os headers que costumam ser usados pelo Mercado Pago
-  const possibleNames = ['x-signature','x-hub-signature','x-mercadopago-signature','x-hook-signature','signature','x-mercadopago-signature-ts','x-signature-ts'];
-  for (const name of possibleNames) {
-    if (req.headers[name]) {
-      console.log(`HEADER ENCONTRADO [${name}]:`, req.headers[name]);
-    } else if (req.headers[name.toLowerCase()]) {
-      console.log(`HEADER ENCONTRADO [${name.toLowerCase()}]:`, req.headers[name.toLowerCase()]);
+    if (!matched) {
+      console.warn('Assinatura inválida: nenhuma combinação (ts ms/s/raw x secret hex/utf8) bateu com v1.');
+      console.log('DEBUG signatureHeader:', signatureHeader);
+      console.log('DEBUG v1:', v1);
+      console.log('DEBUG rawBody len:', raw.length);
+      return res.status(401).end('assinatura inválida');
     }
-  }
 
-  // fallback: imprimir qualquer header que contenha "sign" no nome
-  const signLike = headerKeys.filter(k => k.toLowerCase().includes('sign'));
-  if (signLike.length) {
-    for (const k of signLike) console.log(`HEADER COM 'sign' NO NOME [${k}]:`, req.headers[k]);
-  }
-} catch (e) {
-  console.warn('Erro ao logar headers extras:', e);
-}
+    // se chegou aqui, encontrou match — prosseguir
+    console.log('MATCH FOUND:', matchedInfo.secretAs, 'payloadLen:', matchedInfo.payload.length, 'computed:', matchedInfo.computed);
+    // continuar processamento normal do webhook
+    // --- END: Verificação HMAC com tentativa de ts em ms e em s ---
 
 
     const acao = (req.query && req.query.acao) ? String(req.query.acao) : null;
