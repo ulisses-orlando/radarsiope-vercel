@@ -22,9 +22,6 @@ try {
   console.error('ERRO AO LOGAR ENV VARS', e);
 }
 
-// Inicializar Firebase Admin usando variáveis separadas (padrão do pixel.js)
-import admin from "firebase-admin";
-
 if (!admin.apps.length) {
   admin.initializeApp({
     credential: admin.credential.cert({
