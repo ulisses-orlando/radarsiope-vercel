@@ -199,6 +199,31 @@ export default async function handler(req, res) {
       }
     }
 
+    // --- LOG EXTRA: listar chaves de header e imprimir possíveis nomes de assinatura ---
+try {
+  // lista curta das chaves de header recebidas (case-insensitive)
+  const headerKeys = Object.keys(req.headers || {});
+  console.log('HEADER KEYS RECEBIDAS:', headerKeys.join(', '));
+
+  // imprimir explicitamente os headers que costumam ser usados pelo Mercado Pago
+  const possibleNames = ['x-signature','x-hub-signature','x-mercadopago-signature','x-hook-signature','signature','x-mercadopago-signature-ts','x-signature-ts'];
+  for (const name of possibleNames) {
+    if (req.headers[name]) {
+      console.log(`HEADER ENCONTRADO [${name}]:`, req.headers[name]);
+    } else if (req.headers[name.toLowerCase()]) {
+      console.log(`HEADER ENCONTRADO [${name.toLowerCase()}]:`, req.headers[name.toLowerCase()]);
+    }
+  }
+
+  // fallback: imprimir qualquer header que contenha "sign" no nome
+  const signLike = headerKeys.filter(k => k.toLowerCase().includes('sign'));
+  if (signLike.length) {
+    for (const k of signLike) console.log(`HEADER COM 'sign' NO NOME [${k}]:`, req.headers[k]);
+  }
+} catch (e) {
+  console.warn('Erro ao logar headers extras:', e);
+}
+
 
     const acao = (req.query && req.query.acao) ? String(req.query.acao) : null;
 
