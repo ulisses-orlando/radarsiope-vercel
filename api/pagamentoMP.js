@@ -4,9 +4,7 @@
 // - Captura raw body, loga headers/body, valida assinatura HMAC se MP_WEBHOOK_SECRET estiver configurado
 // - Gera parcelas no backend e trata webhooks com tolerância a 404 (simulações)
 
-//import crypto from 'crypto';
-const crypto = require('crypto');
-
+import crypto from 'crypto';
 import admin from 'firebase-admin';
 
 // DEBUG: log inicial (não expõe segredos)
