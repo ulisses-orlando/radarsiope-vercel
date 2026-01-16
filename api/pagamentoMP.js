@@ -149,8 +149,11 @@ export default async function handler(req, res) {
     }
 
     // --- BEGIN: Validação HMAC do Mercado Pago (substituir bloco antigo) ---
-    const secret = process.env.MP_WEBHOOK_SECRET || null;
-    if (secret) {
+    // --- BEGIN DEBUG: testar múltiplas interpretações do secret e variantes do payload ---
+    const secret = process.env.MP_WEBHOOK_SECRET || '';
+    if (!secret) {
+      console.log('MP_WEBHOOK_SECRET não configurado; pulando verificação HMAC.');
+    } else {
       const signatureHeader = req.headers['x-signature'] || req.headers['x-hub-signature'] || req.headers['x-mercadopago-signature'] || req.headers['x-hook-signature'] || req.headers['signature'];
       console.log('HEADER DE ASSINATURA RECEBIDO:', signatureHeader || '(nenhum)');
 
@@ -160,7 +163,7 @@ export default async function handler(req, res) {
       }
 
       // extrair ts e v1 do header no formato "ts=12345,v1=abcdef..."
-      let ts = null;
+      let ts = '';
       let v1 = null;
       try {
         const parts = String(signatureHeader).split(',');
@@ -175,55 +178,72 @@ export default async function handler(req, res) {
       } catch (e) {
         console.warn('Falha ao parsear header de assinatura:', e);
       }
-
-      // fallback: extrair hex se não vier no formato ts/v1
       if (!v1) {
         const m = String(signatureHeader).match(/([a-f0-9]{64})/i);
         if (m) v1 = m[1];
       }
-
       if (!v1) {
         console.warn('v1 não encontrado no header de assinatura; rejeitando.');
         return res.status(401).end('assinatura inválida');
       }
 
-      if (!ts) {
-        console.warn('timestamp (ts) ausente no header de assinatura; prosseguindo com ts vazio para debug.');
-        ts = '';
-      }
+      // variantes de payload para testar (timestamp + '.', só body, newline, CRLF)
+      const variants = [
+        `${ts}.${rawBody}`,
+        `${rawBody}`,
+        `${ts}\n${rawBody}`,
+        `${rawBody}\n`,
+        `${ts}\r\n${rawBody}`,
+        `${rawBody}\r\n`
+      ];
 
-      const payloadToSign = `${ts}.${rawBody}`;
+      console.log('DEBUG ts:', ts);
+      console.log('DEBUG v1:', v1);
+      console.log('DEBUG rawBody len:', rawBody.length);
 
-      // Tentar interpretar secret como hex primeiro (mais comum para MP), senão usar utf8
-      let candidateComputed = null;
-      try {
-        candidateComputed = crypto.createHmac('sha256', Buffer.from(secret, 'hex')).update(payloadToSign).digest('hex');
-        console.log('Usando MP_WEBHOOK_SECRET como hex para calcular HMAC.');
-      } catch (e) {
-        // se falhar ao interpretar como hex, usar utf8
-        candidateComputed = crypto.createHmac('sha256', Buffer.from(secret, 'utf8')).update(payloadToSign).digest('hex');
-        console.log('Usando MP_WEBHOOK_SECRET como utf8 para calcular HMAC.');
-      }
+      // testar interpretações do secret: utf8, hex, base64
+      const secretVariants = [
+        { name: 'utf8', fn: (s) => Buffer.from(s, 'utf8') },
+        { name: 'hex', fn: (s) => { try { return Buffer.from(s, 'hex'); } catch (e) { return null; } } },
+        { name: 'base64', fn: (s) => { try { return Buffer.from(s, 'base64'); } catch (e) { return null; } } }
+      ];
 
-      // comparação segura (constant-time) apenas se comprimentos baterem
-      let valid = false;
-      try {
-        if (v1.length === candidateComputed.length) {
-          valid = crypto.timingSafeEqual(Buffer.from(v1, 'hex'), Buffer.from(candidateComputed, 'hex'));
-        } else {
-          valid = false;
+      let matched = false;
+      for (const payload of variants) {
+        console.log('DEBUG variant payload (len):', payload.length);
+        for (const sv of secretVariants) {
+          const keyBuf = sv.fn(secret);
+          if (!keyBuf) {
+            console.log(`DEBUG secret as ${sv.name}: not applicable`);
+            continue;
+          }
+          let computed;
+          try {
+            computed = crypto.createHmac('sha256', keyBuf).update(payload).digest('hex');
+          } catch (e) {
+            console.log(`DEBUG erro ao calcular HMAC com secret as ${sv.name}:`, String(e));
+            continue;
+          }
+          const match = (computed === v1);
+          console.log(`DEBUG secret as ${sv.name} -> computed:`, computed, 'match:', match);
+          if (match) {
+            console.log('DEBUG MATCH FOUND -> secretInterpretation:', sv.name, 'payloadVariantLen:', payload.length);
+            matched = true;
+            break;
+          }
         }
-      } catch (e) {
-        valid = false;
+        if (matched) break;
       }
 
-      console.log('ASSINATURA COMPUTADA:', candidateComputed, 'RECEBIDA(v1):', v1, 'VALIDA:', valid);
+      if (!matched) {
+        console.warn('DEBUG: nenhuma combinação testada bateu com v1. Veja os logs acima para detalhes.');
+        // responder 401 para manter segurança (opcional: responder 200 para evitar reenvios durante debug)
+        return res.status(401).end('assinatura inválida (debug)');
+      }
 
-      if (!valid) return res.status(401).end('assinatura inválida');
-    } else {
-      console.log('MP_WEBHOOK_SECRET não configurado; pulando verificação HMAC.');
+      // se chegou aqui, encontrou match e prossegue (não retorna)
     }
-    // --- END: Validação HMAC do Mercado Pago ---
+    // --- END DEBUG ---
 
     const acao = (req.query && req.query.acao) ? String(req.query.acao) : null;
 
