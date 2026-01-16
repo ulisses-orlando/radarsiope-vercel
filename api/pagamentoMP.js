@@ -139,6 +139,69 @@ export default async function handler(req, res) {
     console.log('WEBHOOK HEADERS:', req.headers);
     console.log('WEBHOOK RAW BODY:', rawBody);
 
+    // DEBUG controlado por variável de ambiente
+    const MP_HMAC_DEBUG = (process.env.MP_HMAC_DEBUG || 'false').toLowerCase() === 'true';
+
+    // --- BEGIN: DEBUG HMAC IMEDIATO (executa apenas se MP_HMAC_DEBUG=true) ---
+    if (MP_HMAC_DEBUG) {
+      try {
+        const signatureHeader = req.headers['x-signature'] || req.headers['signature'] || req.headers['x-hub-signature'] || req.headers['x-mercadopago-signature'] || '';
+        console.log('DEBUG signatureHeader (raw):', signatureHeader);
+
+        let ts = '';
+        let v1 = null;
+        try {
+          const parts = String(signatureHeader).split(',');
+          for (const p of parts) {
+            const [k, v] = p.split('=');
+            if (!k || !v) continue;
+            const key = k.trim();
+            const val = v.trim();
+            if (key === 'ts') ts = val;
+            if (key === 'v1') v1 = val;
+          }
+        } catch (e) { /* ignore */ }
+        if (!v1) {
+          const m = String(signatureHeader).match(/([a-f0-9]{64})/i);
+          if (m) v1 = m[1];
+        }
+        console.log('DEBUG ts:', ts, 'DEBUG v1:', v1);
+
+        const raw = rawBody || '';
+        const payloads = [
+          `${ts}.${raw}`,
+          `${Math.floor(Number(ts) / 1000)}.${raw}`,
+          raw,
+          raw.trim(),
+          `${ts}\n${raw}`
+        ];
+
+        const secretRaw = process.env.MP_WEBHOOK_SECRET || '';
+        console.log('DEBUG secret length (chars):', String(secretRaw).length);
+
+        const tryModes = ['utf8', 'hex', 'base64'];
+        for (const mode of tryModes) {
+          let keyBuf = null;
+          try { keyBuf = Buffer.from(secretRaw, mode); } catch (e) { keyBuf = null; }
+          console.log(`DEBUG secret as ${mode}: buffer ${keyBuf ? keyBuf.length + ' bytes' : 'invalid'}`);
+          if (!keyBuf) continue;
+          for (const p of payloads) {
+            try {
+              const h = crypto.createHmac('sha256', keyBuf).update(p).digest('hex');
+              console.log(`DEBUG HMAC mode=${mode} payloadLen=${p.length} -> ${h}`);
+            } catch (e) {
+              console.log('DEBUG HMAC error:', String(e));
+            }
+          }
+        }
+      } catch (e) {
+        console.log('DEBUG fatal error in HMAC debug:', String(e));
+      }
+
+      // responder 200 apenas no modo debug para evitar reenvios
+      return res.status(200).json({ ok: true, debug: 'hmac-logged' });
+    }
+    // --- END: DEBUG HMAC IMEDIATO ---
     // --- BEGIN: Validação HMAC final (Mercado Pago) ---
     const secretRaw = process.env.MP_WEBHOOK_SECRET || '';
     if (!secretRaw) {
@@ -146,7 +209,6 @@ export default async function handler(req, res) {
       return res.status(401).end('assinatura ausente');
     }
 
-    // extrair header de assinatura
     const signatureHeader = req.headers['x-signature'] || req.headers['x-hub-signature'] || req.headers['x-mercadopago-signature'] || req.headers['x-hook-signature'] || req.headers['signature'];
     if (!signatureHeader) {
       console.warn('Nenhum header de assinatura encontrado; rejeitando por segurança.');
@@ -179,15 +241,10 @@ export default async function handler(req, res) {
 
     const raw = rawBody || '';
     const payloadCandidates = [`${ts}.${raw}`];
-
-    // também tentar ts em segundos (algumas integrações usam segundos)
     const tsNum = Number(ts);
     if (!Number.isNaN(tsNum)) payloadCandidates.push(`${Math.floor(tsNum / 1000)}.${raw}`);
-
-    // tentar também só o raw (fallback)
     payloadCandidates.push(raw);
 
-    // tentar secret como hex primeiro (mais comum), depois utf8
     const secretVariants = [
       { name: 'hex', buf: (() => { try { return Buffer.from(secretRaw, 'hex'); } catch (e) { return null; } })() },
       { name: 'utf8', buf: Buffer.from(secretRaw, 'utf8') }
@@ -205,7 +262,6 @@ export default async function handler(req, res) {
         } catch (e) {
           continue;
         }
-        // comparação segura apenas se comprimentos baterem
         try {
           if (v1.length === computed.length) {
             if (crypto.timingSafeEqual(Buffer.from(v1, 'hex'), Buffer.from(computed, 'hex'))) {
@@ -214,9 +270,7 @@ export default async function handler(req, res) {
               break;
             }
           }
-        } catch (e) {
-          // ignore e continue
-        }
+        } catch (e) { /* ignore */ }
       }
       if (valid) break;
     }
@@ -226,9 +280,9 @@ export default async function handler(req, res) {
       return res.status(401).end('assinatura inválida');
     }
 
-    // assinatura válida — prosseguir com processamento
     console.log('ASSINATURA VALIDADA:', matchedInfo.secretAs, 'payloadLen:', matchedInfo.payload.length);
     // --- END: Validação HMAC final ---
+
 
     const acao = (req.query && req.query.acao) ? String(req.query.acao) : null;
 
