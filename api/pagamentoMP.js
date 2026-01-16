@@ -148,11 +148,7 @@ export default async function handler(req, res) {
       console.warn('Falha ao parsear rawBody como JSON:', e);
     }
 
-    // verificar assinatura HMAC se MP_WEBHOOK_SECRET estiver configurado
-    // --- verificar assinatura HMAC (Mercado Pago: header com ts=... , v1=...) ---
-    // assinatura HMAC (Mercado Pago: header no formato ts=...,v1=...)
-    // DEBUG EXTENSO: testar múltiplas variantes de payload e interpretação do secret
-    // Validação HMAC do Mercado Pago (final)
+    // --- BEGIN: Validação HMAC do Mercado Pago (substituir bloco antigo) ---
     const secret = process.env.MP_WEBHOOK_SECRET || null;
     if (secret) {
       const signatureHeader = req.headers['x-signature'] || req.headers['x-hub-signature'] || req.headers['x-mercadopago-signature'] || req.headers['x-hook-signature'] || req.headers['signature'];
@@ -227,6 +223,7 @@ export default async function handler(req, res) {
     } else {
       console.log('MP_WEBHOOK_SECRET não configurado; pulando verificação HMAC.');
     }
+    // --- END: Validação HMAC do Mercado Pago ---
 
     const acao = (req.query && req.query.acao) ? String(req.query.acao) : null;
 
