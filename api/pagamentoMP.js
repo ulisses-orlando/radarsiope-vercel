@@ -198,6 +198,8 @@ export default async function handler(req, res) {
 
       // calcular HMAC sobre `${ts}.${rawBody}`
       const payloadToSign = `${ts}.${rawBody}`;
+      console.log('DEBUG payloadToSign (len):', payloadToSign.length, payloadToSign);
+
       const computed = crypto.createHmac('sha256', secret).update(payloadToSign).digest('hex');
 
       // comparação segura (constant-time)
