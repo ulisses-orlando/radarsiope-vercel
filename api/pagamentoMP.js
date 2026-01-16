@@ -139,6 +139,22 @@ export default async function handler(req, res) {
     console.log('WEBHOOK HEADERS:', req.headers);
     console.log('WEBHOOK RAW BODY:', rawBody);
 
+    // DEBUG IMEDIATO: confirmar execução e imprimir header de assinatura
+console.log('DEBUG PING: handler reached after rawBody read');
+
+try {
+  const headerKeys = Object.keys(req.headers || {});
+  console.log('DEBUG HEADER KEYS:', headerKeys.join(', '));
+  const sig = req.headers['x-signature'] || req.headers['signature'] || req.headers['x-hub-signature'] || req.headers['x-mercadopago-signature'];
+  console.log('DEBUG signature header raw:', sig || '(nenhum encontrado)');
+} catch (e) {
+  console.log('DEBUG erro ao logar headers:', String(e));
+}
+
+// Para evitar 401 enquanto investigamos, responder 200 temporariamente
+// REMOVA esta linha assim que confirmar os logs
+return res.status(200).json({ ok: true, debug: 'ping' });
+
     // --- BEGIN: DEBUG FINAL EXAUSTIVO (substituir verificação atual temporariamente) ---
     const secretRaw = process.env.MP_WEBHOOK_SECRET || '';
     try {
