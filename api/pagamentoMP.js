@@ -3,12 +3,9 @@
 // - Inicializa Firebase via env vars (FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, FIREBASE_PRIVATE_KEY)
 // - Captura raw body, loga headers/body, valida assinatura HMAC se MP_WEBHOOK_SECRET estiver configurado
 // - Gera parcelas no backend e trata webhooks com tolerância a 404 (simulações)
-export const config = {
-  api: {
-    bodyParser: false, // importante: precisamos do raw body
-  },
-};
 
+// pages/api/pagamentoMP.js
+export const config = { runtime: 'nodejs' };
 import crypto from 'crypto';
 import admin from 'firebase-admin';
 
@@ -276,37 +273,92 @@ function validateMpSignature(rawBody, signatureHeader) {
   return false;
 }
 
+function tryHexToBuffer(s) {
+  const cleaned = String(s).trim().replace(/[^0-9a-fA-F]/g, '');
+  if (!cleaned || cleaned.length % 2 !== 0) return null;
+  try { return Buffer.from(cleaned, 'hex'); } catch { return null; }
+}
+
+function tryBase64ToBuffer(s) {
+  try {
+    // validação simples: base64 deve decodificar sem erro
+    const b = Buffer.from(String(s).trim(), 'base64');
+    // rejeita se a re-encodificação não bater (evita strings inválidas)
+    if (b.toString('base64').replace(/=+$/, '') === String(s).trim().replace(/=+$/, '')) return b;
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+async function readRawBody(req) {
+  return await new Promise((resolve, reject) => {
+    const chunks = [];
+    req.on('data', c => chunks.push(c));
+    req.on('end', () => resolve(Buffer.concat(chunks)));
+    req.on('error', reject);
+  });
+}
+
 export default async function handler(req, res) {
   try {
-    // lê raw body como buffer
-    const raw = await new Promise((resolve, reject) => {
-      const chunks = [];
-      req.on('data', c => chunks.push(c));
-      req.on('end', () => resolve(Buffer.concat(chunks)));
-      req.on('error', reject);
-    });
+    const signatureHeader = req.headers['x-signature'] || req.headers['signature'] || '';
+    const ts = (String(signatureHeader).match(/ts=(\d+)/) || [])[1] || '';
+    const expected = (String(signatureHeader).match(/v1=([0-9a-fA-F]+)/) || [])[1] || '';
 
-    // log temporário para diagnóstico (não logar secret)
-    console.log('DEBUG signatureHeader (raw):', req.headers['x-signature'] || req.headers['signature'] || '');
-    console.log('DEBUG raw hex (first 400 chars):', raw.toString('hex').slice(0, 400));
-    // calcular HMAC com a secret do ambiente e logar os resultados (sem expor a secret)
-    try {
-      const crypto = require('crypto');
-      const secret = process.env.MP_WEBHOOK_SECRET || '';
-      const prefix = Buffer.from(String((req.headers['x-signature']||'').match(/ts=([0-9]+)/)?.[1] || '') + '.', 'utf8');
-      const payloadBuf = Buffer.concat([prefix, raw]);
-      const keyUtf8 = Buffer.from(secret, 'utf8');
-      const keyHex = (() => { const c = secret.replace(/[^0-9a-fA-F]/g,''); return (c.length && c.length%2===0) ? Buffer.from(c,'hex') : null; })();
-      console.log('DEBUG computed_from_env (utf8):', crypto.createHmac('sha256', keyUtf8).update(payloadBuf).digest('hex'));
-      if (keyHex) console.log('DEBUG computed_from_env (hex):', crypto.createHmac('sha256', keyHex).update(payloadBuf).digest('hex'));
-    } catch (e) {
-      console.log('DEBUG compute error', String(e));
+    const raw = await readRawBody(req);
+    const prefix = Buffer.from(String(ts) + '.', 'utf8');
+    const payload = Buffer.concat([prefix, raw]);
+
+    const secretEnv = process.env.MP_WEBHOOK_SECRET || '';
+
+    // possíveis interpretações da secret
+    const candidates = [
+      { name: 'utf8', key: Buffer.from(secretEnv, 'utf8') },
+      { name: 'trimmed utf8', key: Buffer.from(String(secretEnv).trim(), 'utf8') },
+    ];
+
+    const hexBuf = tryHexToBuffer(secretEnv);
+    if (hexBuf) candidates.push({ name: 'hex', key: hexBuf });
+
+    const b64Buf = tryBase64ToBuffer(secretEnv);
+    if (b64Buf) candidates.push({ name: 'base64', key: b64Buf });
+
+    // calcula HMAC para cada candidato e compara
+    let matched = null;
+    for (const c of candidates) {
+      try {
+        const h = crypto.createHmac('sha256', c.key).update(payload).digest('hex');
+        if (h === expected) {
+          matched = c.name;
+          break;
+        }
+      } catch (e) {
+        // ignora e tenta próximo
+      }
     }
 
-    // resposta temporária: aceitar para que o MP não marque como falha
-    res.status(200).json({ ok: true, diagnostic: true });
+    // logs de diagnóstico (remova após validação)
+    console.log('INICIANDO pagamentoMP - envs:', {
+      MP_WEBHOOK_SECRET: !!process.env.MP_WEBHOOK_SECRET,
+      MP_ACCESS_TOKEN: !!process.env.MP_ACCESS_TOKEN,
+      MP_PUBLIC_KEY: !!process.env.MP_PUBLIC_KEY,
+    });
+    console.log('DEBUG signatureHeader (raw):', signatureHeader);
+    console.log('DEBUG raw hex (first 400 chars):', raw.toString('hex').slice(0, 400));
+    if (matched) console.log('DEBUG matched secret interpretation:', matched);
+    else console.log('DEBUG no match with current secret interpretations');
+
+    if (matched) {
+      // assinatura válida
+      res.status(200).json({ ok: true });
+    } else {
+      // assinatura inválida
+      res.status(401).json({ ok: false, reason: 'invalid signature' });
+    }
   } catch (err) {
-    console.log('ERROR webhook handler:', String(err));
+    console.error('ERROR webhook handler:', String(err));
     res.status(500).end('internal error');
   }
 }
+
