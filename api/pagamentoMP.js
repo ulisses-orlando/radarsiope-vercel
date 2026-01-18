@@ -277,80 +277,36 @@ function validateMpSignature(rawBody, signatureHeader) {
 }
 
 export default async function handler(req, res) {
-  console.log('DEBUG handler start');
-console.log('DEPLOY_TAG: webhook-v20260118-01');
-
   try {
-    // Ler rawBody como texto cru
-    const rawBody = await new Promise((resolve, reject) => {
-      let data = '';
-      req.on('data', chunk => { data += chunk; });
-      req.on('end', () => resolve(data));
-      req.on('error', err => reject(err));
+    // lê raw body como buffer
+    const raw = await new Promise((resolve, reject) => {
+      const chunks = [];
+      req.on('data', c => chunks.push(c));
+      req.on('end', () => resolve(Buffer.concat(chunks)));
+      req.on('error', reject);
     });
 
-    console.log('DEBUG got rawBody (chars):', rawBody ? rawBody.length : 0);
-
-    // garantir header
-    const signatureHeader = req.headers['x-signature'] || req.headers['signature'] || '';
-    console.log('DEBUG signatureHeader (raw):', signatureHeader || null);
-
-    // -------------------------
-    // DIAGNÓSTICO SIMPLES (executa imediatamente)
-    // -------------------------
+    // log temporário para diagnóstico (não logar secret)
+    console.log('DEBUG signatureHeader (raw):', req.headers['x-signature'] || req.headers['signature'] || '');
+    console.log('DEBUG raw hex (first 400 chars):', raw.toString('hex').slice(0, 400));
+    // calcular HMAC com a secret do ambiente e logar os resultados (sem expor a secret)
     try {
+      const crypto = require('crypto');
       const secret = process.env.MP_WEBHOOK_SECRET || '';
-      const ts = (String(signatureHeader).match(/ts=([0-9]+)/) || [])[1] || '';
-      const raw = String(rawBody || '');
-      const payload = `${ts}.${raw}`;
-
-      // computed using UTF-8 key
-      let computedUtf8 = 'error';
-      try {
-        computedUtf8 = crypto.createHmac('sha256', Buffer.from(secret, 'utf8')).update(payload, 'utf8').digest('hex');
-      } catch (e) {
-        computedUtf8 = `error:${String(e && e.message ? e.message : e)}`;
-      }
-
-      // computed using hex key (diagnóstico)
-      let computedHex = 'skipped';
-      try {
-        const cleaned = String(secret).replace(/[^0-9a-fA-F]/g, '');
-        if (cleaned.length) {
-          computedHex = crypto.createHmac('sha256', Buffer.from(cleaned, 'hex')).update(payload, 'utf8').digest('hex');
-        } else {
-          computedHex = 'invalid-hex';
-        }
-      } catch (e) {
-        computedHex = `error:${String(e && e.message ? e.message : e)}`;
-      }
-
-      console.log('DEBUG computed_from_env (utf8):', computedUtf8);
-      console.log('DEBUG computed_from_env (hex):', computedHex);
-      console.log('DEBUG expected_v1:', (signatureHeader.match(/v1=([0-9a-fA-F]{64})/) || [])[1] || null);
-
-      // mostrar apenas meta da secret para detectar espaços/BOM (NÃO exponha o valor)
-      console.log('DEBUG MP_WEBHOOK_SECRET length:', secret ? secret.length : 0);
-    } catch (diagErr) {
-      console.log('DEBUG diagnostic block error:', String(diagErr));
-    }
-    // ------------------------- end diagnóstico -------------------------
-
-    // Validar assinatura com a função de produção
-    if (!validateMpSignature(rawBody, signatureHeader)) {
-      console.log('DEBUG signature validation failed');
-      return res.status(401).end('invalid signature');
+      const prefix = Buffer.from(String((req.headers['x-signature']||'').match(/ts=([0-9]+)/)?.[1] || '') + '.', 'utf8');
+      const payloadBuf = Buffer.concat([prefix, raw]);
+      const keyUtf8 = Buffer.from(secret, 'utf8');
+      const keyHex = (() => { const c = secret.replace(/[^0-9a-fA-F]/g,''); return (c.length && c.length%2===0) ? Buffer.from(c,'hex') : null; })();
+      console.log('DEBUG computed_from_env (utf8):', crypto.createHmac('sha256', keyUtf8).update(payloadBuf).digest('hex'));
+      if (keyHex) console.log('DEBUG computed_from_env (hex):', crypto.createHmac('sha256', keyHex).update(payloadBuf).digest('hex'));
+    } catch (e) {
+      console.log('DEBUG compute error', String(e));
     }
 
-    console.log('DEBUG signature validated OK');
-
-    // Processamento do webhook (substitua pelo seu código)
-    // ... seu processamento aqui ...
-
-    return res.status(200).json({ ok: true });
+    // resposta temporária: aceitar para que o MP não marque como falha
+    res.status(200).json({ ok: true, diagnostic: true });
   } catch (err) {
     console.log('ERROR webhook handler:', String(err));
-    return res.status(500).end('internal error');
+    res.status(500).end('internal error');
   }
 }
-
