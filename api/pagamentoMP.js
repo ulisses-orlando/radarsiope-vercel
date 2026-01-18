@@ -11,7 +11,6 @@ export const config = {
 
 import crypto from 'crypto';
 import admin from 'firebase-admin';
-import { validateMpSignature } from '../../lib/validateMpSignature';
 
 // DEBUG: log inicial (não expõe segredos)
 try {
@@ -229,7 +228,53 @@ async function validateSignature(rawBody, headers) {
   return false;
 }
 
+/**
+ * Valida a assinatura Mercado Pago (x-signature).
+ * Tenta interpretar a secret como UTF-8 e, se necessário, como hex.
+ * Retorna true se a assinatura for válida, false caso contrário.
+ */
+function validateMpSignature(rawBody, signatureHeader) {
+  if (!signatureHeader || typeof signatureHeader !== 'string') return false;
 
+  const v1Match = String(signatureHeader).match(/v1=([0-9a-fA-F]{64})/);
+  const tsMatch = String(signatureHeader).match(/ts=([0-9]+)/);
+  if (!v1Match || !tsMatch) return false;
+
+  const v1Hex = v1Match[1];
+  const ts = tsMatch[1];
+  const secret = process.env.MP_WEBHOOK_SECRET || '';
+  if (!secret) return false;
+
+  const payload = `${ts}.${String(rawBody)}`;
+  const expected = Buffer.from(v1Hex, 'hex');
+
+  // tenta com chave UTF-8
+  try {
+    const keyUtf8 = Buffer.from(secret, 'utf8');
+    const computedUtf8 = crypto.createHmac('sha256', keyUtf8).update(payload, 'utf8').digest();
+    if (computedUtf8.length === expected.length && crypto.timingSafeEqual(computedUtf8, expected)) {
+      return true;
+    }
+  } catch (e) {
+    // ignore and tentar hex abaixo
+  }
+
+  // tenta interpretar secret como hex (apenas se parecer hex válido)
+  try {
+    const cleaned = String(secret).replace(/[^0-9a-fA-F]/g, '');
+    if (cleaned.length && cleaned.length % 2 === 0) {
+      const keyHex = Buffer.from(cleaned, 'hex');
+      const computedHex = crypto.createHmac('sha256', keyHex).update(payload, 'utf8').digest();
+      if (computedHex.length === expected.length && crypto.timingSafeEqual(computedHex, expected)) {
+        return true;
+      }
+    }
+  } catch (e) {
+    // ignore
+  }
+
+  return false;
+}
 
 export default async function handler(req, res) {
   console.log('DEBUG handler start');
