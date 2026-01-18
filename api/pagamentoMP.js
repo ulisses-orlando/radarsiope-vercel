@@ -8,6 +8,51 @@
 export const config = { runtime: 'nodejs' };
 import crypto from 'crypto';
 import admin from 'firebase-admin';
+import https from 'https';
+
+async function readRawBody(req) {
+  return await new Promise((resolve, reject) => {
+    const chunks = [];
+    req.on('data', c => chunks.push(c));
+    req.on('end', () => resolve(Buffer.concat(chunks)));
+    req.on('error', reject);
+  });
+}
+
+function mpGetPayment(paymentId, accessToken) {
+  return new Promise((resolve, reject) => {
+    const options = {
+      hostname: 'api.mercadopago.com',
+      path: `/v1/payments/${encodeURIComponent(paymentId)}`,
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json'
+      },
+      timeout: 8000
+    };
+
+    const req = https.request(options, res => {
+      const chunks = [];
+      res.on('data', d => chunks.push(d));
+      res.on('end', () => {
+        try {
+          const body = Buffer.concat(chunks).toString('utf8');
+          const json = JSON.parse(body || '{}');
+          resolve({ statusCode: res.statusCode, body: json });
+        } catch (err) {
+          reject(err);
+        }
+      });
+    });
+
+    req.on('error', reject);
+    req.on('timeout', () => {
+      req.destroy(new Error('timeout'));
+    });
+    req.end();
+  });
+}
 
 // DEBUG: log inicial (não expõe segredos)
 try {
@@ -300,65 +345,80 @@ async function readRawBody(req) {
   });
 }
 
+
+
+// pages/api/pagamentoMP.js
+
+
 export default async function handler(req, res) {
   try {
-    const signatureHeader = req.headers['x-signature'] || req.headers['signature'] || '';
-    const ts = (String(signatureHeader).match(/ts=(\d+)/) || [])[1] || '';
-    const expected = (String(signatureHeader).match(/v1=([0-9a-fA-F]+)/) || [])[1] || '';
-
+    // 1) Ler raw body e tentar parse JSON (para extrair id)
     const raw = await readRawBody(req);
-    const prefix = Buffer.from(String(ts) + '.', 'utf8');
-    const payload = Buffer.concat([prefix, raw]);
-
-    const secretEnv = process.env.MP_WEBHOOK_SECRET || '';
-
-    // possíveis interpretações da secret
-    const candidates = [
-      { name: 'utf8', key: Buffer.from(secretEnv, 'utf8') },
-      { name: 'trimmed utf8', key: Buffer.from(String(secretEnv).trim(), 'utf8') },
-    ];
-
-    const hexBuf = tryHexToBuffer(secretEnv);
-    if (hexBuf) candidates.push({ name: 'hex', key: hexBuf });
-
-    const b64Buf = tryBase64ToBuffer(secretEnv);
-    if (b64Buf) candidates.push({ name: 'base64', key: b64Buf });
-
-    // calcula HMAC para cada candidato e compara
-    let matched = null;
-    for (const c of candidates) {
-      try {
-        const h = crypto.createHmac('sha256', c.key).update(payload).digest('hex');
-        if (h === expected) {
-          matched = c.name;
-          break;
-        }
-      } catch (e) {
-        // ignora e tenta próximo
-      }
+    let payload;
+    try {
+      payload = JSON.parse(raw.toString('utf8'));
+    } catch {
+      // Se não for JSON, responde 400 (não é esperado)
+      console.error('Webhook: payload inválido JSON');
+      return res.status(400).json({ ok: false, reason: 'invalid json' });
     }
 
-    // logs de diagnóstico (remova após validação)
-    console.log('INICIANDO pagamentoMP - envs:', {
-      MP_WEBHOOK_SECRET: !!process.env.MP_WEBHOOK_SECRET,
-      MP_ACCESS_TOKEN: !!process.env.MP_ACCESS_TOKEN,
-      MP_PUBLIC_KEY: !!process.env.MP_PUBLIC_KEY,
-    });
-    console.log('DEBUG signatureHeader (raw):', signatureHeader);
-    console.log('DEBUG raw hex (first 400 chars):', raw.toString('hex').slice(0, 400));
-    if (matched) console.log('DEBUG matched secret interpretation:', matched);
-    else console.log('DEBUG no match with current secret interpretations');
+    // 2) Extrair id do pagamento (padrão Mercado Pago: payload.data.id ou data.id)
+    const paymentId = (payload && payload.data && payload.data.id) || payload.id || null;
+    if (!paymentId) {
+      console.warn('Webhook: id do pagamento não encontrado no payload');
+      // Responder 200 para não gerar retries do MP, mas registrar para investigação
+      return res.status(200).json({ ok: true, note: 'no payment id' });
+    }
 
-    if (matched) {
-      // assinatura válida
-      res.status(200).json({ ok: true });
+    // 3) Consultar Mercado Pago para validar o pagamento
+    const accessToken = process.env.MP_ACCESS_TOKEN || '';
+    if (!accessToken) {
+      console.error('MP_ACCESS_TOKEN não configurado');
+      // Responder 500 para sinalizar erro de configuração
+      return res.status(500).json({ ok: false, reason: 'missing mp access token' });
+    }
+
+    let mpResp;
+    try {
+      mpResp = await mpGetPayment(paymentId, accessToken);
+    } catch (err) {
+      console.error('Erro ao consultar MP:', String(err));
+      // Responder 202 para indicar que recebemos, mas não processamos (ou 200 se preferir)
+      return res.status(202).json({ ok: false, reason: 'mp api error' });
+    }
+
+    // 4) Verificar resposta e decidir
+    if (mpResp.statusCode !== 200) {
+      console.warn('MP retornou status não-200', mpResp.statusCode, mpResp.body);
+      // Responder 200 para evitar retries do MP; registrar para investigação
+      return res.status(200).json({ ok: true, note: 'mp returned non-200' });
+    }
+
+    const payment = mpResp.body;
+    // Exemplo de checagens úteis (ajuste conforme seu fluxo):
+    // - payment.status (approved, pending, rejected)
+    // - payment.transaction_amount, payment.currency_id
+    // - payment.external_reference (se você usa)
+    const isApproved = String(payment.status || '').toLowerCase() === 'approved';
+
+    // 5) Idempotência: verifique se já processou esse paymentId (implemente persistência)
+    // Aqui apenas logamos; em produção, salve em DB (Firestore, Redis, etc.) e ignore duplicatas.
+    console.log('Webhook: paymentId', paymentId, 'status', payment.status);
+
+    if (isApproved) {
+      // TODO: executar lógica de negócio (marcar pedido, creditar, notificar)
+      // Exemplo: await markOrderPaid(payment.external_reference, payment);
+      console.log('Pagamento aprovado — processar negócio para', paymentId);
+      return res.status(200).json({ ok: true, processed: true });
     } else {
-      // assinatura inválida
-      res.status(401).json({ ok: false, reason: 'invalid signature' });
+      // Pagamento não aprovado (pending, rejected, etc.)
+      console.log('Pagamento não aprovado — status:', payment.status);
+      return res.status(200).json({ ok: true, processed: false, status: payment.status });
     }
   } catch (err) {
     console.error('ERROR webhook handler:', String(err));
-    res.status(500).end('internal error');
+    // Responder 500 para sinalizar erro inesperado
+    return res.status(500).json({ ok: false, reason: 'internal error' });
   }
 }
-
