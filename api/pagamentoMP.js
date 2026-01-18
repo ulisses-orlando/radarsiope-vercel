@@ -336,14 +336,7 @@ function tryBase64ToBuffer(s) {
   }
 }
 
-async function readRawBody(req) {
-  return await new Promise((resolve, reject) => {
-    const chunks = [];
-    req.on('data', c => chunks.push(c));
-    req.on('end', () => resolve(Buffer.concat(chunks)));
-    req.on('error', reject);
-  });
-}
+
 
 
 
