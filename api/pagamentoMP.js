@@ -266,7 +266,8 @@ export default async function handler(req, res) {
         return json(res, 500, { ok: false, message: 'Erro ao criar preferência no Mercado Pago', detail: err.body || String(err) });
       }
 
-      const initPoint = mpResp.init_point || mpResp.sandbox_init_point || null;
+      // sempre usar sandbox_init_point em ambiente de testes
+      const initPoint = mpResp.sandbox_init_point || mpResp.init_point || null;
 
       await novoPedidoRef.set({
         mpPreferenceId: mpResp.id,
