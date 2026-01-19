@@ -1,88 +1,30 @@
-// api/pagamentoMP.js (ESM) - versão completa e atualizada
-// - Usa REST do Mercado Pago via fetch (sem dependência mercadopago)
-// - Inicializa Firebase via env vars (FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, FIREBASE_PRIVATE_KEY)
-// - Captura raw body, loga headers/body, valida assinatura HMAC se MP_WEBHOOK_SECRET estiver configurado
-// - Gera parcelas no backend e trata webhooks com tolerância a 404 (simulações)
-
 // pages/api/pagamentoMP.js
+// Node runtime (garante crypto, Buffer, firebase-admin)
 export const config = { runtime: 'nodejs' };
+
 import crypto from 'crypto';
 import admin from 'firebase-admin';
-import https from 'https';
 
-async function readRawBody(req) {
-  return await new Promise((resolve, reject) => {
-    const chunks = [];
-    req.on('data', c => chunks.push(c));
-    req.on('end', () => resolve(Buffer.concat(chunks)));
-    req.on('error', reject);
-  });
-}
-
-function mpGetPayment(paymentId, accessToken) {
-  return new Promise((resolve, reject) => {
-    const options = {
-      hostname: 'api.mercadopago.com',
-      path: `/v1/payments/${encodeURIComponent(paymentId)}`,
-      method: 'GET',
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        'Content-Type': 'application/json'
-      },
-      timeout: 8000
-    };
-
-    const req = https.request(options, res => {
-      const chunks = [];
-      res.on('data', d => chunks.push(d));
-      res.on('end', () => {
-        try {
-          const body = Buffer.concat(chunks).toString('utf8');
-          const json = JSON.parse(body || '{}');
-          resolve({ statusCode: res.statusCode, body: json });
-        } catch (err) {
-          reject(err);
-        }
-      });
-    });
-
-    req.on('error', reject);
-    req.on('timeout', () => {
-      req.destroy(new Error('timeout'));
-    });
-    req.end();
-  });
-}
-
-// DEBUG: log inicial (não expõe segredos)
-try {
-  console.log('INICIANDO pagamentoMP - envs:', {
-    MP_ACCESS_TOKEN: !!process.env.MP_ACCESS_TOKEN,
-    MP_PUBLIC_KEY: !!process.env.MP_PUBLIC_KEY,
-    FIREBASE_PROJECT_ID: !!process.env.FIREBASE_PROJECT_ID,
-    FIREBASE_CLIENT_EMAIL: !!process.env.FIREBASE_CLIENT_EMAIL,
-    FIREBASE_PRIVATE_KEY: !!process.env.FIREBASE_PRIVATE_KEY,
-    MP_WEBHOOK_URL: !!process.env.MP_WEBHOOK_URL,
-    MP_WEBHOOK_SECRET: !!process.env.MP_WEBHOOK_SECRET
-  });
-} catch (e) {
-  console.error('ERRO AO LOGAR ENV VARS', e);
-}
-
+// ---------- Init Firebase (use env vars) ----------
 if (!admin.apps.length) {
   admin.initializeApp({
     credential: admin.credential.cert({
       projectId: process.env.FIREBASE_PROJECT_ID,
       clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+      // Vercel often requires \\n -> \n replacement
       privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\\\n/g, '\n')
     })
   });
 }
 const db = admin.firestore();
 
-// utilitários
+// ---------- Utilities ----------
+function json(res, status, payload) {
+  res.status(status).setHeader('Content-Type', 'application/json').end(JSON.stringify(payload));
+}
 function montarExternalReference(userId, assinaturaId, pedidoId) {
-  return `${userId}|${assinaturaId}|${pedidoId}`;
+  // deterministic external_reference used to map back to Firestore
+  return `${String(userId)}|${String(assinaturaId)}|${String(pedidoId)}`;
 }
 function parseExternalReference(externalRef) {
   if (!externalRef) return null;
@@ -90,11 +32,22 @@ function parseExternalReference(externalRef) {
   if (parts.length !== 3) return null;
   return { userId: parts[0], assinaturaId: parts[1], pedidoId: parts[2] };
 }
-function json(res, status, payload) {
-  res.status(status).setHeader('Content-Type', 'application/json').end(JSON.stringify(payload));
+
+// fetch with timeout wrapper (Node 18+ fetch supports AbortSignal)
+async function fetchWithTimeout(url, opts = {}, ms = 8000) {
+  const controller = new AbortController();
+  const id = setTimeout(() => controller.abort(), ms);
+  try {
+    const resp = await fetch(url, { ...opts, signal: controller.signal });
+    clearTimeout(id);
+    return resp;
+  } catch (err) {
+    clearTimeout(id);
+    throw err;
+  }
 }
 
-// helper para chamar API do Mercado Pago via fetch
+// mpFetch: calls Mercado Pago API, throws with status/body on non-2xx
 async function mpFetch(path, method = 'GET', body = null) {
   const token = process.env.MP_ACCESS_TOKEN;
   if (!token) throw new Error('MP_ACCESS_TOKEN não definido');
@@ -103,10 +56,20 @@ async function mpFetch(path, method = 'GET', body = null) {
   const headers = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
   const opts = { method, headers };
   if (body) opts.body = JSON.stringify(body);
-  const resp = await fetch(url, opts);
+
+  let resp;
+  try {
+    resp = await fetchWithTimeout(url, opts, 10000);
+  } catch (err) {
+    const e = new Error(`Network error calling MP ${method} ${path}: ${err.message}`);
+    e.cause = err;
+    throw e;
+  }
+
   const text = await resp.text();
   let data = null;
   try { data = text ? JSON.parse(text) : null; } catch (e) { data = text; }
+
   if (!resp.ok) {
     const err = new Error(`MP API ${resp.status} ${resp.statusText}`);
     err.status = resp.status;
@@ -116,20 +79,13 @@ async function mpFetch(path, method = 'GET', body = null) {
   return data;
 }
 
-/**
- * Gera parcelas na subcoleção:
- * usuarios/{userId}/assinaturas/{assinaturaId}/pagamentos
- *
- * - amountCentavos: inteiro (centavos)
- * - numParcelas: inteiro >= 1
- * - metodoPagamento: string (ex.: 'cartao', 'boleto', 'pix') - opcional
- * - dataPrimeiroVencimento: string ISO ou Date; se ausente, usa hoje
- */
-async function gerarParcelasAssinaturaBackend(userId, assinaturaId, amountCentavos, numParcelas = 1, metodoPagamento = null, dataPrimeiroVencimento = null) {
-  if (!userId || !assinaturaId) throw new Error('userId e assinaturaId são obrigatórios para gerar parcelas');
+// gerarParcelasAssinaturaBackend: cria parcelas no Firestore (com checks)
+async function gerarParcelasAssinaturaBackend(userId, assinaturaId, amountCentavos, numParcelas = 1, metodoPagamento = null, dataPrimeiroVencimento = null, pedidoId = null) {
+  if (!userId || !assinaturaId) throw new Error('userId e assinaturaId são obrigatórios');
   const parcelas = Math.max(1, parseInt(numParcelas, 10) || 1);
-  const total = Math.max(0, parseInt(amountCentavos, 10) || 0);
+  if (parcelas > 500) throw new Error('parcelas > 500: divida em múltiplos batches');
 
+  const total = Math.max(0, parseInt(amountCentavos, 10) || 0);
   const base = Math.floor(total / parcelas);
   let resto = total - base * parcelas;
 
@@ -154,7 +110,9 @@ async function gerarParcelasAssinaturaBackend(userId, assinaturaId, amountCentav
     const venc = new Date(primeiro);
     venc.setMonth(venc.getMonth() + i);
 
-    const docRef = pagamentosRef.doc();
+    // idempotency: if pedidoId provided, use deterministic doc id
+    const docId = pedidoId ? `${pedidoId}-${numero}` : pagamentosRef.doc().id;
+    const docRef = pagamentosRef.doc(docId);
     const data = {
       numero_parcela: numero,
       valor_centavos: valorCentavos,
@@ -164,254 +122,375 @@ async function gerarParcelasAssinaturaBackend(userId, assinaturaId, amountCentav
       status: 'pendente',
       criadoEm: admin.firestore.FieldValue.serverTimestamp()
     };
-    batch.set(docRef, data);
+    batch.set(docRef, data, { merge: true });
   }
 
   await batch.commit();
   return true;
 }
 
-// handler exportado
-// Dependências externas esperadas no escopo:
-// - crypto (Node.js): const crypto = require('crypto');
-// - admin, db (Firebase Admin SDK) já inicializados
-// - mpFetch(path, method, payload) -> faz chamadas ao Mercado Pago e retorna JSON
-// - montarExternalReference(userId, assinaturaId, pedidoId)
-// - gerarParcelasAssinaturaBackend(userId, assinaturaId, amountCentavos, parcelas, metodoPagamento, dataPrimeiroVencimento)
-// - parseExternalReference(externalRef) -> { userId, assinaturaId, pedidoId }
-// Se algum helper não existir no seu projeto, adapte as chamadas abaixo.
-
-
-function tryParseJson(text) {
-  try { return JSON.parse(text); } catch (e) { return null; }
-}
-
-function canonicalJson(obj) {
-  if (obj === null || typeof obj !== 'object') return JSON.stringify(obj);
-  if (Array.isArray(obj)) return '[' + obj.map(canonicalJson).join(',') + ']';
-  const keys = Object.keys(obj).sort();
-  return '{' + keys.map(k => JSON.stringify(k) + ':' + canonicalJson(obj[k])).join(',') + '}';
-}
-
-function sendJson(res, status, body) {
-  if (!res.headersSent) return res.status(status).json(body);
-  return null;
-}
-
-async function validateSignature(rawBody, headers) {
-  const signatureHeader = headers['x-signature'] || headers['x-hub-signature'] || headers['x-mercadopago-signature'] || headers['x-hook-signature'] || headers['signature'] || '';
-  if (!signatureHeader) return false;
-
-  let ts = '';
-  let v1 = null;
-  try {
-    const parts = String(signatureHeader).split(',');
-    for (const p of parts) {
-      const [k, v] = p.split('=');
-      if (!k || !v) continue;
-      const key = k.trim();
-      const val = v.trim();
-      if (key === 'ts') ts = val;
-      if (key === 'v1') v1 = val;
-    }
-  } catch (e) { /* ignore */ }
-
-  if (!v1) {
-    const m = String(signatureHeader).match(/([a-f0-9]{64})/i);
-    if (m) v1 = m[1];
-  }
-  if (!v1) return false;
-
-  const secretRaw = process.env.MP_WEBHOOK_SECRET || '';
-  if (!secretRaw) return false;
-
-  const raw = rawBody || '';
-  const parsedBody = tryParseJson(raw);
-
-  const payloadCandidates = new Set();
-  payloadCandidates.add(`${ts}.${raw}`);
-  const tsNum = Number(ts);
-  if (!Number.isNaN(tsNum)) payloadCandidates.add(`${Math.floor(tsNum / 1000)}.${raw}`);
-  payloadCandidates.add(raw);
-  payloadCandidates.add(raw.trim());
-  payloadCandidates.add(`${ts}\n${raw}`);
-  payloadCandidates.add(raw.replace(/^\uFEFF/, ''));
-  if (parsedBody) {
-    payloadCandidates.add(JSON.stringify(parsedBody));
-    payloadCandidates.add(JSON.stringify(parsedBody).trim());
-    payloadCandidates.add(canonicalJson(parsedBody));
-  }
-
-  const secretVariants = [
-    { name: 'hex', buf: (() => { try { return Buffer.from(secretRaw, 'hex'); } catch (e) { return null; } })() },
-    { name: 'utf8', buf: (() => { try { return Buffer.from(secretRaw, 'utf8'); } catch (e) { return null; } })() },
-    { name: 'base64', buf: (() => { try { return Buffer.from(secretRaw, 'base64'); } catch (e) { return null; } })() }
-  ];
-
-  for (const payload of payloadCandidates) {
-    for (const sv of secretVariants) {
-      if (!sv.buf) continue;
-      let computed;
-      try {
-        computed = crypto.createHmac('sha256', sv.buf).update(payload).digest('hex');
-      } catch (e) {
-        continue;
-      }
-      try {
-        if (v1.length === computed.length && crypto.timingSafeEqual(Buffer.from(v1, 'hex'), Buffer.from(computed, 'hex'))) {
-          return true;
-        }
-      } catch (e) {
-        // ignore and continue
-      }
-    }
-  }
-
-  return false;
-}
-
-/**
- * Valida a assinatura Mercado Pago (x-signature).
- * Tenta interpretar a secret como UTF-8 e, se necessário, como hex.
- * Retorna true se a assinatura for válida, false caso contrário.
- */
-function validateMpSignature(rawBody, signatureHeader) {
-  if (!signatureHeader || typeof signatureHeader !== 'string') return false;
-
-  const v1Match = String(signatureHeader).match(/v1=([0-9a-fA-F]{64})/);
-  const tsMatch = String(signatureHeader).match(/ts=([0-9]+)/);
-  if (!v1Match || !tsMatch) return false;
-
-  const v1Hex = v1Match[1];
-  const ts = tsMatch[1];
-  const secret = process.env.MP_WEBHOOK_SECRET || '';
-  if (!secret) return false;
-
-  const payload = `${ts}.${String(rawBody)}`;
-  const expected = Buffer.from(v1Hex, 'hex');
-
-  // tenta com chave UTF-8
-  try {
-    const keyUtf8 = Buffer.from(secret, 'utf8');
-    const computedUtf8 = crypto.createHmac('sha256', keyUtf8).update(payload, 'utf8').digest();
-    if (computedUtf8.length === expected.length && crypto.timingSafeEqual(computedUtf8, expected)) {
-      return true;
-    }
-  } catch (e) {
-    // ignore and tentar hex abaixo
-  }
-
-  // tenta interpretar secret como hex (apenas se parecer hex válido)
-  try {
-    const cleaned = String(secret).replace(/[^0-9a-fA-F]/g, '');
-    if (cleaned.length && cleaned.length % 2 === 0) {
-      const keyHex = Buffer.from(cleaned, 'hex');
-      const computedHex = crypto.createHmac('sha256', keyHex).update(payload, 'utf8').digest();
-      if (computedHex.length === expected.length && crypto.timingSafeEqual(computedHex, expected)) {
-        return true;
-      }
-    }
-  } catch (e) {
-    // ignore
-  }
-
-  return false;
-}
-
-function tryHexToBuffer(s) {
-  const cleaned = String(s).trim().replace(/[^0-9a-fA-F]/g, '');
-  if (!cleaned || cleaned.length % 2 !== 0) return null;
-  try { return Buffer.from(cleaned, 'hex'); } catch { return null; }
-}
-
-function tryBase64ToBuffer(s) {
-  try {
-    // validação simples: base64 deve decodificar sem erro
-    const b = Buffer.from(String(s).trim(), 'base64');
-    // rejeita se a re-encodificação não bater (evita strings inválidas)
-    if (b.toString('base64').replace(/=+$/, '') === String(s).trim().replace(/=+$/, '')) return b;
-    return null;
-  } catch {
-    return null;
-  }
-}
-
-
-
-
-
-// pages/api/pagamentoMP.js
-
-
+// ---------- Handler ----------
 export default async function handler(req, res) {
   try {
-    // 1) Ler raw body e tentar parse JSON (para extrair id)
-    const raw = await readRawBody(req);
-    let payload;
+    // read raw body as string for HMAC and parsing
+    const rawBody = await new Promise((resolve, reject) => {
+      let data = '';
+      req.on('data', chunk => { data += chunk; });
+      req.on('end', () => resolve(data));
+      req.on('error', err => reject(err));
+    });
+
+    // try to populate req.body if JSON
     try {
-      payload = JSON.parse(raw.toString('utf8'));
-    } catch {
-      // Se não for JSON, responde 400 (não é esperado)
-      console.error('Webhook: payload inválido JSON');
-      return res.status(400).json({ ok: false, reason: 'invalid json' });
+      if (rawBody && rawBody.length > 0 && req.headers['content-type'] && req.headers['content-type'].includes('application/json')) {
+        req.body = JSON.parse(rawBody);
+      }
+    } catch (e) {
+      // keep rawBody for HMAC diagnostics
+      console.warn('Falha ao parsear rawBody como JSON (ok em sandbox):', e.message);
     }
 
-    // 2) Extrair id do pagamento (padrão Mercado Pago: payload.data.id ou data.id)
-    const paymentId = (payload && payload.data && payload.data.id) || payload.id || null;
-    if (!paymentId) {
-      console.warn('Webhook: id do pagamento não encontrado no payload');
-      // Responder 200 para não gerar retries do MP, mas registrar para investigação
-      return res.status(200).json({ ok: true, note: 'no payment id' });
-    }
+    // minimal debug (do not log secrets)
+    console.log('INICIANDO pagamentoMP - envs:', {
+      MP_ACCESS_TOKEN: !!process.env.MP_ACCESS_TOKEN,
+      MP_PUBLIC_KEY: !!process.env.MP_PUBLIC_KEY,
+      MP_WEBHOOK_URL: !!process.env.MP_WEBHOOK_URL,
+      MP_WEBHOOK_SECRET: !!process.env.MP_WEBHOOK_SECRET
+    });
 
-    // 3) Consultar Mercado Pago para validar o pagamento
-    const accessToken = process.env.MP_ACCESS_TOKEN || '';
-    if (!accessToken) {
-      console.error('MP_ACCESS_TOKEN não configurado');
-      // Responder 500 para sinalizar erro de configuração
-      return res.status(500).json({ ok: false, reason: 'missing mp access token' });
-    }
+    // ---------- HMAC validation (robust) ----------
+    const secretRaw = String(process.env.MP_WEBHOOK_SECRET || '');
+    let signatureVerified = false;
+    if (secretRaw) {
+      // extract signature header (support multiple header names)
+      const signatureHeader = req.headers['x-signature'] || req.headers['x-hub-signature'] || req.headers['x-mercadopago-signature'] || req.headers['x-hook-signature'] || req.headers['signature'] || '';
+      let ts = '';
+      let v1 = null;
+      try {
+        const parts = String(signatureHeader).split(',');
+        for (const p of parts) {
+          const [k, v] = p.split('=');
+          if (!k || !v) continue;
+          const key = k.trim();
+          const val = v.trim();
+          if (key === 'ts') ts = val;
+          if (key === 'v1') v1 = val;
+        }
+      } catch (e) { /* ignore parse errors */ }
+      if (!v1) {
+        const m = String(signatureHeader).match(/([a-f0-9]{64})/i);
+        if (m) v1 = m[1];
+      }
 
-    let mpResp;
-    try {
-      mpResp = await mpGetPayment(paymentId, accessToken);
-    } catch (err) {
-      console.error('Erro ao consultar MP:', String(err));
-      // Responder 202 para indicar que recebemos, mas não processamos (ou 200 se preferir)
-      return res.status(202).json({ ok: false, reason: 'mp api error' });
-    }
+      if (v1) {
+        // normalize raw body newlines to LF
+        const normalizedRaw = (rawBody || '').replace(/\r\n/g, '\n');
+        const payloadStrings = [];
+        payloadStrings.push(`${ts}.${normalizedRaw}`);
+        const tsNum = Number(ts);
+        if (!Number.isNaN(tsNum)) payloadStrings.push(`${Math.floor(tsNum / 1000)}.${normalizedRaw}`);
+        payloadStrings.push(normalizedRaw);
 
-    // 4) Verificar resposta e decidir
-    if (mpResp.statusCode !== 200) {
-      console.warn('MP retornou status não-200', mpResp.statusCode, mpResp.body);
-      // Responder 200 para evitar retries do MP; registrar para investigação
-      return res.status(200).json({ ok: true, note: 'mp returned non-200' });
-    }
+        // secret candidates
+        const trimmed = secretRaw.trim();
+        const secretCandidates = [];
+        try { secretCandidates.push({ name: 'hex', buf: Buffer.from(trimmed, 'hex') }); } catch (e) {}
+        try { secretCandidates.push({ name: 'base64', buf: Buffer.from(trimmed, 'base64') }); } catch (e) {}
+        secretCandidates.push({ name: 'utf8', buf: Buffer.from(secretRaw, 'utf8') });
+        if (trimmed !== secretRaw) secretCandidates.push({ name: 'trimmed utf8', buf: Buffer.from(trimmed, 'utf8') });
 
-    const payment = mpResp.body;
-    // Exemplo de checagens úteis (ajuste conforme seu fluxo):
-    // - payment.status (approved, pending, rejected)
-    // - payment.transaction_amount, payment.currency_id
-    // - payment.external_reference (se você usa)
-    const isApproved = String(payment.status || '').toLowerCase() === 'approved';
+        // target buffer from header (v1 hex)
+        let targetBuf = null;
+        try { targetBuf = Buffer.from(String(v1).trim(), 'hex'); } catch (e) { targetBuf = null; }
 
-    // 5) Idempotência: verifique se já processou esse paymentId (implemente persistência)
-    // Aqui apenas logamos; em produção, salve em DB (Firestore, Redis, etc.) e ignore duplicatas.
-    console.log('Webhook: paymentId', paymentId, 'status', payment.status);
-
-    if (isApproved) {
-      // TODO: executar lógica de negócio (marcar pedido, creditar, notificar)
-      // Exemplo: await markOrderPaid(payment.external_reference, payment);
-      console.log('Pagamento aprovado — processar negócio para', paymentId);
-      return res.status(200).json({ ok: true, processed: true });
+        if (targetBuf && targetBuf.length === 32) {
+          for (const pstr of payloadStrings) {
+            const payloadBuf = Buffer.from(pstr, 'utf8');
+            for (const sc of secretCandidates) {
+              if (!sc.buf) continue;
+              let computed;
+              try {
+                computed = crypto.createHmac('sha256', sc.buf).update(payloadBuf).digest();
+              } catch (e) {
+                continue;
+              }
+              if (computed.length === targetBuf.length && crypto.timingSafeEqual(computed, targetBuf)) {
+                signatureVerified = true;
+                console.log('HMAC match -> secretAs:', sc.name, 'payloadLen:', payloadBuf.length);
+                break;
+              }
+            }
+            if (signatureVerified) break;
+          }
+        } else {
+          console.warn('v1 header inválido ou não presente; v1:', v1 ? String(v1).slice(0,8) + '...' : 'n/a');
+        }
+      } else {
+        console.warn('Nenhum v1 encontrado no header de assinatura.');
+      }
     } else {
-      // Pagamento não aprovado (pending, rejected, etc.)
-      console.log('Pagamento não aprovado — status:', payment.status);
-      return res.status(200).json({ ok: true, processed: false, status: payment.status });
+      console.warn('MP_WEBHOOK_SECRET não configurado; usando fallback (sandbox only).');
     }
+
+    // mark verification on request for downstream logic
+    req.__mp_signature_verified = signatureVerified;
+
+    // ---------------------------
+    // ROUTING: ?acao=criar-pedido  OR webhook (no acao)
+    // ---------------------------
+    const acao = (req.query && req.query.acao) ? String(req.query.acao) : null;
+
+    // ---------- AÇÃO: criar-pedido (Checkout Pro) ----------
+    if (req.method === 'POST' && acao === 'criar-pedido') {
+      const body = req.body || {};
+      const { userId, assinaturaId } = body;
+      const amountCentavos = parseInt(body.amountCentavos, 10);
+      const descricao = body.descricao || `Assinatura`;
+      const parcelas = body.parcelas ? Math.max(1, parseInt(body.parcelas, 10)) : 1;
+      const metodoPagamento = body.metodoPagamento || null;
+      const dataPrimeiroVencimento = body.dataPrimeiroVencimento || null;
+
+      if (!userId || !assinaturaId || !amountCentavos || isNaN(amountCentavos) || amountCentavos <= 0) {
+        return json(res, 400, { ok: false, message: 'Parâmetros inválidos: userId, assinaturaId e amountCentavos (>0) são obrigatórios.' });
+      }
+
+      const pedidosRef = db.collection('usuarios').doc(userId)
+        .collection('assinaturas').doc(assinaturaId)
+        .collection('pedidos_mp');
+
+      const novoPedidoRef = pedidosRef.doc();
+      const pedidoData = {
+        userId,
+        assinaturaId,
+        amountCentavos,
+        descricao,
+        parcelas,
+        metodo_pagamento: metodoPagamento || null,
+        status: 'pendente',
+        criadoEm: admin.firestore.FieldValue.serverTimestamp()
+      };
+      await novoPedidoRef.set(pedidoData);
+
+      const external_reference = montarExternalReference(userId, assinaturaId, novoPedidoRef.id);
+
+      // Preference payload (Checkout Pro)
+      const preferencePayload = {
+        items: [
+          {
+            id: novoPedidoRef.id,
+            title: descricao,
+            quantity: 1,
+            currency_id: 'BRL',
+            unit_price: (amountCentavos / 100)
+          }
+        ],
+        external_reference,
+        back_urls: {
+          success: process.env.MP_BACK_URL_SUCCESS || '',
+          failure: process.env.MP_BACK_URL_FAILURE || '',
+          pending: process.env.MP_BACK_URL_PENDING || ''
+        },
+        notification_url: process.env.MP_WEBHOOK_URL || ''
+      };
+
+      let mpResp;
+      try {
+        mpResp = await mpFetch('/checkout/preferences', 'POST', preferencePayload);
+      } catch (err) {
+        console.error('Erro ao criar preference no Mercado Pago:', err.message || err);
+        await novoPedidoRef.set({ status: 'erro_mp', atualizadoEm: admin.firestore.FieldValue.serverTimestamp(), mpError: err.body || String(err) }, { merge: true });
+        return json(res, 500, { ok: false, message: 'Erro ao criar preferência no Mercado Pago', detail: err.body || String(err) });
+      }
+
+      const initPoint = mpResp.init_point || mpResp.sandbox_init_point || null;
+
+      await novoPedidoRef.set({
+        mpPreferenceId: mpResp.id,
+        mpInitPoint: initPoint,
+        mpSandboxInitPoint: mpResp.sandbox_init_point || null,
+        external_reference,
+        atualizadoEm: admin.firestore.FieldValue.serverTimestamp()
+      }, { merge: true });
+
+      // generate backend parcelas (idempotent using pedidoId)
+      try {
+        await gerarParcelasAssinaturaBackend(userId, assinaturaId, amountCentavos, parcelas, metodoPagamento, dataPrimeiroVencimento, novoPedidoRef.id);
+      } catch (err) {
+        console.warn('Falha ao gerar parcelas no backend:', err.message || err);
+      }
+
+      return json(res, 200, { ok: true, redirectUrl: initPoint, pedidoId: novoPedidoRef.id });
+    }
+
+    // ---------- AÇÃO: webhook (MP POST sem acao) ----------
+    if (req.method === 'POST' && !acao) {
+      // topic and id may come via query or body
+      const topic = req.query.topic || (req.body && (req.body.topic || req.body.type)) || null;
+      const id = req.query.id || (req.body && (req.body.id || (req.body.data && req.body.data.id))) || null;
+
+      if (!topic || !id) {
+        console.log('Webhook recebido sem topic/id; respondendo 200.');
+        return json(res, 200, { ok: true, message: 'notificação recebida (sem topic/id)' });
+      }
+
+      // If signature not verified, we accept in sandbox and will validate via MP API (fallback)
+      if (!req.__mp_signature_verified) {
+        console.warn('Assinatura não verificada; usando fallback de validação via API do MP (sandbox).');
+      }
+
+      // fetch resource from MP with fallback to merchant_orders
+      let mpData = null;
+      try {
+        if (topic === 'payment' || topic === 'payment.updated' || topic === 'payment.created') {
+          mpData = await mpFetch(`/v1/payments/${id}`, 'GET');
+        } else if (topic === 'merchant_order' || topic === 'merchant_order.updated') {
+          mpData = await mpFetch(`/merchant_orders/${id}`, 'GET');
+        } else {
+          // fallback: try payment then merchant_orders
+          try {
+            mpData = await mpFetch(`/v1/payments/${id}`, 'GET');
+          } catch (err) {
+            if (err && err.status === 404) {
+              try {
+                mpData = await mpFetch(`/merchant_orders/${id}`, 'GET');
+              } catch (err2) {
+                console.warn('MP fetch fallback também falhou:', err2.message || err2);
+                mpData = null;
+              }
+            } else {
+              throw err;
+            }
+          }
+        }
+      } catch (err) {
+        console.warn('Falha ao buscar recurso no Mercado Pago:', err.message || err);
+        if (err && err.status === 404) {
+          console.log('MP retornou 404 para id:', id, 'topic:', topic);
+          return json(res, 200, { ok: true, message: 'mp resource not found (simulação ou id inválido)' });
+        }
+        return json(res, 200, { ok: true, message: 'notificação recebida (erro ao buscar MP)' });
+      }
+
+      if (!mpData) return json(res, 200, { ok: true, message: 'mpData vazio' });
+
+      // extract external_reference (userId|assinaturaId|pedidoId)
+      const externalRef = mpData.external_reference || (mpData.order && mpData.order.external_reference) || null;
+      if (!externalRef) return json(res, 200, { ok: true, message: 'sem external_reference' });
+
+      const parsed = parseExternalReference(externalRef);
+      if (!parsed) return json(res, 200, { ok: true, message: 'external_reference inválido' });
+
+      const { userId, assinaturaId, pedidoId } = parsed;
+
+      // idempotência: notificacoes_mp/{topic}_{id}
+      const notifId = `${topic}_${id}`;
+      const notifRef = db.collection('usuarios').doc(userId)
+        .collection('assinaturas').doc(assinaturaId)
+        .collection('notificacoes_mp').doc(notifId);
+
+      const notifSnap = await notifRef.get();
+      if (notifSnap.exists) {
+        console.log('Notificação já processada:', notifId);
+        return json(res, 200, { ok: true, message: 'já processado' });
+      }
+
+      // save notification (store mpData for audit)
+      await notifRef.set({
+        topic,
+        id,
+        mpData,
+        signature_verified: !!req.__mp_signature_verified,
+        recebidoEm: admin.firestore.FieldValue.serverTimestamp()
+      });
+
+      // update pedido document
+      const pedidoRef = db.collection('usuarios').doc(userId)
+        .collection('assinaturas').doc(assinaturaId)
+        .collection('pedidos_mp').doc(pedidoId);
+
+      const pedidoSnap = await pedidoRef.get();
+      if (pedidoSnap.exists) {
+        const mpStatus = mpData.status || mpData.payment_status || null;
+        let novoStatusPedido = 'pendente';
+        if (mpStatus === 'approved' || mpStatus === 'paid') novoStatusPedido = 'pago';
+        else if (mpStatus === 'pending') novoStatusPedido = 'pendente';
+        else if (['cancelled', 'rejected', 'refunded'].includes(mpStatus)) novoStatusPedido = 'falha';
+
+        await pedidoRef.set({
+          status: novoStatusPedido,
+          mpStatus,
+          mpPaymentId: id,
+          atualizadoEm: admin.firestore.FieldValue.serverTimestamp()
+        }, { merge: true });
+
+        // mark pre-created parcelas as paid according to installments
+        const pagamentosRef = db.collection('usuarios').doc(userId)
+          .collection('assinaturas').doc(assinaturaId)
+          .collection('pagamentos');
+
+        const installments = (mpData.installments && Number(mpData.installments)) ? Number(mpData.installments) : 1;
+
+        const pendentesSnap = await pagamentosRef.where('status', '==', 'pendente').orderBy('numero_parcela', 'asc').get();
+
+        if (!pendentesSnap.empty) {
+          let toMark = installments;
+          const batch = db.batch();
+          for (const doc of pendentesSnap.docs) {
+            if (toMark <= 0) break;
+            const pRef = pagamentosRef.doc(doc.id);
+            batch.set(pRef, {
+              status: 'pago',
+              data_pagamento: admin.firestore.FieldValue.serverTimestamp(),
+              mpPaymentId: id,
+              atualizadoEm: admin.firestore.FieldValue.serverTimestamp()
+            }, { merge: true });
+            toMark--;
+          }
+          await batch.commit();
+        } else {
+          // if no pending parcelas, create a single payment record
+          const pagamentoRef = pagamentosRef.doc(String(id));
+          await pagamentoRef.set({
+            paymentId: id,
+            pedidoId,
+            status: novoStatusPedido,
+            mpData,
+            recebidoEm: admin.firestore.FieldValue.serverTimestamp()
+          }, { merge: true });
+        }
+
+        // update assinatura status
+        const assinRef = db.collection('usuarios').doc(userId)
+          .collection('assinaturas').doc(assinaturaId);
+
+        if (novoStatusPedido === 'pago') {
+          await assinRef.set({
+            status: 'ativo',
+            ativadoEm: admin.firestore.FieldValue.serverTimestamp(),
+            atualizadoEm: admin.firestore.FieldValue.serverTimestamp()
+          }, { merge: true });
+        } else if (novoStatusPedido === 'falha') {
+          await assinRef.set({
+            status: 'pagamento_falhou',
+            atualizadoEm: admin.firestore.FieldValue.serverTimestamp()
+          }, { merge: true });
+        } else if (novoStatusPedido === 'pendente') {
+          await assinRef.set({
+            status: 'pendente_pagamento',
+            atualizadoEm: admin.firestore.FieldValue.serverTimestamp()
+          }, { merge: true });
+        }
+      } else {
+        console.warn('Pedido não encontrado para external_reference:', externalRef);
+      }
+
+      return json(res, 200, { ok: true, message: 'processado' });
+    }
+
+    // invalid route
+    return json(res, 400, { ok: false, message: 'Rota inválida. Use ?acao=criar-pedido ou envie webhook do MP.' });
   } catch (err) {
-    console.error('ERROR webhook handler:', String(err));
-    // Responder 500 para sinalizar erro inesperado
-    return res.status(500).json({ ok: false, reason: 'internal error' });
+    console.error('Erro pagamentoMP:', err && err.message ? err.message : err);
+    return json(res, 500, { ok: false, message: 'Erro interno', detail: String(err && err.message ? err.message : err) });
   }
 }
