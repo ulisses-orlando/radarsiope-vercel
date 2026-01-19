@@ -1,40 +1,29 @@
 // pages/api/pagamentoMP.js
-// Node runtime (garante crypto, Buffer, firebase-admin)
+// Runtime Node para garantir compatibilidade com firebase-admin e crypto
 export const config = { runtime: 'nodejs' };
 
 import crypto from 'crypto';
 import admin from 'firebase-admin';
 
-// ---------- Init Firebase (use env vars) ----------
+// Inicializa Firebase (atenção ao formato da PRIVATE_KEY no Vercel: use \\n)
 if (!admin.apps.length) {
   admin.initializeApp({
     credential: admin.credential.cert({
       projectId: process.env.FIREBASE_PROJECT_ID,
       clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-      // Vercel often requires \\n -> \n replacement
       privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\\\n/g, '\n')
     })
   });
 }
 const db = admin.firestore();
 
-// ---------- Utilities ----------
+// Utilitários
 function json(res, status, payload) {
   res.status(status).setHeader('Content-Type', 'application/json').end(JSON.stringify(payload));
 }
-function montarExternalReference(userId, assinaturaId, pedidoId) {
-  // deterministic external_reference used to map back to Firestore
-  return `${String(userId)}|${String(assinaturaId)}|${String(pedidoId)}`;
-}
-function parseExternalReference(externalRef) {
-  if (!externalRef) return null;
-  const parts = String(externalRef).split('|');
-  if (parts.length !== 3) return null;
-  return { userId: parts[0], assinaturaId: parts[1], pedidoId: parts[2] };
-}
 
-// fetch with timeout wrapper (Node 18+ fetch supports AbortSignal)
-async function fetchWithTimeout(url, opts = {}, ms = 8000) {
+// fetch com timeout
+async function fetchWithTimeout(url, opts = {}, ms = 10000) {
   const controller = new AbortController();
   const id = setTimeout(() => controller.abort(), ms);
   try {
@@ -47,7 +36,7 @@ async function fetchWithTimeout(url, opts = {}, ms = 8000) {
   }
 }
 
-// mpFetch: calls Mercado Pago API, throws with status/body on non-2xx
+// Chamada à API do Mercado Pago (lança erro com status/body em não-2xx)
 async function mpFetch(path, method = 'GET', body = null) {
   const token = process.env.MP_ACCESS_TOKEN;
   if (!token) throw new Error('MP_ACCESS_TOKEN não definido');
@@ -61,7 +50,7 @@ async function mpFetch(path, method = 'GET', body = null) {
   try {
     resp = await fetchWithTimeout(url, opts, 10000);
   } catch (err) {
-    const e = new Error(`Network error calling MP ${method} ${path}: ${err.message}`);
+    const e = new Error(`Erro de rede ao chamar MP ${method} ${path}: ${err.message}`);
     e.cause = err;
     throw e;
   }
@@ -79,7 +68,18 @@ async function mpFetch(path, method = 'GET', body = null) {
   return data;
 }
 
-// gerarParcelasAssinaturaBackend: cria parcelas no Firestore (com checks)
+// Monta external_reference determinístico
+function montarExternalReference(userId, assinaturaId, pedidoId) {
+  return `${String(userId)}|${String(assinaturaId)}|${String(pedidoId)}`;
+}
+function parseExternalReference(externalRef) {
+  if (!externalRef) return null;
+  const parts = String(externalRef).split('|');
+  if (parts.length !== 3) return null;
+  return { userId: parts[0], assinaturaId: parts[1], pedidoId: parts[2] };
+}
+
+// Gera parcelas no backend (idempotente quando pedidoId fornecido)
 async function gerarParcelasAssinaturaBackend(userId, assinaturaId, amountCentavos, numParcelas = 1, metodoPagamento = null, dataPrimeiroVencimento = null, pedidoId = null) {
   if (!userId || !assinaturaId) throw new Error('userId e assinaturaId são obrigatórios');
   const parcelas = Math.max(1, parseInt(numParcelas, 10) || 1);
@@ -110,7 +110,6 @@ async function gerarParcelasAssinaturaBackend(userId, assinaturaId, amountCentav
     const venc = new Date(primeiro);
     venc.setMonth(venc.getMonth() + i);
 
-    // idempotency: if pedidoId provided, use deterministic doc id
     const docId = pedidoId ? `${pedidoId}-${numero}` : pagamentosRef.doc().id;
     const docRef = pagamentosRef.doc(docId);
     const data = {
@@ -129,10 +128,57 @@ async function gerarParcelasAssinaturaBackend(userId, assinaturaId, amountCentav
   return true;
 }
 
-// ---------- Handler ----------
+// ---------- Resolver recurso MP (payment | merchant_order | search) ----------
+async function resolverRecursoMP(id) {
+  // 1) tentar payment direto
+  try {
+    const p = await mpFetch(`/v1/payments/${encodeURIComponent(id)}`, 'GET');
+    return { tipo: 'payment', data: p };
+  } catch (err) {
+    if (!(err && err.status === 404)) throw err;
+  }
+
+  // 2) tentar merchant_order
+  try {
+    const mo = await mpFetch(`/merchant_orders/${encodeURIComponent(id)}`, 'GET');
+    return { tipo: 'merchant_order', data: mo };
+  } catch (err) {
+    if (!(err && err.status === 404)) throw err;
+  }
+
+  // 3) se id parece notification id (contém ';' ou 'UTC'), não tentar endpoints diretos
+  const idStr = String(id || '');
+  if (idStr.includes(';') || idStr.toLowerCase().includes('utc')) {
+    return null;
+  }
+
+  // 4) tentar search por order.id
+  try {
+    const searchOrder = await mpFetch(`/v1/payments/search?order.id=${encodeURIComponent(id)}`, 'GET');
+    if (searchOrder && Array.isArray(searchOrder.results) && searchOrder.results.length) {
+      return { tipo: 'payment_search', data: searchOrder.results[0] };
+    }
+  } catch (err) {
+    if (!(err && err.status === 404)) console.warn('Erro search order.id:', err.message || err);
+  }
+
+  // 5) tentar search por external_reference
+  try {
+    const searchExt = await mpFetch(`/v1/payments/search?external_reference=${encodeURIComponent(id)}`, 'GET');
+    if (searchExt && Array.isArray(searchExt.results) && searchExt.results.length) {
+      return { tipo: 'payment_search_ext', data: searchExt.results[0] };
+    }
+  } catch (err) {
+    if (!(err && err.status === 404)) console.warn('Erro search external_reference:', err.message || err);
+  }
+
+  return null;
+}
+
+// ---------- Handler principal (sem validação HMAC) ----------
 export default async function handler(req, res) {
   try {
-    // read raw body as string for HMAC and parsing
+    // ler raw body (string) para compatibilidade com webhooks
     const rawBody = await new Promise((resolve, reject) => {
       let data = '';
       req.on('data', chunk => { data += chunk; });
@@ -140,107 +186,26 @@ export default async function handler(req, res) {
       req.on('error', err => reject(err));
     });
 
-    // try to populate req.body if JSON
+    // tentar popular req.body se for JSON
     try {
       if (rawBody && rawBody.length > 0 && req.headers['content-type'] && req.headers['content-type'].includes('application/json')) {
         req.body = JSON.parse(rawBody);
       }
     } catch (e) {
-      // keep rawBody for HMAC diagnostics
-      console.warn('Falha ao parsear rawBody como JSON (ok em sandbox):', e.message);
+      // ok em sandbox; manter rawBody para auditoria
     }
 
-    // minimal debug (do not log secrets)
+    // log inicial mínimo (não expõe segredos)
     console.log('INICIANDO pagamentoMP - envs:', {
       MP_ACCESS_TOKEN: !!process.env.MP_ACCESS_TOKEN,
       MP_PUBLIC_KEY: !!process.env.MP_PUBLIC_KEY,
-      MP_WEBHOOK_URL: !!process.env.MP_WEBHOOK_URL,
-      MP_WEBHOOK_SECRET: !!process.env.MP_WEBHOOK_SECRET
+      MP_WEBHOOK_URL: !!process.env.MP_WEBHOOK_URL
     });
 
-    // ---------- HMAC validation (robust) ----------
-    const secretRaw = String(process.env.MP_WEBHOOK_SECRET || '');
-    let signatureVerified = false;
-    if (secretRaw) {
-      // extract signature header (support multiple header names)
-      const signatureHeader = req.headers['x-signature'] || req.headers['x-hub-signature'] || req.headers['x-mercadopago-signature'] || req.headers['x-hook-signature'] || req.headers['signature'] || '';
-      let ts = '';
-      let v1 = null;
-      try {
-        const parts = String(signatureHeader).split(',');
-        for (const p of parts) {
-          const [k, v] = p.split('=');
-          if (!k || !v) continue;
-          const key = k.trim();
-          const val = v.trim();
-          if (key === 'ts') ts = val;
-          if (key === 'v1') v1 = val;
-        }
-      } catch (e) { /* ignore parse errors */ }
-      if (!v1) {
-        const m = String(signatureHeader).match(/([a-f0-9]{64})/i);
-        if (m) v1 = m[1];
-      }
-
-      if (v1) {
-        // normalize raw body newlines to LF
-        const normalizedRaw = (rawBody || '').replace(/\r\n/g, '\n');
-        const payloadStrings = [];
-        payloadStrings.push(`${ts}.${normalizedRaw}`);
-        const tsNum = Number(ts);
-        if (!Number.isNaN(tsNum)) payloadStrings.push(`${Math.floor(tsNum / 1000)}.${normalizedRaw}`);
-        payloadStrings.push(normalizedRaw);
-
-        // secret candidates
-        const trimmed = secretRaw.trim();
-        const secretCandidates = [];
-        try { secretCandidates.push({ name: 'hex', buf: Buffer.from(trimmed, 'hex') }); } catch (e) {}
-        try { secretCandidates.push({ name: 'base64', buf: Buffer.from(trimmed, 'base64') }); } catch (e) {}
-        secretCandidates.push({ name: 'utf8', buf: Buffer.from(secretRaw, 'utf8') });
-        if (trimmed !== secretRaw) secretCandidates.push({ name: 'trimmed utf8', buf: Buffer.from(trimmed, 'utf8') });
-
-        // target buffer from header (v1 hex)
-        let targetBuf = null;
-        try { targetBuf = Buffer.from(String(v1).trim(), 'hex'); } catch (e) { targetBuf = null; }
-
-        if (targetBuf && targetBuf.length === 32) {
-          for (const pstr of payloadStrings) {
-            const payloadBuf = Buffer.from(pstr, 'utf8');
-            for (const sc of secretCandidates) {
-              if (!sc.buf) continue;
-              let computed;
-              try {
-                computed = crypto.createHmac('sha256', sc.buf).update(payloadBuf).digest();
-              } catch (e) {
-                continue;
-              }
-              if (computed.length === targetBuf.length && crypto.timingSafeEqual(computed, targetBuf)) {
-                signatureVerified = true;
-                console.log('HMAC match -> secretAs:', sc.name, 'payloadLen:', payloadBuf.length);
-                break;
-              }
-            }
-            if (signatureVerified) break;
-          }
-        } else {
-          console.warn('v1 header inválido ou não presente; v1:', v1 ? String(v1).slice(0,8) + '...' : 'n/a');
-        }
-      } else {
-        console.warn('Nenhum v1 encontrado no header de assinatura.');
-      }
-    } else {
-      console.warn('MP_WEBHOOK_SECRET não configurado; usando fallback (sandbox only).');
-    }
-
-    // mark verification on request for downstream logic
-    req.__mp_signature_verified = signatureVerified;
-
-    // ---------------------------
-    // ROUTING: ?acao=criar-pedido  OR webhook (no acao)
-    // ---------------------------
+    // rota e ação
     const acao = (req.query && req.query.acao) ? String(req.query.acao) : null;
 
-    // ---------- AÇÃO: criar-pedido (Checkout Pro) ----------
+    // ---------- criar-pedido (Checkout Pro) ----------
     if (req.method === 'POST' && acao === 'criar-pedido') {
       const body = req.body || {};
       const { userId, assinaturaId } = body;
@@ -273,7 +238,6 @@ export default async function handler(req, res) {
 
       const external_reference = montarExternalReference(userId, assinaturaId, novoPedidoRef.id);
 
-      // Preference payload (Checkout Pro)
       const preferencePayload = {
         items: [
           {
@@ -312,7 +276,7 @@ export default async function handler(req, res) {
         atualizadoEm: admin.firestore.FieldValue.serverTimestamp()
       }, { merge: true });
 
-      // generate backend parcelas (idempotent using pedidoId)
+      // gerar parcelas no backend (idempotente usando pedidoId)
       try {
         await gerarParcelasAssinaturaBackend(userId, assinaturaId, amountCentavos, parcelas, metodoPagamento, dataPrimeiroVencimento, novoPedidoRef.id);
       } catch (err) {
@@ -322,9 +286,8 @@ export default async function handler(req, res) {
       return json(res, 200, { ok: true, redirectUrl: initPoint, pedidoId: novoPedidoRef.id });
     }
 
-    // ---------- AÇÃO: webhook (MP POST sem acao) ----------
+    // ---------- webhook (MP POST sem acao) ----------
     if (req.method === 'POST' && !acao) {
-      // topic and id may come via query or body
       const topic = req.query.topic || (req.body && (req.body.topic || req.body.type)) || null;
       const id = req.query.id || (req.body && (req.body.id || (req.body.data && req.body.data.id))) || null;
 
@@ -333,57 +296,71 @@ export default async function handler(req, res) {
         return json(res, 200, { ok: true, message: 'notificação recebida (sem topic/id)' });
       }
 
-      // If signature not verified, we accept in sandbox and will validate via MP API (fallback)
-      if (!req.__mp_signature_verified) {
-        console.warn('Assinatura não verificada; usando fallback de validação via API do MP (sandbox).');
-      }
+      // idempotência: notificacoes_mp/{topic}_{id}
+      // precisamos do parsed external_reference mais adiante; criar ref de notificação agora
+      // parsed userId/assinaturaId/pedidoId só após resolver mpData
+      const notifId = `${topic}_${id}`;
 
-      // fetch resource from MP with fallback to merchant_orders
-      let mpData = null;
+      // tentar resolver recurso MP (payment | merchant_order | search)
+      let resolved = null;
       try {
-        if (topic === 'payment' || topic === 'payment.updated' || topic === 'payment.created') {
-          mpData = await mpFetch(`/v1/payments/${id}`, 'GET');
-        } else if (topic === 'merchant_order' || topic === 'merchant_order.updated') {
-          mpData = await mpFetch(`/merchant_orders/${id}`, 'GET');
-        } else {
-          // fallback: try payment then merchant_orders
-          try {
-            mpData = await mpFetch(`/v1/payments/${id}`, 'GET');
-          } catch (err) {
-            if (err && err.status === 404) {
-              try {
-                mpData = await mpFetch(`/merchant_orders/${id}`, 'GET');
-              } catch (err2) {
-                console.warn('MP fetch fallback também falhou:', err2.message || err2);
-                mpData = null;
-              }
-            } else {
-              throw err;
-            }
-          }
-        }
+        resolved = await resolverRecursoMP(id);
       } catch (err) {
         console.warn('Falha ao buscar recurso no Mercado Pago:', err.message || err);
-        if (err && err.status === 404) {
-          console.log('MP retornou 404 para id:', id, 'topic:', topic);
-          return json(res, 200, { ok: true, message: 'mp resource not found (simulação ou id inválido)' });
-        }
+        // se erro de rede ou permissão, responder 200 para evitar retries agressivos do MP
         return json(res, 200, { ok: true, message: 'notificação recebida (erro ao buscar MP)' });
       }
 
-      if (!mpData) return json(res, 200, { ok: true, message: 'mpData vazio' });
+      if (!resolved) {
+        console.log('Não foi possível resolver id no MP; id pode ser notification id ou ambiente errado:', id);
+        // registrar notificação mínima para auditoria
+        // salvar em coleção global de notificações (sem userId/assinaturaId)
+        const globalNotifRef = db.collection('notificacoes_mp_global').doc(notifId);
+        await globalNotifRef.set({
+          topic,
+          id,
+          rawBody: rawBody ? rawBody.slice(0, 2000) : null,
+          recebidoEm: admin.firestore.FieldValue.serverTimestamp(),
+          resolved: false
+        }, { merge: true });
+        return json(res, 200, { ok: true, message: 'mp resource not found (simulação ou id inválido)' });
+      }
 
-      // extract external_reference (userId|assinaturaId|pedidoId)
+      const mpData = resolved.data;
+
+      // extrair external_reference (userId|assinaturaId|pedidoId)
       const externalRef = mpData.external_reference || (mpData.order && mpData.order.external_reference) || null;
-      if (!externalRef) return json(res, 200, { ok: true, message: 'sem external_reference' });
+      if (!externalRef) {
+        // salvar globalmente para auditoria
+        const globalNotifRef = db.collection('notificacoes_mp_global').doc(notifId);
+        await globalNotifRef.set({
+          topic,
+          id,
+          mpData,
+          recebidoEm: admin.firestore.FieldValue.serverTimestamp(),
+          resolved: true,
+          external_reference: null
+        }, { merge: true });
+        return json(res, 200, { ok: true, message: 'sem external_reference' });
+      }
 
       const parsed = parseExternalReference(externalRef);
-      if (!parsed) return json(res, 200, { ok: true, message: 'external_reference inválido' });
+      if (!parsed) {
+        const globalNotifRef = db.collection('notificacoes_mp_global').doc(notifId);
+        await globalNotifRef.set({
+          topic,
+          id,
+          mpData,
+          external_reference: externalRef,
+          recebidoEm: admin.firestore.FieldValue.serverTimestamp(),
+          resolved: true,
+          parsed: false
+        }, { merge: true });
+        return json(res, 200, { ok: true, message: 'external_reference inválido' });
+      }
 
       const { userId, assinaturaId, pedidoId } = parsed;
 
-      // idempotência: notificacoes_mp/{topic}_{id}
-      const notifId = `${topic}_${id}`;
       const notifRef = db.collection('usuarios').doc(userId)
         .collection('assinaturas').doc(assinaturaId)
         .collection('notificacoes_mp').doc(notifId);
@@ -394,16 +371,17 @@ export default async function handler(req, res) {
         return json(res, 200, { ok: true, message: 'já processado' });
       }
 
-      // save notification (store mpData for audit)
+      // salvar notificação com mpData para auditoria
       await notifRef.set({
         topic,
         id,
         mpData,
-        signature_verified: !!req.__mp_signature_verified,
-        recebidoEm: admin.firestore.FieldValue.serverTimestamp()
+        recebidoEm: admin.firestore.FieldValue.serverTimestamp(),
+        resolvedTipo: resolved.tipo,
+        signature_verified: false // sem validação HMAC por enquanto
       });
 
-      // update pedido document
+      // atualizar pedido
       const pedidoRef = db.collection('usuarios').doc(userId)
         .collection('assinaturas').doc(assinaturaId)
         .collection('pedidos_mp').doc(pedidoId);
@@ -423,7 +401,7 @@ export default async function handler(req, res) {
           atualizadoEm: admin.firestore.FieldValue.serverTimestamp()
         }, { merge: true });
 
-        // mark pre-created parcelas as paid according to installments
+        // atualizar pagamentos pré-criados: marcar parcelas pagas conforme installments
         const pagamentosRef = db.collection('usuarios').doc(userId)
           .collection('assinaturas').doc(assinaturaId)
           .collection('pagamentos');
@@ -448,7 +426,7 @@ export default async function handler(req, res) {
           }
           await batch.commit();
         } else {
-          // if no pending parcelas, create a single payment record
+          // se não houver parcelas pendentes, criar um registro de pagamento único
           const pagamentoRef = pagamentosRef.doc(String(id));
           await pagamentoRef.set({
             paymentId: id,
@@ -459,7 +437,7 @@ export default async function handler(req, res) {
           }, { merge: true });
         }
 
-        // update assinatura status
+        // atualizar status da assinatura
         const assinRef = db.collection('usuarios').doc(userId)
           .collection('assinaturas').doc(assinaturaId);
 
@@ -487,7 +465,7 @@ export default async function handler(req, res) {
       return json(res, 200, { ok: true, message: 'processado' });
     }
 
-    // invalid route
+    // rota inválida
     return json(res, 400, { ok: false, message: 'Rota inválida. Use ?acao=criar-pedido ou envie webhook do MP.' });
   } catch (err) {
     console.error('Erro pagamentoMP:', err && err.message ? err.message : err);
