@@ -195,6 +195,8 @@ export default async function handler(req, res) {
       // ok em sandbox; manter rawBody para auditoria
     }
 
+    console.log('Webhook recebido:', req.body);
+
     // log inicial mínimo (não expõe segredos)
     console.log('INICIANDO pagamentoMP - envs:', {
       MP_ACCESS_TOKEN: !!process.env.MP_ACCESS_TOKEN,
@@ -260,7 +262,9 @@ export default async function handler(req, res) {
       let mpResp;
       try {
         mpResp = await mpFetch('/checkout/preferences', 'POST', preferencePayload);
+        console.log('Preference criada:', JSON.stringify(mpResp, null, 2));
       } catch (err) {
+        console.log('Preference criada com erro:', JSON.stringify(mpResp, null, 2));
         console.error('Erro ao criar preference no Mercado Pago:', err.message || err);
         await novoPedidoRef.set({ status: 'erro_mp', atualizadoEm: admin.firestore.FieldValue.serverTimestamp(), mpError: err.body || String(err) }, { merge: true });
         return json(res, 500, { ok: false, message: 'Erro ao criar preferência no Mercado Pago', detail: err.body || String(err) });
@@ -268,6 +272,7 @@ export default async function handler(req, res) {
 
       // sempre usar sandbox_init_point em ambiente de testes
       const initPoint = mpResp.sandbox_init_point || mpResp.init_point || null;
+      console.log('Redirect URL usado:', initPoint);
 
       await novoPedidoRef.set({
         mpPreferenceId: mpResp.id,
