@@ -693,6 +693,12 @@ async function processarEnvioAssinatura(e) {
 
   if (!cpf) { showFormError('cpf', 'Informe seu CPF.'); return; }
 
+  if (!perfil) { mostrarMensagem('Selecione seu perfil.'); return; }
+
+  if (!preferencia) { mostrarMensagem('Selecione sua preferência de contato.'); return; }
+
+  if (!forma) { mostrarMensagem('Selecione a forma de pagamento.'); return; }
+
   if (!validarEmail(email)) { showFormError('email', 'E-mail inválido.'); return; }
 
   // --- se já existe usuário com este e-mail ---
@@ -775,6 +781,8 @@ async function processarEnvioAssinatura(e) {
       assinaturaId,
       amountCentavos: preview.amountCentavos,
       cpf,
+      nome,
+      email,
       descricao: `Assinatura ${window._currentPlan ? window._currentPlan.nome || '' : ''}`
     };
 
