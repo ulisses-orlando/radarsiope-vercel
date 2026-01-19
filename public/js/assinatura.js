@@ -464,13 +464,14 @@ function onPlanoSelecionado(planId) {
 // -----------------------------
 // Upsert usuário por email
 // -----------------------------
-async function upsertUsuario({ nome, email, telefone, perfil, mensagem, preferencia, cod_uf, cod_municipio, nome_municipio }) {
+async function upsertUsuario({ nome, cpf, email, telefone, perfil, mensagem, preferencia, cod_uf, cod_municipio, nome_municipio }) {
   try {
     const q = await db.collection('usuarios').where('email', '==', email).limit(1).get();
     if (!q.empty) {
       const doc = q.docs[0];
       await db.collection('usuarios').doc(doc.id).update({
         nome,
+        cpf,
         telefone: telefone || null,
         perfil: perfil || null,
         mensagem: mensagem || null,
@@ -485,6 +486,7 @@ async function upsertUsuario({ nome, email, telefone, perfil, mensagem, preferen
     } else {
       const ref = await db.collection('usuarios').add({
         nome,
+        cpf,
         email,
         telefone: telefone || null,
         perfil: perfil || null,
@@ -673,6 +675,7 @@ async function processarEnvioAssinatura(e) {
 
   // --- validações (mantidas) ---
   const nome = document.getElementById('nome').value.trim();
+  const cpf = document.getElementById('cpf').value.trim();
   const email = document.getElementById('email').value.trim();
   const telefone = document.getElementById('telefone').value.trim();
   const perfil = document.getElementById('perfil').value;
@@ -687,15 +690,18 @@ async function processarEnvioAssinatura(e) {
   const tiposSelecionados = Array.from(checks).map(cb => cb.value);
 
   if (nome.length < 3) { showFormError('nome', 'Nome deve ter pelo menos 3 caracteres.'); return; }
+
+  if (!cpf) { showFormError('cpf', 'Informe seu CPF.'); return; }
+
   if (!validarEmail(email)) { showFormError('email', 'E-mail inválido.'); return; }
 
   // --- se já existe usuário com este e-mail ---
   const usuarioRef = db.collection('usuarios').doc(email);
   const usuarioSnap = await usuarioRef.get();
 
-  if (usuarioSnap.exists) { 
+  if (usuarioSnap.exists) {
     showFormError('email', 'Este e-mail já está cadastrado. Acesse a área do assinante e contate o suporte.');
-    return; 
+    return;
   }
 
   if (telefone) {
@@ -742,7 +748,7 @@ async function processarEnvioAssinatura(e) {
   try {
     // 1) upsert do usuário
     const userId = await upsertUsuario({
-      nome, email, telefone, perfil, mensagem,
+      nome, cpf, email, telefone, perfil, mensagem,
       preferencia, cod_uf: dadosUf ? dadosUf.cod_uf : null, cod_municipio: dadosUf ? dadosUf.cod_municipio : null, nome_municipio: dadosUf ? dadosUf.nome_municipio : null
     });
 
@@ -768,6 +774,7 @@ async function processarEnvioAssinatura(e) {
       userId,
       assinaturaId,
       amountCentavos: preview.amountCentavos,
+      cpf,
       descricao: `Assinatura ${window._currentPlan ? window._currentPlan.nome || '' : ''}`
     };
 
@@ -852,6 +859,14 @@ async function atualizarEstadoBotaoCupom() {
 // -----------------------------
 async function initAssinatura() {
   aplicarMascaraTelefone(document.getElementById("telefone"));
+
+  document.getElementById('cpf').addEventListener('input', function (e) {
+    let value = e.target.value.replace(/\D/g, ''); 
+    value = value.replace(/(\d{3})(\d)/, '$1.$2');
+    value = value.replace(/(\d{3})(\d)/, '$1.$2');
+    value = value.replace(/(\d{3})(\d{1,2})$/, '$1-$2');
+    e.target.value = value;
+  });
 
   // tentar obter leadId antecipadamente para passar UF/Mun como padrão ao helper
   const leadId = getParametro('leadId') || getParametro('idLead') || null;
