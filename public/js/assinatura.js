@@ -688,6 +688,16 @@ async function processarEnvioAssinatura(e) {
 
   if (nome.length < 3) { showFormError('nome', 'Nome deve ter pelo menos 3 caracteres.'); return; }
   if (!validarEmail(email)) { showFormError('email', 'E-mail inválido.'); return; }
+
+  // --- se já existe usuário com este e-mail ---
+  const usuarioRef = db.collection('usuarios').doc(email);
+  const usuarioSnap = await usuarioRef.get();
+
+  if (usuarioSnap.exists) { 
+    showFormError("Este e-mail já está cadastrado. Acesse a área do assinante e contate o suporte.");
+    return; 
+  }
+
   if (telefone) {
     const telefoneNumerico = telefone.replace(/\D/g, "");
     if (telefoneNumerico.length < 10 || !validarTelefoneFormato(telefone)) { showFormError('telefone', 'Telefone inválido.'); return; }
