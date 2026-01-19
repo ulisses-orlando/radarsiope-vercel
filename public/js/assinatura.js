@@ -694,7 +694,7 @@ async function processarEnvioAssinatura(e) {
   const usuarioSnap = await usuarioRef.get();
 
   if (usuarioSnap.exists) { 
-    showFormError("Este e-mail já está cadastrado. Acesse a área do assinante e contate o suporte.");
+    showFormError('email', 'Este e-mail já está cadastrado. Acesse a área do assinante e contate o suporte.');
     return; 
   }
 
