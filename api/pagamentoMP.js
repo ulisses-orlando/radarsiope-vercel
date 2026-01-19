@@ -250,6 +250,15 @@ export default async function handler(req, res) {
             unit_price: (amountCentavos / 100)
           }
         ],
+        payer: { 
+          name: nome, 
+          surname: "", 
+          email: email, 
+          identification: { 
+            type: "CPF", 
+            number: cpf
+          }
+        },
         external_reference,
         back_urls: {
           success: process.env.MP_BACK_URL_SUCCESS || '',
