@@ -216,6 +216,9 @@ export default async function handler(req, res) {
       const parcelas = body.parcelas ? Math.max(1, parseInt(body.parcelas, 10)) : 1;
       const metodoPagamento = body.metodoPagamento || null;
       const dataPrimeiroVencimento = body.dataPrimeiroVencimento || null;
+      const nome = body.nome || "";
+      const email = body.email || "";
+      const cpf = body.cpf || "";
 
       if (!userId || !assinaturaId || !amountCentavos || isNaN(amountCentavos) || amountCentavos <= 0) {
         return json(res, 400, { ok: false, message: 'Parâmetros inválidos: userId, assinaturaId e amountCentavos (>0) são obrigatórios.' });
@@ -250,12 +253,12 @@ export default async function handler(req, res) {
             unit_price: (amountCentavos / 100)
           }
         ],
-        payer: { 
-          name: nome, 
-          surname: "", 
-          email: email, 
-          identification: { 
-            type: "CPF", 
+        payer: {
+          name: nome,
+          surname: "",
+          email: email,
+          identification: {
+            type: "CPF",
             number: cpf
           }
         },
