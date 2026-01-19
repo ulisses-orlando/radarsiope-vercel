@@ -732,6 +732,8 @@ async function processarEnvioAssinatura(e) {
     dadosUf = null;
   }
 
+  if (!parcelas) { mostrarMensagem('Selecione a quantidade de parcelas.'); return; }
+  
   // calcular preview (IMPORTANTE: aguardar)
   let preview;
   try {
