@@ -283,6 +283,10 @@ export default async function handler(req, res) {
           }
         },
         external_reference,
+        
+        binary_mode: true, // força aprovação ou rejeição imediata 
+        auto_return: "approved", // redireciona automaticamente para back_urls.success quando aprovado
+
         back_urls: {
           success: process.env.MP_BACK_URL_SUCCESS || '',
           failure: process.env.MP_BACK_URL_FAILURE || '',
