@@ -283,7 +283,7 @@ export default async function handler(req, res) {
           }
         },
         external_reference,
-        
+
         binary_mode: true, // força aprovação ou rejeição imediata 
         auto_return: "approved", // redireciona automaticamente para back_urls.success quando aprovado
 
@@ -307,7 +307,7 @@ export default async function handler(req, res) {
       }
 
       // sempre usar sandbox_init_point em ambiente de testes
-      const initPoint = mpResp.sandbox_init_point || mpResp.init_point || null;
+      const initPoint = mpResp.init_point || mpResp.sandbox_init_point || null;
       console.log('Redirect URL usado:', initPoint);
 
       await novoPedidoRef.set({
@@ -458,7 +458,7 @@ export default async function handler(req, res) {
         }, { merge: true });
 
         console.log(`Pedido ${pedidoId} atualizado para: ${novoStatusPedido} (tipoNotificacao=${resolved.tipo})`);
-        
+
         // atualizar pagamentos pré-criados: marcar parcelas pagas conforme installments
         const pagamentosRef = db.collection('usuarios').doc(userId)
           .collection('assinaturas').doc(assinaturaId)
