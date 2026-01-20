@@ -242,6 +242,7 @@ export default async function handler(req, res) {
       await novoPedidoRef.set(pedidoData);
 
       const external_reference = montarExternalReference(userId, assinaturaId, novoPedidoRef.id);
+      const cpfNormalizado = (cpf || "").replace(/\D/g, "");
 
       const preferencePayload = {
         items: [
@@ -259,7 +260,7 @@ export default async function handler(req, res) {
           email: email,
           identification: {
             type: "CPF",
-            number: cpf
+            number: cpfNormalizado
           }
         },
         external_reference,
@@ -345,6 +346,8 @@ export default async function handler(req, res) {
       }
 
       const mpData = resolved.data;
+
+      console.log("Webhook MP status recebido:", mpData.status || mpData.payment_status || "sem status");
 
       // extrair external_reference (userId|assinaturaId|pedidoId)
       const externalRef = mpData.external_reference || (mpData.order && mpData.order.external_reference) || null;
