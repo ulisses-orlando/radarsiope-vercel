@@ -128,9 +128,28 @@ async function gerarParcelasAssinaturaBackend(userId, assinaturaId, amountCentav
   return true;
 }
 
-// ---------- Resolver recurso MP (payment | merchant_order | search) ----------
-async function resolverRecursoMP(id) {
-  // 1) tentar payment direto
+async function resolverRecursoMP(id, topic) {
+  // 1) se veio topic=payment, buscar direto em /v1/payments/{id}
+  if (topic === 'payment') {
+    try {
+      const p = await mpFetch(`/v1/payments/${encodeURIComponent(id)}`, 'GET');
+      return { tipo: 'payment', data: p };
+    } catch (err) {
+      if (!(err && err.status === 404)) throw err;
+    }
+  }
+
+  // 2) se veio topic=merchant_order, buscar direto em /merchant_orders/{id}
+  if (topic === 'merchant_order') {
+    try {
+      const mo = await mpFetch(`/merchant_orders/${encodeURIComponent(id)}`, 'GET');
+      return { tipo: 'merchant_order', data: mo };
+    } catch (err) {
+      if (!(err && err.status === 404)) throw err;
+    }
+  }
+
+  // 3) fallback: tentar payment direto
   try {
     const p = await mpFetch(`/v1/payments/${encodeURIComponent(id)}`, 'GET');
     return { tipo: 'payment', data: p };
@@ -138,7 +157,7 @@ async function resolverRecursoMP(id) {
     if (!(err && err.status === 404)) throw err;
   }
 
-  // 2) tentar merchant_order
+  // 4) fallback: tentar merchant_order
   try {
     const mo = await mpFetch(`/merchant_orders/${encodeURIComponent(id)}`, 'GET');
     return { tipo: 'merchant_order', data: mo };
@@ -146,13 +165,13 @@ async function resolverRecursoMP(id) {
     if (!(err && err.status === 404)) throw err;
   }
 
-  // 3) se id parece notification id (contém ';' ou 'UTC'), não tentar endpoints diretos
+  // 5) se id parece notification id (contém ';' ou 'UTC'), não tentar endpoints diretos
   const idStr = String(id || '');
   if (idStr.includes(';') || idStr.toLowerCase().includes('utc')) {
     return null;
   }
 
-  // 4) tentar search por order.id
+  // 6) tentar search por order.id
   try {
     const searchOrder = await mpFetch(`/v1/payments/search?order.id=${encodeURIComponent(id)}`, 'GET');
     if (searchOrder && Array.isArray(searchOrder.results) && searchOrder.results.length) {
@@ -162,7 +181,7 @@ async function resolverRecursoMP(id) {
     if (!(err && err.status === 404)) console.warn('Erro search order.id:', err.message || err);
   }
 
-  // 5) tentar search por external_reference
+  // 7) tentar search por external_reference
   try {
     const searchExt = await mpFetch(`/v1/payments/search?external_reference=${encodeURIComponent(id)}`, 'GET');
     if (searchExt && Array.isArray(searchExt.results) && searchExt.results.length) {
@@ -323,7 +342,8 @@ export default async function handler(req, res) {
       // tentar resolver recurso MP (payment | merchant_order | search)
       let resolved = null;
       try {
-        resolved = await resolverRecursoMP(id);
+        resolved = await resolverRecursoMP(id, topic);
+
       } catch (err) {
         console.warn('Falha ao buscar recurso no Mercado Pago:', err.message || err);
         // se erro de rede ou permissão, responder 200 para evitar retries agressivos do MP
@@ -346,8 +366,9 @@ export default async function handler(req, res) {
       }
 
       const mpData = resolved.data;
-
+      // logs para diferenciar merchant_order vs payment 
       console.log("Webhook MP status recebido:", mpData.status || mpData.payment_status || "sem status");
+      console.log(`Webhook MP recebido - topic: ${topic}, status: ${mpData.status || mpData.payment_status || "sem status"}`);
 
       // extrair external_reference (userId|assinaturaId|pedidoId)
       const externalRef = mpData.external_reference || (mpData.order && mpData.order.external_reference) || null;
@@ -411,9 +432,19 @@ export default async function handler(req, res) {
       if (pedidoSnap.exists) {
         const mpStatus = mpData.status || mpData.payment_status || null;
         let novoStatusPedido = 'pendente';
-        if (mpStatus === 'approved' || mpStatus === 'paid') novoStatusPedido = 'pago';
-        else if (mpStatus === 'pending') novoStatusPedido = 'pendente';
-        else if (['cancelled', 'rejected', 'refunded'].includes(mpStatus)) novoStatusPedido = 'falha';
+
+        // se veio de payment, confiar no status do pagamento
+        if (resolved.tipo === 'payment' || resolved.tipo === 'payment_search' || resolved.tipo === 'payment_search_ext') {
+          if (mpStatus === 'approved' || mpStatus === 'paid') novoStatusPedido = 'pago';
+          else if (mpStatus === 'pending') novoStatusPedido = 'pendente';
+          else if (['cancelled', 'rejected', 'refunded'].includes(mpStatus)) novoStatusPedido = 'falha';
+        }
+
+        // se veio de merchant_order, marcar como pendente/aberto
+        if (resolved.tipo === 'merchant_order') {
+          // merchant_order "opened" significa que ainda não há pagamento
+          novoStatusPedido = 'pendente';
+        }
 
         await pedidoRef.set({
           status: novoStatusPedido,
@@ -422,6 +453,8 @@ export default async function handler(req, res) {
           atualizadoEm: admin.firestore.FieldValue.serverTimestamp()
         }, { merge: true });
 
+        console.log(`Pedido ${pedidoId} atualizado para: ${novoStatusPedido} (tipoNotificacao=${resolved.tipo})`);
+        
         // atualizar pagamentos pré-criados: marcar parcelas pagas conforme installments
         const pagamentosRef = db.collection('usuarios').doc(userId)
           .collection('assinaturas').doc(assinaturaId)
@@ -441,6 +474,7 @@ export default async function handler(req, res) {
               status: 'pago',
               data_pagamento: admin.firestore.FieldValue.serverTimestamp(),
               mpPaymentId: id,
+              tipoNotificacao: resolved.tipo,
               atualizadoEm: admin.firestore.FieldValue.serverTimestamp()
             }, { merge: true });
             toMark--;
@@ -454,6 +488,7 @@ export default async function handler(req, res) {
             pedidoId,
             status: novoStatusPedido,
             mpData,
+            tipoNotificacao: resolved.tipo,
             recebidoEm: admin.firestore.FieldValue.serverTimestamp()
           }, { merge: true });
         }
