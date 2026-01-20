@@ -692,6 +692,7 @@ async function processarEnvioAssinatura(e) {
   if (nome.length < 3) { showFormError('nome', 'Nome deve ter pelo menos 3 caracteres.'); return; }
 
   if (!cpf) { showFormError('cpf', 'Informe seu CPF.'); return; }
+  if (!validarCPF(cpf)) { showFormError('cpf', 'CPF inválido.'); return; }
 
   if (!perfil) { mostrarMensagem('Selecione seu perfil.'); return; }
 
@@ -702,10 +703,12 @@ async function processarEnvioAssinatura(e) {
   if (!validarEmail(email)) { showFormError('email', 'E-mail inválido.'); return; }
 
   // --- se já existe usuário com este e-mail ---
-  const usuarioRef = db.collection('usuarios').doc(email);
-  const usuarioSnap = await usuarioRef.get();
+  const usuarioSnap = await db.collection('usuarios')
+    .where('email', '==', email.toLowerCase())
+    .limit(1)
+    .get();
 
-  if (usuarioSnap.exists) {
+  if (!usuarioSnap.empty) {
     showFormError('email', 'Este e-mail já está cadastrado. Acesse a área do assinante e contate o suporte.');
     return;
   }
@@ -733,7 +736,7 @@ async function processarEnvioAssinatura(e) {
   }
 
   if (!parcelas) { mostrarMensagem('Selecione a quantidade de parcelas.'); return; }
-  
+
   // calcular preview (IMPORTANTE: aguardar)
   let preview;
   try {
@@ -864,6 +867,26 @@ async function atualizarEstadoBotaoCupom() {
   }
 }
 
+// função simples para validar CPF (formato e dígitos)
+function validarCPF(cpf) {
+  cpf = cpf.replace(/\D/g, '');
+  if (cpf.length !== 11) return false;
+  // descarta CPFs inválidos conhecidos
+  if (/^(\d)\1+$/.test(cpf)) return false;
+  // cálculo dos dígitos verificadores
+  let soma = 0;
+  for (let i = 0; i < 9; i++) soma += parseInt(cpf.charAt(i)) * (10 - i);
+  let resto = (soma * 10) % 11;
+  if (resto === 10 || resto === 11) resto = 0;
+  if (resto !== parseInt(cpf.charAt(9))) return false;
+  soma = 0;
+  for (let i = 0; i < 10; i++) soma += parseInt(cpf.charAt(i)) * (11 - i);
+  resto = (soma * 10) % 11;
+  if (resto === 10 || resto === 11) resto = 0;
+  if (resto !== parseInt(cpf.charAt(10))) return false;
+  return true;
+}
+
 // -----------------------------
 // Inicialização (busca lead antes de inserir campos UF/Mun para permitir prefill do município)
 // -----------------------------
@@ -871,7 +894,9 @@ async function initAssinatura() {
   aplicarMascaraTelefone(document.getElementById("telefone"));
 
   document.getElementById('cpf').addEventListener('input', function (e) {
-    let value = e.target.value.replace(/\D/g, ''); 
+    let value = e.target.value.replace(/\D/g, ''); // só dígitos
+    if (value.length > 11) value = value.slice(0, 11); // limita a 11 dígitos
+
     value = value.replace(/(\d{3})(\d)/, '$1.$2');
     value = value.replace(/(\d{3})(\d)/, '$1.$2');
     value = value.replace(/(\d{3})(\d{1,2})$/, '$1-$2');
