@@ -467,11 +467,13 @@ function onPlanoSelecionado(planId) {
 async function upsertUsuario({ nome, cpf, email, telefone, perfil, mensagem, preferencia, cod_uf, cod_municipio, nome_municipio }) {
   try {
     const q = await db.collection('usuarios').where('email', '==', email).limit(1).get();
+    const cpfNormalizado = (cpf || "").replace(/\D/g, "");
+
     if (!q.empty) {
       const doc = q.docs[0];
       await db.collection('usuarios').doc(doc.id).update({
         nome,
-        cpf,
+        cpfNormalizado,
         telefone: telefone || null,
         perfil: perfil || null,
         mensagem: mensagem || null,
@@ -486,7 +488,7 @@ async function upsertUsuario({ nome, cpf, email, telefone, perfil, mensagem, pre
     } else {
       const ref = await db.collection('usuarios').add({
         nome,
-        cpf,
+        cpfNormalizado,
         email,
         telefone: telefone || null,
         perfil: perfil || null,
@@ -710,6 +712,7 @@ async function processarEnvioAssinatura(e) {
 
   if (!usuarioSnap.empty) {
     showFormError('email', 'Este e-mail já está cadastrado. Acesse a área do assinante e contate o suporte.');
+    mostrarMensagem('Este e-mail já está cadastrado. Acesse a área do assinante e contate o suporte.');
     return;
   }
 
