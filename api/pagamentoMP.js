@@ -197,6 +197,12 @@ async function resolverRecursoMP(id, topic) {
 // ---------- Handler principal (sem validação HMAC) ----------
 export default async function handler(req, res) {
   try {
+
+    // debug temporário — remover depois
+    const tokenPreview = process.env.MP_ACCESS_TOKEN ? process.env.MP_ACCESS_TOKEN.slice(0, 6) : 'NO_TOKEN';
+    console.info('DEBUG MP token prefix:', tokenPreview);
+
+
     // ler raw body (string) para compatibilidade com webhooks
     const rawBody = await new Promise((resolve, reject) => {
       let data = '';
