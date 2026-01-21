@@ -319,8 +319,22 @@ export default async function handler(req, res) {
         return json(res, 500, { ok: false, message: 'Erro ao criar preferência no Mercado Pago', detail: err.body || String(err) });
       }
 
-      // sempre usar sandbox_init_point em ambiente de testes
-      const initPoint = mpResp.init_point || mpResp.sandbox_init_point || null;
+      // decidir se deve usar sandbox
+      // mpResp é o objeto retornado por mpFetch('/checkout/preferences', 'POST', payload) ou por mpFetch('/merchant_orders/...')
+      const preferSandbox = (
+        process.env.MP_FORCE_SANDBOX === 'true' ||
+        (mpResp && mpResp.is_test === true) ||
+        (req && req.body && req.body.live_mode === false)
+      );
+
+      let initPoint;
+      if (preferSandbox) {
+        initPoint = mpResp.sandbox_init_point || mpResp.init_point || null;
+      } else {
+        initPoint = mpResp.init_point || mpResp.sandbox_init_point || null;
+      }
+
+
       console.log('Redirect URL usado:', initPoint);
 
       await novoPedidoRef.set({
@@ -330,6 +344,7 @@ export default async function handler(req, res) {
         external_reference,
         atualizadoEm: admin.firestore.FieldValue.serverTimestamp()
       }, { merge: true });
+
 
       // gerar parcelas no backend (idempotente usando pedidoId)
       try {
