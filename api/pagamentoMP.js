@@ -37,11 +37,18 @@ async function fetchWithTimeout(url, opts = {}, ms = 10000) {
 }
 
 // Chamada à API do Mercado Pago (lança erro com status/body em não-2xx)
-async function mpFetch(path, method = 'GET', body = null) {
+async function mpFetch(pathOrUrl, method = 'GET', body = null) {
   const token = process.env.MP_ACCESS_TOKEN;
   if (!token) throw new Error('MP_ACCESS_TOKEN não definido');
-  const base = 'https://api.mercadopago.com';
-  const url = `${base}${path}`;
+
+  // permitir passar URL completa ou apenas path
+  let url = String(pathOrUrl);
+  if (!url.startsWith('http')) {
+    // escolher host correto para merchant_orders
+    const base = (pathOrUrl && pathOrUrl.startsWith('/merchant_orders')) ? 'https://api.mercadolibre.com' : 'https://api.mercadopago.com';
+    url = `${base}${pathOrUrl}`;
+  }
+
   const headers = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
   const opts = { method, headers };
   if (body) opts.body = JSON.stringify(body);
@@ -50,7 +57,7 @@ async function mpFetch(path, method = 'GET', body = null) {
   try {
     resp = await fetchWithTimeout(url, opts, 10000);
   } catch (err) {
-    const e = new Error(`Erro de rede ao chamar MP ${method} ${path}: ${err.message}`);
+    const e = new Error(`Erro de rede ao chamar MP ${method} ${url}: ${err.message}`);
     e.cause = err;
     throw e;
   }
