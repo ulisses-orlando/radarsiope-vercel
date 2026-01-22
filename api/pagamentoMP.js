@@ -1,6 +1,7 @@
 // pages/api/pagamentoMP.js
 // Runtime Node para garantir compatibilidade com firebase-admin e crypto
-export const config = { runtime: 'nodejs' };
+// desabilitar bodyParser para permitir validação HMAC no futuro
+export const config = { runtime: 'nodejs', api: { bodyParser: false } };
 
 import crypto from 'crypto';
 import admin from 'firebase-admin';
@@ -38,33 +39,29 @@ async function fetchWithTimeout(url, opts = {}, ms = 10000) {
 
 /*
   Centralizar seleção do access token do Mercado Pago
-  - MP_FORCE_SANDBOX === 'true' => usar MP_ACCESS_TOKEN_TEST
+  - MP_FORCE_SANDBOX === 'true' => usar MP_ACCESS_TOKEN_TEST (ou fallback MP_ACCESS_TOKEN legado)
   - caso contrário, preferir MP_ACCESS_TOKEN_PROD
   - fallback para MP_ACCESS_TOKEN (legado) se nenhuma das novas variáveis estiver presente
+  Observação: evitar usar token legado em produção; monitore logs.
 */
 function getMpAccessToken() {
   const forceSandbox = process.env.MP_FORCE_SANDBOX === 'true';
   const testToken = process.env.MP_ACCESS_TOKEN_TEST || null;
   const prodToken = process.env.MP_ACCESS_TOKEN_PROD || null;
-  const legacyToken = process.env.MP_ACCESS_TOKEN || null;
 
   if (forceSandbox) {
-    if (!testToken && !legacyToken) {
-      throw new Error('MP_FORCE_SANDBOX=true mas MP_ACCESS_TOKEN_TEST não está configurado (ou MP_ACCESS_TOKEN legado ausente).');
+    if (!testToken) {
+      throw new Error('MP_FORCE_SANDBOX=true mas MP_ACCESS_TOKEN_TEST não está configurado.');
     }
-    // preferir explicitamente MP_ACCESS_TOKEN_TEST, senão usar legado
-    return testToken || legacyToken;
+    return testToken;
   }
 
-  // preferir token de produção quando disponível
   if (prodToken) return prodToken;
-
-  // fallback para legado ou test se prod ausente
-  if (legacyToken) return legacyToken;
   if (testToken) return testToken;
 
-  throw new Error('Nenhum token MP configurado. Configure MP_ACCESS_TOKEN_PROD ou MP_ACCESS_TOKEN_TEST (ou MP_ACCESS_TOKEN legado).');
+  throw new Error('Nenhum token MP configurado. Configure MP_ACCESS_TOKEN_PROD ou MP_ACCESS_TOKEN_TEST.');
 }
+
 
 // Chamada à API do Mercado Pago (lança erro com status/body em não-2xx)
 async function mpFetch(pathOrUrl, method = 'GET', body = null) {
@@ -74,8 +71,8 @@ async function mpFetch(pathOrUrl, method = 'GET', body = null) {
   // permitir passar URL completa ou apenas path
   let url = String(pathOrUrl);
   if (!url.startsWith('http')) {
-    // escolher host correto para merchant_orders
-    const base = (pathOrUrl && pathOrUrl.startsWith('/merchant_orders')) ? 'https://api.mercadolibre.com' : 'https://api.mercadopago.com';
+    // usar sempre api.mercadopago.com (merchant_orders também está aqui)
+    const base = 'https://api.mercadopago.com';
     url = `${base}${pathOrUrl}`;
   }
 
@@ -180,6 +177,10 @@ async function resolverRecursoMP(id, topic) {
   if (topic === 'merchant_order') {
     try {
       const mo = await mpFetch(`/merchant_orders/${encodeURIComponent(id)}`, 'GET');
+      // extrair external_reference também de mo.order.external_reference quando aplicável
+      if (mo && !mo.external_reference && mo.order && mo.order.external_reference) {
+        mo.external_reference = mo.order.external_reference;
+      }
       return { tipo: 'merchant_order', data: mo };
     } catch (err) {
       if (!(err && err.status === 404)) throw err;
@@ -197,6 +198,9 @@ async function resolverRecursoMP(id, topic) {
   // 4) fallback: tentar merchant_order
   try {
     const mo = await mpFetch(`/merchant_orders/${encodeURIComponent(id)}`, 'GET');
+    if (mo && !mo.external_reference && mo.order && mo.order.external_reference) {
+      mo.external_reference = mo.order.external_reference;
+    }
     return { tipo: 'merchant_order', data: mo };
   } catch (err) {
     if (!(err && err.status === 404)) throw err;
@@ -231,20 +235,109 @@ async function resolverRecursoMP(id, topic) {
   return null;
 }
 
+function getMpTokenType() {
+  // não chama getMpAccessToken() para evitar lançar erro aqui
+  if (process.env.MP_FORCE_SANDBOX === 'true') return 'TEST';
+  if (process.env.MP_ACCESS_TOKEN_PROD) return 'PROD';
+  if (process.env.MP_ACCESS_TOKEN_TEST) return 'TEST';
+  return 'UNKNOWN';
+}
+
+/**
+ * validateMpWebhookSignature(rawBody, req)
+ * - Lê headers comuns de assinatura do Mercado Pago
+ * - Suporta header no formato "t=..., v1=..." ou apenas o hash (hex/base64)
+ * - Por padrão usa HMAC-SHA256 sobre rawBody; se precisar de string canônica, ajuste baseString
+ * - Só executa quando MP_VALIDATE_WEBHOOK === 'true'
+ *
+ * Retorno: { ok: true } ou { ok: false, reason: 'mensagem', ts?: '...' }
+ */
+function validateMpWebhookSignature(rawBody, req) {
+  // controle explícito: ativar validação apenas com MP_VALIDATE_WEBHOOK='true'
+  if (process.env.MP_VALIDATE_WEBHOOK !== 'true') {
+    return { ok: true, reason: 'validation disabled by MP_VALIDATE_WEBHOOK' };
+  }
+
+  const secret = process.env.MP_WEBHOOK_SECRET || process.env.MPWEBHOOKSECRET || null;
+  if (!secret) {
+    return { ok: false, reason: 'MP_WEBHOOK_SECRET not configured' };
+  }
+
+  // coletar header de assinatura (tenta nomes comuns)
+  const sigHeaderRaw = String(
+    req.headers['x-signature'] ||
+    req.headers['x-meli-signature'] ||
+    req.headers['x-hub-signature-256'] ||
+    req.headers['x-hub-signature'] ||
+    req.headers['x-signature-256'] ||
+    ''
+  );
+
+  // extrair ts e v1 se header no formato "t=..., v1=..."
+  let ts = null;
+  let sigV1 = null;
+  if (sigHeaderRaw.includes('=')) {
+    sigHeaderRaw.split(',').forEach(p => {
+      const [k, v] = p.trim().split('=');
+      if (!k || !v) return;
+      if (k === 't') ts = v;
+      if (k === 'v1') sigV1 = v;
+    });
+  } else {
+    // header pode ser apenas o hash (hex ou base64)
+    if (sigHeaderRaw) sigV1 = sigHeaderRaw.trim();
+  }
+
+  // escolher baseString para HMAC
+  // DEFAULT: HMAC direto do raw body (recomendado)
+  let baseString = rawBody || '';
+
+  // se seu MP enviar timestamp e exigir string canônica, descomente/ajuste:
+  // baseString = `${req.url}|${ts || ''}|${rawBody || ''}`;
+
+  // calcular HMAC-SHA256
+  let expected;
+  try {
+    const h = crypto.createHmac('sha256', secret);
+    h.update(baseString, 'utf8');
+    expected = h.digest(); // Buffer
+  } catch (e) {
+    return { ok: false, reason: 'hmac computation failed' };
+  }
+
+  // se não veio assinatura, rejeitar
+  if (!sigV1) return { ok: false, reason: 'no signature header present', ts };
+
+  // tentar comparar com hex e base64 (compatibilidade)
+  const candidates = [];
+  try { candidates.push(Buffer.from(sigV1, 'hex')); } catch (e) { /* ignore */ }
+  try { candidates.push(Buffer.from(sigV1, 'base64')); } catch (e) { /* ignore */ }
+
+  for (const cand of candidates) {
+    if (!cand || cand.length !== expected.length) continue;
+    try {
+      if (crypto.timingSafeEqual(expected, cand)) {
+        return { ok: true, ts };
+      }
+    } catch (e) {
+      // continue tentando outros formatos
+    }
+  }
+
+  // nenhuma comparação bateu
+  return { ok: false, reason: 'signature mismatch', ts };
+}
+
 // ---------- Handler principal (sem validação HMAC) ----------
 export default async function handler(req, res) {
   try {
-
-    // debug temporário — remover depois
-    let tokenPreview = 'NO_TOKEN';
-    try {
-      const token = getMpAccessToken();
-      tokenPreview = token ? String(token).slice(0, 6) : 'NO_TOKEN';
-    } catch (e) {
-      tokenPreview = 'NO_TOKEN';
+    // debug seguro: não logar prefixo do token; logar apenas o tipo (TEST/PROD)
+    // ativar logs detalhados apenas com MP_DEBUG='true'
+    if (process.env.MP_DEBUG === 'true') {
+      console.info('DEBUG MP token type:', getMpTokenType());
+    } else {
+      console.info('DEBUG MP token type: [redacted]');
     }
-    console.info('DEBUG MP token prefix:', tokenPreview);
-
 
     // ler raw body (string) para compatibilidade com webhooks
     const rawBody = await new Promise((resolve, reject) => {
@@ -253,6 +346,14 @@ export default async function handler(req, res) {
       req.on('end', () => resolve(data));
       req.on('error', err => reject(err));
     });
+
+    // validar assinatura (se habilitado) 
+    const sigCheck = validateMpWebhookSignature(rawBody, req);
+    if (!sigCheck.ok) {
+      console.warn('Webhook assinatura inválida ou validação desativada:', sigCheck.reason, 'ts:', sigCheck.ts || null);
+      // responder 200 para evitar retries agressivos do MP (opção operacional segura) 
+      return json(res, 200, { ok: true, message: 'signature invalid (ignored)' });
+    }
 
     // tentar popular req.body se for JSON
     try {
@@ -271,7 +372,9 @@ export default async function handler(req, res) {
       MP_ACCESS_TOKEN_TEST: !!process.env.MP_ACCESS_TOKEN_TEST,
       MP_ACCESS_TOKEN: !!process.env.MP_ACCESS_TOKEN,
       MP_PUBLIC_KEY: !!process.env.MP_PUBLIC_KEY,
-      MP_WEBHOOK_URL: !!process.env.MP_WEBHOOK_URL
+      MP_WEBHOOK_URL: !!process.env.MP_WEBHOOK_URL,
+      MP_FORCE_SANDBOX: !!process.env.MP_FORCE_SANDBOX,
+      MP_VALIDATE_WEBHOOK: !!process.env.MP_VALIDATE_WEBHOOK
     });
 
     // rota e ação
@@ -357,21 +460,12 @@ export default async function handler(req, res) {
         return json(res, 500, { ok: false, message: 'Erro ao criar preferência no Mercado Pago', detail: err.body || String(err) });
       }
 
-      // decidir se deve usar sandbox
-      // mpResp é o objeto retornado por mpFetch('/checkout/preferences', 'POST', payload) ou por mpFetch('/merchant_orders/...')
-      const preferSandbox = (
-        process.env.MP_FORCE_SANDBOX === 'true' ||
-        (mpResp && mpResp.is_test === true) ||
-        (req && req.body && req.body.live_mode === false)
-      );
-
-      let initPoint;
-      if (preferSandbox) {
-        initPoint = mpResp.sandbox_init_point || mpResp.init_point || null;
-      } else {
-        initPoint = mpResp.init_point || mpResp.sandbox_init_point || null;
-      }
-
+      // decidir se deve usar sandbox: apenas MP_FORCE_SANDBOX controla isso
+      // em produção preferir sempre mpResp.init_point
+      const preferSandbox = process.env.MP_FORCE_SANDBOX === 'true';
+      const initPoint = preferSandbox
+        ? (mpResp.sandbox_init_point || mpResp.init_point || null)
+        : (mpResp.init_point || mpResp.sandbox_init_point || null);
 
       console.log('Redirect URL usado:', initPoint);
 
@@ -382,7 +476,6 @@ export default async function handler(req, res) {
         external_reference,
         atualizadoEm: admin.firestore.FieldValue.serverTimestamp()
       }, { merge: true });
-
 
       // gerar parcelas no backend (idempotente usando pedidoId)
       try {
@@ -396,8 +489,8 @@ export default async function handler(req, res) {
 
     // ---------- webhook (MP POST sem acao) ----------
     if (req.method === 'POST' && !acao) {
-      const topic = req.query.topic || (req.body && (req.body.topic || req.body.type)) || null;
-      const id = req.query.id || (req.body && (req.body.id || (req.body.data && req.body.data.id))) || null;
+      const topic = req.query.topic || req.query.type || (req.body && (req.body.topic || req.body.type)) || null;
+      const id = req.query.id || (req.query && req.query.notification_id) || (req.body && (req.body.id || (req.body.data && req.body.data.id))) || null;
 
       if (!topic || !id) {
         console.log('Webhook recebido sem topic/id; respondendo 200.');
@@ -405,15 +498,12 @@ export default async function handler(req, res) {
       }
 
       // idempotência: notificacoes_mp/{topic}_{id}
-      // precisamos do parsed external_reference mais adiante; criar ref de notificação agora
-      // parsed userId/assinaturaId/pedidoId só após resolver mpData
       const notifId = `${topic}_${id}`;
 
       // tentar resolver recurso MP (payment | merchant_order | search)
       let resolved = null;
       try {
         resolved = await resolverRecursoMP(id, topic);
-
       } catch (err) {
         console.warn('Falha ao buscar recurso no Mercado Pago:', err.message || err);
         // se erro de rede ou permissão, responder 200 para evitar retries agressivos do MP
@@ -423,7 +513,6 @@ export default async function handler(req, res) {
       if (!resolved) {
         console.log('Não foi possível resolver id no MP; id pode ser notification id ou ambiente errado:', id);
         // registrar notificação mínima para auditoria
-        // salvar em coleção global de notificações (sem userId/assinaturaId)
         const globalNotifRef = db.collection('notificacoes_mp_global').doc(notifId);
         await globalNotifRef.set({
           topic,
@@ -435,10 +524,37 @@ export default async function handler(req, res) {
         return json(res, 200, { ok: true, message: 'mp resource not found (simulação ou id inválido)' });
       }
 
-      const mpData = resolved.data;
+      // effectiveId começa com o id da notificação; pode ser substituído pelo payment.id real
+      let effectiveId = String(id);
+      let mpData = resolved.data;
+
       // logs para diferenciar merchant_order vs payment 
       console.log("Webhook MP status recebido:", mpData.status || mpData.payment_status || "sem status");
       console.log(`Webhook MP recebido - topic: ${topic}, status: ${mpData.status || mpData.payment_status || "sem status"}`);
+
+      // Se veio merchant_order, não gravar mpPaymentId com o id do MO.
+      // Se houver um payment dentro do merchant_order, buscar o payment real e usar seu status/id.
+      if (resolved.tipo === 'merchant_order') {
+        const mo = mpData;
+        // extrair external_reference também de mo.order.external_reference quando aplicável
+        if (!mo.external_reference && mo.order && mo.order.external_reference) {
+          mo.external_reference = mo.order.external_reference;
+        }
+        const payId = mo.payments && mo.payments[0] && mo.payments[0].id;
+        if (payId) {
+          try {
+            const payment = await mpFetch(`/v1/payments/${encodeURIComponent(payId)}`, 'GET');
+            // substituir mpData pelo payment real para lógica abaixo (status, installments, etc)
+            mpData = payment;
+            // ajustar resolved.tipo para 'payment' para tratamento unificado
+            resolved.tipo = 'payment';
+            effectiveId = String(payment.id);
+          } catch (err) {
+            // se não conseguir buscar payment, manter mo como mpData e gravar moId separadamente mais abaixo
+            console.warn('Falha ao buscar payment dentro do merchant_order:', err && err.message ? err.message : err);
+          }
+        }
+      }
 
       // extrair external_reference (userId|assinaturaId|pedidoId)
       const externalRef = mpData.external_reference || (mpData.order && mpData.order.external_reference) || null;
@@ -510,18 +626,24 @@ export default async function handler(req, res) {
           else if (['cancelled', 'rejected', 'refunded'].includes(mpStatus)) novoStatusPedido = 'falha';
         }
 
-        // se veio de merchant_order, marcar como pendente/aberto
+        // se veio de merchant_order, marcar como pendente/aberto (caso não tenha sido convertido para payment acima)
         if (resolved.tipo === 'merchant_order') {
-          // merchant_order "opened" significa que ainda não há pagamento
           novoStatusPedido = 'pendente';
         }
 
-        await pedidoRef.set({
+        const updateObj = {
           status: novoStatusPedido,
           mpStatus,
-          mpPaymentId: id,
           atualizadoEm: admin.firestore.FieldValue.serverTimestamp()
-        }, { merge: true });
+        };
+        // se veio payment, gravar mpPaymentId usando effectiveId
+        if (resolved.tipo === 'payment') {
+          updateObj.mpPaymentId = effectiveId;
+        } else if (resolved.tipo === 'merchant_order') {
+          // gravar merchant_order id separadamente (usar id original da notificação)
+          updateObj.mpMerchantOrderId = id;
+        }
+        await pedidoRef.set(updateObj, { merge: true });
 
         console.log(`Pedido ${pedidoId} atualizado para: ${novoStatusPedido} (tipoNotificacao=${resolved.tipo})`);
 
@@ -543,7 +665,7 @@ export default async function handler(req, res) {
             batch.set(pRef, {
               status: 'pago',
               data_pagamento: admin.firestore.FieldValue.serverTimestamp(),
-              mpPaymentId: id,
+              mpPaymentId: effectiveId, // usar effectiveId aqui
               tipoNotificacao: resolved.tipo,
               atualizadoEm: admin.firestore.FieldValue.serverTimestamp()
             }, { merge: true });
@@ -552,9 +674,9 @@ export default async function handler(req, res) {
           await batch.commit();
         } else {
           // se não houver parcelas pendentes, criar um registro de pagamento único
-          const pagamentoRef = pagamentosRef.doc(String(id));
+          const pagamentoRef = pagamentosRef.doc(String(effectiveId));
           await pagamentoRef.set({
-            paymentId: id,
+            paymentId: effectiveId,
             pedidoId,
             status: novoStatusPedido,
             mpData,
