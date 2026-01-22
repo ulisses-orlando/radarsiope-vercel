@@ -36,10 +36,40 @@ async function fetchWithTimeout(url, opts = {}, ms = 10000) {
   }
 }
 
+/*
+  Centralizar seleção do access token do Mercado Pago
+  - MP_FORCE_SANDBOX === 'true' => usar MP_ACCESS_TOKEN_TEST
+  - caso contrário, preferir MP_ACCESS_TOKEN_PROD
+  - fallback para MP_ACCESS_TOKEN (legado) se nenhuma das novas variáveis estiver presente
+*/
+function getMpAccessToken() {
+  const forceSandbox = process.env.MP_FORCE_SANDBOX === 'true';
+  const testToken = process.env.MP_ACCESS_TOKEN_TEST || null;
+  const prodToken = process.env.MP_ACCESS_TOKEN_PROD || null;
+  const legacyToken = process.env.MP_ACCESS_TOKEN || null;
+
+  if (forceSandbox) {
+    if (!testToken && !legacyToken) {
+      throw new Error('MP_FORCE_SANDBOX=true mas MP_ACCESS_TOKEN_TEST não está configurado (ou MP_ACCESS_TOKEN legado ausente).');
+    }
+    // preferir explicitamente MP_ACCESS_TOKEN_TEST, senão usar legado
+    return testToken || legacyToken;
+  }
+
+  // preferir token de produção quando disponível
+  if (prodToken) return prodToken;
+
+  // fallback para legado ou test se prod ausente
+  if (legacyToken) return legacyToken;
+  if (testToken) return testToken;
+
+  throw new Error('Nenhum token MP configurado. Configure MP_ACCESS_TOKEN_PROD ou MP_ACCESS_TOKEN_TEST (ou MP_ACCESS_TOKEN legado).');
+}
+
 // Chamada à API do Mercado Pago (lança erro com status/body em não-2xx)
 async function mpFetch(pathOrUrl, method = 'GET', body = null) {
-  const token = process.env.MP_ACCESS_TOKEN;
-  if (!token) throw new Error('MP_ACCESS_TOKEN não definido');
+  const token = getMpAccessToken();
+  if (!token) throw new Error('MP access token não definido');
 
   // permitir passar URL completa ou apenas path
   let url = String(pathOrUrl);
@@ -206,7 +236,13 @@ export default async function handler(req, res) {
   try {
 
     // debug temporário — remover depois
-    const tokenPreview = process.env.MP_ACCESS_TOKEN ? process.env.MP_ACCESS_TOKEN.slice(0, 6) : 'NO_TOKEN';
+    let tokenPreview = 'NO_TOKEN';
+    try {
+      const token = getMpAccessToken();
+      tokenPreview = token ? String(token).slice(0, 6) : 'NO_TOKEN';
+    } catch (e) {
+      tokenPreview = 'NO_TOKEN';
+    }
     console.info('DEBUG MP token prefix:', tokenPreview);
 
 
@@ -231,6 +267,8 @@ export default async function handler(req, res) {
 
     // log inicial mínimo (não expõe segredos)
     console.log('INICIANDO pagamentoMP - envs:', {
+      MP_ACCESS_TOKEN_PROD: !!process.env.MP_ACCESS_TOKEN_PROD,
+      MP_ACCESS_TOKEN_TEST: !!process.env.MP_ACCESS_TOKEN_TEST,
       MP_ACCESS_TOKEN: !!process.env.MP_ACCESS_TOKEN,
       MP_PUBLIC_KEY: !!process.env.MP_PUBLIC_KEY,
       MP_WEBHOOK_URL: !!process.env.MP_WEBHOOK_URL
