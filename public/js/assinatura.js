@@ -764,7 +764,6 @@ async function processarEnvioAssinatura(e) {
       planId: document.getElementById('planId').value || null,
       tipos_selecionados: tiposSelecionados,
       cupom: cupom || null,
-      forma_pagamento: forma,
       parcelas: parcelas ? Number(parcelas) : 1,
       origem
     };
