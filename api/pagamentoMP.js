@@ -364,7 +364,7 @@ export default async function handler(req, res) {
       // ok em sandbox; manter rawBody para auditoria
     }
 
-    console.log('Webhook recebido:', req.body);
+/*     console.log('Webhook recebido:', req.body);
 
     // log inicial mínimo (não expõe segredos)
     console.log('INICIANDO pagamentoMP - envs:', {
@@ -375,7 +375,7 @@ export default async function handler(req, res) {
       MP_WEBHOOK_URL: !!process.env.MP_WEBHOOK_URL,
       MP_FORCE_SANDBOX: !!process.env.MP_FORCE_SANDBOX,
       MP_VALIDATE_WEBHOOK: !!process.env.MP_VALIDATE_WEBHOOK
-    });
+    }); */
 
     // rota e ação
     const acao = (req.query && req.query.acao) ? String(req.query.acao) : null;
@@ -386,8 +386,7 @@ export default async function handler(req, res) {
       const { userId, assinaturaId } = body;
       const amountCentavos = parseInt(body.amountCentavos, 10);
       const descricao = body.descricao || `Assinatura`;
-      const parcelas = body.parcelas ? Math.max(1, parseInt(body.parcelas, 10)) : 1;
-      const metodoPagamento = body.metodoPagamento || null;
+      const installmentsMax = body.installmentsMax ? Math.max(1, parseInt(body.installmentsMax, 10)) : 1;
       const dataPrimeiroVencimento = body.dataPrimeiroVencimento || null;
       const nome = body.nome || "";
       const email = body.email || "";
@@ -407,8 +406,7 @@ export default async function handler(req, res) {
         assinaturaId,
         amountCentavos,
         descricao,
-        parcelas,
-        metodo_pagamento: metodoPagamento || null,
+        installmentsMax,
         status: 'pendente',
         criadoEm: admin.firestore.FieldValue.serverTimestamp()
       };
@@ -438,36 +436,35 @@ export default async function handler(req, res) {
         },
         external_reference,
 
-        binary_mode: true, // força aprovação ou rejeição imediata 
-        auto_return: "approved", // redireciona automaticamente para back_urls.success quando aprovado
+        binary_mode: true,
+        auto_return: "approved",
 
         back_urls: {
           success: process.env.MP_BACK_URL_SUCCESS || '',
           failure: process.env.MP_BACK_URL_FAILURE || '',
           pending: process.env.MP_BACK_URL_PENDING || ''
         },
-        notification_url: process.env.MP_WEBHOOK_URL || ''
+        notification_url: process.env.MP_WEBHOOK_URL || '',
+
+        installments: installmentsMax   // limite de parcelas definido pelo plano
       };
 
       let mpResp;
       try {
         mpResp = await mpFetch('/checkout/preferences', 'POST', preferencePayload);
-        console.log('Preference criada:', JSON.stringify(mpResp, null, 2));
+        //console.log('Preference criada:', JSON.stringify(mpResp, null, 2));
       } catch (err) {
-        console.log('Preference criada com erro:', JSON.stringify(mpResp, null, 2));
         console.error('Erro ao criar preference no Mercado Pago:', err.message || err);
         await novoPedidoRef.set({ status: 'erro_mp', atualizadoEm: admin.firestore.FieldValue.serverTimestamp(), mpError: err.body || String(err) }, { merge: true });
         return json(res, 500, { ok: false, message: 'Erro ao criar preferência no Mercado Pago', detail: err.body || String(err) });
       }
 
-      // decidir se deve usar sandbox: apenas MP_FORCE_SANDBOX controla isso
-      // em produção preferir sempre mpResp.init_point
       const preferSandbox = process.env.MP_FORCE_SANDBOX === 'true';
       const initPoint = preferSandbox
         ? (mpResp.sandbox_init_point || mpResp.init_point || null)
         : (mpResp.init_point || mpResp.sandbox_init_point || null);
 
-      console.log('Redirect URL usado:', initPoint);
+      //console.log('Redirect URL usado:', initPoint);
 
       await novoPedidoRef.set({
         mpPreferenceId: mpResp.id,
@@ -477,9 +474,9 @@ export default async function handler(req, res) {
         atualizadoEm: admin.firestore.FieldValue.serverTimestamp()
       }, { merge: true });
 
-      // gerar parcelas no backend (idempotente usando pedidoId)
+      // gerar parcelas no backend usando installmentsMax
       try {
-        await gerarParcelasAssinaturaBackend(userId, assinaturaId, amountCentavos, parcelas, metodoPagamento, dataPrimeiroVencimento, novoPedidoRef.id);
+        await gerarParcelasAssinaturaBackend(userId, assinaturaId, amountCentavos, installmentsMax, null, dataPrimeiroVencimento, novoPedidoRef.id);
       } catch (err) {
         console.warn('Falha ao gerar parcelas no backend:', err.message || err);
       }
@@ -493,7 +490,7 @@ export default async function handler(req, res) {
       const id = req.query.id || (req.query && req.query.notification_id) || (req.body && (req.body.id || (req.body.data && req.body.data.id))) || null;
 
       if (!topic || !id) {
-        console.log('Webhook recebido sem topic/id; respondendo 200.');
+        //console.log('Webhook recebido sem topic/id; respondendo 200.');
         return json(res, 200, { ok: true, message: 'notificação recebida (sem topic/id)' });
       }
 
@@ -511,7 +508,7 @@ export default async function handler(req, res) {
       }
 
       if (!resolved) {
-        console.log('Não foi possível resolver id no MP; id pode ser notification id ou ambiente errado:', id);
+        //console.log('Não foi possível resolver id no MP; id pode ser notification id ou ambiente errado:', id);
         // registrar notificação mínima para auditoria
         const globalNotifRef = db.collection('notificacoes_mp_global').doc(notifId);
         await globalNotifRef.set({
@@ -529,8 +526,8 @@ export default async function handler(req, res) {
       let mpData = resolved.data;
 
       // logs para diferenciar merchant_order vs payment 
-      console.log("Webhook MP status recebido:", mpData.status || mpData.payment_status || "sem status");
-      console.log(`Webhook MP recebido - topic: ${topic}, status: ${mpData.status || mpData.payment_status || "sem status"}`);
+      //console.log("Webhook MP status recebido:", mpData.status || mpData.payment_status || "sem status");
+      //console.log(`Webhook MP recebido - topic: ${topic}, status: ${mpData.status || mpData.payment_status || "sem status"}`);
 
       // Se veio merchant_order, não gravar mpPaymentId com o id do MO.
       // Se houver um payment dentro do merchant_order, buscar o payment real e usar seu status/id.
@@ -595,7 +592,7 @@ export default async function handler(req, res) {
 
       const notifSnap = await notifRef.get();
       if (notifSnap.exists) {
-        console.log('Notificação já processada:', notifId);
+        //console.log('Notificação já processada:', notifId);
         return json(res, 200, { ok: true, message: 'já processado' });
       }
 
@@ -634,8 +631,11 @@ export default async function handler(req, res) {
         const updateObj = {
           status: novoStatusPedido,
           mpStatus,
+          mpPaymentMethod: mpData.payment_method_id || null,   // método escolhido (ex.: visa, pix, boleto)
+          mpInstallments: (mpData.installments && Number(mpData.installments)) ? Number(mpData.installments) : 1, // número de parcelas
           atualizadoEm: admin.firestore.FieldValue.serverTimestamp()
         };
+
         // se veio payment, gravar mpPaymentId usando effectiveId
         if (resolved.tipo === 'payment') {
           updateObj.mpPaymentId = effectiveId;
@@ -645,7 +645,7 @@ export default async function handler(req, res) {
         }
         await pedidoRef.set(updateObj, { merge: true });
 
-        console.log(`Pedido ${pedidoId} atualizado para: ${novoStatusPedido} (tipoNotificacao=${resolved.tipo})`);
+        //console.log(`Pedido ${pedidoId} atualizado para: ${novoStatusPedido} (tipoNotificacao=${resolved.tipo})`);
 
         // atualizar pagamentos pré-criados: marcar parcelas pagas conforme installments
         const pagamentosRef = db.collection('usuarios').doc(userId)
@@ -665,7 +665,9 @@ export default async function handler(req, res) {
             batch.set(pRef, {
               status: 'pago',
               data_pagamento: admin.firestore.FieldValue.serverTimestamp(),
-              mpPaymentId: effectiveId, // usar effectiveId aqui
+              mpPaymentId: effectiveId,
+              mpPaymentMethod: mpData.payment_method_id || null,
+              mpInstallments: (mpData.installments && Number(mpData.installments)) ? Number(mpData.installments) : 1,
               tipoNotificacao: resolved.tipo,
               atualizadoEm: admin.firestore.FieldValue.serverTimestamp()
             }, { merge: true });
@@ -680,6 +682,8 @@ export default async function handler(req, res) {
             pedidoId,
             status: novoStatusPedido,
             mpData,
+            mpPaymentMethod: mpData.payment_method_id || null,
+            mpInstallments: (mpData.installments && Number(mpData.installments)) ? Number(mpData.installments) : 1,
             tipoNotificacao: resolved.tipo,
             recebidoEm: admin.firestore.FieldValue.serverTimestamp()
           }, { merge: true });
