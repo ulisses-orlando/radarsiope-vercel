@@ -272,7 +272,9 @@ async function abrirModalNewsletter(docId = null, isEdit = false) {
   const col1 = document.createElement('div'); // Campos iniciais
   const col2 = document.createElement('div'); // Editor HTML + templates + preview
   const col3 = document.createElement('div'); // Blocos
-
+  col1.style.marginTop = '350px';
+  col2.style.marginTop = '350px';
+  col3.style.marginTop = '350px';
   grid.appendChild(col1);
   grid.appendChild(col2);
   grid.appendChild(col3);
@@ -280,9 +282,17 @@ async function abrirModalNewsletter(docId = null, isEdit = false) {
   // -----------------------------
   // COLUNA 1 — CAMPOS INICIAIS
   // -----------------------------
-  col1.appendChild(generateDateInput('data_publicacao', data.data_publicacao ? data.data_publicacao.toDate() : null));
-  col1.appendChild(generateTextField('edicao', data.edicao));
-  col1.appendChild(generateTextField('titulo', data.titulo));
+  col1.appendChild(generateDateInput('Data publicacao', data.data_publicacao ? data.data_publicacao.toDate() : null));
+  col1.appendChild(generateTextField('Edição', data.edicao));
+  col1.appendChild(generateTextField('Titulo', data.titulo));
+
+  // Label do Resumo
+  const resumoLabel = document.createElement('label');
+  resumoLabel.innerText = 'Resumo';
+  resumoLabel.style.display = 'block';
+  resumoLabel.style.fontWeight = '600';
+  resumoLabel.style.marginBottom = '0.25em';
+  col1.appendChild(resumoLabel);
 
   // Campo Resumo (textarea curto)
   const resumoField = document.createElement('textarea');
@@ -296,7 +306,7 @@ async function abrirModalNewsletter(docId = null, isEdit = false) {
 
   // Campo de URL da imagem destacada
   const imagemField = generateTextField(
-    'imagem_url',
+    'URL da imagem',
     data.imagem_url || '',
     'URL da imagem destacada (para carrossel)'
   );
@@ -327,8 +337,8 @@ async function abrirModalNewsletter(docId = null, isEdit = false) {
 
   const tiposSnap = await db.collection("tipo_newsletters").get();
   const tiposArr = tiposSnap.docs.map(doc => doc.data().nome).filter(Boolean);
-  col1.appendChild(generateDomainSelect("tipo", tiposArr, data.tipo));
-  col1.appendChild(generateDomainSelect('classificacao', ['Básica', 'Premium'], data.classificacao || 'Básica'));
+  col1.appendChild(generateDomainSelect("Tipo", tiposArr, data.tipo));
+  col1.appendChild(generateDomainSelect('Classificação', ['Básica', 'Premium'], data.classificacao || 'Básica'));
 
   // Campo "Enviada" (somente leitura)
   const enviadaDiv = document.createElement("div");
@@ -3179,7 +3189,7 @@ async function abrirModalTemplateNewsletter(docId = null, isEdit = false, dadosP
   // Campos principais
   // body.appendChild(generateTextField('nome', data.nome || ''));
   const nomeField = generateTextField('nome', data.nome || '');
-  nomeField.style.marginTop = isEdit ? '160px' : '10px' ;
+  nomeField.style.marginTop = isEdit ? '160px' : '10px';
   body.appendChild(nomeField);
   body.appendChild(generateTextAreaField('descricao', data.descricao || '', 'Descrição do template'));
 
