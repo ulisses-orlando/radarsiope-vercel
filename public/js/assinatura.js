@@ -424,10 +424,6 @@ async function atualizarPreview() {
 
   if (totalWrap) {
     const total = preview.total;
-    const parcelasEl = document.getElementById('parcelas');
-    const numParcelas = parcelasEl ? parseInt(parcelasEl.value, 10) || 1 : 1;
-    const valorParcela = total / numParcelas;
-
     let textoResumo = '';
 
     // valor original sempre mostrado
@@ -446,7 +442,11 @@ async function atualizarPreview() {
     }
 
     // total final
-    textoResumo += `Total final: ${total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} em ${numParcelas} parcela${numParcelas > 1 ? 's' : ''} de ${valorParcela.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`;
+    if (window._currentPlan?.permitir_sem_juros && window._currentPlan?.parcelas_sem_juros > 1) {
+      textoResumo += `Total final: ${total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} em até ${window._currentPlan.parcelas_sem_juros} vezes sem juros`;
+    } else {
+      textoResumo += `Total final: ${total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`;
+    }
 
     totalWrap.innerHTML = `<strong>${textoResumo}</strong>`;
   }
@@ -531,8 +531,6 @@ async function registrarAssinatura(userId, payload, preview) {
       planId: payload.planId || null,
       tipos_selecionados: Array.isArray(payload.tipos_selecionados) ? payload.tipos_selecionados : [],
       cupom: payload.cupom || null,
-      forma_pagamento: payload.forma_pagamento || null,
-      parcelas: typeof payload.parcelas === 'number' ? payload.parcelas : (payload.parcelas ? Number(payload.parcelas) : 1),
       origem: payload.origem || null,
       valor_original: typeof preview.baseTotal === 'number' ? preview.baseTotal : (preview.baseTotal ? Number(preview.baseTotal) : 0),
       valor_final: typeof preview.total === 'number' ? preview.total : (preview.total ? Number(preview.total) : 0),
@@ -684,8 +682,6 @@ async function processarEnvioAssinatura(e) {
   const mensagem = document.getElementById('mensagem').value.trim();
   const preferencia = document.getElementById('preferencia-contato').value;
   const cupom = document.getElementById('cupom').value.trim();
-  const forma = document.getElementById('forma-pagamento').value;
-  const parcelas = document.getElementById('parcelas').value;
   const aceita = !!document.getElementById('aceita-termos').checked;
 
   const checks = document.querySelectorAll('#grupo-newsletters input[type="checkbox"]:checked');
@@ -699,8 +695,6 @@ async function processarEnvioAssinatura(e) {
   if (!perfil) { mostrarMensagem('Selecione seu perfil.'); return; }
 
   if (!preferencia) { mostrarMensagem('Selecione sua preferência de contato.'); return; }
-
-  if (!forma) { mostrarMensagem('Selecione a forma de pagamento.'); return; }
 
   if (!validarEmail(email)) { showFormError('email', 'E-mail inválido.'); return; }
 
@@ -737,8 +731,6 @@ async function processarEnvioAssinatura(e) {
     console.warn('Erro ao obter dados UF/Mun via validarUfMunicipio():', err);
     dadosUf = null;
   }
-
-  if (!parcelas) { mostrarMensagem('Selecione a quantidade de parcelas.'); return; }
 
   // calcular preview (IMPORTANTE: aguardar)
   let preview;
@@ -791,7 +783,8 @@ async function processarEnvioAssinatura(e) {
       cpf,
       nome,
       email,
-      descricao: `Assinatura ${window._currentPlan ? window._currentPlan.nome || '' : ''}`
+      descricao: `Assinatura ${window._currentPlan ? window._currentPlan.nome || '' : ''}`,
+      installmentsMax: window._currentPlan?.parcelas_sem_juros || window._currentPlan?.qtde_parcelas || 1
     };
 
     const backendResp = await createOrderBackend(backendPayload);
