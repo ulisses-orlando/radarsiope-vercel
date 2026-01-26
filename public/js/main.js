@@ -563,20 +563,20 @@ async function abrirModalNewsletter(docId = null, isEdit = false) {
   const btnToken = document.createElement('button');
   btnToken.innerText = '➕ Token/click';
   btnToken.onclick = () => {
-  const texto = `
+    const texto = `
     <p style="font-size:12px; color:#888; margin-top:30px">
       👉 <a href="https://www.radarsiope.com.br/verNewsletterComToken.html?d=ENCODED">
         Acessar edição completa
       </a>
     </p>
     `;
-/*         const texto = `
-    <p style="font-size:12px; color:#888; margin-top:30px">
-      👉 <a href="https://www.radarsiope.com.br/verNewsletterComToken.html?nid={{newsletterId}}&env={{envioId}}&uid={{destinatarioId}}&assinaturaId={{assinaturaId}}&token={{token}}">
-        Acessar edição completa
-      </a>
-    </p>
-    `; */
+    /*         const texto = `
+        <p style="font-size:12px; color:#888; margin-top:30px">
+          👉 <a href="https://www.radarsiope.com.br/verNewsletterComToken.html?nid={{newsletterId}}&env={{envioId}}&uid={{destinatarioId}}&assinaturaId={{assinaturaId}}&token={{token}}">
+            Acessar edição completa
+          </a>
+        </p>
+        `; */
 
     if (!ta.value.includes("https://www.radarsiope.com.br/verNewsletterComToken.html")) {
       ta.value += "\n" + texto;
@@ -625,6 +625,7 @@ async function abrirModalNewsletter(docId = null, isEdit = false) {
   const descBlocos = document.createElement('p');
   descBlocos.style.fontSize = "13px";
   descBlocos.style.color = "#555";
+  descBlocos.style.marginTop = "10px";
   descBlocos.innerHTML = `
     Se você usar blocos, o HTML acima será ignorado no envio.<br>
     Cada bloco pode ser exibido para: <strong>Todos</strong>, <strong>Leads</strong> ou <strong>Assinantes</strong>.
@@ -634,6 +635,7 @@ async function abrirModalNewsletter(docId = null, isEdit = false) {
   const btnAddBloco = document.createElement('button');
   btnAddBloco.type = "button";
   btnAddBloco.innerText = "➕ Adicionar bloco";
+  btnAddBloco.style.marginTop = "20px";
   btnAddBloco.style.marginBottom = "10px";
   btnAddBloco.onclick = () => adicionarBlocoEdicao();
   col3.appendChild(btnAddBloco);
@@ -866,15 +868,15 @@ function validarHtmlEmail(html, blocos = []) {
   // -----------------------------
   // 5. Pixel dentro da tabela e existência
   // -----------------------------
-/*   if (!html.includes("api.radarsiope.com.br/api/pixel")) {
-    erros.push("O HTML não contém o pixel de rastreamento.");
-  } else if (idxTableClose !== -1) {
-    const pixelPos = html.indexOf("api.radarsiope.com.br/api/pixel");
-    if (pixelPos > idxTableClose) {
-      erros.push("O pixel de rastreamento está fora da tabela principal.");
+  /*   if (!html.includes("api.radarsiope.com.br/api/pixel")) {
+      erros.push("O HTML não contém o pixel de rastreamento.");
+    } else if (idxTableClose !== -1) {
+      const pixelPos = html.indexOf("api.radarsiope.com.br/api/pixel");
+      if (pixelPos > idxTableClose) {
+        erros.push("O pixel de rastreamento está fora da tabela principal.");
+      }
     }
-  }
- */
+   */
   // -----------------------------
   // 6. Link de click dentro da tabela e existência
   // -----------------------------
@@ -902,9 +904,9 @@ function validarHtmlEmail(html, blocos = []) {
   // -----------------------------
   // 8. Placeholder de token
   // -----------------------------
-/*   if (!html.includes("{{token}}")) {
-    erros.push("O HTML não contém o placeholder {{token}}.");
-  } */
+  /*   if (!html.includes("{{token}}")) {
+      erros.push("O HTML não contém o placeholder {{token}}.");
+    } */
 
   // -----------------------------
   // 9. Verifica tags <tr> mal fechadas
@@ -3175,7 +3177,10 @@ async function abrirModalTemplateNewsletter(docId = null, isEdit = false, dadosP
   body.innerHTML = '';
 
   // Campos principais
-  body.appendChild(generateTextField('nome', data.nome || ''));
+  // body.appendChild(generateTextField('nome', data.nome || ''));
+  const nomeField = generateTextField('nome', data.nome || '');
+  nomeField.style.marginTop = isEdit ? '160px' : '10px' ;
+  body.appendChild(nomeField);
   body.appendChild(generateTextAreaField('descricao', data.descricao || '', 'Descrição do template'));
 
   const tiposSnap = await db.collection('tipo_newsletters').orderBy('nome').get();
