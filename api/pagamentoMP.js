@@ -459,10 +459,13 @@ export default async function handler(req, res) {
         return json(res, 500, { ok: false, message: 'Erro ao criar preferência no Mercado Pago', detail: err.body || String(err) });
       }
 
-      const preferSandbox = process.env.MP_FORCE_SANDBOX === 'true';
+/*       const preferSandbox = process.env.MP_FORCE_SANDBOX === 'true';
       const initPoint = preferSandbox
         ? (mpResp.sandbox_init_point || mpResp.init_point || null)
-        : (mpResp.init_point || mpResp.sandbox_init_point || null);
+        : (mpResp.init_point || mpResp.sandbox_init_point || null); */
+
+      // Sempre usar init_point, mesmo em sandbox/teste 
+      const initPoint = mpResp.init_point || mpResp.sandbox_init_point || null;
 
       //console.log('Redirect URL usado:', initPoint);
 
