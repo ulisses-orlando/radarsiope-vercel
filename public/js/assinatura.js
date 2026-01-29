@@ -781,8 +781,9 @@ async function processarEnvioAssinatura(e) {
       cpf,
       nome,
       email,
-      descricao: `Assinatura ${window._currentPlan ? window._currentPlan.nome || '' : ''}`,
-      installmentsMax: window._currentPlan?.parcelas_sem_juros || window._currentPlan?.qtde_parcelas || 1
+      descricao: window._currentPlan?.nome || 'Assinatura',
+      installmentsMax: window._currentPlan?.parcelas_sem_juros || 1, 
+      dataPrimeiroVencimento: new Date().toISOString().split('T')[0]
     };
 
     const backendResp = await createOrderBackend(backendPayload);
