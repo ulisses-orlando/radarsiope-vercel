@@ -364,18 +364,18 @@ export default async function handler(req, res) {
       // ok em sandbox; manter rawBody para auditoria
     }
 
-/*     console.log('Webhook recebido:', req.body);
-
-    // log inicial mínimo (não expõe segredos)
-    console.log('INICIANDO pagamentoMP - envs:', {
-      MP_ACCESS_TOKEN_PROD: !!process.env.MP_ACCESS_TOKEN_PROD,
-      MP_ACCESS_TOKEN_TEST: !!process.env.MP_ACCESS_TOKEN_TEST,
-      MP_ACCESS_TOKEN: !!process.env.MP_ACCESS_TOKEN,
-      MP_PUBLIC_KEY: !!process.env.MP_PUBLIC_KEY,
-      MP_WEBHOOK_URL: !!process.env.MP_WEBHOOK_URL,
-      MP_FORCE_SANDBOX: !!process.env.MP_FORCE_SANDBOX,
-      MP_VALIDATE_WEBHOOK: !!process.env.MP_VALIDATE_WEBHOOK
-    }); */
+    /*     console.log('Webhook recebido:', req.body);
+    
+        // log inicial mínimo (não expõe segredos)
+        console.log('INICIANDO pagamentoMP - envs:', {
+          MP_ACCESS_TOKEN_PROD: !!process.env.MP_ACCESS_TOKEN_PROD,
+          MP_ACCESS_TOKEN_TEST: !!process.env.MP_ACCESS_TOKEN_TEST,
+          MP_ACCESS_TOKEN: !!process.env.MP_ACCESS_TOKEN,
+          MP_PUBLIC_KEY: !!process.env.MP_PUBLIC_KEY,
+          MP_WEBHOOK_URL: !!process.env.MP_WEBHOOK_URL,
+          MP_FORCE_SANDBOX: !!process.env.MP_FORCE_SANDBOX,
+          MP_VALIDATE_WEBHOOK: !!process.env.MP_VALIDATE_WEBHOOK
+        }); */
 
     // rota e ação
     const acao = (req.query && req.query.acao) ? String(req.query.acao) : null;
@@ -459,10 +459,10 @@ export default async function handler(req, res) {
         return json(res, 500, { ok: false, message: 'Erro ao criar preferência no Mercado Pago', detail: err.body || String(err) });
       }
 
-/*       const preferSandbox = process.env.MP_FORCE_SANDBOX === 'true';
-      const initPoint = preferSandbox
-        ? (mpResp.sandbox_init_point || mpResp.init_point || null)
-        : (mpResp.init_point || mpResp.sandbox_init_point || null); */
+      /*       const preferSandbox = process.env.MP_FORCE_SANDBOX === 'true';
+            const initPoint = preferSandbox
+              ? (mpResp.sandbox_init_point || mpResp.init_point || null)
+              : (mpResp.init_point || mpResp.sandbox_init_point || null); */
 
       // Sempre usar init_point, mesmo em sandbox/teste 
       const initPoint = mpResp.init_point || mpResp.sandbox_init_point || null;
@@ -692,24 +692,26 @@ export default async function handler(req, res) {
           }, { merge: true });
         }
 
-        // atualizar status da assinatura
+        // atualizar status da assinatura de acordo com o status do pedido
         const assinRef = db.collection('usuarios').doc(userId)
           .collection('assinaturas').doc(assinaturaId);
 
         if (novoStatusPedido === 'pago') {
           await assinRef.set({
-            status: 'ativo',
+            status: 'ativa',   // assinatura passa a ativa
+            paymentProvider: 'mercadopago',
+            orderId: pedidoId,
             ativadoEm: admin.firestore.FieldValue.serverTimestamp(),
             atualizadoEm: admin.firestore.FieldValue.serverTimestamp()
           }, { merge: true });
         } else if (novoStatusPedido === 'falha') {
           await assinRef.set({
-            status: 'pagamento_falhou',
+            status: 'cancelada',   // assinatura cancelada
             atualizadoEm: admin.firestore.FieldValue.serverTimestamp()
           }, { merge: true });
         } else if (novoStatusPedido === 'pendente') {
           await assinRef.set({
-            status: 'pendente_pagamento',
+            status: 'pendente_pagamento',   // aguardando pagamento
             atualizadoEm: admin.firestore.FieldValue.serverTimestamp()
           }, { merge: true });
         }
