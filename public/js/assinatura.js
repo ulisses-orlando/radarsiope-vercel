@@ -705,9 +705,33 @@ async function processarEnvioAssinatura(e) {
     .get();
 
   if (!usuarioSnap.empty) {
-    showFormError('email', 'Este e-mail já está cadastrado. Acesse a área do assinante e contate o suporte.');
-    mostrarMensagem('Este e-mail já está cadastrado. Acesse a área do assinante e contate o suporte.');
-    return;
+    const userId = usuarioSnap.docs[0].id;
+    const assinaturasSnap = await db.collection('usuarios')
+      .doc(userId)
+      .collection('assinaturas')
+      .get();
+
+    const temAtiva = assinaturasSnap.docs.some(doc => {
+      const st = doc.data().status;
+      return st === 'ativa' || st === 'aprovada';
+    });
+
+    if (temAtiva) {
+      showFormError('email', 'Usuário já está cadastrado com este e-mail. Acesse a área do assinante e contate o suporte.');
+      mostrarMensagem('Usuário já está cadastrado com este e-mail. Acesse a área do assinante e contate o suporte.');
+      return;
+    }
+
+    // Se só existem assinaturas pendentes/canceladas, pode limpar
+    const pendentes = assinaturasSnap.docs.filter(doc => {
+      const st = doc.data().status;
+      return st !== 'ativa' && st !== 'aprovada';
+    });
+
+    for (const doc of pendentes) {
+      await db.collection('usuarios').doc(userId)
+        .collection('assinaturas').doc(doc.id).delete();
+    }
   }
 
   if (telefone) {
@@ -782,7 +806,7 @@ async function processarEnvioAssinatura(e) {
       nome,
       email,
       descricao: window._currentPlan?.nome || 'Assinatura',
-      installmentsMax: window._currentPlan?.parcelas_sem_juros || 1, 
+      installmentsMax: window._currentPlan?.parcelas_sem_juros || 1,
       dataPrimeiroVencimento: new Date().toISOString().split('T')[0]
     };
 
