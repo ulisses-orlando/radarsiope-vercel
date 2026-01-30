@@ -23,6 +23,10 @@ function json(res, status, payload) {
   res.status(status).setHeader('Content-Type', 'application/json').end(JSON.stringify(payload));
 }
 
+function logCompleto() {
+  return process.env.MP_LOG_COMPLETO === 'true';
+}
+
 // fetch com timeout
 async function fetchWithTimeout(url, opts = {}, ms = 10000) {
   const controller = new AbortController();
@@ -483,10 +487,25 @@ export default async function handler(req, res) {
       }, { merge: true });
 
       // gerar parcelas no backend usando installmentsMax
-      try {
-        await gerarParcelasAssinaturaBackend(userId, assinaturaId, amountCentavos, installmentsMax, null, dataPrimeiroVencimento, novoPedidoRef.id);
-      } catch (err) {
-        console.warn('Falha ao gerar parcelas no backend:', err.message || err);
+      if (logCompleto()) {
+        try {
+          await gerarParcelasAssinaturaBackend(
+            userId, assinaturaId, amountCentavos,
+            installmentsMax, null, dataPrimeiroVencimento, novoPedidoRef.id
+          );
+        } catch (err) {
+          console.warn('Falha ao gerar parcelas no backend:', err.message || err);
+        }
+      } else {
+        const pagamentoRef = db.collection('usuarios').doc(userId)
+          .collection('assinaturas').doc(assinaturaId)
+          .collection('pagamentos').doc(novoPedidoRef.id);
+        await pagamentoRef.set({
+          valor_centavos: amountCentavos,
+          numero_parcelas: installmentsMax,
+          status: 'pendente',
+          criadoEm: admin.firestore.FieldValue.serverTimestamp()
+        });
       }
 
       return json(res, 200, { ok: true, redirectUrl: initPoint, pedidoId: novoPedidoRef.id });
@@ -518,14 +537,16 @@ export default async function handler(req, res) {
       if (!resolved) {
         //console.log('Não foi possível resolver id no MP; id pode ser notification id ou ambiente errado:', id);
         // registrar notificação mínima para auditoria
-        const globalNotifRef = db.collection('notificacoes_mp_global').doc(notifId);
-        await globalNotifRef.set({
-          topic,
-          id,
-          rawBody: rawBody ? rawBody.slice(0, 2000) : null,
-          recebidoEm: admin.firestore.FieldValue.serverTimestamp(),
-          resolved: false
-        }, { merge: true });
+        if (logCompleto()) {
+          const globalNotifRef = db.collection('notificacoes_mp_global').doc(notifId);
+          await globalNotifRef.set({
+            topic,
+            id,
+            rawBody: rawBody ? rawBody.slice(0, 2000) : null,
+            recebidoEm: admin.firestore.FieldValue.serverTimestamp(),
+            resolved: false
+          }, { merge: true });
+        }
         return json(res, 200, { ok: true, message: 'mp resource not found (simulação ou id inválido)' });
       }
 
@@ -565,30 +586,31 @@ export default async function handler(req, res) {
       const externalRef = mpData.external_reference || (mpData.order && mpData.order.external_reference) || null;
       if (!externalRef) {
         // salvar globalmente para auditoria
-        const globalNotifRef = db.collection('notificacoes_mp_global').doc(notifId);
-        await globalNotifRef.set({
-          topic,
-          id,
-          mpData,
-          recebidoEm: admin.firestore.FieldValue.serverTimestamp(),
-          resolved: true,
-          external_reference: null
-        }, { merge: true });
+        if (logCompleto()) {
+          const globalNotifRef = db.collection('notificacoes_mp_global').doc(notifId);
+          await globalNotifRef.set({
+            topic,
+            id,
+            rawBody: rawBody ? rawBody.slice(0, 2000) : null,
+            recebidoEm: admin.firestore.FieldValue.serverTimestamp(),
+            resolved: false
+          }, { merge: true });
+        }
         return json(res, 200, { ok: true, message: 'sem external_reference' });
       }
 
       const parsed = parseExternalReference(externalRef);
       if (!parsed) {
-        const globalNotifRef = db.collection('notificacoes_mp_global').doc(notifId);
-        await globalNotifRef.set({
-          topic,
-          id,
-          mpData,
-          external_reference: externalRef,
-          recebidoEm: admin.firestore.FieldValue.serverTimestamp(),
-          resolved: true,
-          parsed: false
-        }, { merge: true });
+        if (logCompleto()) {
+          const globalNotifRef = db.collection('notificacoes_mp_global').doc(notifId);
+          await globalNotifRef.set({
+            topic,
+            id,
+            rawBody: rawBody ? rawBody.slice(0, 2000) : null,
+            recebidoEm: admin.firestore.FieldValue.serverTimestamp(),
+            resolved: false
+          }, { merge: true });
+        }
         return json(res, 200, { ok: true, message: 'external_reference inválido' });
       }
 
@@ -605,14 +627,26 @@ export default async function handler(req, res) {
       }
 
       // salvar notificação com mpData para auditoria
-      await notifRef.set({
-        topic,
-        id,
-        mpData,
-        recebidoEm: admin.firestore.FieldValue.serverTimestamp(),
-        resolvedTipo: resolved.tipo,
-        signature_verified: false // sem validação HMAC por enquanto
-      });
+      if (logCompleto()) {
+        await notifRef.set({
+          topic,
+          id,
+          mpData,
+          recebidoEm: admin.firestore.FieldValue.serverTimestamp(),
+          resolvedTipo: resolved.tipo,
+          signature_verified: false
+        });
+      } else {
+        const notifRefSimple = db.collection('usuarios').doc(userId)
+          .collection('assinaturas').doc(assinaturaId)
+          .collection('ultima_notificacao').doc('last');
+        await notifRefSimple.set({
+          topic,
+          id,
+          mpStatus: mpData.status || mpData.payment_status || null,
+          recebidoEm: admin.firestore.FieldValue.serverTimestamp()
+        }, { merge: true });
+      }
 
       // atualizar pedido
       const pedidoRef = db.collection('usuarios').doc(userId)
@@ -662,38 +696,39 @@ export default async function handler(req, res) {
 
         const installments = (mpData.installments && Number(mpData.installments)) ? Number(mpData.installments) : 1;
 
-        const pendentesSnap = await pagamentosRef.where('status', '==', 'pendente').orderBy('numero_parcela', 'asc').get();
+        if (logCompleto()) {
+          const pendentesSnap = await pagamentosRef.where('status', '==', 'pendente')
+            .orderBy('numero_parcela', 'asc').get();
 
-        if (!pendentesSnap.empty) {
-          let toMark = installments;
-          const batch = db.batch();
-          for (const doc of pendentesSnap.docs) {
-            if (toMark <= 0) break;
-            const pRef = pagamentosRef.doc(doc.id);
-            batch.set(pRef, {
-              status: 'pago',
-              data_pagamento: admin.firestore.FieldValue.serverTimestamp(),
-              mpPaymentId: effectiveId,
-              mpPaymentMethod: mpData.payment_method_id || null,
-              mpInstallments: (mpData.installments && Number(mpData.installments)) ? Number(mpData.installments) : 1,
-              tipoNotificacao: resolved.tipo,
-              atualizadoEm: admin.firestore.FieldValue.serverTimestamp()
-            }, { merge: true });
-            toMark--;
+          if (!pendentesSnap.empty) {
+            let toMark = installments;
+            const batch = db.batch();
+            for (const doc of pendentesSnap.docs) {
+              if (toMark <= 0) break;
+              const pRef = pagamentosRef.doc(doc.id);
+              batch.set(pRef, {
+                status: 'pago',
+                data_pagamento: admin.firestore.FieldValue.serverTimestamp(),
+                mpPaymentId: effectiveId,
+                mpPaymentMethod: mpData.payment_method_id || null,
+                mpInstallments: installments,
+                tipoNotificacao: resolved.tipo,
+                atualizadoEm: admin.firestore.FieldValue.serverTimestamp()
+              }, { merge: true });
+              toMark--;
+            }
+            await batch.commit();
           }
-          await batch.commit();
         } else {
-          // se não houver parcelas pendentes, criar um registro de pagamento único
           const pagamentoRef = pagamentosRef.doc(String(effectiveId));
           await pagamentoRef.set({
             paymentId: effectiveId,
             pedidoId,
             status: novoStatusPedido,
-            mpData,
             mpPaymentMethod: mpData.payment_method_id || null,
-            mpInstallments: (mpData.installments && Number(mpData.installments)) ? Number(mpData.installments) : 1,
-            tipoNotificacao: resolved.tipo,
-            recebidoEm: admin.firestore.FieldValue.serverTimestamp()
+            mpInstallments: installments,
+            data_pagamento: admin.firestore.FieldValue.serverTimestamp(),
+            atualizadoEm: admin.firestore.FieldValue.serverTimestamp()
           }, { merge: true });
         }
 
