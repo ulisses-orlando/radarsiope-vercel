@@ -446,7 +446,12 @@ export default async function handler(req, res) {
         },
         notification_url: process.env.MP_WEBHOOK_URL || '',
 
-        installments: installmentsMax   // limite de parcelas definido pelo plano
+        installments: installmentsMax,   // limite de parcelas definido pelo plano
+
+        // 🚫 Bloquear boleto 
+        excluded_payment_types: [
+          { id: "ticket" }
+        ]
       };
 
       let mpResp;
