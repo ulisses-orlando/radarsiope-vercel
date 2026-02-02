@@ -123,7 +123,7 @@ async function processarEnvioInteresse(e) {
     botao.disabled = true;
 
     try {
-        await db.collection("leads").add({
+        const novoLeadRef = await db.collection("leads").add({
             nome,
             nome_lowercase: nome.toLowerCase(),
             email,
@@ -142,6 +142,17 @@ async function processarEnvioInteresse(e) {
 
             data_criacao: firebase.firestore.Timestamp.now()
         });
+
+        // Disparo automático de boas-vindas 
+        await dispararMensagemAutomatica("primeiro_contato", {
+            id: novoLeadRef.id,
+            nome: dadosLead.nome,
+            email: dadosLead.email,
+            interesses: dadosLead.interesses,
+            cod_uf: dadosLead.cod_uf,
+            nome_municipio: dadosLead.nome_municipio,
+            perfil: dadosLead.perfil
+        }, "lead");
 
         status.innerText = "Enviado com sucesso!";
         status.style.color = "green";

@@ -444,3 +444,82 @@ function clearFieldErrors(fieldNames = []) {
     if (span) { span.textContent = ''; span.style.display = 'none'; }
   });
 }
+
+async function enviarMensagem(usuario, canal, assunto, mensagemHtml) {
+  if (canal === "email") {
+    await fetch("/api/enviarEmail", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        nome: usuario.nome,
+        email: usuario.email,
+        assunto,
+        mensagemHtml
+      })
+    });
+  }
+  // Futuro: outros canais (push, WhatsApp, SMS)
+}
+
+async function dispararMensagemAutomatica(momento, dados, tipo = "usuario") {
+  try {
+    // 1. Buscar template ativo e automático
+    const snapshot = await db.collection("respostas_automaticas")
+      .where("momento_envio", "==", momento)
+      .where("ativo", "==", true)
+      .where("enviar_automaticamente", "==", true)
+      .get();
+
+    if (snapshot.empty) {
+      console.log(`Nenhum template encontrado para ${momento}`);
+      return;
+    }
+
+    // 2. Para cada template encontrado
+    for (const doc of snapshot.docs) {
+      const msg = doc.data();
+
+      // 3. Substituir placeholders usando sua função
+      const mensagemHtml = aplicarPlaceholders(msg.mensagem_html, dados);
+
+      // 4. Chamar API enviarEmail.js
+      await fetch("/api/enviarEmail", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          nome: dados.nome,
+          email: dados.email,
+          assunto: msg.titulo,
+          mensagemHtml
+        })
+      });
+
+      console.log(`Mensagem enviada: ${msg.titulo} → ${dados.email}`);
+
+      // 5. Gravar log de envio automático
+      if (tipo === "lead") {
+        // log dentro de leads/{leadId}/log_envio_automatico
+        const leadRef = db.collection("leads").doc(dados.id);
+        await leadRef.collection("log_envio_automatico").add({
+          momento,
+          titulo: msg.titulo,
+          email: dados.email,
+          enviadoEm: firebase.firestore.Timestamp.now()
+        });
+      } else {
+        // log dentro de usuarios/{userId}/assinaturas/{assinaturaId}/log_envio_automatico
+        const assinRef = db.collection("usuarios").doc(dados.userId)
+          .collection("assinaturas").doc(dados.assinaturaId);
+        await assinRef.collection("log_envio_automatico").add({
+          momento,
+          titulo: msg.titulo,
+          email: dados.email,
+          enviadoEm: firebase.firestore.Timestamp.now()
+        });
+      }
+    }
+  } catch (error) {
+    console.error("❌ Erro no disparo automático:", error);
+  }
+}
+
