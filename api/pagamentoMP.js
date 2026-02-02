@@ -744,6 +744,14 @@ export default async function handler(req, res) {
             ativadoEm: admin.firestore.FieldValue.serverTimestamp(),
             atualizadoEm: admin.firestore.FieldValue.serverTimestamp()
           }, { merge: true });
+          // Disparo automático de confirmação de assinatura
+          await dispararMensagemAutomatica("pos_cadastro_assinante", { 
+            userId, 
+            assinaturaId, 
+            nome: mpData.payer?.first_name || usuario?.nome || "", 
+            email: mpData.payer?.email || usuario?.email || "", 
+            plano: usuario?.plano || "Padrão", 
+            data_assinatura: new Date() }, "usuario");
         } else if (novoStatusPedido === 'falha') {
           await assinRef.set({
             status: 'cancelada',   // assinatura cancelada
