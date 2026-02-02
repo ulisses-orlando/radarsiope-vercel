@@ -494,8 +494,6 @@ async function dispararMensagemAutomatica(momento, dados, tipo = "usuario") {
         })
       });
 
-      console.log(`Mensagem enviada: ${msg.titulo} → ${dados.email}`);
-
       // 5. Gravar log de envio automático
       if (tipo === "lead") {
         // log dentro de leads/{leadId}/log_envio_automatico
