@@ -222,6 +222,7 @@ function aplicarPlaceholders(template, dados) {
   const interesse = dados.interesse || "(sem interesse)";
   const interesseId = dados.interesseId || "(sem interesseId)";
   const token = dados.token_acesso || "(sem token)";
+  const plano = dados.plano || "(sem plano)";
 
   let dataFormatada = "";
   if (dados.data_publicacao) {
@@ -244,7 +245,8 @@ function aplicarPlaceholders(template, dados) {
     .replace(/{{cargo}}/gi, cargo)
     .replace(/{{interesse}}/gi, interesse)  
     .replace(/{{interesseId}}/gi, interesseId)
-    .replace(/{{token}}/gi, token);
+    .replace(/{{token}}/gi, token)
+    .replace(/{{plano}}/gi, plano);
 }
 
 async function inserirCamposUfMunicipio(container, ufPadrao = "", municipioPadrao = "") {
