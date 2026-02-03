@@ -85,6 +85,7 @@ function gerarHtmlPlaceholdersExpandivel() {
           <li><code>{{cargo}}</code> → Cargo do usuário</li>
           <li><code>{{interesse}}</code> → Interesse do usuário</li>
           <li><code>{{token}}</code> → Token para envio da newsletter</li>
+          <li><code>{{preferencia_contato}}</code> → Preferencia de contato</li>
         </ul>
         <p>Esses campos serão substituídos automaticamente no momento do envio.</p>
       </div>
@@ -223,6 +224,7 @@ function aplicarPlaceholders(template, dados) {
   const interesseId = dados.interesseId || "(sem interesseId)";
   const token = dados.token_acesso || "(sem token)";
   const plano = dados.plano || "(sem plano)";
+  const preferencia_contato = dados.preferencia_contato || "(preferencia de contato)";
 
   let dataFormatada = "";
   if (dados.data_publicacao) {
@@ -246,7 +248,8 @@ function aplicarPlaceholders(template, dados) {
     .replace(/{{interesse}}/gi, interesse)  
     .replace(/{{interesseId}}/gi, interesseId)
     .replace(/{{token}}/gi, token)
-    .replace(/{{plano}}/gi, plano);
+    .replace(/{{plano}}/gi, plano)
+    .replace(/{{preferencia_contato}}/gi, preferencia_contato);
 }
 
 async function inserirCamposUfMunicipio(container, ufPadrao = "", municipioPadrao = "") {

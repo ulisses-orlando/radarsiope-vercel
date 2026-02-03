@@ -148,9 +148,10 @@ async function processarEnvioInteresse(e) {
             id: novoLeadRef.id,
             nome: nome,
             email: email,
-            interesses: interesses,
-            cod_uf: dadosUf.od_uf,
-            nome_municipio: dadosUf.nome_municipio,
+            interesse: interesses,
+            preferencia_contato: preferencia,
+            uf: dadosUf.cod_uf,
+            municipio: dadosUf.nome_municipio,
             perfil: perfil
         }, "lead");
 
