@@ -874,8 +874,8 @@ export default async function handler(req, res) {
           await dispararMensagemAutomatica("pos_cadastro_assinante", {
             userId,
             assinaturaId,
-            nome: mpData.payer?.first_name || usuario?.nome || "",
-            email: mpData.payer?.email || usuario?.email || "",
+            nome: mpData.payer?.first_name || assinaturaData?.nome || "",
+            email: mpData.payer?.email || assinaturaData?.email || "",
             plano: nomePlano,
             data_assinatura: new Date()
           }, "usuario");
