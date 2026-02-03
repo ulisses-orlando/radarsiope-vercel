@@ -461,7 +461,7 @@ async function enviarMensagem(usuario, canal, assunto, mensagemHtml) {
   // Futuro: outros canais (push, WhatsApp, SMS)
 }
 
-export async function dispararMensagemAutomatica(momento, dados, tipo = "usuario") {
+async function dispararMensagemAutomatica(momento, dados, tipo = "usuario") {
   try {
     // 1. Buscar template ativo e automático
     const snapshot = await db.collection("respostas_automaticas")
