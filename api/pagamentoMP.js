@@ -5,7 +5,7 @@ export const config = { runtime: 'nodejs', api: { bodyParser: false } };
 
 import crypto from 'crypto';
 import admin from 'firebase-admin';
-import { dispararMensagemAutomatica } from "../public/js/functions.js";
+import { dispararMensagemAutomatica } from "../lib/functions.js";
 
 // Inicializa Firebase (atenção ao formato da PRIVATE_KEY no Vercel: use \\n)
 if (!admin.apps.length) {
