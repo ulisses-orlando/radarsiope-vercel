@@ -146,12 +146,12 @@ async function processarEnvioInteresse(e) {
         // Disparo automático de boas-vindas 
         await dispararMensagemAutomatica("primeiro_contato", {
             id: novoLeadRef.id,
-            nome: dadosLead.nome,
-            email: dadosLead.email,
-            interesses: dadosLead.interesses,
-            cod_uf: dadosLead.cod_uf,
-            nome_municipio: dadosLead.nome_municipio,
-            perfil: dadosLead.perfil
+            nome: novoLeadRef.nome,
+            email: novoLeadRef.email,
+            interesses: novoLeadRef.interesses,
+            cod_uf: novoLeadRef.cod_uf,
+            nome_municipio: novoLeadRef.nome_municipio,
+            perfil: novoLeadRef.perfil
         }, "lead");
 
         status.innerText = "Enviado com sucesso!";
