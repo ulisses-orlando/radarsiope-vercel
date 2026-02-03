@@ -333,6 +333,115 @@ function validateMpWebhookSignature(rawBody, req) {
   return { ok: false, reason: 'signature mismatch', ts };
 }
 
+async function dispararMensagemAutomatica(momento, dados, tipo = "usuario") {
+  try {
+    // 1. Buscar template ativo e automático
+    const snapshot = await db.collection("respostas_automaticas")
+      .where("momento_envio", "==", momento)
+      .where("ativo", "==", true)
+      .where("enviar_automaticamente", "==", true)
+      .get();
+
+    if (snapshot.empty) {
+      return;
+    }
+
+    // 2. Para cada template encontrado
+    for (const doc of snapshot.docs) {
+      const msg = doc.data();
+
+      // 3. Substituir placeholders usando sua função
+      const mensagemHtml = aplicarPlaceholders(msg.mensagem_html, dados);
+
+      // 4. Chamar API enviarEmail.js
+      await fetch("/api/enviarEmail", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          nome: dados.nome,
+          email: dados.email,
+          assunto: msg.titulo,
+          mensagemHtml
+        })
+      });
+
+      // 5. Gravar log de envio automático
+      if (tipo === "lead") {
+        // log dentro de leads/{leadId}/log_envio_automatico
+        const leadRef = db.collection("leads").doc(dados.id);
+        await leadRef.collection("log_envio_automatico").add({
+          momento,
+          titulo: msg.titulo,
+          email: dados.email,
+          enviadoEm: firebase.firestore.Timestamp.now()
+        });
+      } else {
+        // log dentro de usuarios/{userId}/assinaturas/{assinaturaId}/log_envio_automatico
+        const assinRef = db.collection("usuarios").doc(dados.userId)
+          .collection("assinaturas").doc(dados.assinaturaId);
+        await assinRef.collection("log_envio_automatico").add({
+          momento,
+          titulo: msg.titulo,
+          email: dados.email,
+          enviadoEm: firebase.firestore.Timestamp.now()
+        });
+      }
+    }
+  } catch (error) {
+    console.error("❌ Erro no disparo automático:", error);
+  }
+}
+function formatDateBR(date) {
+  if (!date) return "";
+  const d = new Date(date.seconds ? date.seconds * 1000 : date);
+  return d.toLocaleDateString("pt-BR");
+}
+
+function aplicarPlaceholders(template, dados) {
+  const nome = dados.nome || "(nome não informado)";
+  const email = dados.email || "(email não informado)";
+  const edicao = dados.edicao || "(sem edição)";
+  let tipo = "(sem tipo)";
+  if (Array.isArray(dados.interesses) && dados.interesses.length > 0) {
+    tipo = dados.interesses.join(", ");
+  } else if (dados.tipo) {
+    tipo = dados.tipo;
+  }
+  const titulo = dados.titulo || "(sem título)";
+  const newsletterId = dados.newsletterId || "(sem newsletterId)";
+  const envioId = dados.envioId || "(sem envioId)";
+  const destinatarioId = dados.destinatarioId || "(sem destinatarioId)";
+  const cod_uf = dados.cod_uf || "(sem UFId)";
+  const nome_municipio = dados.nome_municipio || "(sem municipioId)";
+  const cargo = dados.tipo_perfil || dados.perfil || "(sem cargoId)";
+  const interesse = dados.interesse || "(sem interesse)";
+  const interesseId = dados.interesseId || "(sem interesseId)";
+  const token = dados.token_acesso || "(sem token)";
+
+  let dataFormatada = "";
+  if (dados.data_publicacao) {
+    const dataObj = dados.data_publicacao.toDate?.() || dados.data_publicacao;
+    dataFormatada = formatDateBR(dataObj);
+  }
+
+  return template
+    .replace(/{{nome}}/gi, nome)
+    .replace(/{{email}}/gi, email)
+    .replace(/{{edicao}}/gi, edicao)
+    .replace(/{{tipo}}/gi, tipo)
+    .replace(/{{titulo}}/gi, titulo)
+    .replace(/{{data_publicacao}}/gi, dataFormatada)
+    .replace(/{{newsletterId}}/gi, newsletterId)
+    .replace(/{{envioId}}/gi, envioId)
+    .replace(/{{destinatarioId}}/gi, destinatarioId)
+    .replace(/{{uf}}/gi, cod_uf)
+    .replace(/{{municipio}}/gi, nome_municipio)
+    .replace(/{{cargo}}/gi, cargo)
+    .replace(/{{interesse}}/gi, interesse)  
+    .replace(/{{interesseId}}/gi, interesseId)
+    .replace(/{{token}}/gi, token);
+}
+
 // ---------- Handler principal (sem validação HMAC) ----------
 export default async function handler(req, res) {
   try {
