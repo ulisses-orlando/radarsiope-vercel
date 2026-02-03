@@ -416,6 +416,7 @@ function aplicarPlaceholders(template, dados) {
   const interesse = dados.interesse || "(sem interesse)";
   const interesseId = dados.interesseId || "(sem interesseId)";
   const token = dados.token_acesso || "(sem token)";
+  const plano = dados.plano || "(sem plano)";
 
   let dataFormatada = "";
   if (dados.data_publicacao) {
@@ -436,9 +437,10 @@ function aplicarPlaceholders(template, dados) {
     .replace(/{{uf}}/gi, cod_uf)
     .replace(/{{municipio}}/gi, nome_municipio)
     .replace(/{{cargo}}/gi, cargo)
-    .replace(/{{interesse}}/gi, interesse)  
+    .replace(/{{interesse}}/gi, interesse)
     .replace(/{{interesseId}}/gi, interesseId)
-    .replace(/{{token}}/gi, token);
+    .replace(/{{token}}/gi, token)
+    .replace(/{{plano}}/gi, plano);
 }
 
 // ---------- Handler principal (sem validação HMAC) ----------
@@ -853,14 +855,30 @@ export default async function handler(req, res) {
             ativadoEm: admin.firestore.FieldValue.serverTimestamp(),
             atualizadoEm: admin.firestore.FieldValue.serverTimestamp()
           }, { merge: true });
+          // Buscar dados da assinatura
+          const assinaturaDoc = await db.collection("usuarios").doc(userId)
+            .collection("assinaturas").doc(assinaturaId).get();
+
+          const assinaturaData = assinaturaDoc.exists ? assinaturaDoc.data() : {};
+
+          // Buscar nome do plano na coleção planos
+          let nomePlano = "(plano não informado)";
+          if (assinaturaData.planId) {
+            const planoDoc = await db.collection("planos").doc(assinaturaData.planId).get();
+            if (planoDoc.exists) {
+              nomePlano = planoDoc.data().nome || nomePlano;
+            }
+          }
+
           // Disparo automático de confirmação de assinatura
-          await dispararMensagemAutomatica("pos_cadastro_assinante", { 
-            userId, 
-            assinaturaId, 
-            nome: mpData.payer?.first_name || usuario?.nome || "", 
-            email: mpData.payer?.email || usuario?.email || "", 
-            plano: usuario?.plano || "Padrão", 
-            data_assinatura: new Date() }, "usuario");
+          await dispararMensagemAutomatica("pos_cadastro_assinante", {
+            userId,
+            assinaturaId,
+            nome: mpData.payer?.first_name || usuario?.nome || "",
+            email: mpData.payer?.email || usuario?.email || "",
+            plano: nomePlano,
+            data_assinatura: new Date()
+          }, "usuario");
         } else if (novoStatusPedido === 'falha') {
           await assinRef.set({
             status: 'cancelada',   // assinatura cancelada
