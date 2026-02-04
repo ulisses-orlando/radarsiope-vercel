@@ -848,6 +848,10 @@ export default async function handler(req, res) {
 
           const assinaturaData = assinaturaDoc.exists ? assinaturaDoc.data() : {};
 
+          // Buscar dados do usuário (coleção raiz)
+          const usuarioDoc = await db.collection("usuarios").doc(userId).get();
+          const usuarioData = usuarioDoc.exists ? usuarioDoc.data() : {};
+
           // Buscar nome do plano na coleção planos
           let nomePlano = "(plano não informado)";
           if (assinaturaData.planId) {
@@ -862,8 +866,7 @@ export default async function handler(req, res) {
             userId,
             assinaturaId,
             nome: mpData.payer?.first_name || assinaturaData?.nome || "",
-            email: body.email || mpData.payer?.email || "(email não informado)",
-            // email: assinaturaData?.email || mpData.payer?.email || "(email não informado)",
+            email: usuarioData?.email || mpData.payer?.email || "(email não informado)",
             plano: nomePlano,
             data_assinatura: new Date()
           });
