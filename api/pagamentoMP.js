@@ -370,7 +370,7 @@ async function dispararMensagemAutomatica(momento, dados) {
         momento,
         titulo: msg.titulo,
         email: dados.email,
-        enviadoEm: firebase.firestore.Timestamp.now()
+        enviadoEm: admin.firestore.Timestamp.now()
       });
     }
   } catch (error) {
