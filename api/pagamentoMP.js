@@ -404,6 +404,7 @@ function aplicarPlaceholders(template, dados) {
   const interesseId = dados.interesseId || "(sem interesseId)";
   const token = dados.token_acesso || "(sem token)";
   const plano = dados.plano || "(sem plano)";
+  const data_assinatura = dados.data_assinatura || "(sem data de assinatura)";
 
   let dataFormatada = "";
   if (dados.data_publicacao) {
@@ -427,7 +428,8 @@ function aplicarPlaceholders(template, dados) {
     .replace(/{{interesse}}/gi, interesse)
     .replace(/{{interesseId}}/gi, interesseId)
     .replace(/{{token}}/gi, token)
-    .replace(/{{plano}}/gi, plano);
+    .replace(/{{plano}}/gi, plano)
+    .replace(/{{data_assinatura}}/gi, data_assinatura);
 }
 
 // ---------- Handler principal (sem validação HMAC) ----------
@@ -865,7 +867,7 @@ export default async function handler(req, res) {
           await dispararMensagemAutomatica("pos_cadastro_assinante", {
             userId,
             assinaturaId,
-            nome: mpData.payer?.first_name || assinaturaData?.nome || "",
+            nome: usuarioData?.nome || mpData.payer?.first_name || assinaturaData?.nome || "",
             email: usuarioData?.email || mpData.payer?.email || "(email não informado)",
             plano: nomePlano,
             data_assinatura: new Date()
