@@ -12,8 +12,8 @@ async function carregarTiposNewsletter() {
     const container = document.getElementById("campo-newsletters");
 
     const snap = await db.collection("tipo_newsletters").get();
-    const tipos = snap.docs.map(doc => doc.data().nome).filter(Boolean);
-
+    const tipos = snap.docs.map(doc => doc.data().nome).filter(nome => nome && nome !== "Momento envio");
+    
     if (!tipos.length) {
         container.innerHTML = "<p style='color:#999'>Nenhum tipo de newsletter configurado.</p>";
         return;
