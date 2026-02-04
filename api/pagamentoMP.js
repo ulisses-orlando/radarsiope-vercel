@@ -353,7 +353,7 @@ async function dispararMensagemAutomatica(momento, dados) {
       const mensagemHtml = aplicarPlaceholders(msg.mensagem_html, dados);
 
       // 4. Chamar API enviarEmail.js
-      await fetch("/api/enviarEmail", {
+      await fetch(`${process.env.NEXT_PUBLIC_BASE_URL}/api/enviarEmail`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
