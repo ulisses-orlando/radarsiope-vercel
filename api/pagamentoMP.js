@@ -862,7 +862,8 @@ export default async function handler(req, res) {
             userId,
             assinaturaId,
             nome: mpData.payer?.first_name || assinaturaData?.nome || "",
-            email: assinaturaData?.email || mpData.payer?.email || "(email não informado)",
+            email: body.email || mpData.payer?.email || "(email não informado)",
+            // email: assinaturaData?.email || mpData.payer?.email || "(email não informado)",
             plano: nomePlano,
             data_assinatura: new Date()
           });
