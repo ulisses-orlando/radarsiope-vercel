@@ -332,7 +332,7 @@ function validateMpWebhookSignature(rawBody, req) {
   return { ok: false, reason: 'signature mismatch', ts };
 }
 
-async function dispararMensagemAutomatica(momento, dados, tipo = "usuario") {
+async function dispararMensagemAutomatica(momento, dados) {
   try {
     // 1. Buscar template ativo e automático
     const snapshot = await db.collection("respostas_automaticas")
@@ -363,28 +363,15 @@ async function dispararMensagemAutomatica(momento, dados, tipo = "usuario") {
           mensagemHtml
         })
       });
-
-      // 5. Gravar log de envio automático
-      if (tipo === "lead") {
-        // log dentro de leads/{leadId}/log_envio_automatico
-        const leadRef = db.collection("leads").doc(dados.id);
-        await leadRef.collection("log_envio_automatico").add({
-          momento,
-          titulo: msg.titulo,
-          email: dados.email,
-          enviadoEm: firebase.firestore.Timestamp.now()
-        });
-      } else {
-        // log dentro de usuarios/{userId}/assinaturas/{assinaturaId}/log_envio_automatico
-        const assinRef = db.collection("usuarios").doc(dados.userId)
-          .collection("assinaturas").doc(dados.assinaturaId);
-        await assinRef.collection("log_envio_automatico").add({
-          momento,
-          titulo: msg.titulo,
-          email: dados.email,
-          enviadoEm: firebase.firestore.Timestamp.now()
-        });
-      }
+      // log dentro de usuarios/{userId}/assinaturas/{assinaturaId}/log_envio_automatico
+      const assinRef = db.collection("usuarios").doc(dados.userId)
+        .collection("assinaturas").doc(dados.assinaturaId);
+      await assinRef.collection("log_envio_automatico").add({
+        momento,
+        titulo: msg.titulo,
+        email: dados.email,
+        enviadoEm: firebase.firestore.Timestamp.now()
+      });
     }
   } catch (error) {
     console.error("❌ Erro no disparo automático:", error);
@@ -878,7 +865,7 @@ export default async function handler(req, res) {
             email: mpData.payer?.email || assinaturaData?.email || "",
             plano: nomePlano,
             data_assinatura: new Date()
-          }, "usuario");
+          });
         } else if (novoStatusPedido === 'falha') {
           await assinRef.set({
             status: 'cancelada',   // assinatura cancelada
