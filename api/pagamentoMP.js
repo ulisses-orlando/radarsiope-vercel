@@ -263,7 +263,6 @@ function validateMpWebhookSignature(rawBody, req) {
   console.log("Query params recebidos:", req.query);
   console.log("Raw body recebido:", rawBody);
 
-  // controle explícito: ativar validação apenas com MP_VALIDATE_WEBHOOK='true'
   if (process.env.MP_VALIDATE_WEBHOOK !== 'true') {
     console.log("⚠️ Validação desativada por MP_VALIDATE_WEBHOOK");
     return { ok: true, reason: 'validation disabled by MP_VALIDATE_WEBHOOK' };
@@ -274,9 +273,7 @@ function validateMpWebhookSignature(rawBody, req) {
     console.error("❌ MP_WEBHOOK_SECRET não configurado");
     return { ok: false, reason: 'MP_WEBHOOK_SECRET not configured' };
   }
-  console.log("🔑 Segredo carregado da env:", secret ? "[OK]" : "[Faltando]");
 
-  // coletar header de assinatura (tenta nomes comuns)
   const sigHeaderRaw = String(
     req.headers['x-signature'] ||
     req.headers['x-meli-signature'] ||
@@ -287,18 +284,16 @@ function validateMpWebhookSignature(rawBody, req) {
   );
   console.log("📩 Header de assinatura bruto:", sigHeaderRaw);
 
-  // extrair ts e v1 se header no formato "t=..., v1=..."
   let ts = null;
   let sigV1 = null;
   if (sigHeaderRaw.includes('=')) {
     sigHeaderRaw.split(',').forEach(p => {
       const [k, v] = p.trim().split('=');
       if (!k || !v) return;
-      if (k === 't') ts = v;
+      if (k === 'ts') ts = v;   // <-- corrigido
       if (k === 'v1') sigV1 = v;
     });
   } else {
-    // header pode ser apenas o hash (hex ou base64)
     if (sigHeaderRaw) sigV1 = sigHeaderRaw.trim();
   }
   console.log("🕒 Timestamp extraído:", ts);
@@ -309,28 +304,34 @@ function validateMpWebhookSignature(rawBody, req) {
     return { ok: false, reason: 'no signature header present', ts };
   }
 
-  // montar baseString conforme orientação do MP
-  const dataId = req.query?.id ? String(req.query.id).toLowerCase() : '';
+  // pegar id corretamente
+  let dataId = '';
+  if (req.query && req.query['data.id']) {
+    dataId = String(req.query['data.id']);
+  } else if (rawBody && rawBody.data && rawBody.data.id) {
+    dataId = String(rawBody.data.id);
+  } else if (rawBody && rawBody.id) {
+    dataId = String(rawBody.id);
+  }
+
   const requestId = req.headers['x-request-id'] || '';
   const baseString = `id:${dataId};request-id:${requestId};ts:${ts || ''};`;
   console.log("🧩 BaseString montada para HMAC:", baseString);
 
-  // calcular HMAC-SHA256
   let expected;
   try {
     const h = crypto.createHmac('sha256', secret);
     h.update(baseString, 'utf8');
-    expected = h.digest(); // Buffer
+    expected = h.digest();
     console.log("✅ HMAC calculado com sucesso");
   } catch (e) {
     console.error("❌ Falha ao calcular HMAC:", e);
     return { ok: false, reason: 'hmac computation failed' };
   }
 
-  // tentar comparar com hex e base64 (compatibilidade)
   const candidates = [];
-  try { candidates.push(Buffer.from(sigV1, 'hex')); } catch (e) { /* ignore */ }
-  try { candidates.push(Buffer.from(sigV1, 'base64')); } catch (e) { /* ignore */ }
+  try { candidates.push(Buffer.from(sigV1, 'hex')); } catch (e) {}
+  try { candidates.push(Buffer.from(sigV1, 'base64')); } catch (e) {}
   console.log("📊 Candidatos de assinatura gerados:", candidates.length);
 
   for (const cand of candidates) {
@@ -338,7 +339,6 @@ function validateMpWebhookSignature(rawBody, req) {
     try {
       if (crypto.timingSafeEqual(expected, cand)) {
         console.log("🎉 Assinatura válida encontrada!");
-        // opcional: validar se ts está dentro de uma janela de tempo (ex.: ±5 min)
         if (ts) {
           const tsNum = parseInt(ts, 10);
           const now = Math.floor(Date.now() / 1000);
@@ -348,7 +348,7 @@ function validateMpWebhookSignature(rawBody, req) {
             return { ok: false, reason: 'timestamp out of tolerance', ts };
           }
         }
-        return { ok: true, ts };
+        return { ok: true, ts, id: dataId };
       }
     } catch (e) {
       console.error("❌ Erro ao comparar assinaturas:", e);
@@ -356,9 +356,8 @@ function validateMpWebhookSignature(rawBody, req) {
   }
 
   console.error("❌ Nenhuma comparação bateu. Assinatura inválida.");
-  return { ok: false, reason: 'signature mismatch', ts };
+  return { ok: false, reason: 'signature mismatch', ts, id: dataId };
 }
-
 
 
 async function dispararMensagemAutomatica(momento, dados) {
