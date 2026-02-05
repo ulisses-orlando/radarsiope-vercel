@@ -481,11 +481,15 @@ export default async function handler(req, res) {
     });
 
     // validar assinatura (se habilitado) 
-    const sigCheck = validateMpWebhookSignature(rawBody, req);
-    if (!sigCheck.ok) {
-      console.warn('Webhook assinatura inválida ou validação desativada:', sigCheck.reason, 'ts:', sigCheck.ts || null);
-      // responder 200 para evitar retries agressivos do MP (opção operacional segura) 
-      return json(res, 200, { ok: true, message: 'signature invalid (ignored)' });
+    // só validar assinatura se NÃO for criar-pedido
+    const temAcaoCriarPedido = (req.query && req.query.acao) ? String(req.query.acao) : null;
+
+    if (!temAcaoCriarPedido) {
+      const sigCheck = validateMpWebhookSignature(rawBody, req);
+      if (!sigCheck.ok) {
+        console.warn('Webhook assinatura inválida ou validação desativada:', sigCheck.reason, 'ts:', sigCheck.ts || null);
+        return json(res, 200, { ok: true, message: 'signature invalid (ignored)' });
+      }
     }
 
     // tentar popular req.body se for JSON
