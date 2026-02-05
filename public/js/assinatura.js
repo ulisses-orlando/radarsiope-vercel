@@ -845,7 +845,7 @@ async function processarEnvioAssinatura(e) {
       if (modal) {
         modal.style.display = 'flex';
         const msg = document.getElementById('modal-msg');
-        if (msg) msg.textContent = backendResp.message || 'Pedido criado. Aguardando confirmação.';
+        if (msg) msg.textContent = 'Pedido criado. Aguardando confirmação.';
       }
       return;
     }
