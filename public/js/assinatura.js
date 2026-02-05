@@ -812,6 +812,8 @@ async function processarEnvioAssinatura(e) {
 
     const backendResp = await createOrderBackend(backendPayload);
 
+    console.log("Resposta do backend:", backendResp);
+
     if (!backendResp || backendResp.ok === false) {
       const msg = (backendResp && backendResp.message) ? backendResp.message : 'Erro ao criar pedido no servidor.';
       throw new Error(msg);
