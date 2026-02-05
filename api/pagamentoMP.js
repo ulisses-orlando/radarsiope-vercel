@@ -257,8 +257,6 @@ function getMpTokenType() {
  * Retorno: { ok: true } ou { ok: false, reason: 'mensagem', ts?: '...' }
  */
 
-import crypto from 'crypto';
-
 function validateMpWebhookSignature(rawBody, req) {
   console.log("🔎 Iniciando validação de webhook MP...");
   console.log("Headers recebidos:", req.headers);
