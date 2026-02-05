@@ -256,16 +256,27 @@ function getMpTokenType() {
  *
  * Retorno: { ok: true } ou { ok: false, reason: 'mensagem', ts?: '...' }
  */
+
+import crypto from 'crypto';
+
 function validateMpWebhookSignature(rawBody, req) {
+  console.log("🔎 Iniciando validação de webhook MP...");
+  console.log("Headers recebidos:", req.headers);
+  console.log("Query params recebidos:", req.query);
+  console.log("Raw body recebido:", rawBody);
+
   // controle explícito: ativar validação apenas com MP_VALIDATE_WEBHOOK='true'
   if (process.env.MP_VALIDATE_WEBHOOK !== 'true') {
+    console.log("⚠️ Validação desativada por MP_VALIDATE_WEBHOOK");
     return { ok: true, reason: 'validation disabled by MP_VALIDATE_WEBHOOK' };
   }
 
   const secret = process.env.MP_WEBHOOK_SECRET || process.env.MPWEBHOOKSECRET || null;
   if (!secret) {
+    console.error("❌ MP_WEBHOOK_SECRET não configurado");
     return { ok: false, reason: 'MP_WEBHOOK_SECRET not configured' };
   }
+  console.log("🔑 Segredo carregado da env:", secret ? "[OK]" : "[Faltando]");
 
   // coletar header de assinatura (tenta nomes comuns)
   const sigHeaderRaw = String(
@@ -276,6 +287,7 @@ function validateMpWebhookSignature(rawBody, req) {
     req.headers['x-signature-256'] ||
     ''
   );
+  console.log("📩 Header de assinatura bruto:", sigHeaderRaw);
 
   // extrair ts e v1 se header no formato "t=..., v1=..."
   let ts = null;
@@ -291,13 +303,19 @@ function validateMpWebhookSignature(rawBody, req) {
     // header pode ser apenas o hash (hex ou base64)
     if (sigHeaderRaw) sigV1 = sigHeaderRaw.trim();
   }
+  console.log("🕒 Timestamp extraído:", ts);
+  console.log("🔐 Assinatura v1 extraída:", sigV1);
 
-  // escolher baseString para HMAC
-  // DEFAULT: HMAC direto do raw body (recomendado)
-  let baseString = rawBody || '';
+  if (!sigV1) {
+    console.error("❌ Nenhuma assinatura presente no header");
+    return { ok: false, reason: 'no signature header present', ts };
+  }
 
-  // se seu MP enviar timestamp e exigir string canônica, descomente/ajuste:
-  // baseString = `${req.url}|${ts || ''}|${rawBody || ''}`;
+  // montar baseString conforme orientação do MP
+  const dataId = req.query?.id ? String(req.query.id).toLowerCase() : '';
+  const requestId = req.headers['x-request-id'] || '';
+  const baseString = `id:${dataId};request-id:${requestId};ts:${ts || ''};`;
+  console.log("🧩 BaseString montada para HMAC:", baseString);
 
   // calcular HMAC-SHA256
   let expected;
@@ -305,32 +323,45 @@ function validateMpWebhookSignature(rawBody, req) {
     const h = crypto.createHmac('sha256', secret);
     h.update(baseString, 'utf8');
     expected = h.digest(); // Buffer
+    console.log("✅ HMAC calculado com sucesso");
   } catch (e) {
+    console.error("❌ Falha ao calcular HMAC:", e);
     return { ok: false, reason: 'hmac computation failed' };
   }
-
-  // se não veio assinatura, rejeitar
-  if (!sigV1) return { ok: false, reason: 'no signature header present', ts };
 
   // tentar comparar com hex e base64 (compatibilidade)
   const candidates = [];
   try { candidates.push(Buffer.from(sigV1, 'hex')); } catch (e) { /* ignore */ }
   try { candidates.push(Buffer.from(sigV1, 'base64')); } catch (e) { /* ignore */ }
+  console.log("📊 Candidatos de assinatura gerados:", candidates.length);
 
   for (const cand of candidates) {
     if (!cand || cand.length !== expected.length) continue;
     try {
       if (crypto.timingSafeEqual(expected, cand)) {
+        console.log("🎉 Assinatura válida encontrada!");
+        // opcional: validar se ts está dentro de uma janela de tempo (ex.: ±5 min)
+        if (ts) {
+          const tsNum = parseInt(ts, 10);
+          const now = Math.floor(Date.now() / 1000);
+          console.log("⏱️ Comparando timestamp:", { tsNum, now });
+          if (Math.abs(now - tsNum) > 300) {
+            console.error("⚠️ Timestamp fora da tolerância");
+            return { ok: false, reason: 'timestamp out of tolerance', ts };
+          }
+        }
         return { ok: true, ts };
       }
     } catch (e) {
-      // continue tentando outros formatos
+      console.error("❌ Erro ao comparar assinaturas:", e);
     }
   }
 
-  // nenhuma comparação bateu
+  console.error("❌ Nenhuma comparação bateu. Assinatura inválida.");
   return { ok: false, reason: 'signature mismatch', ts };
 }
+
+
 
 async function dispararMensagemAutomatica(momento, dados) {
   try {
