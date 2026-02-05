@@ -259,20 +259,22 @@ function getMpTokenType() {
 
 function validateMpWebhookSignature(rawBody, req) {
   console.log("🔎 Iniciando validação de webhook MP...");
-  console.log("Headers recebidos:", req.headers);
-  console.log("Query params recebidos:", req.query);
-  console.log("Raw body recebido:", rawBody);
 
   if (process.env.MP_VALIDATE_WEBHOOK !== 'true') {
-    console.log("⚠️ Validação desativada por MP_VALIDATE_WEBHOOK");
     return { ok: true, reason: 'validation disabled by MP_VALIDATE_WEBHOOK' };
   }
 
-  const secret = process.env.MP_WEBHOOK_SECRET || process.env.MPWEBHOOKSECRET || null;
+  // escolher segredo conforme ambiente
+  const forceSandbox = process.env.MP_FORCE_SANDBOX === 'true';
+  const secret = forceSandbox
+    ? process.env.MP_WEBHOOK_SECRET_TEST
+    : process.env.MP_WEBHOOK_SECRET;
+
   if (!secret) {
-    console.error("❌ MP_WEBHOOK_SECRET não configurado");
-    return { ok: false, reason: 'MP_WEBHOOK_SECRET not configured' };
+    console.error("❌ Segredo não configurado para ambiente:", forceSandbox ? 'SANDBOX' : 'PROD');
+    return { ok: false, reason: 'webhook secret not configured' };
   }
+  console.log("🔑 Segredo carregado da env:", forceSandbox ? 'SANDBOX' : 'PROD', secret ? "[OK]" : "[Faltando]");
 
   const sigHeaderRaw = String(
     req.headers['x-signature'] ||
@@ -330,8 +332,8 @@ function validateMpWebhookSignature(rawBody, req) {
   }
 
   const candidates = [];
-  try { candidates.push(Buffer.from(sigV1, 'hex')); } catch (e) {}
-  try { candidates.push(Buffer.from(sigV1, 'base64')); } catch (e) {}
+  try { candidates.push(Buffer.from(sigV1, 'hex')); } catch (e) { }
+  try { candidates.push(Buffer.from(sigV1, 'base64')); } catch (e) { }
   console.log("📊 Candidatos de assinatura gerados:", candidates.length);
 
   for (const cand of candidates) {
