@@ -393,20 +393,12 @@ async function dispararMensagemAutomatica(momento, dados) {
           mensagemHtml
         })
       });
-      // log dentro de usuarios/{userId}/assinaturas/{assinaturaId}/log_envio_automatico
-      const assinRef = db.collection("usuarios").doc(dados.userId)
-        .collection("assinaturas").doc(dados.assinaturaId);
-      await assinRef.collection("log_envio_automatico").add({
-        momento,
-        titulo: msg.titulo,
-        email: dados.email,
-        enviadoEm: admin.firestore.Timestamp.now()
-      });
     }
   } catch (error) {
     console.error("❌ Erro no disparo automático:", error);
   }
 }
+
 function formatDateBR(date) {
   if (!date) return "";
   const d = new Date(date.seconds ? date.seconds * 1000 : date);
@@ -854,10 +846,15 @@ export default async function handler(req, res) {
             await batch.commit();
           }
         } else {
-          const pagamentoRef = pagamentosRef.doc(String(effectiveId));
+          // Atualizar o documento criado no fluxo de pedido (pedidoId).
+          // Se por algum motivo pedidoId não estiver disponível, usar fallback para effectiveId.
+          const targetDocId = pedidoId ? String(pedidoId) : String(effectiveId);
+          const pagamentoRef = pagamentosRef.doc(targetDocId);
+
           await pagamentoRef.set({
+            // manter referência ao payment do MP para reconciliação
             paymentId: effectiveId,
-            pedidoId,
+            pedidoId: pedidoId || null,
             status: novoStatusPedido,
             mpPaymentMethod: mpData.payment_method_id || null,
             mpInstallments: installments,
@@ -878,10 +875,10 @@ export default async function handler(req, res) {
             ativadoEm: admin.firestore.FieldValue.serverTimestamp(),
             atualizadoEm: admin.firestore.FieldValue.serverTimestamp()
           }, { merge: true });
+          // --- Início do bloco substituto ---
           // Buscar dados da assinatura
           const assinaturaDoc = await db.collection("usuarios").doc(userId)
             .collection("assinaturas").doc(assinaturaId).get();
-
           const assinaturaData = assinaturaDoc.exists ? assinaturaDoc.data() : {};
 
           // Buscar dados do usuário (coleção raiz)
@@ -897,15 +894,84 @@ export default async function handler(req, res) {
             }
           }
 
-          // Disparo automático de confirmação de assinatura
-          await dispararMensagemAutomatica("pos_cadastro_assinante", {
-            userId,
-            assinaturaId,
-            nome: usuarioData?.nome || mpData.payer?.first_name || assinaturaData?.nome || "",
-            email: usuarioData?.email || mpData.payer?.email || "(email não informado)",
-            plano: nomePlano,
-            data_assinatura: new Date()
-          });
+          // Controle de envio direto no documento assinatura usando enviosAutomaticos.<pedidoId>
+          // Chave determinística para travar por pedido
+          const assinRef = db.collection('usuarios').doc(userId)
+            .collection('assinaturas').doc(assinaturaId);
+          const logKey = `enviosAutomaticos.${String(pedidoId)}`;
+
+          let devoEnviar = false;
+          try {
+            await db.runTransaction(async (tx) => {
+              const snap = await tx.get(assinRef);
+              const data = snap.exists ? snap.data() : {};
+
+              // Se já existe entrada para esse pedidoId, outro processo já iniciou/enviou
+              if (data && data.enviosAutomaticos && data.enviosAutomaticos[String(pedidoId)]) {
+                return;
+              }
+
+              // Criar entrada inicial (status iniciado)
+              const payload = {};
+              payload[logKey] = {
+                momento: 'pos_cadastro_assinante',
+                titulo: 'Confirmação de assinatura',
+                email: usuarioData?.email || mpData.payer?.email || "(email não informado)",
+                status: 'iniciado',
+                criadoEm: admin.firestore.FieldValue.serverTimestamp()
+              };
+
+              tx.set(assinRef, payload, { merge: true });
+              // Se a transação fizer commit, somos responsáveis por enviar
+              devoEnviar = true;
+            });
+          } catch (err) {
+            console.error('Erro na transação de marcação de envio:', err && err.message ? err.message : err);
+            devoEnviar = false;
+          }
+
+          if (devoEnviar) {
+            try {
+              // Enviar e-mail (mantendo sua lógica de template)
+              await dispararMensagemAutomatica("pos_cadastro_assinante", {
+                userId,
+                assinaturaId,
+                nome: usuarioData?.nome || mpData.payer?.first_name || assinaturaData?.nome || "",
+                email: usuarioData?.email || mpData.payer?.email || "(email não informado)",
+                plano: nomePlano,
+                data_assinatura: new Date()
+              });
+
+              // Marcar sucesso no doc da assinatura
+              const successPayload = {};
+              successPayload[logKey] = {
+                momento: 'pos_cadastro_assinante',
+                titulo: 'Confirmação de assinatura',
+                email: usuarioData?.email || mpData.payer?.email || "(email não informado)",
+                status: 'enviado',
+                criadoEm: admin.firestore.FieldValue.serverTimestamp(),
+                enviadoEm: admin.firestore.FieldValue.serverTimestamp()
+              };
+              await assinRef.set(successPayload, { merge: true });
+
+            } catch (err) {
+              console.error('Erro ao enviar e marcar envio no doc da assinatura:', err && err.message ? err.message : err);
+              // Marcar erro no doc para auditoria
+              const errPayload = {};
+              errPayload[logKey] = {
+                momento: 'pos_cadastro_assinante',
+                titulo: 'Confirmação de assinatura',
+                email: usuarioData?.email || mpData.payer?.email || "(email não informado)",
+                status: 'erro',
+                criadoEm: admin.firestore.FieldValue.serverTimestamp(),
+                erro: String(err && err.message ? err.message : err),
+                atualizadoEm: admin.firestore.FieldValue.serverTimestamp()
+              };
+              try { await assinRef.set(errPayload, { merge: true }); } catch (e2) { console.warn('Falha ao gravar erro no doc da assinatura:', e2 && e2.message ? e2.message : e2); }
+            }
+          } else {
+            if (logCompleto()) console.info('Envio já registrado em assinatura para pedidoId:', pedidoId);
+          }
         } else if (novoStatusPedido === 'falha') {
           await assinRef.set({
             status: 'cancelada',   // assinatura cancelada
