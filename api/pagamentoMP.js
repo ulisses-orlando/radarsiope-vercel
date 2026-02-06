@@ -902,13 +902,13 @@ export default async function handler(req, res) {
 
           let devoEnviar = false;
           try {
-            await db.runTransaction(async (tx) => {
+            devoEnviar = await db.runTransaction(async (tx) => {
               const snap = await tx.get(assinDocRef);
               const data = snap.exists ? snap.data() : {};
 
               // Se já existe entrada para esse pedidoId, outro processo já iniciou/enviou
               if (data && data.enviosAutomaticos && data.enviosAutomaticos[String(pedidoId)]) {
-                return;
+                return false; // não somos responsáveis
               }
 
               // Criar entrada inicial (status iniciado)
@@ -922,9 +922,11 @@ export default async function handler(req, res) {
               };
 
               tx.set(assinDocRef, payload, { merge: true });
-              // Se a transação fizer commit, somos responsáveis por enviar
-              devoEnviar = true;
+
+              return true; // commit fará a criação; somos responsáveis
             });
+            console.info('resultado transacao enviosAutomaticos', { pedidoId, assinaturaId, devoEnviar });
+
           } catch (err) {
             console.error('Erro na transação de marcação de envio:', err && err.message ? err.message : err);
             devoEnviar = false;
@@ -932,6 +934,9 @@ export default async function handler(req, res) {
 
           if (devoEnviar) {
             try {
+              // log diagnóstico: confirmar tentativa de envio e contexto
+console.info('tentativa envio', { pedidoId, assinaturaId, userId, devoEnviar });
+
               // Enviar e-mail (mantendo sua lógica de template)
               await dispararMensagemAutomatica("pos_cadastro_assinante", {
                 userId,
