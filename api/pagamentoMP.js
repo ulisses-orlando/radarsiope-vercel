@@ -896,14 +896,14 @@ export default async function handler(req, res) {
 
           // Controle de envio direto no documento assinatura usando enviosAutomaticos.<pedidoId>
           // Chave determinística para travar por pedido
-          const assinRef = db.collection('usuarios').doc(userId)
+          const assinDocRef = db.collection('usuarios').doc(userId)
             .collection('assinaturas').doc(assinaturaId);
           const logKey = `enviosAutomaticos.${String(pedidoId)}`;
 
           let devoEnviar = false;
           try {
             await db.runTransaction(async (tx) => {
-              const snap = await tx.get(assinRef);
+              const snap = await tx.get(assinDocRef);
               const data = snap.exists ? snap.data() : {};
 
               // Se já existe entrada para esse pedidoId, outro processo já iniciou/enviou
@@ -921,7 +921,7 @@ export default async function handler(req, res) {
                 criadoEm: admin.firestore.FieldValue.serverTimestamp()
               };
 
-              tx.set(assinRef, payload, { merge: true });
+              tx.set(assinDocRef, payload, { merge: true });
               // Se a transação fizer commit, somos responsáveis por enviar
               devoEnviar = true;
             });
@@ -952,7 +952,7 @@ export default async function handler(req, res) {
                 criadoEm: admin.firestore.FieldValue.serverTimestamp(),
                 enviadoEm: admin.firestore.FieldValue.serverTimestamp()
               };
-              await assinRef.set(successPayload, { merge: true });
+              await assinDocRef.set(successPayload, { merge: true });
 
             } catch (err) {
               console.error('Erro ao enviar e marcar envio no doc da assinatura:', err && err.message ? err.message : err);
