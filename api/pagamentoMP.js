@@ -374,26 +374,44 @@ async function dispararMensagemAutomatica(momento, dados) {
     if (snapshot.empty) {
       return;
     }
+    // usar apenas o primeiro template encontrado (isolamento de teste) 
+    const doc = snapshot.docs[0];
+    if (!doc) return;
+    const msg = doc.data();
 
-    // 2. Para cada template encontrado
-    for (const doc of snapshot.docs) {
-      const msg = doc.data();
+    const mensagemHtml = aplicarPlaceholders(msg.mensagem_html, dados);
 
-      // 3. Substituir placeholders usando sua função
-      const mensagemHtml = aplicarPlaceholders(msg.mensagem_html, dados);
+    // 4. Chamar API enviarEmail.js
+    await fetch(`${process.env.NEXT_PUBLIC_BASE_URL}/api/enviarEmail`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        nome: dados.nome,
+        email: dados.email,
+        assunto: msg.titulo,
+        mensagemHtml
+      })
+    });
 
-      // 4. Chamar API enviarEmail.js
-      await fetch(`${process.env.NEXT_PUBLIC_BASE_URL}/api/enviarEmail`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          nome: dados.nome,
-          email: dados.email,
-          assunto: msg.titulo,
-          mensagemHtml
-        })
-      });
-    }
+    /*     // 2. Para cada template encontrado
+        for (const doc of snapshot.docs) {
+          const msg = doc.data();
+    
+          // 3. Substituir placeholders usando sua função
+          const mensagemHtml = aplicarPlaceholders(msg.mensagem_html, dados);
+    
+          // 4. Chamar API enviarEmail.js
+          await fetch(`${process.env.NEXT_PUBLIC_BASE_URL}/api/enviarEmail`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              nome: dados.nome,
+              email: dados.email,
+              assunto: msg.titulo,
+              mensagemHtml
+            })
+          });
+        } */
   } catch (error) {
     console.error("❌ Erro no disparo automático:", error);
   }
@@ -935,7 +953,7 @@ export default async function handler(req, res) {
           if (devoEnviar) {
             try {
               // log diagnóstico: confirmar tentativa de envio e contexto
-console.info('tentativa envio', { pedidoId, assinaturaId, userId, devoEnviar });
+              console.info('tentativa envio', { pedidoId, assinaturaId, userId, devoEnviar });
 
               // Enviar e-mail (mantendo sua lógica de template)
               await dispararMensagemAutomatica("pos_cadastro_assinante", {
