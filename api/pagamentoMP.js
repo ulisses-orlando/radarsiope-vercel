@@ -258,8 +258,6 @@ function getMpTokenType() {
  */
 
 function validateMpWebhookSignature(rawBody, req) {
-  console.log("🔎 Iniciando validação de webhook MP...");
-
   if (process.env.MP_VALIDATE_WEBHOOK !== 'true') {
     return { ok: true, reason: 'validation disabled by MP_VALIDATE_WEBHOOK' };
   }
@@ -274,7 +272,6 @@ function validateMpWebhookSignature(rawBody, req) {
     console.error("❌ Segredo não configurado para ambiente:", forceSandbox ? 'SANDBOX' : 'PROD');
     return { ok: false, reason: 'webhook secret not configured' };
   }
-  console.log("🔑 Segredo carregado da env:", forceSandbox ? 'SANDBOX' : 'PROD', secret ? "[OK]" : "[Faltando]");
 
   const sigHeaderRaw = String(
     req.headers['x-signature'] ||
@@ -284,7 +281,6 @@ function validateMpWebhookSignature(rawBody, req) {
     req.headers['x-signature-256'] ||
     ''
   );
-  console.log("📩 Header de assinatura bruto:", sigHeaderRaw);
 
   let ts = null;
   let sigV1 = null;
@@ -298,8 +294,6 @@ function validateMpWebhookSignature(rawBody, req) {
   } else {
     if (sigHeaderRaw) sigV1 = sigHeaderRaw.trim();
   }
-  console.log("🕒 Timestamp extraído:", ts);
-  console.log("🔐 Assinatura v1 extraída:", sigV1);
 
   if (!sigV1) {
     console.error("❌ Nenhuma assinatura presente no header");
@@ -318,14 +312,12 @@ function validateMpWebhookSignature(rawBody, req) {
 
   const requestId = req.headers['x-request-id'] || '';
   const baseString = `id:${dataId};request-id:${requestId};ts:${ts || ''};`;
-  console.log("🧩 BaseString montada para HMAC:", baseString);
 
   let expected;
   try {
     const h = crypto.createHmac('sha256', secret);
     h.update(baseString, 'utf8');
     expected = h.digest();
-    console.log("✅ HMAC calculado com sucesso");
   } catch (e) {
     console.error("❌ Falha ao calcular HMAC:", e);
     return { ok: false, reason: 'hmac computation failed' };
@@ -334,17 +326,14 @@ function validateMpWebhookSignature(rawBody, req) {
   const candidates = [];
   try { candidates.push(Buffer.from(sigV1, 'hex')); } catch (e) { }
   try { candidates.push(Buffer.from(sigV1, 'base64')); } catch (e) { }
-  console.log("📊 Candidatos de assinatura gerados:", candidates.length);
 
   for (const cand of candidates) {
     if (!cand || cand.length !== expected.length) continue;
     try {
       if (crypto.timingSafeEqual(expected, cand)) {
-        console.log("🎉 Assinatura válida encontrada!");
         if (ts) {
           const tsNum = parseInt(ts, 10);
           const now = Math.floor(Date.now() / 1000);
-          console.log("⏱️ Comparando timestamp:", { tsNum, now });
           if (Math.abs(now - tsNum) > 300) {
             console.error("⚠️ Timestamp fora da tolerância");
             return { ok: false, reason: 'timestamp out of tolerance', ts };
@@ -512,19 +501,6 @@ export default async function handler(req, res) {
       // ok em sandbox; manter rawBody para auditoria
     }
 
-    /*     console.log('Webhook recebido:', req.body);
-    
-        // log inicial mínimo (não expõe segredos)
-        console.log('INICIANDO pagamentoMP - envs:', {
-          MP_ACCESS_TOKEN_PROD: !!process.env.MP_ACCESS_TOKEN_PROD,
-          MP_ACCESS_TOKEN_TEST: !!process.env.MP_ACCESS_TOKEN_TEST,
-          MP_ACCESS_TOKEN: !!process.env.MP_ACCESS_TOKEN,
-          MP_PUBLIC_KEY: !!process.env.MP_PUBLIC_KEY,
-          MP_WEBHOOK_URL: !!process.env.MP_WEBHOOK_URL,
-          MP_FORCE_SANDBOX: !!process.env.MP_FORCE_SANDBOX,
-          MP_VALIDATE_WEBHOOK: !!process.env.MP_VALIDATE_WEBHOOK
-        }); */
-
     // rota e ação
     const acao = (req.query && req.query.acao) ? String(req.query.acao) : null;
 
@@ -605,7 +581,6 @@ export default async function handler(req, res) {
       let mpResp;
       try {
         mpResp = await mpFetch('/checkout/preferences', 'POST', preferencePayload);
-        //console.log('Preference criada:', JSON.stringify(mpResp, null, 2));
       } catch (err) {
         console.error('Erro ao criar preference no Mercado Pago:', err.message || err);
         await novoPedidoRef.set({ status: 'erro_mp', atualizadoEm: admin.firestore.FieldValue.serverTimestamp(), mpError: err.body || String(err) }, { merge: true });
@@ -619,8 +594,6 @@ export default async function handler(req, res) {
 
       // Sempre usar init_point, mesmo em sandbox/teste 
       const initPoint = mpResp.init_point || mpResp.sandbox_init_point || null;
-
-      //console.log('Redirect URL usado:', initPoint);
 
       await novoPedidoRef.set({
         mpPreferenceId: mpResp.id,
@@ -661,7 +634,6 @@ export default async function handler(req, res) {
       const id = req.query.id || (req.query && req.query.notification_id) || (req.body && (req.body.id || (req.body.data && req.body.data.id))) || null;
 
       if (!topic || !id) {
-        //console.log('Webhook recebido sem topic/id; respondendo 200.');
         return json(res, 200, { ok: true, message: 'notificação recebida (sem topic/id)' });
       }
 
@@ -679,7 +651,6 @@ export default async function handler(req, res) {
       }
 
       if (!resolved) {
-        //console.log('Não foi possível resolver id no MP; id pode ser notification id ou ambiente errado:', id);
         // registrar notificação mínima para auditoria
         if (logCompleto()) {
           const globalNotifRef = db.collection('notificacoes_mp_global').doc(notifId);
@@ -697,10 +668,6 @@ export default async function handler(req, res) {
       // effectiveId começa com o id da notificação; pode ser substituído pelo payment.id real
       let effectiveId = String(id);
       let mpData = resolved.data;
-
-      // logs para diferenciar merchant_order vs payment 
-      //console.log("Webhook MP status recebido:", mpData.status || mpData.payment_status || "sem status");
-      //console.log(`Webhook MP recebido - topic: ${topic}, status: ${mpData.status || mpData.payment_status || "sem status"}`);
 
       // Se veio merchant_order, não gravar mpPaymentId com o id do MO.
       // Se houver um payment dentro do merchant_order, buscar o payment real e usar seu status/id.
@@ -766,7 +733,6 @@ export default async function handler(req, res) {
 
       const notifSnap = await notifRef.get();
       if (notifSnap.exists) {
-        //console.log('Notificação já processada:', notifId);
         return json(res, 200, { ok: true, message: 'já processado' });
       }
 
@@ -830,8 +796,6 @@ export default async function handler(req, res) {
           updateObj.mpMerchantOrderId = id;
         }
         await pedidoRef.set(updateObj, { merge: true });
-
-        //console.log(`Pedido ${pedidoId} atualizado para: ${novoStatusPedido} (tipoNotificacao=${resolved.tipo})`);
 
         // atualizar pagamentos pré-criados: marcar parcelas pagas conforme installments
         const pagamentosRef = db.collection('usuarios').doc(userId)
