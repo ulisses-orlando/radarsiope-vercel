@@ -1,5 +1,8 @@
 // public/js/capturaLeads.js
-import { supabase } from 'js/supabaseClient.js'
+import { supabase } from './supabaseClient.js'
+
+// Inicializa o Firebase
+const db = window.db;
 
 function getParametro(nome) {
     const url = new URL(window.location.href);
