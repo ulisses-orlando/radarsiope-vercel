@@ -1,3 +1,6 @@
+// public/js/capturaLeads.js
+import { supabase } from './supabaseClient.js'
+
 function getParametro(nome) {
     const url = new URL(window.location.href);
     return url.searchParams.get(nome);
@@ -13,7 +16,7 @@ async function carregarTiposNewsletter() {
 
     const snap = await db.collection("tipo_newsletters").get();
     const tipos = snap.docs.map(doc => doc.data().nome).filter(nome => nome && nome !== "Momento envio");
-    
+
     if (!tipos.length) {
         container.innerHTML = "<p style='color:#999'>Nenhum tipo de newsletter configurado.</p>";
         return;
@@ -123,25 +126,31 @@ async function processarEnvioInteresse(e) {
     botao.disabled = true;
 
     try {
-        const novoLeadRef = await db.collection("leads").add({
-            nome,
-            nome_lowercase: nome.toLowerCase(),
-            email,
-            telefone,
-            perfil,
-            mensagem: mensagem || null,
-            interesses,
-            preferencia_contato: preferencia,
-            origem: origem,
-            status: "Novo",
+        const { data, error } = await supabase
+            .from("leads")
+            .insert([{
+                nome,
+                nome_lowercase: nome.toLowerCase(),
+                email,
+                telefone,
+                perfil,
+                mensagem: mensagem || null,
+                interesses,
+                preferencia_contato: preferencia,
+                origem: origem,
+                status: "Novo",
 
-            // 🔹 Campos novos
-            cod_uf: dadosUf.cod_uf,
-            cod_municipio: dadosUf.cod_municipio,
-            nome_municipio: dadosUf.nome_municipio,
+                // 🔹 Campos novos
+                cod_uf: dadosUf.cod_uf,
+                cod_municipio: dadosUf.cod_municipio,
+                nome_municipio: dadosUf.nome_municipio,
 
-            data_criacao: firebase.firestore.Timestamp.now()
-        });
+                data_criacao: new Date().toISOString()
+            }])
+            .select();
+
+        if (error) throw error;
+        const novoLeadRef = { id: data[0].id };
 
         // Disparo automático de boas-vindas 
         await dispararMensagemAutomatica("primeiro_contato", {
