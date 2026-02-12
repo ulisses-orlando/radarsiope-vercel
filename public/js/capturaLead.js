@@ -1,5 +1,5 @@
 // public/js/capturaLeads.js
-import { supabase } from './supabaseClient.js'
+import { supabase } from 'js/supabaseClient.js'
 
 function getParametro(nome) {
     const url = new URL(window.location.href);
