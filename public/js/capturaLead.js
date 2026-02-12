@@ -126,7 +126,7 @@ async function processarEnvioInteresse(e) {
     botao.disabled = true;
 
     try {
-        const { data, error } = await supabase
+        const { data, error } = await window.supabase
             .from("leads")
             .insert([{
                 nome,
