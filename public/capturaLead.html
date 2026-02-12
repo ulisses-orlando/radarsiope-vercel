@@ -25,7 +25,7 @@
 
       <label>Telefone:</label>
       <input type="tel" id="telefone" required>
-
+      
       <div id="campo-uf-municipio"></div>
 
       <label>Como prefere ser contatado?</label>
@@ -68,28 +68,22 @@
   </div>
 
   <!-- Firebase -->
-  <!-- Firebase SDKs -->
   <script src="https://www.gstatic.com/firebasejs/10.0.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.0.0/firebase-firestore-compat.js"></script>
-
-  <!-- Inicialização do Firebase -->
-  <script src="/js/firebase-init.js"></script>
-
-  <!-- Variáveis de ambiente para o Supabase -->
+  
+  <script src="js/firebase-init.js"></script>
   <script>
     window.env = {
       VITE_SUPABASE_URL: "https://seu-projeto.supabase.co",
       VITE_SUPABASE_ANON_KEY: "sua-chave-publica"
     }
   </script>
-
-  <!-- Supabase Client precisa ser módulo -->
-  <script type="module" src="/js/supabaseClient.js"></script>
-
-  <!-- Seus outros scripts -->
-  <script src="/js/functions.js"></script>
-  <script src="/js/mailer.js"></script>
-  <script src="/js/capturaLeads.js"></script>
+  <script type="module" src="js/supabaseClient.js"></script>
+  <!-- Suas funções já existentes -->
+  <script src="js/functions.js"></script>
+  <script src="js/mailer.js"></script>
+  <!-- Lógica da captura -->
+  <script src="js/capturaLead.js"></script>
 
 </body>
 
