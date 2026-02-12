@@ -148,9 +148,11 @@ async function processarEnvioInteresse(e) {
                 data_criacao: new Date().toISOString()
             }])
             .select();
-
+console.log("Resposta do Supabase:", { data, error });
         if (error) throw error;
         const novoLeadRef = { id: data[0].id };
+
+console.log("✅ Lead inserido com nome:", nome);
 
         // Disparo automático de boas-vindas 
         await dispararMensagemAutomatica("primeiro_contato", {
@@ -163,7 +165,7 @@ async function processarEnvioInteresse(e) {
             municipio: dadosUf.nome_municipio,
             perfil: perfil
         }, "lead");
-
+console.log("✅ Mensagem automática disparada para:", nome);
         status.innerText = "Enviado com sucesso!";
         status.style.color = "green";
 
