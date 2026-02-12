@@ -1,6 +1,3 @@
-// public/js/capturaLeads.js
-import { supabase } from './supabaseClient.js'
-
 // Inicializa o Firebase
 const db = window.db;
 
