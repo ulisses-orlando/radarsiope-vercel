@@ -44,12 +44,22 @@ function mostrarModalAgradecimento(nome) {
     document.getElementById("modalAgradecimento").style.display = "flex";
 }
 
+// Função para fechar o modal
 function fecharModalAgradecimento() {
-    document.getElementById("modalAgradecimento").style.display = "none";
-    setTimeout(() => {
-        window.location.href = "newsletters.html";
-    }, 200);
+  document.getElementById("modalAgradecimento").style.display = "none";
+  setTimeout(() => {
+    window.location.href = "newsletters.html";
+  }, 200);
 }
+
+// 🔹 Adiciona o listener ao botão
+document.addEventListener("DOMContentLoaded", () => {
+  const btnFechar = document.getElementById("btnFecharModal");
+  if (btnFechar) {
+    btnFechar.addEventListener("click", fecharModalAgradecimento);
+  }
+});
+
 
 // ============================
 // 3. Envio do formulário
