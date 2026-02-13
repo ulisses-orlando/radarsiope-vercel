@@ -1,7 +1,7 @@
 import { createClient } from '@supabase/supabase-js'
 
 // Vite injeta as variáveis de ambiente do Vercel
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
+const supabaseUrl = 'https://ekrtekidjuwxfspjmmvl.supabase.co'
+const supabaseAnonKey = 'sb_publishable_O4cgL1aB5kqTyd0turl_cw_t9JkvK7u'
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey)
