@@ -125,7 +125,7 @@ async function processarEnvioInteresse(e) {
     status.innerText = "Enviando...";
     botao.disabled = true;
 
-// Teste de conexão com Supabase
+/* // Teste de conexão com Supabase
  try {
   const { data, error } = await window.supabase
     .from("leads")
@@ -139,7 +139,7 @@ async function processarEnvioInteresse(e) {
   }
 } catch (err) {
   console.error("❌ Falha geral ao tentar conectar:", err);
-} 
+}  */
 
     try {
         const { data, error } = await window.supabase
