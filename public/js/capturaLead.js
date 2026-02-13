@@ -126,7 +126,7 @@ async function processarEnvioInteresse(e) {
     botao.disabled = true;
 
 // Teste de conexão com Supabase
-try {
+/* try {
   const { data, error } = await window.supabase
     .from("leads")
     .select("*")
@@ -139,10 +139,7 @@ try {
   }
 } catch (err) {
   console.error("❌ Falha geral ao tentar conectar:", err);
-}
-
-
-
+} */
 
     try {
         const { data, error } = await window.supabase
@@ -167,11 +164,9 @@ try {
                 data_criacao: new Date().toISOString()
             }])
             .select();
-console.log("Resposta do Supabase:", { data, error });
+
         if (error) throw error;
         const novoLeadRef = { id: data[0].id };
-
-console.log("✅ Lead inserido com nome:", nome);
 
         // Disparo automático de boas-vindas 
         await dispararMensagemAutomatica("primeiro_contato", {
@@ -184,7 +179,6 @@ console.log("✅ Lead inserido com nome:", nome);
             municipio: dadosUf.nome_municipio,
             perfil: perfil
         }, "lead");
-console.log("✅ Mensagem automática disparada para:", nome);
         status.innerText = "Enviado com sucesso!";
         status.style.color = "green";
 
