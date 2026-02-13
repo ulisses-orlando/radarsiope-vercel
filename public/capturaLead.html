@@ -72,17 +72,12 @@
   <script src="https://www.gstatic.com/firebasejs/10.0.0/firebase-firestore-compat.js"></script>
   
   <script src="js/firebase-init.js"></script>
-  <script>
-    window.env = {
-      VITE_SUPABASE_URL: "https://https://ekrtekidjuwxfspjmmvl.supabase.co-projeto.supabase.co",
-      VITE_SUPABASE_ANON_KEY: "sua-chave-eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVrcnRla2lkanV3eGZzcGptbXZsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA0OTQzNTAsImV4cCI6MjA4NjA3MDM1MH0.tm2y114xrBHeRU62beNln8TQmskm2yxap7MiRIAHhoc"
-    }
-  </script>
-  <script type="module" src="js/supabaseClient.js"></script>
-  <!-- Suas funções já existentes -->
+
+<!-- Vite bundle (gera supabase e expõe em window) --> 
+ <script type="module" src="/src/exposeSupabase.js"></script>
+
   <script src="js/functions.js"></script>
   <script src="js/mailer.js"></script>
-  <!-- Lógica da captura -->
   <script src="js/capturaLead.js"></script>
 
 </body>
