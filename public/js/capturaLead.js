@@ -126,7 +126,7 @@ async function processarEnvioInteresse(e) {
     botao.disabled = true;
 
 // Teste de conexão com Supabase
-/* try {
+ try {
   const { data, error } = await window.supabase
     .from("leads")
     .select("*")
@@ -135,11 +135,11 @@ async function processarEnvioInteresse(e) {
   if (error) {
     console.error("❌ Erro ao conectar no Supabase:", error);
   } else {
-    console.log("✅ Conexão OK. Exemplo de dado retornado:", data);
+        console.log("✅ Conexão OK. Exemplo de dado retornado:", data);
   }
 } catch (err) {
   console.error("❌ Falha geral ao tentar conectar:", err);
-} */
+} 
 
     try {
         const { data, error } = await window.supabase
