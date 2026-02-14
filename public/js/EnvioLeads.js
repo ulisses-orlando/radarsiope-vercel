@@ -358,7 +358,7 @@ async function listarNewslettersDisponiveis() {
                 <td>${n.classificacao || "-"}</td>
                 <td>${dataFormatada}</td>
                 <td>
-                <button onclick="visualizarNewsletterHtml('${id}')">👁️ Visualizar</button>
+                <button class="btn-visualizar-newsletter" data-id="${id}">👁️ Visualizar</button>
                 <button class="btn-preparar-envio" onclick="prepararEnvioNewsletter('${id}')" disabled>
                     📬 Preparar envio
                 </button>
@@ -712,6 +712,21 @@ function alterarTipoDestinatario(tipo) {
     botoes.forEach(btn => btn.disabled = false); // habilita todos
 }
 
+document.addEventListener("DOMContentLoaded", () => {
+  const selectDestinatario = document.getElementById("tipo-destinatario");
+  if (selectDestinatario) {
+    selectDestinatario.addEventListener("change", e => {
+      alterarTipoDestinatario(e.target.value);
+    });
+  }
+
+  // exemplo para botões de visualizar
+  document.querySelectorAll(".btn-visualizar-newsletter").forEach(btn => {
+    btn.addEventListener("click", () => {
+      visualizarNewsletterHtml(btn.dataset.id);
+    });
+  });
+});
 
 
 let usuariosFiltraveis = []; // array global para manipulação
@@ -972,6 +987,14 @@ async function gerarPreviaEnvioUsuarios() {
     mostrarAba("secao-preview-envio");
 }
 
+document.addEventListener("DOMContentLoaded", () => {
+  const selectDestinatario = document.getElementById("tipo-destinatario");
+  if (selectDestinatario) {
+    selectDestinatario.addEventListener("change", e => {
+      alterarTipoDestinatario(e.target.value);
+    });
+  }
+});
 
 async function gerarPreviaEnvioLeads() {
     if (!newsletterSelecionada) {
