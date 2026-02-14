@@ -8,13 +8,13 @@ async function listarLeadsComPreferencias() {
     //const snap = await db.collection("leads").get();
 
     // 🔹 Busca os leads no Supabase/Postgres 
-    const { data: snap, error } = await window.supabase 
-        .from("leads") 
-        .select("*"); 
-        
-    if (error) { 
-        console.error("Erro ao buscar leads:", error); 
-        corpo.innerHTML = "<tr><td colspan='6'>Erro ao carregar leads.</td></tr>"; 
+    const { data: snap, error } = await window.supabase
+        .from("leads")
+        .select("*");
+
+    if (error) {
+        console.error("Erro ao buscar leads:", error);
+        corpo.innerHTML = "<tr><td colspan='6'>Erro ao carregar leads.</td></tr>";
         return;
     }
 
@@ -116,10 +116,10 @@ function filtrarLeadsEnvio() {
 }
 
 document.addEventListener("DOMContentLoaded", () => {
-  const botao = document.querySelector("#botaoEnvioNewsletterLeads");
-  if (botao) {
-    botao.addEventListener("click", abrirEnvioNewsletterLeads);
-  }
+    const botao = document.querySelector("#botaoEnvioNewsletterLeads");
+    if (botao) {
+        botao.addEventListener("click", abrirEnvioNewsletterLeads);
+    }
 });
 
 function abrirEnvioNewsletterLeads() {
@@ -338,57 +338,50 @@ async function prepararEnvioParaUsuarios(newsletterId) {
 }
 
 async function listarNewslettersDisponiveis() {
-  const corpo = document.querySelector("#tabela-newsletters-envio tbody");
-  corpo.innerHTML = "<tr><td colspan='5'>Carregando newsletters...</td></tr>";
+    const corpo = document.querySelector("#tabela-newsletters-envio tbody");
+    corpo.innerHTML = "<tr><td colspan='5'>Carregando newsletters...</td></tr>";
 
-  const { data: snap, error } = await window.supabase
-    .from("newsletters")
-    .select("*")
-    .order("data_publicacao", { ascending: false });
+    const snap = await db.collection("newsletters").orderBy("data_publicacao", "desc").get();
+    let linhas = "";
 
-  if (error) {
-    console.error("Erro ao buscar newsletters:", error);
-    corpo.innerHTML = "<tr><td colspan='5'>Erro ao carregar newsletters.</td></tr>";
-    return;
-  }
+    for (const doc of snap.docs) {
+        const n = doc.data();
+        const id = doc.id;
+        const data = n.data_publicacao?.toDate?.() || n.data_publicacao;
+        const dataFormatada = data ? formatDateBR(data) : "-";
 
-  let linhas = "";
-  for (const n of snap) {
-    const id = n.id;
-    const data = n.data_publicacao;
-    const dataFormatada = data ? formatDateBR(data) : "-";
+        linhas += `
+            <tr>
+                <td>${n.titulo || "(sem título)"}</td>
+                <td>${n.edicao || "-"}</td>
+                <td>${n.tipo || "-"}</td>
+                <td>${n.classificacao || "-"}</td>
+                <td>${dataFormatada}</td>
+                <td>
+                <button class="btn-visualizar-newsletter" data-id="${id}">👁️ Visualizar</button>
+                <button class="btn-preparar-envio" data-id="${id}" disabled>
+                📬 Preparar envio
+                </button>
+                </td>
+            </tr>
+            `;
+    }
 
-    linhas += `
-      <tr>
-        <td>${n.titulo || "(sem título)"}</td>
-        <td>${n.edicao || "-"}</td>
-        <td>${n.tipo || "-"}</td>
-        <td>${n.classificacao || "-"}</td>
-        <td>${dataFormatada}</td>
-        <td>
-          <button class="btn-visualizar-newsletter" data-id="${id}">👁️ Visualizar</button>
-          <button class="btn-preparar-envio" data-id="${id}" disabled>
-            📬 Preparar envio
-          </button>
-        </td>
-      </tr>
-    `;
-  }
+    corpo.innerHTML = linhas || "<tr><td colspan='5'>Nenhuma newsletter encontrada.</td></tr>";
 
-  corpo.innerHTML = linhas || "<tr><td colspan='5'>Nenhuma newsletter encontrada.</td></tr>";
-
-  // 🔹 Agora que os botões existem, adicionamos os listeners
-  corpo.querySelectorAll(".btn-preparar-envio").forEach(btn => {
-    btn.addEventListener("click", () => {
-      prepararEnvioNewsletter(btn.dataset.id);
+    // Agora que os botões existem, adicionamos os listeners
+    corpo.querySelectorAll(".btn-preparar-envio").forEach(btn => {
+        btn.addEventListener("click", () => {
+            prepararEnvioNewsletter(btn.dataset.id);
+        });
     });
-  });
 
-  corpo.querySelectorAll(".btn-visualizar-newsletter").forEach(btn => {
-    btn.addEventListener("click", () => {
-      visualizarNewsletterHtml(btn.dataset.id);
+    corpo.querySelectorAll(".btn-visualizar-newsletter").forEach(btn => {
+        btn.addEventListener("click", () => {
+            visualizarNewsletterHtml(btn.dataset.id);
+        });
     });
-  });
+
 }
 
 function prepararEnvioNewsletter(newsletterId) {
@@ -734,12 +727,12 @@ function alterarTipoDestinatario(tipo) {
 }
 
 document.addEventListener("DOMContentLoaded", () => {
-  const selectDestinatario = document.getElementById("tipo-destinatario");
-  if (selectDestinatario) {
-    selectDestinatario.addEventListener("change", e => {
-      alterarTipoDestinatario(e.target.value);
-    });
-  }
+    const selectDestinatario = document.getElementById("tipo-destinatario");
+    if (selectDestinatario) {
+        selectDestinatario.addEventListener("change", e => {
+            alterarTipoDestinatario(e.target.value);
+        });
+    }
 });
 
 let usuariosFiltraveis = []; // array global para manipulação
@@ -1001,12 +994,12 @@ async function gerarPreviaEnvioUsuarios() {
 }
 
 document.addEventListener("DOMContentLoaded", () => {
-  const selectDestinatario = document.getElementById("tipo-destinatario");
-  if (selectDestinatario) {
-    selectDestinatario.addEventListener("change", e => {
-      alterarTipoDestinatario(e.target.value);
-    });
-  }
+    const selectDestinatario = document.getElementById("tipo-destinatario");
+    if (selectDestinatario) {
+        selectDestinatario.addEventListener("change", e => {
+            alterarTipoDestinatario(e.target.value);
+        });
+    }
 });
 
 async function gerarPreviaEnvioLeads() {
