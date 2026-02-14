@@ -5,7 +5,20 @@ async function listarLeadsComPreferencias() {
     const corpo = document.querySelector("#tabela-leads-envio tbody");
     corpo.innerHTML = "<tr><td colspan='6'>Carregando leads...</td></tr>";
 
-    const snap = await db.collection("leads").get();
+    //const snap = await db.collection("leads").get();
+
+    // 🔹 Busca os leads no Supabase/Postgres 
+    const { data: snap, error } = await window.supabase 
+        .from("leads") 
+        .select("*"); 
+        
+    if (error) { 
+        console.error("Erro ao buscar leads:", error); 
+        corpo.innerHTML = "<tr><td colspan='6'>Erro ao carregar leads.</td></tr>"; 
+        return;
+    }
+
+
     let linhas = "";
     leadsFiltraveis = []; // 🔄 limpa antes de preencher
 
