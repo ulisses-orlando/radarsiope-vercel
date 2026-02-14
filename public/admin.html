@@ -561,7 +561,11 @@
   <main id="conteudo">
     <!-- Enviar Newsletters para Leads -->
     <section id="secao-envio-newsletters" class="card">
-      <script src="js/EnvioLeads.js"></script>
+    <!-- Supabase -->
+    <script type="module" src="/exposeSupabaseAdmin.js"></script>
+    <!-- Scripts específicos do admin -->
+    <script type="module" src="js/EnvioLeads.js"></script>
+
       <div class="abas-navegacao">
         <button onclick="mostrarAba('secao-newsletters-envio')">📰 Newsletters Disponíveis</button>
         <button onclick="abrirAbaDescadastramentos()">📉 Descadastramentos</button>
