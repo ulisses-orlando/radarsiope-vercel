@@ -2,46 +2,41 @@
 let leadsFiltraveis = [];
 
 async function listarLeadsComPreferencias() {
-    const corpo = document.querySelector("#tabela-leads-envio tbody");
-    corpo.innerHTML = "<tr><td colspan='6'>Carregando leads...</td></tr>";
+  const corpo = document.querySelector("#tabela-leads-envio tbody");
+  corpo.innerHTML = "<tr><td colspan='6'>Carregando leads...</td></tr>";
 
-    //const snap = await db.collection("leads").get();
+  const { data: leads, error } = await window.supabase
+    .from("leads")
+    .select("*");
 
-    // 🔹 Busca os leads no Supabase/Postgres 
-    const { data: snap, error } = await window.supabase
-        .from("leads")
-        .select("*");
+  if (error) {
+    console.error("Erro ao buscar leads:", error);
+    corpo.innerHTML = "<tr><td colspan='6'>Erro ao carregar leads.</td></tr>";
+    return;
+  }
 
-    if (error) {
-        console.error("Erro ao buscar leads:", error);
-        corpo.innerHTML = "<tr><td colspan='6'>Erro ao carregar leads.</td></tr>";
-        return;
-    }
+  let linhas = "";
+  leadsFiltraveis = [];
 
+  for (const lead of leads) {
+    const leadId = lead.id;
 
-    let linhas = "";
-    leadsFiltraveis = []; // 🔄 limpa antes de preencher
+    if (!["Novo", "Em contato"].includes(lead.status)) continue;
 
-    for (const doc of snap.docs) {
-        const lead = doc.data();
-        const leadId = doc.id;
+    const interesses = Array.isArray(lead.interesses)
+      ? lead.interesses.join(", ")
+      : "-";
 
-        // Filtra por status desejado
-        if (!["Novo", "Em contato"].includes(lead.status)) continue;
+    leadsFiltraveis.push({
+      id: leadId,
+      nome: lead.nome || "",
+      email: lead.email || "",
+      perfil: lead.perfil || "",
+      interesses: Array.isArray(lead.interesses) ? lead.interesses : [],
+      status: lead.status || ""
+    });
 
-        const interesses = Array.isArray(lead.interesses) ? lead.interesses.join(", ") : "-";
-
-        // 🔄 adiciona ao array de leads filtráveis
-        leadsFiltraveis.push({
-            id: leadId,
-            nome: lead.nome || "",
-            email: lead.email || "",
-            perfil: lead.perfil || "",
-            interesses: Array.isArray(lead.interesses) ? lead.interesses : [],
-            status: lead.status || ""
-        });
-
-        linhas += `
+    linhas += `
       <tr data-lead-id="${leadId}">
         <td><input type="checkbox" class="chk-lead-envio" checked /></td>
         <td>${lead.nome || ""}</td>
@@ -51,8 +46,10 @@ async function listarLeadsComPreferencias() {
         <td>${lead.status || ""}</td>
       </tr>
     `;
-    }
-    corpo.innerHTML = linhas || "<tr><td colspan='6'>Nenhum lead disponível.</td></tr>";
+  }
+
+  corpo.innerHTML =
+    linhas || "<tr><td colspan='6'>Nenhum lead disponível.</td></tr>";
 }
 
 
