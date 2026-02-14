@@ -4,10 +4,11 @@ export default defineConfig({
   build: {
     rollupOptions: {
       input: {
-        exposeSupabase: 'src/exposeSupabase.js'
+        exposeSupabase: 'src/exposeSupabase.js',
+        exposeSupabaseAdmin: 'src/exposeSupabaseAdmin.js'
       },
       output: {
-        entryFileNames: 'exposeSupabase.js'
+        entryFileNames: '[name].js' 
       }
     }
   }
