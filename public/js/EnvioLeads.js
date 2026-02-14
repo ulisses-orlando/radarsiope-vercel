@@ -359,8 +359,8 @@ async function listarNewslettersDisponiveis() {
                 <td>${dataFormatada}</td>
                 <td>
                 <button class="btn-visualizar-newsletter" data-id="${id}">👁️ Visualizar</button>
-                <button class="btn-preparar-envio" onclick="prepararEnvioNewsletter('${id}')" disabled>
-                    📬 Preparar envio
+                <button class="btn-preparar-envio" data-id="${id}" disabled>
+                📬 Preparar envio
                 </button>
                 </td>
             </tr>
@@ -369,6 +369,14 @@ async function listarNewslettersDisponiveis() {
 
     corpo.innerHTML = linhas || "<tr><td colspan='5'>Nenhuma newsletter encontrada.</td></tr>";
 }
+
+document.addEventListener("DOMContentLoaded", () => {
+  document.querySelectorAll(".btn-preparar-envio").forEach(btn => {
+    btn.addEventListener("click", () => {
+      prepararEnvioNewsletter(btn.dataset.id);
+    });
+  });
+});
 
 function prepararEnvioNewsletter(newsletterId) {
     if (!tipoDestinatarioSelecionado) {
