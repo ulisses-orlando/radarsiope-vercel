@@ -115,6 +115,12 @@ function filtrarLeadsEnvio() {
     renderizarTabelaLeads(filtrados);
 }
 
+document.addEventListener("DOMContentLoaded", () => {
+  const botao = document.querySelector("#botaoEnvioNewsletterLeads");
+  if (botao) {
+    botao.addEventListener("click", abrirEnvioNewsletterLeads);
+  }
+});
 
 function abrirEnvioNewsletterLeads() {
     // Oculta todas as seções
