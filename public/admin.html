@@ -522,7 +522,9 @@
     <button onclick="abrirTab('relatorio-avaliacoes')">🗳️ Relatório de Avaliações</button>
     <button onclick="abrirTab('leads')">📥 Leads Capturados</button>
     <button onclick="abrirTab('auditoria')">🕵️ Auditoria Leads</button>
-    <button onclick="abrirEnvioNewsletterLeads()">📮 Enviar Newsletters</button>
+    <!-- <button onclick="abrirEnvioNewsletterLeads()">📮 Enviar Newsletters</button> -->
+     <button id="botaoEnvioNewsletterLeads">Enviar Newsletter</button>
+
     <button onclick="abrirModalVerificarLotes(event)">📮 Verificar lotes pendentes - atualizar status</button>
     <button onclick="abrirPainelGestao()">🗞️ Painel</button>
 
@@ -585,7 +587,7 @@
 
         <!-- Campo "Tamanho do lote" -->
         <label for="tamanho-lote"><strong>Tamanho do lote:</strong></label>
-        <input type="number" id="tamanho-lote" value="100" min="1" style="width: 80px;" />
+        <input type="number" id="tamanho-lote" value="50" min="1" style="width: 80px;" />
 
         <!-- Info da newsletter -->
         <div id="dados-newsletter-selecionada" class="info-box"
