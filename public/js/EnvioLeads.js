@@ -5,6 +5,22 @@ async function listarLeadsComPreferencias() {
   const corpo = document.querySelector("#tabela-leads-envio tbody");
   corpo.innerHTML = "<tr><td colspan='6'>Carregando leads...</td></tr>";
 
+ try {
+  const { data, error } = await window.supabase
+    .from("leads")
+    .select("*")
+    .limit(1); // pega só 1 registro para testar
+
+  if (error) {
+    console.error("❌ Erro ao conectar no Supabase:", error);
+  } else {
+        console.log("✅ Conexão OK. Exemplo de dado retornado:", data);
+  }
+} catch (err) {
+  console.error("❌ Falha geral ao tentar conectar:", err);
+}  
+
+
   const { data: leads, error } = await window.supabase
     .from("leads")
     .select("*");
