@@ -293,9 +293,9 @@ function mostrarAba(id) {
         mostrarDadosNewsletterSelecionada();
     }
 }
+window.mostrarAba = mostrarAba; // para acesso global
 
-
-let newsletterSelecionada = null;
+window.newsletterSelecionada = null;
 
 async function prepararEnvioParaLeads(newsletterId) {
     const snap = await db.collection("newsletters").doc(newsletterId).get();
@@ -724,8 +724,9 @@ function abrirAbaDescadastramentos() {
     mostrarAba("secao-descadastramentos");
     listarDescadastramentos();
 }
+window.abrirAbaDescadastramentos = abrirAbaDescadastramentos; // acesso global
 
-let tipoDestinatarioSelecionado = null;
+window.tipoDestinatarioSelecionado = tipoDestinatarioSelecionado; // para acesso global
 
 function alterarTipoDestinatario(tipo) {
     const botoes = document.querySelectorAll(".btn-preparar-envio");
@@ -739,6 +740,7 @@ function alterarTipoDestinatario(tipo) {
     tipoDestinatarioSelecionado = tipo;
     botoes.forEach(btn => btn.disabled = false); // habilita todos
 }
+window.alterarTipoDestinatario = alterarTipoDestinatario; // para acesso global
 
 document.addEventListener("DOMContentLoaded", () => {
     const selectDestinatario = document.getElementById("tipo-destinatario");
@@ -749,7 +751,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 });
 
-let usuariosFiltraveis = []; // array global para manipulação
+window.usuariosFiltraveis = usuariosFiltraveis; // para acesso global
 
 // Listar usuários com suas assinaturas
 async function listarUsuariosComAssinaturas(newsletterId) {
@@ -829,7 +831,7 @@ async function listarUsuariosComAssinaturas(newsletterId) {
         corpo.innerHTML = linhas;
     }
 }
-
+window.listarUsuariosComAssinaturas = listarUsuariosComAssinaturas; // para acesso global
 
 
 // Filtro de usuários
@@ -861,6 +863,7 @@ function filtrarUsuariosEnvio() {
 
     corpo.innerHTML = linhas || "<tr><td colspan='5'>Nenhum usuário encontrado com os filtros.</td></tr>";
 }
+window.filtrarUsuariosEnvio = filtrarUsuariosEnvio; // para acesso global
 
 function selecionarTodosEnvioFinal(chkMaster) {
     const todos = document.querySelectorAll("#tabela-preview-envio .chk-envio-final");
@@ -1006,6 +1009,7 @@ async function gerarPreviaEnvioUsuarios() {
 
     mostrarAba("secao-preview-envio");
 }
+window.gerarPreviaEnvioUsuarios = gerarPreviaEnvioUsuarios; // para acesso global   
 
 document.addEventListener("DOMContentLoaded", () => {
     const selectDestinatario = document.getElementById("tipo-destinatario");
@@ -1059,6 +1063,7 @@ async function gerarPreviaEnvioLeads() {
     corpo.innerHTML = linhas || "<tr><td colspan='7'>Nenhum lead selecionado para prévia.</td></tr>";
     mostrarAba("secao-preview-envio");
 }
+window.gerarPreviaEnvioLeads = gerarPreviaEnvioLeads; // para acesso global 
 
 function voltarParaEnvio() {
 
@@ -1071,6 +1076,7 @@ function voltarParaEnvio() {
         mostrarAba("secao-newsletters-envio");
     }
 }
+window.voltarParaEnvio = voltarParaEnvio; // para acesso global
 
 function verificarCompatibilidadeNewsletter(destinatario, newsletter) {
     // Caso seja Lead
@@ -1091,6 +1097,7 @@ function verificarCompatibilidadeNewsletter(destinatario, newsletter) {
 
     return false;
 }
+window.verificarCompatibilidadeNewsletter = verificarCompatibilidadeNewsletter; // para acesso global
 
 // Selecionar todos os usuários
 function selecionarTodosUsuarios(chkMaster) {
@@ -1099,15 +1106,19 @@ function selecionarTodosUsuarios(chkMaster) {
         chk.checked = chkMaster.checked;
     }
 }
+window.selecionarTodosUsuarios = selecionarTodosUsuarios; // para acesso global
 
 // Configuração do provedor de envio
 // Troque para "ses" quando migrar para Amazon SES
-const EMAIL_PROVIDER = "vercel";
+
+window.EMAIL_PROVIDER = EMAIL_PROVIDER; // para acesso global
+EMAIL_PROVIDER = "vercel";
 
 // Função utilitária para pausar (controla taxa de envio)
 function sleep(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
 }
+window.sleep = sleep; // para acesso global
 
 /**
  * Função genérica para processar tarefas em paralelo com limite de workers
@@ -1138,10 +1149,12 @@ async function processarEmLotes(tarefas, limiteParalelo = 5, delayMs = 600) {
     await Promise.all(Array.from({ length: limiteParalelo }, worker));
     return resultados;
 }
+window.processarEmLotes = processarEmLotes; // para acesso global
 
 function abrirAbaOrientacoes() {
     mostrarAba("secao-orientacoes");
 }
+window.abrirAbaOrientacoes = abrirAbaOrientacoes; // acesso global
 
 async function confirmarPrevia(newsletterId, filtros) {
     const tamanhoLote = parseInt(document.getElementById("tamanho-lote").value) || 100;
@@ -1236,7 +1249,7 @@ async function confirmarPrevia(newsletterId, filtros) {
 
     mostrarAba("secao-lotes-envio");
 }
-
+window.confirmarPrevia = confirmarPrevia; // para acesso global
 
 async function listarLotesEnvio(newsletterId, envioId) {
     envioSelecionadoId = envioId;
@@ -1332,7 +1345,7 @@ async function listarLotesEnvio(newsletterId, envioId) {
 
     corpo.innerHTML = linhas || "<tr><td colspan='10'>Nenhum lote encontrado.</td></tr>";
 }
-
+window.listarLotesEnvio = listarLotesEnvio; // para acesso global
 
 async function enviarLoteIndividual(newsletterId, envioId, loteId) {
     try {
@@ -1585,6 +1598,7 @@ function montarHtmlNewsletterParaEnvio(newsletter, dados, segmento = null) {
     htmlFinal = aplicarPlaceholders(htmlFinal, dados);
     return htmlFinal;
 }
+window.montarHtmlNewsletterParaEnvio = montarHtmlNewsletterParaEnvio; // para acesso global
 
 /* function aplicarRastreamento(htmlBase, envioId, destinatarioId, newsletterId) {
  
@@ -1669,7 +1683,7 @@ function aplicarRastreamento(htmlBase, envioId, destinatarioId, newsletterId, as
 
     return html;
 }
-
+window.aplicarRastreamento = aplicarRastreamento; // para acesso global
 
 function voltarParaPrevia() {
     // Esconde a section de lotes
@@ -1677,6 +1691,7 @@ function voltarParaPrevia() {
     // Mostra novamente a section de prévia
     document.getElementById("secao-preview-envio").style.display = "block";
 }
+window.voltarParaPrevia = voltarParaPrevia; // para acesso global
 
 function coletarFiltros() {
     if (tipoDestinatarioSelecionado === "leads") {
@@ -1699,6 +1714,7 @@ function coletarFiltros() {
         return { tipo: null };
     }
 }
+window.coletarFiltros = coletarFiltros; // para acesso global
 
 function abrirLotesGerados() {
     if (!newsletterSelecionada || !newsletterSelecionada.id) {
@@ -1759,7 +1775,7 @@ function abrirLotesGerados() {
             mostrarMensagem("❌ Erro ao carregar lotes.");
         });
 }
-
+window.abrirLotesGerados = abrirLotesGerados; // para acesso global
 
 function verDestinatariosLote(loteId) {
     const corpo = document.querySelector("#tabela-preview-envio tbody");
@@ -1799,6 +1815,7 @@ function verDestinatariosLote(loteId) {
             mostrarAba("secao-preview-envio");
         });
 }
+window.verDestinatariosLote = verDestinatariosLote; // para acesso global   
 
 async function listarTodosOsLotes() {
     const corpo = document.getElementById("corpo-todos-os-lotes");
@@ -1907,8 +1924,7 @@ async function listarTodosOsLotes() {
 
     mostrarAba("secao-todos-os-lotes");
 }
-
-
+window.listarTodosOsLotes = listarTodosOsLotes; // para acesso global
 
 async function verHistoricoEnvios(newsletterId, envioId, loteId) {
     const corpo = document.getElementById("corpo-historico-reenvios");
@@ -1997,8 +2013,7 @@ function verDestinatariosLoteCompleto(newsletterId, envioId, loteId) {
 
     configurarBotoesPrevia("visualizacao");
 }
-
-
+window.verDestinatariosLoteCompleto = verDestinatariosLoteCompleto; // para acesso global
 
 async function enviarLote(newsletterId, envioId, loteId) {
     const loteRef = db.collection("newsletters")
@@ -2059,6 +2074,7 @@ async function enviarLote(newsletterId, envioId, loteId) {
 
     mostrarMensagem(`Lote ${lote.numero_lote} enviado: ${enviados} enviados, ${erros} erros.`);
 }
+window.enviarLote = enviarLote; // para acesso global
 
 async function preencherFiltroNewsletters() {
     const select = document.getElementById("filtro-newsletter");
@@ -2082,12 +2098,13 @@ async function preencherFiltroNewsletters() {
         select.appendChild(option);
     }
 }
+window.preencherFiltroNewsletters = preencherFiltroNewsletters; // para acesso global   
 
 function abrirTelaTodosOsLotes() {
-
     preencherFiltroNewsletters(); // ✅ só uma vez
     listarTodosOsLotes();         // ✅ com filtros aplicados
 }
+window.abrirTelaTodosOsLotes = abrirTelaTodosOsLotes; // para acesso global 
 
 function configurarBotoesPrevia(contexto) {
     const botoesPadrao = document.getElementById("botoes-envio-padrao");
@@ -2098,6 +2115,7 @@ function configurarBotoesPrevia(contexto) {
         botoesPadrao.style.display = "none"; // esconde os extras
     }
 }
+window.configurarBotoesPrevia = configurarBotoesPrevia; // para acesso global
 
 async function verDestinatariosLoteUnificado(loteId) {
     const tabelaPrevio = document.querySelector("#tabela-preview-envio");
@@ -2419,4 +2437,4 @@ async function atualizarRetornoSES(newsletterId, envioId, loteId, logResultados)
         mostrarMensagem("❌ Erro ao atualizar retorno SES.");
     }
 }
-
+window.atualizarRetornoSES = atualizarRetornoSES; // para acesso global
