@@ -495,7 +495,7 @@
     const perfil = (usuario.tipo_perfil || "").toLowerCase();
 
     if (perfil !== "admin") {
-      mostrarMensagem("Acesso restrito. Redirecionando...");
+      window.mostrarMensagem("Acesso restrito. Redirecionando...");
       window.location.href = "login.html";
     }
   </script>
@@ -982,12 +982,12 @@
 
         document.getElementById("btn-gerar-lotes").addEventListener("click", function () {
           const newsletterId = newsletterSelecionada.id;
-          const filtros = coletarFiltros();
+          const filtros = window.coletarFiltros();
           const linhasSelecionadas = Array.from(document.querySelectorAll(".chk-envio-final:checked"));
           const totalSelecionados = linhasSelecionadas.length;
 
           if (totalSelecionados === 0) {
-            mostrarMensagem("Nenhum destinatário selecionado para envio.");
+            window.mostrarMensagem("Nenhum destinatário selecionado para envio.");
             return;
           }
 
@@ -1018,7 +1018,7 @@
         async function prosseguirGeracao() {
           document.getElementById("modal-confirmacao").style.display = "none";
           if (dadosCampanha) {
-            await confirmarPrevia(dadosCampanha.newsletterId, dadosCampanha.filtros);
+            await window.confirmarPrevia(dadosCampanha.newsletterId, dadosCampanha.filtros);
             dadosCampanha = null;
           }
         }
