@@ -5,20 +5,20 @@ async function listarLeadsComPreferencias() {
   const corpo = document.querySelector("#tabela-leads-envio tbody");
   corpo.innerHTML = "<tr><td colspan='6'>Carregando leads...</td></tr>";
 
- try {
-  const { data, error } = await window.supabase
-    .from("leads")
-    .select("*")
-    .limit(1); // pega só 1 registro para testar
+/*     try {
+    const { data, error } = await window.supabase
+        .from("leads")
+        .select("*")
+        .limit(1); // pega só 1 registro para testar
 
-  if (error) {
-    console.error("❌ Erro ao conectar no Supabase:", error);
-  } else {
-        console.log("✅ Conexão OK. Exemplo de dado retornado:", data);
-  }
-} catch (err) {
-  console.error("❌ Falha geral ao tentar conectar:", err);
-}  
+    if (error) {
+        console.error("❌ Erro ao conectar no Supabase:", error);
+    } else {
+            console.log("✅ Conexão OK. Exemplo de dado retornado:", data);
+    }
+    } catch (err) {
+    console.error("❌ Falha geral ao tentar conectar:", err);
+    }   */
 
 
   const { data: leads, error } = await window.supabase
@@ -416,6 +416,7 @@ function selecionarTodosEnvioFinalLeads(chkMaster) {
         chk.checked = chkMaster.checked;
     }
 }
+window.selecionarTodosEnvioFinalLeads = selecionarTodosEnvioFinalLeads;
 
 async function gerarPreviaEnvio() {
     const corpo = document.querySelector("#tabela-preview-envio tbody");
@@ -867,7 +868,7 @@ function selecionarTodosEnvioFinal(chkMaster) {
         chk.checked = chkMaster.checked;
     }
 }
-
+window.selecionarTodosEnvioFinal = selecionarTodosEnvioFinal;
 
 // Preparar prévia de envio para usuários
 async function gerarPreviaEnvioUsuarios() {
@@ -1547,6 +1548,7 @@ async function enviarLoteIndividual(newsletterId, envioId, loteId) {
         mostrarMensagem("❌ Erro ao enviar lote.");
     }
 }
+window.enviarLoteIndividual = enviarLoteIndividual;
 
 function montarHtmlNewsletterParaEnvio(newsletter, dados, segmento = null) {
     // ✅ HTML base da edição
@@ -1946,6 +1948,7 @@ async function verHistoricoEnvios(newsletterId, envioId, loteId) {
 
     mostrarAba("secao-historico-reenvios");
 }
+window.verHistoricoEnvios = verHistoricoEnvios;
 
 function verDestinatariosLoteCompleto(newsletterId, envioId, loteId) {
     const corpo = document.querySelector("#tabela-preview-envio tbody");
@@ -2206,6 +2209,7 @@ async function verDestinatariosLoteUnificado(loteId) {
         corpo.innerHTML = "<tr><td colspan='6'>Erro ao carregar destinatários.</td></tr>";
     }
 }
+window.verDestinatariosLoteUnificado = verDestinatariosLoteUnificado; // para acesso global
 
 async function enviarLoteEmMassa(newsletterId, envioId, loteId, tipo) {
     const loteRef = db.collection("newsletters")
@@ -2341,6 +2345,7 @@ async function enviarLoteEmMassa(newsletterId, envioId, loteId, tipo) {
     mostrarMensagem(`✅ Lote nº ${lote.numero_lote} enviado com sucesso!`);
     return result; // log de retorno do backend
 }
+window.enviarLoteEmMassa = enviarLoteEmMassa; // para acesso global
 
 async function atualizarRetornoSES(newsletterId, envioId, loteId, logResultados) {
     try {
