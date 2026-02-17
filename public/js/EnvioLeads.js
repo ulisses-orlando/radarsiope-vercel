@@ -764,7 +764,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 });
 
-usuariosFiltraveis = [];
+let usuariosFiltraveis = [];
 window.usuariosFiltraveis = usuariosFiltraveis; // para acesso global
 
 // Listar usuários com suas assinaturas
