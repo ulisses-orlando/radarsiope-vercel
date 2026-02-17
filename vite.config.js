@@ -8,9 +8,8 @@ export default defineConfig({
         exposeSupabaseAdmin: 'src/exposeSupabaseAdmin.js'
       },
       output: {
-        entryFileNames: '[name].js' 
+        entryFileNames: '[name].js'
       }
     }
   }
 })
-
