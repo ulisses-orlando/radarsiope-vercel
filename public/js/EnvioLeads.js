@@ -721,13 +721,24 @@ async function listarDescadastramentos() {
 
     corpo.innerHTML = linhas || "<tr><td colspan='5'>Nenhum descadastramento encontrado.</td></tr>";
 }
-
+window.listarDescadastramentos = listarDescadastramentos; // para acesso global
 
 function abrirAbaDescadastramentos() {
     mostrarAba("secao-descadastramentos");
     listarDescadastramentos();
 }
 window.abrirAbaDescadastramentos = abrirAbaDescadastramentos; // acesso global
+
+function abrirTelaTodosOsLotes() {
+    preencherFiltroNewsletters(); // ✅ só uma vez
+    listarTodosOsLotes();         // ✅ com filtros aplicados
+}
+window.abrirTelaTodosOsLotes = abrirTelaTodosOsLotes; // para acesso global 
+
+function abrirAbaOrientacoes() {
+    mostrarAba("secao-orientacoes");
+}
+window.abrirAbaOrientacoes = abrirAbaOrientacoes; // acesso global
 
 function alterarTipoDestinatario(tipo) {
     const botoes = document.querySelectorAll(".btn-preparar-envio");
@@ -752,6 +763,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 });
 
+usuariosFiltraveis = [];
 window.usuariosFiltraveis = usuariosFiltraveis; // para acesso global
 
 // Listar usuários com suas assinaturas
@@ -770,7 +782,6 @@ async function listarUsuariosComAssinaturas(newsletterId) {
         .where("tipo_newsletter", "==", newsletterSelecionada.tipo)
         .get();
 
-    usuariosFiltraveis = [];
     let linhas = "";
 
     for (const doc of snapAssinaturas.docs) {
@@ -1151,11 +1162,6 @@ async function processarEmLotes(tarefas, limiteParalelo = 5, delayMs = 600) {
     return resultados;
 }
 window.processarEmLotes = processarEmLotes; // para acesso global
-
-function abrirAbaOrientacoes() {
-    mostrarAba("secao-orientacoes");
-}
-window.abrirAbaOrientacoes = abrirAbaOrientacoes; // acesso global
 
 async function confirmarPrevia(newsletterId, filtros) {
     const tamanhoLote = parseInt(document.getElementById("tamanho-lote").value) || 100;
@@ -2100,12 +2106,6 @@ async function preencherFiltroNewsletters() {
     }
 }
 window.preencherFiltroNewsletters = preencherFiltroNewsletters; // para acesso global   
-
-function abrirTelaTodosOsLotes() {
-    preencherFiltroNewsletters(); // ✅ só uma vez
-    listarTodosOsLotes();         // ✅ com filtros aplicados
-}
-window.abrirTelaTodosOsLotes = abrirTelaTodosOsLotes; // para acesso global 
 
 function configurarBotoesPrevia(contexto) {
     const botoesPadrao = document.getElementById("botoes-envio-padrao");
