@@ -1,6 +1,5 @@
 window.tipoDestinatarioSelecionado = tipoDestinatarioSelecionado; // para acesso global
 
-let leadsFiltraveis = [];
 window.leadsFiltraveis = leadsFiltraveis; // para acesso global
 window.leadsFiltraveis = [];
 
