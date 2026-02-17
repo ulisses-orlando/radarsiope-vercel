@@ -1123,8 +1123,9 @@ window.selecionarTodosUsuarios = selecionarTodosUsuarios; // para acesso global
 // Configuração do provedor de envio
 // Troque para "ses" quando migrar para Amazon SES
 
+
+let EMAIL_PROVIDER = "vercel";
 window.EMAIL_PROVIDER = EMAIL_PROVIDER; // para acesso global
-EMAIL_PROVIDER = "vercel";
 
 // Função utilitária para pausar (controla taxa de envio)
 function sleep(ms) {
