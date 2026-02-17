@@ -555,7 +555,7 @@ async function gerarPreviaEnvio() {
 
     mostrarAba("secao-preview-envio");
 }
-
+window.prepararEnvioNewsletter = prepararEnvioNewsletter; // para acesso global
 
 function aplicarFiltroPreviewEnvio() {
     const filtros = Array.from(document.querySelectorAll(".filtro-preview:checked")).map(f => f.value);
@@ -610,7 +610,7 @@ function aplicarFiltroPreviewEnvio() {
     document.getElementById("contador-erro-envio").textContent = totalErroEnvio;
     document.getElementById("contador-visiveis").textContent = totalVisiveis;
 }
-
+window.aplicarFiltroPreviewEnvio = aplicarFiltroPreviewEnvio; // para acesso global
 
 function limparFiltrosPreview() {
     document.querySelectorAll(".filtro-preview").forEach(chk => chk.checked = false);
@@ -618,7 +618,7 @@ function limparFiltrosPreview() {
     if (perfilSelect) perfilSelect.value = ""; // volta para "Todos"
     aplicarFiltroPreviewEnvio();
 }
-
+window.limparFiltrosPreview = limparFiltrosPreview; // para acesso global
 
 function selecionarTodosLeads(chkMaster) {
     const todos = document.querySelectorAll(".chk-lead-envio");
@@ -626,6 +626,7 @@ function selecionarTodosLeads(chkMaster) {
         chk.checked = chkMaster.checked;
     }
 }
+window.selecionarTodosLeads = selecionarTodosLeads; // para acesso global
 
 function exportarCSVPrevia() {
     const linhas = document.querySelectorAll("#tabela-preview-envio tbody tr");
@@ -656,7 +657,7 @@ function exportarCSVPrevia() {
     link.download = "previa_envio.csv";
     link.click();
 }
-
+window.exportarCSVPrevia = exportarCSVPrevia; // para acesso global
 
 async function listarDescadastramentos() {
 
@@ -844,7 +845,6 @@ async function listarUsuariosComAssinaturas(newsletterId) {
     }
 }
 window.listarUsuariosComAssinaturas = listarUsuariosComAssinaturas; // para acesso global
-
 
 // Filtro de usuários
 function filtrarUsuariosEnvio() {
@@ -2439,3 +2439,122 @@ async function atualizarRetornoSES(newsletterId, envioId, loteId, logResultados)
     }
 }
 window.atualizarRetornoSES = atualizarRetornoSES; // para acesso global
+
+// variável de estado local ao módulo (ou exposta no window se precisar)
+let dadosCampanha = null;
+window.dadosCampanha = dadosCampanha; // para acesso global se necessário
+
+// função que abre o modal e prepara os dados
+function abrirModalConfirmacao(newsletter, filtros, totalSelecionados) {
+  dadosCampanha = { newsletterId: newsletter.id, filtros };
+
+  const tipo = filtros.tipo === "leads" ? "Leads" : "Usuários";
+  const titulo = newsletter.titulo;
+  const edicao = newsletter.edicao || newsletter.id;
+
+  const info = `📰 Newsletter: ${titulo} (${edicao})\n` +
+               `👥 Tipo: ${tipo}\n` +
+               `📬 Destinatários selecionados: ${totalSelecionados}`;
+
+  const infoEl = document.getElementById("info-campanha");
+  if (infoEl) infoEl.innerText = info;
+
+  const modal = document.getElementById("modal-confirmacao");
+  if (modal) modal.style.display = "flex";
+}
+
+// função que fecha modal
+function fecharModal() {
+  const modal = document.getElementById("modal-confirmacao");
+  if (modal) modal.style.display = "none";
+  dadosCampanha = null;
+}
+
+// função que fecha modal de erros
+function fecharModalErrosEncontrados() {
+  const alertModal = document.getElementById("alert-modal");
+  if (alertModal) alertModal.style.display = "none";
+  dadosCampanha = null;
+}
+
+// prosseguir com a geração chamando confirmarPrevia (já exposta no window)
+async function prosseguirGeracao() {
+  const modal = document.getElementById("modal-confirmacao");
+  if (modal) modal.style.display = "none";
+
+  if (dadosCampanha && typeof window.confirmarPrevia === "function") {
+    try {
+      await window.confirmarPrevia(dadosCampanha.newsletterId, dadosCampanha.filtros);
+    } finally {
+      dadosCampanha = null;
+    }
+  } else {
+    console.warn("confirmarPrevia não disponível ou dadosCampanha vazio");
+  }
+}
+
+// função que será ligada ao botão Gerar Lotes
+function onClickGerarLotes() {
+  const newsletter = window.newsletterSelecionada;
+  if (!newsletter) {
+    return window.mostrarMensagem?.("Nenhuma newsletter selecionada.");
+  }
+
+  const filtros = typeof window.coletarFiltros === "function"
+    ? window.coletarFiltros()
+    : null;
+
+  if (!filtros) {
+    return window.mostrarMensagem?.("Erro ao coletar filtros.");
+  }
+
+  const linhasSelecionadas = Array.from(document.querySelectorAll(".chk-envio-final:checked"));
+  const totalSelecionados = linhasSelecionadas.length;
+
+  if (totalSelecionados === 0) {
+    return window.mostrarMensagem?.("Nenhum destinatário selecionado para envio.");
+  }
+
+  abrirModalConfirmacao(newsletter, filtros, totalSelecionados);
+}
+
+// inicializador que registra listeners quando o DOM estiver pronto
+function initGeracaoLotes() {
+  // botão principal
+  const btn = document.getElementById("btn-gerar-lotes");
+  if (btn) {
+    btn.removeEventListener("click", onClickGerarLotes); // segurança
+    btn.addEventListener("click", onClickGerarLotes);
+  } else {
+    console.warn("btn-gerar-lotes não encontrado no DOM");
+  }
+
+  // botão fechar modal (se for um botão com onclick="fecharModal()" no HTML,
+  // aqui ligamos ao mesmo comportamento sem depender do inline)
+  const btnFechar = document.querySelector("#modal-confirmacao button[onclick='fecharModal()']");
+  if (btnFechar) {
+    btnFechar.removeEventListener("click", fecharModal);
+    btnFechar.addEventListener("click", fecharModal);
+  }
+
+  // botão prosseguir (ex.: #btn-prosseguir-geracao)
+  const btnProsseguir = document.getElementById("btn-prosseguir-geracao");
+  if (btnProsseguir) {
+    btnProsseguir.removeEventListener("click", prosseguirGeracao);
+    btnProsseguir.addEventListener("click", prosseguirGeracao);
+  }
+
+  // expor funções no window caso HTML use onclick inline em outros pontos
+  window.fecharModal = fecharModal;
+  window.fecharModalErrosEncontrados = fecharModalErrosEncontrados;
+  window.prosseguirGeracao = prosseguirGeracao;
+
+  console.log("EnvioLeads: inicializador de geração de lotes registrado");
+}
+
+// registra init no DOMContentLoaded para garantir que elementos existam
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", initGeracaoLotes);
+} else {
+  initGeracaoLotes();
+}
