@@ -1,5 +1,8 @@
+window.tipoDestinatarioSelecionado = tipoDestinatarioSelecionado; // para acesso global
 
 let leadsFiltraveis = [];
+window.leadsFiltraveis = leadsFiltraveis; // para acesso global
+window.leadsFiltraveis = [];
 
 async function listarLeadsComPreferencias() {
   const corpo = document.querySelector("#tabela-leads-envio tbody");
@@ -174,8 +177,8 @@ async function visualizarNewsletterHtml(newsletterId) {
 
     // ✅ Determina o segmento com base no seletor
     let segmento = null;
-    if (tipoDestinatarioSelecionado === "leads") segmento = "leads";
-    if (tipoDestinatarioSelecionado === "usuarios") segmento = "assinantes";
+    if (window.tipoDestinatarioSelecionado === "leads") segmento = "leads";
+    if (window.tipoDestinatarioSelecionado === "usuarios") segmento = "assinantes";
 
     // ✅ HTML base da edição
     let htmlBase = dados.html_conteudo || "";
@@ -398,14 +401,14 @@ async function listarNewslettersDisponiveis() {
 }
 
 function prepararEnvioNewsletter(newsletterId) {
-    if (!tipoDestinatarioSelecionado) {
+    if (!window.tipoDestinatarioSelecionado) {
         mostrarMensagem("Selecione primeiro se deseja enviar para Leads ou Usuários.");
         return;
     }
     configurarBotoesPrevia("envio");
-    if (tipoDestinatarioSelecionado === "leads") {
+    if (window.tipoDestinatarioSelecionado === "leads") {
         prepararEnvioParaLeads(newsletterId);
-    } else if (tipoDestinatarioSelecionado === "usuarios") {
+    } else if (window.tipoDestinatarioSelecionado === "usuarios") {
         prepararEnvioParaUsuarios(newsletterId);
     }
 }
@@ -726,18 +729,16 @@ function abrirAbaDescadastramentos() {
 }
 window.abrirAbaDescadastramentos = abrirAbaDescadastramentos; // acesso global
 
-window.tipoDestinatarioSelecionado = tipoDestinatarioSelecionado; // para acesso global
-
 function alterarTipoDestinatario(tipo) {
     const botoes = document.querySelectorAll(".btn-preparar-envio");
 
     if (!tipo) {
-        tipoDestinatarioSelecionado = null;
+        window.tipoDestinatarioSelecionado = null;
         botoes.forEach(btn => btn.disabled = true); // desabilita todos
         return;
     }
 
-    tipoDestinatarioSelecionado = tipo;
+    window.tipoDestinatarioSelecionado = tipo;
     botoes.forEach(btn => btn.disabled = false); // habilita todos
 }
 window.alterarTipoDestinatario = alterarTipoDestinatario; // para acesso global
@@ -1067,9 +1068,9 @@ window.gerarPreviaEnvioLeads = gerarPreviaEnvioLeads; // para acesso global
 
 function voltarParaEnvio() {
 
-    if (tipoDestinatarioSelecionado === "leads") {
+    if (window.tipoDestinatarioSelecionado === "leads") {
         mostrarAba("secao-envio-leads");
-    } else if (tipoDestinatarioSelecionado === "usuarios") {
+    } else if (window.tipoDestinatarioSelecionado === "usuarios") {
         mostrarAba("secao-envio-usuarios");
     } else {
         // fallback: volta para lista de newsletters
@@ -1165,7 +1166,7 @@ async function confirmarPrevia(newsletterId, filtros) {
     const destinatarios = linhasSelecionadas.map(tr => {
         const nome = tr.children[1].innerText;
         const email = tr.children[3].innerText;
-        const tipo = tipoDestinatarioSelecionado;
+        const tipo = window.tipoDestinatarioSelecionado;
 
         return {
             id: tipo === "leads" ? tr.dataset.leadId : tr.dataset.usuarioId,
@@ -1334,7 +1335,7 @@ async function listarLotesEnvio(newsletterId, envioId) {
         <td>
             <button onclick="verDestinatariosLoteUnificado('${loteId}')">👥 Ver Destinatários</button>
             <button onclick="enviarLoteIndividual('${newsletterId}', '${envioId}', '${loteId}')">📤 Enviar Newsletter</button>
-            <button onclick="enviarLoteEmMassa('${newsletterId}', '${envioId}', '${loteId}', '${tipoDestinatarioSelecionado}')">🚀 Enviar Newsletter em massa</button>
+            <button onclick="enviarLoteEmMassa('${newsletterId}', '${envioId}', '${loteId}', '${window.tipoDestinatarioSelecionado}')">🚀 Enviar Newsletter em massa</button>
             ${reenvios.length > 0
                 ? `<button onclick="verHistoricoEnvios('${newsletterId}', '${envioId}', '${loteId}')">📜 Ver Reenvios (${reenvios.length})</button>`
                 : `<button disabled title='Sem reenvios registrados'>📜 Ver Reenvios</button>`}
@@ -1694,7 +1695,7 @@ function voltarParaPrevia() {
 window.voltarParaPrevia = voltarParaPrevia; // para acesso global
 
 function coletarFiltros() {
-    if (tipoDestinatarioSelecionado === "leads") {
+    if (window.tipoDestinatarioSelecionado === "leads") {
         return {
             tipo: "leads",
             nome: document.getElementById("filtro-nome").value.trim().toLowerCase(),
@@ -1703,7 +1704,7 @@ function coletarFiltros() {
             preferencias: document.getElementById("filtro-tipo-news-envio").value.trim().toLowerCase(),
             status: document.getElementById("filtro-status-lead").value.trim().toLowerCase()
         };
-    } else if (tipoDestinatarioSelecionado === "usuarios") {
+    } else if (window.tipoDestinatarioSelecionado === "usuarios") {
         return {
             tipo: "usuarios",
             nome: document.getElementById("filtro-usuario-nome").value.trim().toLowerCase(),
@@ -1726,7 +1727,7 @@ function abrirLotesGerados() {
     db.collection("newsletters")
         .doc(newsletterSelecionada.id)
         .collection("envios")
-        .where("tipo", "==", tipoDestinatarioSelecionado)
+        .where("tipo", "==", window.tipoDestinatarioSelecionado)
         .orderBy("data_geracao", "desc")
         .limit(1)
         .get()
@@ -1736,7 +1737,7 @@ function abrirLotesGerados() {
                 snapshot = await db.collection("newsletters")
                     .doc(newsletterSelecionada.id)
                     .collection("envios")
-                    .where("tipo", "==", tipoDestinatarioSelecionado)
+                    .where("tipo", "==", window.tipoDestinatarioSelecionado)
                     .orderBy("data_envio", "desc")
                     .limit(1)
                     .get();
