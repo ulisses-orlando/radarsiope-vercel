@@ -1,7 +1,8 @@
+let tipoDestinatarioSelecionado = null;
 window.tipoDestinatarioSelecionado = tipoDestinatarioSelecionado; // para acesso global
 
+let leadsFiltraveis = [];
 window.leadsFiltraveis = leadsFiltraveis; // para acesso global
-window.leadsFiltraveis = [];
 
 async function listarLeadsComPreferencias() {
   const corpo = document.querySelector("#tabela-leads-envio tbody");
@@ -1736,7 +1737,7 @@ function abrirLotesGerados() {
                 snapshot = await db.collection("newsletters")
                     .doc(newsletterSelecionada.id)
                     .collection("envios")
-                    .where("tipo", "==", window.tipoDestinatarioSelecionado)
+                    .where("tipo", "==", tipoDestinatarioSelecionado)
                     .orderBy("data_envio", "desc")
                     .limit(1)
                     .get();
