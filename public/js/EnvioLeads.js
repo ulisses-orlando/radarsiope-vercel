@@ -1355,12 +1355,12 @@ async function listarLotesEnvio(newsletterId, envioId) {
 }
 window.listarLotesEnvio = listarLotesEnvio; // para acesso global
 
-async function enviarLoteIndividual(newsletterId, envioId, loteId) {
+async function enviarLoteIndividual(newsletterId, envioDocId, loteId) {    
     try {
         const loteRef = db.collection("newsletters")
             .doc(newsletterId)
             .collection("envios")
-            .doc(envioId)
+            .doc(envioDocId)
             .collection("lotes")
             .doc(loteId);
 
@@ -1423,22 +1423,37 @@ async function enviarLoteIndividual(newsletterId, envioId, loteId) {
                 );
 
                 let envioRef;
+                let envioId; // id do registro criado no Supabase (ou Firestore para assinantes)
 
                 if (tipo === "leads") {
-                    envioRef = await db
-                        .collection("leads")
-                        .doc(idDest)
-                        .collection("envios")
-                        .add({
-                            newsletter_id: newsletterId,
-                            data_envio: firebase.firestore.Timestamp.now(),
-                            status: "enviado",
-                            destinatarioId: idDest,
-                            token_acesso: token,
-                            expira_em: expiraEm,
-                            ultimo_acesso: null,
-                            acessos_totais: 0
-                        });
+                    // Chama a Edge Function que insere em leads_envios no Supabase
+                    const FUNCTION_URL = "https://ekrtekidjuwxfspjmmvl.supabase.co/functions/v1/insert-lead-envio";
+
+                    // expiraEm é um firebase.Timestamp; converte para ISO
+                    const expiraEmISO = expiraEm ? expiraEm.toDate().toISOString() : null;
+
+                    const payload = {
+                        lead_id: idDest,
+                        newsletter_id: newsletterId,
+                        data_envio: new Date().toISOString(),
+                        status: "enviado",
+                        token_acesso: token,
+                        expira_em: expiraEmISO
+                    };
+
+                    const resp = await fetch(FUNCTION_URL, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify(payload)
+                    });
+
+                    const json = await resp.json().catch(() => null);
+                    if (!resp.ok || !json || !json.ok) {
+                        // lança para cair no catch externo e registrar erro
+                        throw new Error((json && json.error) || "Falha ao criar envio no Supabase via Edge Function");
+                    }
+                    // Guarda o id retornado pela Edge Function
+                    envioId = json.id;
                 } else {
                     envioRef = await db
                         .collection("usuarios")
@@ -1447,20 +1462,18 @@ async function enviarLoteIndividual(newsletterId, envioId, loteId) {
                         .doc(dest.assinaturaId)
                         .collection("envios")
                         .add({
-                            newsletter_id: newsletterId,
-                            data_envio: firebase.firestore.Timestamp.now(),
-                            status: "enviado",
-                            destinatarioId: idDest,
-                            assinaturaId: dest.assinaturaId,
-                            token_acesso: token,
-                            expira_em: expiraEm,
-                            ultimo_acesso: null,
-                            acessos_totais: 0
+                        newsletter_id: newsletterId,
+                        data_envio: firebase.firestore.Timestamp.now(),
+                        status: "enviado",
+                        destinatarioId: idDest,
+                        assinaturaId: dest.assinaturaId,
+                        token_acesso: token,
+                        expira_em: expiraEm,
+                        ultimo_acesso: null,
+                        acessos_totais: 0
                         });
+                    envioId = envioRef.id;
                 }
-
-                // Obtem o id do envio criado
-                const envioId = envioRef.id;
 
                 // Define assinaturaId para passar à função (null se não existir)
                 const assinaturaId = dest && dest.assinaturaId ? dest.assinaturaId : null;
@@ -1515,7 +1528,35 @@ async function enviarLoteIndividual(newsletterId, envioId, loteId) {
                 };
 
                 if (tipo === "leads") {
-                    await db.collection("leads").doc(idDest).collection("envios").add(registroErro);
+                    // registra erro no Supabase via Edge Function (status: "erro")
+                    const FUNCTION_URL = "https://ekrtekidjuwxfspjmmvl.supabase.co/functions/v1/insert-lead-envio";
+
+                    const payloadErro = {
+                        lead_id: idDest,
+                        newsletter_id: newsletterId,
+                        data_envio: new Date().toISOString(),
+                        status: "erro",
+                        token_acesso: null,
+                        expira_em: null,
+                        // opcional: incluir campo 'erro' se a sua tabela aceitar; caso não aceite, remova
+                        // erro: registroErro.erro
+                    };
+
+                    try {
+                        const respErr = await fetch(FUNCTION_URL, {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify(payloadErro)
+                            });
+                        const jsonErr = await respErr.json().catch(() => null);
+                        if (!respErr.ok || !jsonErr || !jsonErr.ok) {
+                            // se falhar, grava fallback no Firestore para não perder o log
+                            await db.collection("leads").doc(idDest).collection("envios").add(registroErro);
+                        }
+                    } catch (e) {
+                        // fallback: grava no Firestore local
+                        await db.collection("leads").doc(idDest).collection("envios").add(registroErro);
+                    }
                 } else {
                     await db.collection("usuarios").doc(idDest)
                         .collection("assinaturas").doc(dest.assinaturaId)
