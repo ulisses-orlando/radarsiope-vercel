@@ -25,8 +25,6 @@ export default async function handler(req, res) {
 
   const { email, nome, mensagemHtml, assunto } = req.body;
 
-  console.log("📩 Email recebido no backend:", email);
-
   if (!email || !mensagemHtml) {
     return res.status(400).json({ ok: false, error: "Campos obrigatórios: email e mensagemHtml" });
   }
@@ -44,8 +42,6 @@ export default async function handler(req, res) {
     const command = new SendEmailCommand(params);
     const result = await sesClient.send(command);
 
-    console.log("✅ SES envio bem-sucedido:", result);
-
     return res.status(200).json({ ok: true, result });
   } catch (err) {
     console.error("❌ Erro SES:", err);
@@ -58,4 +54,5 @@ export default async function handler(req, res) {
     });
   }
 }
+
 
