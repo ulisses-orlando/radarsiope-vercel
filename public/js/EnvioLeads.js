@@ -2300,22 +2300,37 @@ async function enviarLoteEmMassa(newsletterId, envioId, loteId, tipo) {
         );
 
         let envioRef;
+        let envioRefId;
 
         if (tipo === "leads") {
-            envioRef = await db
-                .collection("leads")
-                .doc(idDest)
-                .collection("envios")
-                .add({
-                    newsletter_id: newsletterId,
-                    data_envio: firebase.firestore.Timestamp.now(),
-                    status: "enviado",
-                    destinatarioId: idDest,
-                    token_acesso: token,
-                    expira_em: expiraEm,
-                    ultimo_acesso: null,
-                    acessos_totais: 0
-                });
+            // Chama a Edge Function que insere em leads_envios no Supabase
+            const FUNCTION_URL = "https://ekrtekidjuwxfspjmmvl.supabase.co/functions/v1/insert-lead-envio";
+
+            // expiraEm é um firebase.Timestamp; converte para ISO
+            const expiraEmISO = expiraEm ? expiraEm.toDate().toISOString() : null;
+
+            const payload = {
+                        lead_id: idDest,
+                        newsletter_id: newsletterId,
+                        data_envio: new Date().toISOString(),
+                        status: "enviado",
+                        token_acesso: token,
+                        expira_em: expiraEmISO
+            };
+
+            const resp = await fetch(FUNCTION_URL, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify(payload)
+            });
+
+            const json = await resp.json().catch(() => null);
+            if (!resp.ok || !json || !json.ok) {
+               // lança para cair no catch externo e registrar erro
+               throw new Error((json && json.error) || "Falha ao criar envio no Supabase via Edge Function");
+            }
+            // Guarda o id retornado pela Edge Function
+            envioRefId = json.id;
         } else {
             envioRef = await db
                 .collection("usuarios")
@@ -2334,7 +2349,9 @@ async function enviarLoteEmMassa(newsletterId, envioId, loteId, tipo) {
                     ultimo_acesso: null,
                     acessos_totais: 0
                 });
+            envioRefId = envioRef.id;
         }
+
         const htmlMontado = montarHtmlNewsletterParaEnvio(newsletter, {
             nome: dest.nome,
             email: dest.email,
@@ -2344,13 +2361,13 @@ async function enviarLoteEmMassa(newsletterId, envioId, loteId, tipo) {
             data_publicacao: newsletter.data_publicacao,
             newsletterId
         }, dest.tipo);
-        const htmlFinal = aplicarRastreamento(htmlMontado, envioRef.id, idDest, newsletterId, assinaturaId, token);
+        const htmlFinal = aplicarRastreamento(htmlMontado, envioRefId, idDest, newsletterId, assinaturaId, token);
         payloadEmails.push({
             nome: dest.nome,
             email: dest.email,
             mensagemHtml: htmlFinal,
             assunto: newsletter.titulo || "Newsletter Radar SIOPE",
-            envioId: envioRef.id,
+            envioId: envioRefId,
             destinatarioId: idDest,
             tipo: dest.tipo || "leads",
             assinaturaId: assinaturaId
