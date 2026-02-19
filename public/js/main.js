@@ -282,7 +282,7 @@ async function abrirModalNewsletter(docId = null, isEdit = false) {
   // -----------------------------
   // COLUNA 1 — CAMPOS INICIAIS
   // -----------------------------
-  col1.appendChild(generateDateInput('Data data_publicacao', data.data_publicacao ? data.data_publicacao.toDate() : null));
+  col1.appendChild(generateDateInput('data_publicacao', data.data_publicacao ? data.data_publicacao.toDate() : null));
   col1.appendChild(generateTextField('edicao', data.edicao));
   col1.appendChild(generateTextField('titulo', data.titulo));
 
