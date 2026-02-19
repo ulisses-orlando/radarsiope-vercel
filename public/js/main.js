@@ -337,7 +337,7 @@ async function abrirModalNewsletter(docId = null, isEdit = false) {
 
   const tiposSnap = await db.collection("tipo_newsletters").get();
   const tiposArr = tiposSnap.docs.map(doc => doc.data().nome).filter(Boolean);
-  col1.appendChild(generateDomainSelect("Tipo", tiposArr, data.tipo));
+  col1.appendChild(generateDomainSelect("tipo", tiposArr, data.tipo));
   col1.appendChild(generateDomainSelect('Classificação', ['Básica', 'Premium'], data.classificacao || 'Básica'));
 
   // Campo "Enviada" (somente leitura)
