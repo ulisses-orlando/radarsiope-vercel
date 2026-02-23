@@ -150,7 +150,8 @@ async function carregarPlanos() {
   tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:#999;padding:12px">Carregando planos...</td></tr>';
 
   try {
-    const snap = await db.collection('planos').get(); // fallback se campo ordem não existir ainda
+    const snap = await db.collection('planos').orderBy('ordem', 'asc').get()
+      .catch(() => db.collection('planos').get()); // fallback se campo ordem não existir ainda
 
     if (snap.empty) {
       tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:#999;padding:12px">Nenhum plano cadastrado. Clique em ➕ Novo Plano.</td></tr>';
