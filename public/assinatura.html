@@ -167,16 +167,48 @@
       padding: 16px;
       background: #fff;
       cursor: pointer;
-      transition: all .2s;
+      transition: background .15s, box-shadow .15s, transform .15s;
+      /* faixa colorida no topo — visível apenas em destaque */
+      border-top: 2px solid #e0e6f0;
     }
-    .plano-card:hover { box-shadow: 0 4px 16px rgba(0,0,0,.1); transform: translateY(-2px); }
+    .plano-card:hover {
+      box-shadow: 0 4px 16px rgba(0,0,0,.1);
+      transform: translateY(-2px);
+    }
     .plano-card input[type="radio"] { position: absolute; opacity: 0; pointer-events: none; }
-    .plano-card.selecionado {
-      border-color: var(--plano-cor, #0A3D62);
-      box-shadow: 0 0 0 3px rgba(10,61,98,.12);
-    }
-    .plano-card.destaque { border-color: var(--plano-cor, #0A3D62); }
 
+    /* SELECIONADO — fundo suave + check no canto. Sem contorno. */
+    .plano-card.selecionado {
+      background: color-mix(in srgb, var(--plano-cor, #0A3D62) 6%, #fff);
+      box-shadow: 0 2px 12px rgba(0,0,0,.08);
+    }
+    /* Ícone ✓ no canto superior direito ao selecionar */
+    .plano-card.selecionado::after {
+      content: '✓';
+      position: absolute;
+      top: 10px;
+      right: 12px;
+      width: 22px;
+      height: 22px;
+      background: var(--plano-cor, #0A3D62);
+      color: #fff;
+      font-size: 13px;
+      font-weight: 700;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      line-height: 22px;
+      text-align: center;
+    }
+
+    /* DESTAQUE — faixa colorida no topo. Independente da seleção. */
+    .plano-card.destaque {
+      border-top: 4px solid var(--plano-cor, #0A3D62);
+      padding-top: 14px; /* compensa os 2px extras da borda */
+    }
+
+    /* Badge flutua acima do card — só em destaque */
     .plano-badge-destaque {
       position: absolute;
       top: -11px;
@@ -189,6 +221,7 @@
       padding: 3px 12px;
       border-radius: 20px;
       white-space: nowrap;
+      pointer-events: none;
     }
     .plano-nome {
       font-size: 15px;
