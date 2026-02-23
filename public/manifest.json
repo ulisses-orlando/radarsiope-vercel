@@ -1,0 +1,52 @@
+{
+  "name": "Radar SIOPE",
+  "short_name": "Radar SIOPE",
+  "description": "Inteligência fiscal educacional personalizada por município. SIOPE, FUNDEB e Salário-Educação na sua mão.",
+  "start_url": "/verNewsletterComToken.html",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#0A3D62",
+  "theme_color": "#0A3D62",
+  "lang": "pt-BR",
+  "dir": "ltr",
+  "categories": ["education", "finance", "government"],
+  "icons": [
+    {
+      "src": "/icons/icon-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-maskable-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Última Edição",
+      "short_name": "Edição",
+      "description": "Acessar a edição mais recente do Radar SIOPE",
+      "url": "/verNewsletterComToken.html",
+      "icons": [{ "src": "/icons/icon-192x192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Minha Área",
+      "short_name": "Minha Área",
+      "description": "Acessar a Área do Assinante",
+      "url": "/painel.html",
+      "icons": [{ "src": "/icons/icon-192x192.png", "sizes": "192x192" }]
+    }
+  ],
+  "screenshots": [],
+  "prefer_related_applications": false
+}
