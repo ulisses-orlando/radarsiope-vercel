@@ -1,1035 +1,899 @@
-// js/assinatura.js
-// Versão completa do fluxo de assinatura (lista apenas planos ativos do tipo "assinatura")
-// Requisitos externos: window.db (Firestore), inserirCamposUfMunicipio, aplicarMascaraTelefone,
-// validarEmail, validarTelefoneFormato, mostrarMensagem, funções utilitárias do projeto.
+/* ==========================================================================
+   assinatura.js — Radar SIOPE
+   Fluxo completo de assinatura: planos, ciclo mensal/anual, WhatsApp,
+   cupom, preview, upsert usuário, registro assinatura, pagamento MP.
 
-// -----------------------------
-// Helpers básicos
-// -----------------------------
-function getParametro(nome) {
-  const url = new URL(window.location.href);
-  return url.searchParams.get(nome);
+   Dependências globais:
+   - window.db (Firestore inicializado)
+   - inserirCamposUfMunicipio, aplicarMascaraTelefone (functions.js)
+   - validarEmail, validarTelefoneFormato, mostrarMensagem (functions.js)
+   - validateValorEParcelas (functions.js)
+   - firebase.firestore.FieldValue (Firebase SDK)
+   ========================================================================== */
+
+'use strict';
+
+// ─── Parâmetros de URL ────────────────────────────────────────────────────────
+function getParam(nome) {
+  return new URL(window.location.href).searchParams.get(nome);
 }
 
-const origem = getParametro("origem") || "origem_nao_informada";
-const planIdFromUrl = getParametro("planId") || null;
+const _origem      = getParam('origem') || 'direto';
+const _planIdUrl   = getParam('planId') || null;
+const _leadIdUrl   = getParam('leadId') || getParam('idLead') || null;
 
-// -----------------------------
-// Parse de preço do plano (robusto)
-// -----------------------------
-function parsePlanPrice(plan) {
-  if (!plan) return 0;
-  if (plan.valorCentavos !== undefined && plan.valorCentavos !== null) {
-    const n = Number(plan.valorCentavos);
-    if (!isNaN(n)) return n / 100;
-  }
-  if (plan.valor !== undefined && plan.valor !== null) {
-    const n = Number(plan.valor);
-    if (!isNaN(n)) return n;
-    const normalized = String(plan.valor).replace(/\./g, '').replace(',', '.');
-    const n2 = Number(normalized);
-    if (!isNaN(n2)) return n2;
-  }
-  if (plan.valor_unitario !== undefined && plan.valor_unitario !== null) {
-    const n = Number(plan.valor_unitario);
-    if (!isNaN(n)) return n;
-  }
-  return 0;
+// ─── Estado global da sessão ──────────────────────────────────────────────────
+let _cicloAtual    = 'mensal';   // 'mensal' | 'anual'
+let _planoAtual    = null;       // objeto completo do plano selecionado
+let _tiposMap      = {};         // id -> nome dos tipos de newsletter
+let _cupomAplicado = null;       // objeto cupom validado
+
+// ─── Features labels para renderizar nos cards ────────────────────────────────
+const FEATURES_CARD = [
+  { key: 'newsletter_texto',       label: 'Newsletter em texto'           },
+  { key: 'newsletter_audio',       label: 'Newsletter em áudio (podcast)' },
+  { key: 'newsletter_infografico', label: 'Infográfico por edição'        },
+  { key: 'alertas_prioritarios',   label: 'Alertas prioritários'          },
+  { key: 'grupo_whatsapp_vip',     label: 'Grupo VIP WhatsApp'            },
+  { key: 'biblioteca_acesso',      label: 'Biblioteca vitalícia'          },
+];
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function fmtBRL(v) {
+  const n = Number(v);
+  if (isNaN(n) || v === null || v === undefined) return '—';
+  return n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 }
 
-// -----------------------------
-// Carregar um plano por ID
-// -----------------------------
+function safeNum(v) {
+  if (v === null || v === undefined || v === '') return null;
+  const n = Number(String(v).replace(',', '.'));
+  return Number.isFinite(n) ? n : null;
+}
+
+function getPrecoPlano(plano, ciclo) {
+  if (!plano) return 0;
+  if (ciclo === 'anual' && plano.valor_anual != null) return Number(plano.valor_anual) || 0;
+  if (plano.valor_mensal != null) return Number(plano.valor_mensal) || 0;
+  // fallback campo legado
+  return Number(plano.valor) || 0;
+}
+
+// ─── Toggle ciclo mensal / anual ─────────────────────────────────────────────
+
+function selecionarCiclo(ciclo) {
+  _cicloAtual = ciclo;
+  document.getElementById('planCiclo').value = ciclo;
+
+  document.getElementById('btn-ciclo-mensal').classList.toggle('ativo', ciclo === 'mensal');
+  document.getElementById('btn-ciclo-anual').classList.toggle('ativo',  ciclo === 'anual');
+
+  // re-renderizar preços nos cards sem recarregar do Firestore
+  document.querySelectorAll('.plano-card').forEach(card => {
+    const slug = card.dataset.slug;
+    const p    = card._planoData;
+    if (!p) return;
+
+    const val  = getPrecoPlano(p, ciclo);
+    const valM = getPrecoPlano(p, 'mensal');
+
+    card.querySelector('.plano-preco-valor').textContent = fmtBRL(val);
+    card.querySelector('.plano-preco-ciclo').textContent = ciclo === 'anual' ? '/ano' : '/mês';
+
+    const econEl = card.querySelector('.plano-preco-anual-economia');
+    if (econEl) {
+      if (ciclo === 'anual' && valM > 0 && val > 0) {
+        const economia = (valM * 12) - val;
+        econEl.textContent = economia > 0 ? `Economia de ${fmtBRL(economia)}/ano` : '';
+        econEl.style.display = 'block';
+      } else {
+        econEl.style.display = 'none';
+      }
+    }
+  });
+
+  // atualiza preview se já tiver plano selecionado
+  if (_planoAtual) atualizarPreview();
+}
+
+// ─── Carregar plano por ID ────────────────────────────────────────────────────
+
 async function carregarPlano(planId) {
   if (!planId) return null;
   try {
     const doc = await db.collection('planos').doc(planId).get();
-    if (!doc.exists) return null;
-    return { id: doc.id, ...doc.data() };
+    return doc.exists ? { id: doc.id, ...doc.data() } : null;
   } catch (err) {
-    console.error('Erro ao carregar plano:', err);
+    console.error('[assinatura] Erro ao carregar plano:', err);
     return null;
   }
 }
 
-// ----------------------------- 
-// // Atualizar campo parcelas como <select> 
-// // ----------------------------- 
-function atualizarCampoParcelas(plan) {
-  const parcelasEl = document.getElementById('parcelas');
-  if (!parcelasEl) return;
-  const maxParcelas = plan.qtde_parcelas || 1;
-  // limpar opções anteriores 
-  parcelasEl.innerHTML = '';
-  // gerar opções de 1 até maxParcelas 
-  for (let i = 1; i <= maxParcelas; i++) {
-    const opt = document.createElement('option');
-    opt.value = i;
-    opt.textContent = `${i}x`;
-    parcelasEl.appendChild(opt);
-  }
-  // valor inicial = 1 
-  parcelasEl.value = "1";
-}
+// ─── Renderizar lista de planos em cards ──────────────────────────────────────
 
-// -----------------------------
-// Render de mensagem para consultoria/capacitação
-// -----------------------------
-function renderarMensagemServicos(containerId = 'planos-lista') {
-  const container = document.getElementById(containerId);
-  if (!container) return;
-  const html = `
-    <div style="margin-top:12px;padding:12px;border-radius:6px;border:1px solid #f0ad4e;background:#fff8e6;color:#333;font-size:14px;line-height:1.4">
-      <strong>Consultoria e Capacitação</strong>
-      <div style="margin-top:6px">
-        Para contratação de consultoria ou capacitação, por favor acesse
-        <a href="https://www.radarsiope.com.br/entre-em-contato" target="_blank" rel="noopener noreferrer" style="color:#0a66c2">radarsiope.com.br/entre-em-contato</a>.
-        Nossa equipe retornará com as opções e orçamento.
-      </div>
-    </div>
-  `;
-  container.insertAdjacentHTML('beforeend', html);
-}
-
-// carregarListaPlanos - lista somente planos ativos do tipo "assinatura"
-// gera cartões com estrutura .plano-card > input + .plano-content
-async function carregarListaPlanos(containerId = 'planos-lista') {
-  let container = document.getElementById(containerId);
-  if (!container) {
-    container = document.createElement('div');
-    container.id = containerId;
-    container.style.margin = '12px 0';
-    const ref = document.getElementById('campo-newsletters') || document.getElementById('form-assinatura');
-    if (ref && ref.parentNode) ref.parentNode.insertBefore(container, ref);
-    else document.body.appendChild(container);
-  }
-
-  container.innerHTML = '<strong>Escolha um plano</strong><div id="planos-cards" style="margin-top:8px"></div>';
-  const cardsWrap = document.getElementById('planos-cards');
+async function carregarListaPlanos() {
+  const wrap = document.getElementById('planos-cards');
+  if (!wrap) return;
+  wrap.innerHTML = '<div style="color:#999;font-size:13px;padding:8px">Carregando planos...</div>';
 
   try {
-    // buscar apenas planos do tipo "assinatura" e com status "ativo"
     const snap = await db.collection('planos')
       .where('tipo', '==', 'assinatura')
       .where('status', '==', 'ativo')
-      .get();
+      .orderBy('ordem', 'asc')
+      .get()
+      .catch(() =>
+        db.collection('planos').where('tipo', '==', 'assinatura').where('status', '==', 'ativo').get()
+      );
 
-    const planos = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-
-    // verificar se existem serviços (consultoria/capacitação) ativos para exibir banner informativo
-    const otherSnap = await db.collection('planos')
-      .where('status', '==', 'ativo')
-      .where('tipo', 'in', ['consultoria', 'capacitação'])
-      .get();
-    const hasOtherServices = !otherSnap.empty;
-
-    if (!planos.length) {
-      let html = '<div style="color:#999">Nenhum plano de assinatura ativo disponível no momento.</div>';
-      cardsWrap.innerHTML = html;
-      if (hasOtherServices) renderarMensagemServicos('planos-cards');
-      return [];
+    if (snap.empty) {
+      wrap.innerHTML = '<div style="color:#999">Nenhum plano disponível no momento.</div>';
+      return;
     }
 
-    // renderizar planos de assinatura no formato do cartão
-    cardsWrap.innerHTML = planos.map(p => {
-      const titulo = p.nome || p.id;
-      const preco = (p.valor !== undefined && p.valor !== null) ? Number(p.valor).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : '—';
-      const descricao = p.descricao ? `<div class="plano-descricao">${p.descricao}</div>` : `<div class="plano-descricao"></div>`;
-      const note = (Array.isArray(p.tipos_inclusos) && p.tipos_inclusos.length) ? `<div class="plano-note">${p.tipos_inclusos.length} tipos incluídos</div>` : '';
-      // cada label envolve o input e o conteúdo para manter área clicável
-      return `
-        <label class="plano-card" tabindex="0">
-          <input type="radio" name="plano-selecionado" value="${p.id}">
-          <div class="plano-content">
-            <div class="plano-top">
-              <div class="plano-titulo">${titulo}</div>
-              <div class="plano-preco">${preco}</div>
-            </div>
-            ${descricao}
-            ${note}
-          </div>
-        </label>
-      `;
-    }).join('');
+    wrap.innerHTML = '';
 
-    if (hasOtherServices) renderarMensagemServicos('planos-cards');
+    snap.forEach(doc => {
+      const p   = { id: doc.id, ...doc.data() };
+      const cor = p.cor_destaque || '#0A3D62';
+      const val = getPrecoPlano(p, _cicloAtual);
+      const valM = getPrecoPlano(p, 'mensal');
+      const features = p.features || {};
 
-    // listener: quando selecionar um plano, carregar e aplicar
-    // delegação no container para capturar mudança do radio
-    cardsWrap.addEventListener('change', async (ev) => {
-      const radio = ev.target;
-      if (radio && radio.name === 'plano-selecionado') {
-        const selectedId = radio.value;
-        const plan = await carregarPlano(selectedId);
-        if (!plan) return;
-        window._currentPlan = plan;
-        const planIdEl = document.getElementById('planId');
-        if (planIdEl) planIdEl.value = selectedId;
-        atualizarCampoParcelas(plan);
-        await carregarTiposNewsletterParaAssinatura('campo-newsletters', Array.isArray(plan.tipos_inclusos) ? plan.tipos_inclusos : []);
-        atualizarPreview();
-      }
-    });
+      const economia = (_cicloAtual === 'anual' && valM > 0 && p.valor_anual)
+        ? (valM * 12) - Number(p.valor_anual)
+        : 0;
 
-    // acessibilidade: permitir seleção via Enter/Space ao focar o label
-    cardsWrap.querySelectorAll('.plano-card').forEach(label => {
-      label.addEventListener('keydown', (ev) => {
-        if (ev.key === 'Enter' || ev.key === ' ') {
-          ev.preventDefault();
-          const radio = label.querySelector('input[type="radio"]');
-          if (radio) {
-            radio.checked = true;
-            radio.dispatchEvent(new Event('change', { bubbles: true }));
-          }
+      // lista de features
+      const featuresHtml = FEATURES_CARD.map(f => {
+        const ativo = !!features[f.key];
+        // sugestão de tema e consultoria — mostra quota
+        let label = f.label;
+        if (f.key === 'grupo_whatsapp_vip' && ativo && features.sugestao_tema_quota) {
+          label += ` + ${features.sugestao_tema_quota} sugestão/mês`;
         }
-      });
+        if (f.key === 'grupo_whatsapp_vip' && features.consultoria_horas_mes) {
+          label = `Consultoria ${features.consultoria_horas_mes}h/mês`;
+        }
+        return `<li class="${ativo ? '' : 'inativo'}">${label}</li>`;
+      }).join('');
+
+      const card = document.createElement('label');
+      card.className     = `plano-card${p.destaque ? ' destaque' : ''}`;
+      card.dataset.id    = p.id;
+      card.dataset.slug  = p.plano_slug || '';
+      card.style.setProperty('--plano-cor', cor);
+      card._planoData    = p; // referência para selecionarCiclo()
+
+      card.innerHTML = `
+        ${p.destaque && p.badge ? `<div class="plano-badge-destaque">${p.badge}</div>` : ''}
+        <input type="radio" name="plano-selecionado" value="${p.id}">
+        <div class="plano-content">
+          <div class="plano-nome">${p.nome || p.id}</div>
+          <div class="plano-preco-wrap">
+            <span class="plano-preco-valor" style="color:${cor}">${fmtBRL(val)}</span>
+            <span class="plano-preco-ciclo">${_cicloAtual === 'anual' ? '/ano' : '/mês'}</span>
+            <div class="plano-preco-anual-economia" style="${economia > 0 && _cicloAtual === 'anual' ? '' : 'display:none'}">
+              ${economia > 0 ? `Economia de ${fmtBRL(economia)}/ano` : ''}
+            </div>
+          </div>
+          ${p.descricao ? `<div class="plano-descricao">${p.descricao}</div>` : ''}
+          <ul class="plano-features">${featuresHtml}</ul>
+        </div>
+      `;
+
+      card.addEventListener('click', () => _onPlanoSelecionado(p.id));
+      wrap.appendChild(card);
     });
 
-    return planos;
+    // Se veio planId na URL, pré-seleciona
+    if (_planIdUrl) {
+      const match = wrap.querySelector(`.plano-card[data-id="${_planIdUrl}"]`);
+      if (match) {
+        match.click();
+      } else {
+        await _onPlanoSelecionado(_planIdUrl);
+      }
+    }
+
   } catch (err) {
-    console.error('Erro ao carregar lista de planos:', err);
-    cardsWrap.innerHTML = '<div style="color:#c00">Erro ao carregar planos.</div>';
-    return [];
+    console.error('[assinatura] Erro ao carregar planos:', err);
+    wrap.innerHTML = '<div style="color:#c00;font-size:13px">Erro ao carregar planos. Recarregue a página.</div>';
   }
 }
 
+// ─── Ao selecionar um plano ───────────────────────────────────────────────────
 
-// -----------------------------
-// Carregar tipos de newsletter (exibe checkboxes; respeita plano fixado)
-// -----------------------------
-// carregarTiposNewsletterParaAssinatura - lista apenas tipos com is_newsletter = true
-async function carregarTiposNewsletterParaAssinatura(containerId = 'campo-newsletters', preselected = []) {
-  const container = document.getElementById(containerId);
+async function _onPlanoSelecionado(planId) {
+  const plano = await carregarPlano(planId);
+  if (!plano) return;
+
+  _planoAtual = plano;
+  document.getElementById('planId').value = planId;
+
+  // marca card visualmente
+  document.querySelectorAll('.plano-card').forEach(c => {
+    c.classList.toggle('selecionado', c.dataset.id === planId);
+    const radio = c.querySelector('input[type="radio"]');
+    if (radio) radio.checked = c.dataset.id === planId;
+  });
+
+  // atualiza campo de parcelas
+  _atualizarCampoParcelas(plano);
+
+  // mostra opt-in WhatsApp para todos os planos
+  _mostrarWhatsappOptin();
+
+  // carrega tipos de newsletter
+  await carregarTiposNewsletter(Array.isArray(plano.tipos_inclusos) ? plano.tipos_inclusos : []);
+
+  // atualiza preview
+  await atualizarPreview();
+}
+
+// ─── Parcelas ────────────────────────────────────────────────────────────────
+
+function _atualizarCampoParcelas(plano) {
+  const el = document.getElementById('parcelas');
+  if (!el) return;
+  const max = plano.qtde_parcelas || 1;
+  el.innerHTML = '';
+  for (let i = 1; i <= max; i++) {
+    const opt = document.createElement('option');
+    opt.value = i;
+    opt.textContent = `${i}x`;
+    el.appendChild(opt);
+  }
+  el.value = '1';
+}
+
+// ─── WhatsApp opt-in ──────────────────────────────────────────────────────────
+
+function _mostrarWhatsappOptin() {
+  // Mostra o opt-in de WhatsApp se o campo tiver algum número digitado
+  const wpInput = document.getElementById('whatsapp');
+  const optinWrap = document.getElementById('whatsapp-optin-wrap');
+  if (!wpInput || !optinWrap) return;
+
+  const mostrar = () => {
+    optinWrap.style.display = wpInput.value.replace(/\D/g, '').length >= 10 ? 'flex' : 'none';
+  };
+
+  wpInput.removeEventListener('input', mostrar);
+  wpInput.addEventListener('input', mostrar);
+  mostrar();
+}
+
+// ─── Tipos de newsletter ──────────────────────────────────────────────────────
+
+async function carregarTiposNewsletter(preselected = []) {
+  const container = document.getElementById('campo-newsletters');
+  if (!container) return;
+
   try {
-    // consulta filtrada: somente tipos marcados como newsletter
-    const snap = await db.collection("tipo_newsletters").where('is_newsletter', '==', true).get();
-    const tipos = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    const snap = await db.collection('tipo_newsletters').where('is_newsletter', '==', true).get();
+    const tipos = snap.docs.map(d => ({ id: d.id, ...d.data() }));
 
-    // criar mapa global id -> nome para uso no cálculo do preview
-    window._tiposMap = {};
-    tipos.forEach(t => { window._tiposMap[t.id] = t.nome || t.id; });
+    _tiposMap = {};
+    tipos.forEach(t => { _tiposMap[t.id] = t.nome || t.id; });
 
     if (!tipos.length) {
-      container.innerHTML = "<p style='color:#999'>Nenhum tipo de newsletter configurado.</p>";
-      return tipos;
+      container.innerHTML = '<p style="color:#999;font-size:13px">Nenhum tipo de newsletter configurado.</p>';
+      return;
     }
 
-    const planFixado = !!(window._currentPlan && Array.isArray(window._currentPlan.tipos_inclusos) && window._currentPlan.tipos_inclusos.length);
+    const planFixado = !!(
+      _planoAtual &&
+      Array.isArray(_planoAtual.tipos_inclusos) &&
+      _planoAtual.tipos_inclusos.length
+    );
 
-    container.innerHTML = `<label>Selecione o(s) seu(s) interesse(s)</label>
-      <div id="grupo-newsletters" class="caixa-interesses duas-colunas">
+    container.innerHTML = `
+      ${planFixado
+        ? '<p style="font-size:12px;color:#666;margin:0 0 8px">Tipos incluídos no seu plano:</p>'
+        : '<p style="font-size:12px;color:#666;margin:0 0 8px">Selecione seu(s) interesse(s):</p>'
+      }
+      <div id="grupo-newsletters" style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
         ${tipos.map(t => {
-      const checked = planFixado ? (window._currentPlan.tipos_inclusos.map(String).includes(String(t.id))) : preselected.includes(t.id);
-      const disabledAttr = planFixado ? 'disabled' : '';
-      return `
-            <label class="item-interesse">
-              <input type="checkbox" value="${t.id}" id="tipo-${t.id}" ${checked ? 'checked' : ''} ${disabledAttr}>
-              <span class="icone"></span>
-              <span class="texto">${t.nome || t.id}</span>
-            </label>
-          `;
-    }).join("")}
+          const incl = planFixado
+            ? _planoAtual.tipos_inclusos.map(String).includes(String(t.id))
+            : preselected.includes(t.id);
+          const disabled = planFixado ? 'disabled' : '';
+          return `
+            <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:${planFixado ? 'default' : 'pointer'}">
+              <input type="checkbox" value="${t.id}" id="tipo-${t.id}"
+                ${incl ? 'checked' : ''} ${disabled}
+                style="width:15px;height:15px">
+              <span>${t.nome || t.id}</span>
+            </label>`;
+        }).join('')}
       </div>
-      ${!planFixado ? '<div style="margin-top:8px"><button type="button" id="btn-selecionar-todos">Selecionar tudo</button></div>' : '<div style="margin-top:8px;color:#666;font-size:13px">Tipos definidos pelo plano</div>'}
-      `;
+      ${!planFixado
+        ? `<button type="button" id="btn-sel-todos"
+             style="margin-top:8px;padding:5px 12px;font-size:12px;background:#f0f4f8;border:1px solid #d1d9e0;border-radius:6px;cursor:pointer">
+             Selecionar todos
+           </button>`
+        : '<p style="font-size:12px;color:#0A3D62;margin:8px 0 0">✓ Tipos definidos pelo seu plano</p>'
+      }
+    `;
 
     if (!planFixado) {
-      const btn = document.getElementById('btn-selecionar-todos');
-      if (btn) btn.addEventListener('click', () => {
-        document.querySelectorAll('#grupo-newsletters input[type="checkbox"]').forEach(cb => cb.checked = true);
+      document.getElementById('btn-sel-todos')?.addEventListener('click', () => {
+        container.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = true);
         atualizarPreview();
       });
-    }
-
-    if (!planFixado) {
       container.addEventListener('change', () => {
-        if (window._currentPlan && !window._currentPlan.allow_multi_select) {
-          const checks = Array.from(document.querySelectorAll('#grupo-newsletters input[type="checkbox"]'));
-          const checked = checks.filter(c => c.checked);
-          if (checked.length > 1) {
-            const last = checked[checked.length - 1];
-            checks.forEach(c => { if (c !== last) c.checked = false; });
+        if (_planoAtual && !_planoAtual.allow_multi_select) {
+          const cbs = [...container.querySelectorAll('input[type="checkbox"]:checked')];
+          if (cbs.length > 1) {
+            const ultimo = cbs[cbs.length - 1];
+            cbs.forEach(c => { if (c !== ultimo) c.checked = false; });
           }
         }
         atualizarPreview();
       });
     } else {
-      atualizarPreview();
+      await atualizarPreview();
     }
 
-    return tipos;
   } catch (err) {
-    console.error('Erro ao carregar tipos de newsletter:', err);
-    container.innerHTML = "<p style='color:#999'>Erro ao carregar tipos.</p>";
-    return [];
+    console.error('[assinatura] Erro ao carregar tipos:', err);
+    container.innerHTML = '<p style="color:#c00;font-size:13px">Erro ao carregar tipos.</p>';
   }
 }
 
-// Função auxiliar para validar cupom no Firestore
+// ─── Validar cupom ────────────────────────────────────────────────────────────
+
 async function validarCupom(codigo) {
   if (!codigo) return null;
   try {
-    const snap = await db.collection('cupons')
-      .where('codigo', '==', codigo)
-      .limit(1)
-      .get();
-    if (snap.empty) {
-      mostrarMensagem('Cupom não encontrado.');
-      return null;
-    }
+    const snap = await db.collection('cupons').where('codigo', '==', codigo).limit(1).get();
+    if (snap.empty) { mostrarMensagem('Cupom não encontrado.'); return null; }
     const cupom = snap.docs[0].data();
-
-    // checar status
-    if (!cupom.status || cupom.status !== 'ativo') {
-      mostrarMensagem('Cupom inativo.');
-      return null;
-    }
-
-    // checar validade por data
-    if (cupom.expira_em && cupom.expira_em.toDate() < new Date()) {
-      mostrarMensagem('Cupom expirado.');
-      return null;
-    }
-
-    return cupom;
+    if (cupom.status !== 'ativo') { mostrarMensagem('Cupom inativo.'); return null; }
+    if (cupom.expira_em && cupom.expira_em.toDate() < new Date()) { mostrarMensagem('Cupom expirado.'); return null; }
+    return { ...cupom, _id: snap.docs[0].id };
   } catch (err) {
-    console.error('Erro ao validar cupom:', err);
-    mostrarMensagem('Erro ao validar cupom. Veja console.');
+    console.error('[assinatura] Erro ao validar cupom:', err);
     return null;
   }
 }
 
+// ─── Calcular preview ─────────────────────────────────────────────────────────
 
-// calcularPreview: monta items e aplica regras de cobrança + cupom
-async function calcularPreview(plan, tiposSelecionados = [], cupomCodigo = '') {
-  const tiposInclusos = Array.isArray(plan && plan.tipos_inclusos ? plan.tipos_inclusos : []) ? plan.tipos_inclusos.map(String) : [];
-  const bundles = Array.isArray(plan && plan.bundles ? plan.bundles : []) ? plan.bundles : [];
-  const allowMulti = !!(plan && plan.allow_multi_select);
+async function calcularPreview(plano, tiposSelecionados = [], cupomObj = null) {
+  const basePrice    = getPrecoPlano(plano, _cicloAtual);
+  const tiposIncl    = Array.isArray(plano.tipos_inclusos) ? plano.tipos_inclusos.map(String) : [];
+  const allowMulti   = !!plano.allow_multi_select;
+  const bundles      = Array.isArray(plano.bundles) ? plano.bundles : [];
 
-  const basePrice = parsePlanPrice(plan);
-  const pricePerTipo = (plan && plan.price_per_tipo) ? Number(plan.price_per_tipo) : basePrice;
+  const items = tiposSelecionados.map(id => ({
+    id,
+    nome:     _tiposMap[id] || id,
+    included: tiposIncl.includes(String(id)),
+    price:    tiposIncl.includes(String(id)) ? 0 : (Number(plano.price_per_tipo) || basePrice),
+  }));
 
-  const tipos = Array.from(tiposSelecionados);
+  let total = allowMulti
+    ? items.reduce((s, i) => s + i.price, 0)
+    : items.find(i => !i.included)?.price ?? (items.length ? basePrice : 0);
 
-  const items = tipos.map(tipoId => {
-    const tipoNome = (window._tiposMap && window._tiposMap[tipoId]) ? window._tiposMap[tipoId] : null;
-    const included = tiposInclusos.includes(String(tipoId)) || (tipoNome && tiposInclusos.includes(String(tipoNome)));
-    const price = included ? 0 : (isNaN(pricePerTipo) ? 0 : pricePerTipo);
-    return { tipoId, tipoNome: tipoNome || tipoId, price, included };
-  });
-
-  let total = 0;
-  if (allowMulti) {
-    total = items.reduce((s, i) => s + (Number(i.price) || 0), 0);
-  } else {
-    const naoIncluidos = items.filter(i => !i.included);
-    if (naoIncluidos.length > 0) {
-      total = Number(naoIncluidos[0].price) || 0;
-    } else if (items.length > 0) {
-      total = basePrice;
-    } else {
-      total = 0;
-    }
-  }
-
-  // aplicar bundles
-  bundles.forEach(bundle => {
-    if (!Array.isArray(bundle.types) || bundle.types.length === 0) return;
-    const match = bundle.types.every(t => tipos.includes(t));
-    if (!match) return;
-    if (bundle.discount_percent) {
-      const pct = Number(bundle.discount_percent) || 0;
-      const discount = total * (pct / 100);
-      total -= discount;
-    } else if (bundle.discount_fixed) {
-      const fixed = Number(bundle.discount_fixed) || 0;
-      total -= fixed;
+  // bundles
+  bundles.forEach(b => {
+    if (Array.isArray(b.types) && b.types.every(t => tiposSelecionados.includes(t))) {
+      if (b.discount_percent) total -= total * (Number(b.discount_percent) / 100);
+      else if (b.discount_fixed) total -= Number(b.discount_fixed);
     }
   });
 
-  // capturar total antes do cupom
-  const totalAntesDoCupom = total;
+  const totalBruto = Math.max(0, total);
+  let desconto = 0;
 
-  let cupomData = null;
-
-  // aplicar cupom
-  if (cupomCodigo) {
-    cupomData = await validarCupom(cupomCodigo);
-    if (cupomData) {
-      if (cupomData.tipo === 'percentual') {
-        const pct = Number(cupomData.valor) || 0;
-        const desconto = totalAntesDoCupom * (pct / 100);
-        total -= desconto;
-        mostrarMensagem(`Cupom aplicado: ${cupomCodigo} (-${pct}% = ${desconto.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })})`);
-      } else if (cupomData.tipo === 'fixo') {
-        const desconto = Number(cupomData.valor) || 0;
-        total -= desconto;
-        mostrarMensagem(`Cupom aplicado: ${cupomCodigo} (-${desconto.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })})`);
-      }
-    }
+  if (cupomObj) {
+    if (cupomObj.tipo === 'percentual') desconto = totalBruto * ((Number(cupomObj.valor) || 0) / 100);
+    else if (cupomObj.tipo === 'fixo')  desconto = Number(cupomObj.valor) || 0;
   }
 
-  const totalNormalized = Math.max(0, total);
-  const amountCentavos = Math.round(totalNormalized * 100);
+  const totalFinal = Math.max(0, totalBruto - desconto);
 
   return {
     items,
-    total: totalNormalized,
-    amountCentavos,
-    allowMulti,
-    pricePerTipo,
     basePrice,
-    baseTotal: totalAntesDoCupom, // valor original antes do cupom
-    cupomData // dados do cupom se válido
+    totalBruto,
+    desconto,
+    total:        totalFinal,
+    amountCentavos: Math.round(totalFinal * 100),
+    ciclo:        _cicloAtual,
+    cupom:        cupomObj,
   };
 }
 
-// -----------------------------
-// Render do preview no DOM
-// -----------------------------
+// ─── Atualizar preview no DOM ─────────────────────────────────────────────────
+
 async function atualizarPreview() {
-  const previewWrap = document.getElementById('preview-breakdown');
-  const itemsWrap = document.getElementById('preview-items');
-  const totalWrap = document.getElementById('preview-total');
+  const wrap     = document.getElementById('preview-breakdown');
+  const itemsEl  = document.getElementById('preview-items');
+  const totalEl  = document.getElementById('preview-total');
+  if (!wrap) return;
 
-  if (!window._currentPlan) {
-    if (previewWrap) previewWrap.style.display = 'none';
-    return null;
+  if (!_planoAtual) { wrap.style.display = 'none'; return; }
+
+  const checks = [...document.querySelectorAll('#grupo-newsletters input[type="checkbox"]:checked')];
+  const tipos  = checks.map(cb => cb.value);
+
+  if (!tipos.length) { wrap.style.display = 'none'; return; }
+
+  const pv = await calcularPreview(_planoAtual, tipos, _cupomAplicado);
+
+  wrap.style.display = 'block';
+
+  // itens
+  if (itemsEl) {
+    itemsEl.innerHTML = pv.items.map(it =>
+      `<div class="preview-row">
+        <span>${it.nome}</span>
+        <span>${it.included ? '<span style="color:#16a34a">Incluído</span>' : fmtBRL(it.price)}</span>
+      </div>`
+    ).join('');
   }
 
-  const checks = document.querySelectorAll('#grupo-newsletters input[type="checkbox"]:checked');
-  const tiposSelecionados = Array.from(checks).map(cb => cb.value);
+  // total
+  if (totalEl) {
+    let html = '';
 
-  const cupom = document.getElementById('cupom') ? document.getElementById('cupom').value.trim() : '';
-  const preview = await calcularPreview(window._currentPlan, tiposSelecionados, cupom);
-
-  if (!tiposSelecionados.length) {
-    if (previewWrap) previewWrap.style.display = 'none';
-    if (totalWrap) totalWrap.innerHTML = '';
-    return preview;
-  }
-
-  if (previewWrap) previewWrap.style.display = 'block';
-
-  if (itemsWrap) {
-    itemsWrap.innerHTML = preview.items.map(it => {
-      const nomeTipo = it.tipoNome || (document.querySelector(`#tipo-${it.tipoId} + .texto`)?.textContent) || it.tipoId;
-      const precoTexto = it.included ? 'Incluído' : (it.price.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }));
-      return `<div style="display:flex;justify-content:space-between;margin-bottom:4px">
-                <div style="flex:1">${nomeTipo}</div>
-                <div style="margin-left:12px">${precoTexto}</div>
-              </div>`;
-    }).join('');
-  }
-
-  if (totalWrap) {
-    const total = preview.total;
-    let textoResumo = '';
-
-    // valor original sempre mostrado
-    textoResumo += `Valor original: ${preview.baseTotal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}<br>`;
-
-    // se cupom aplicado
-    if (preview.cupomData) {
-      if (preview.cupomData.tipo === 'percentual') {
-        const pct = Number(preview.cupomData.valor) || 0;
-        const desconto = (preview.baseTotal * pct / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-        textoResumo += `Cupom ${preview.cupomData.codigo} aplicado: (-${pct}% = ${desconto})<br>`;
-      } else if (preview.cupomData.tipo === 'fixo') {
-        const desconto = Number(preview.cupomData.valor).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-        textoResumo += `Cupom ${preview.cupomData.codigo} aplicado: (-${desconto})<br>`;
-      }
+    if (pv.desconto > 0 && pv.cupom) {
+      html += `<div class="preview-row desconto">
+                 <span>🎟 Cupom ${pv.cupom.codigo}</span>
+                 <span>- ${fmtBRL(pv.desconto)}</span>
+               </div>`;
     }
 
-    // total final
-    if (window._currentPlan?.permitir_sem_juros && window._currentPlan?.parcelas_sem_juros > 1) {
-      textoResumo += `Total final: ${total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} em até ${window._currentPlan.parcelas_sem_juros} vezes sem juros`;
-    } else {
-      textoResumo += `Total final: ${total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`;
+    const parcelasEl = document.getElementById('parcelas');
+    const parcelas = parcelasEl ? Number(parcelasEl.value) || 1 : 1;
+    const semJuros = _planoAtual.permitir_sem_juros && parcelas <= (_planoAtual.parcelas_sem_juros || 1);
+
+    let textoTotal = fmtBRL(pv.total);
+    if (_cicloAtual === 'anual') {
+      textoTotal += ' (pagamento anual)';
+    } else if (parcelas > 1) {
+      const parcVal = pv.total / parcelas;
+      textoTotal = `${parcelas}× de ${fmtBRL(parcVal)}${semJuros ? ' sem juros' : ''}`;
     }
 
-    totalWrap.innerHTML = `<strong>${textoResumo}</strong>`;
+    html += `<div class="preview-row total"><span>Total</span><span>${textoTotal}</span></div>`;
+    totalEl.innerHTML = html;
   }
 
-  return preview;
+  return pv;
 }
 
-// quando o usuário selecionar um plano
-function onPlanoSelecionado(planId) {
-  window._currentPlanId = planId;
-  aplicarCupomBtn.disabled = false; // libera botão
-  atualizarPreview();
-}
+// ─── Upsert usuário no Firestore ──────────────────────────────────────────────
 
-// -----------------------------
-// Upsert usuário por email
-// -----------------------------
-async function upsertUsuario({ nome, cpf, email, telefone, perfil, mensagem, preferencia, cod_uf, cod_municipio, nome_municipio }) {
+async function upsertUsuario(dados) {
+  const {
+    nome, cpf, email, telefone, whatsapp, whatsappOptin,
+    perfil, mensagem, preferencia,
+    cod_uf, cod_municipio, nome_municipio,
+    plano_slug, ciclo, features
+  } = dados;
+
+  const cpfNorm = (cpf || '').replace(/\D/g, '');
+
+  // Campos base (sempre salvos)
+  const base = {
+    nome,
+    cpfNormalizado: cpfNorm,
+    telefone:          telefone  || null,
+    whatsapp:          whatsapp  || null,
+    whatsapp_opt_in:   whatsapp  ? (whatsappOptin ?? true) : false,
+    whatsapp_opt_in_em: whatsapp ? firebase.firestore.FieldValue.serverTimestamp() : null,
+    perfil:            perfil    || null,
+    mensagem:          mensagem  || null,
+    preferencia_contato: preferencia || null,
+    cod_uf:            cod_uf        || null,
+    cod_municipio:     cod_municipio || null,
+    nome_municipio:    nome_municipio || null,
+    origem:            _origem,
+    updatedAt:         firebase.firestore.FieldValue.serverTimestamp(),
+  };
+
+  // Campos de plano — gravados APENAS quando o pagamento for confirmado via webhook.
+  // Aqui salvamos somente o que é seguro gravar antes do pagamento.
+  // (plano_slug, features, status — serão setados pelo webhook do MP)
+
   try {
-    const q = await db.collection('usuarios').where('email', '==', email).limit(1).get();
-    const cpfNormalizado = (cpf || "").replace(/\D/g, "");
+    const q = await db.collection('usuarios').where('email', '==', email.toLowerCase()).limit(1).get();
 
     if (!q.empty) {
-      const doc = q.docs[0];
-      await db.collection('usuarios').doc(doc.id).update({
-        nome,
-        cpfNormalizado,
-        telefone: telefone || null,
-        perfil: perfil || null,
-        mensagem: mensagem || null,
-        preferencia_contato: preferencia || null,
-        cod_uf: cod_uf || null,
-        cod_municipio: cod_municipio || null,
-        nome_municipio: nome_municipio || null,
-        origem,
-        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-      });
-      return doc.id;
+      const uid = q.docs[0].id;
+      await db.collection('usuarios').doc(uid).update(base);
+      return uid;
     } else {
       const ref = await db.collection('usuarios').add({
-        nome,
-        cpfNormalizado,
-        email,
-        telefone: telefone || null,
-        perfil: perfil || null,
-        mensagem: mensagem || null,
-        preferencia_contato: preferencia || null,
-        cod_uf: cod_uf || null,
-        cod_municipio: cod_municipio || null,
-        nome_municipio: nome_municipio || null,
-        origem,
-        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        ...base,
+        email: email.toLowerCase(),
+        // plano pendente — será ativado pelo webhook
+        plano_status: 'pendente_pagamento',
+        plano_slug:   plano_slug || null,
+        plano_ciclo:  ciclo      || 'mensal',
+        features:     features   || null,
+        createdAt:    firebase.firestore.FieldValue.serverTimestamp(),
       });
       return ref.id;
     }
   } catch (err) {
-    console.error('Erro no upsertUsuario:', err);
+    console.error('[assinatura] Erro em upsertUsuario:', err);
     throw err;
   }
 }
 
-/**
- * Cria o documento de assinatura na subcoleção usuarios/{userId}/assinaturas
- * Retorna o id do documento criado (assinaturaId)
- *
- * Parâmetros:
- * - userId string
- * - payload object { planId, tipos_selecionados, cupom, forma_pagamento, parcelas, origem, ... }
- * - preview object retornado por calcularPreview (deve ser await)
- *
- * Observações:
- * - grava campos de auditoria e valores calculados
- * - retorna assinaturaId para uso posterior (geração de parcelas, criação de pedido no backend)
- */
+// ─── Registrar assinatura (subcoleção) ───────────────────────────────────────
+
 async function registrarAssinatura(userId, payload, preview) {
-  if (!userId) throw new Error('userId é obrigatório');
-  if (!payload) throw new Error('payload é obrigatório');
-  if (!preview) throw new Error('preview é obrigatório');
+  if (!userId || !payload || !preview) throw new Error('Parâmetros obrigatórios ausentes.');
+
+  const agora = new Date();
+  const renovacao = new Date(agora);
+  if (preview.ciclo === 'anual') renovacao.setFullYear(renovacao.getFullYear() + 1);
+  else renovacao.setMonth(renovacao.getMonth() + 1);
+
+  const data = {
+    // Identificação
+    planId:       payload.planId  || null,
+    plano_slug:   payload.plano_slug || null,
+    plano_nome:   payload.plano_nome || null,
+    ciclo:        preview.ciclo   || 'mensal',
+    // Tipos
+    tipos_selecionados: Array.isArray(payload.tipos_selecionados) ? payload.tipos_selecionados : [],
+    // Valores
+    valor_original:  preview.totalBruto  ?? 0,
+    valor_desconto:  preview.desconto    ?? 0,
+    valor_final:     preview.total       ?? 0,
+    amountCentavos:  preview.amountCentavos ?? 0,
+    // Cupom
+    cupom:           payload.cupom || null,
+    // Features snapshot — garante histórico mesmo se o plano mudar depois
+    features_snapshot: payload.features || null,
+    // Datas
+    data_inicio:         firebase.firestore.Timestamp.fromDate(agora),
+    data_proxima_renovacao: firebase.firestore.Timestamp.fromDate(renovacao),
+    // Status
+    status:          'pendente_pagamento',
+    paymentProvider: 'mercadopago',
+    orderId:         payload.orderId || null,
+    pedidoId:        null, // preenchido após retorno do backend
+    // Auditoria
+    origem:          _origem,
+    createdAt:       firebase.firestore.FieldValue.serverTimestamp(),
+    updatedAt:       firebase.firestore.FieldValue.serverTimestamp(),
+  };
 
   try {
-    const assinaturaData = {
-      planId: payload.planId || null,
-      tipos_selecionados: Array.isArray(payload.tipos_selecionados) ? payload.tipos_selecionados : [],
-      cupom: payload.cupom || null,
-      origem: payload.origem || null,
-      valor_original: typeof preview.baseTotal === 'number' ? preview.baseTotal : (preview.baseTotal ? Number(preview.baseTotal) : 0),
-      valor_final: typeof preview.total === 'number' ? preview.total : (preview.total ? Number(preview.total) : 0),
-      desconto: (typeof preview.baseTotal === 'number' && typeof preview.total === 'number') ? (preview.baseTotal - preview.total) : null,
-      status: 'pendente_pagamento',
-      // campos opcionais para rastreabilidade
-      amountCentavos: typeof preview.amountCentavos === 'number' ? preview.amountCentavos : Math.round((preview.total || 0) * 100),
-      paymentProvider: null,
-      orderId: payload.orderId || null,
-      createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-    };
-
-    const ref = await db.collection('usuarios').doc(userId).collection('assinaturas').add(assinaturaData);
-
-    // retorna o id do documento criado para uso posterior
+    const ref = await db.collection('usuarios').doc(userId).collection('assinaturas').add(data);
     return ref.id;
   } catch (err) {
-    console.error('registrarAssinatura: erro ao criar assinatura', err);
+    console.error('[assinatura] Erro em registrarAssinatura:', err);
     throw err;
   }
 }
 
-async function gerarParcelasAssinatura(userId, assinaturaId, valorTotal, numParcelas, metodoPagamento, dataPrimeiroVencimento) {
-  try {
-    const valorParcela = valorTotal / numParcelas;
-    const pagamentosRef = db.collection('usuarios')
-      .doc(userId)
-      .collection('assinaturas')
-      .doc(assinaturaId)
-      .collection('pagamentos');
+// ─── Criar pedido no backend (Mercado Pago) ───────────────────────────────────
 
-    for (let i = 0; i < numParcelas; i++) {
-      const vencimento = new Date(dataPrimeiroVencimento);
-      vencimento.setMonth(vencimento.getMonth() + i); // cada parcela no mês seguinte
-
-      await pagamentosRef.add({
-        numero_parcela: i + 1,
-        valor: valorParcela,
-        metodo_pagamento: metodoPagamento,
-        data_vencimento: vencimento,
-        data_pagamento: null,
-        status: 'pendente',
-        createdAt: firebase.firestore.FieldValue.serverTimestamp()
-      });
-    }
-
-    console.log(`Parcelas geradas para assinatura ${assinaturaId}`);
-  } catch (err) {
-    console.error('Erro ao gerar parcelas da assinatura:', err);
-    throw err;
-  }
-}
-
-// chamada do front para criar pedido no backend (Checkout Pro)
-async function createOrderBackend(payload) {
-  // payload esperado: { userId, assinaturaId, amountCentavos, descricao }
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 30000); // 30s timeout opcional
-
+async function criarPedidoBackend(payload) {
+  const ctrl    = new AbortController();
+  const timeout = setTimeout(() => ctrl.abort(), 30000);
   try {
     const resp = await fetch('/api/pagamentoMP?acao=criar-pedido', {
-      method: 'POST',
+      method:  'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-      signal: controller.signal
+      body:    JSON.stringify(payload),
+      signal:  ctrl.signal,
     });
     clearTimeout(timeout);
-
     if (!resp.ok) {
       const txt = await resp.text().catch(() => '');
-      throw new Error(`Erro create-order: ${resp.status} ${txt}`);
+      throw new Error(`Backend ${resp.status}: ${txt}`);
     }
-    const json = await resp.json().catch(() => null);
-    if (!json) throw new Error('Resposta inválida do servidor.');
-    return json; // { ok:true, redirectUrl, pedidoId }
+    return await resp.json();
   } catch (err) {
     clearTimeout(timeout);
-    // lançar para o caller tratar
     throw err;
   }
 }
 
+// ─── Prefill a partir do lead ─────────────────────────────────────────────────
 
-// -----------------------------
-// Prefill a partir de leadId (simplificado; UF/Mun tratados no init)
-// -----------------------------
-async function prefillFromLeadIfPresent() {
-  const leadId = getParametro('leadId') || getParametro('idLead') || null;
-  if (!leadId) return null;
-
+async function prefillFromLead() {
+  if (!_leadIdUrl) return null;
   try {
-    const doc = await db.collection('leads').doc(leadId).get();
-    if (!doc.exists) {
-      console.warn('leadId informado não encontrado:', leadId);
-      return null;
-    }
+    const doc = await db.collection('leads').doc(_leadIdUrl).get();
+    if (!doc.exists) return null;
     const lead = doc.data();
 
-    if (lead.nome) document.getElementById('nome').value = lead.nome;
-    if (lead.email) document.getElementById('email').value = lead.email;
-    if (lead.telefone) document.getElementById('telefone').value = lead.telefone;
-    if (lead.perfil) document.getElementById('perfil').value = lead.perfil;
-    if (lead.preferencia_contato) document.getElementById('preferencia-contato').value = lead.preferencia_contato;
+    const set = (id, val) => { if (val && document.getElementById(id)) document.getElementById(id).value = val; };
+    set('nome',              lead.nome);
+    set('email',             lead.email);
+    set('telefone',          lead.telefone);
+    set('whatsapp',          lead.whatsapp || lead.telefone);
+    set('perfil',            lead.perfil);
+    set('preferencia-contato', lead.preferencia_contato);
 
-    if (Array.isArray(lead.interesses) && lead.interesses.length) {
-      lead.interesses.forEach(val => {
-        const cbById = document.querySelector(`#tipo-${val}`);
-        if (cbById) cbById.checked = true;
-        else {
-          const cbByValue = Array.from(document.querySelectorAll('#grupo-newsletters input[type="checkbox"]'))
-            .find(cb => cb.value === val || (cb.nextElementSibling && cb.nextElementSibling.textContent.trim() === val));
-          if (cbByValue) cbByValue.checked = true;
-        }
+    if (Array.isArray(lead.interesses)) {
+      lead.interesses.forEach(v => {
+        const cb = document.getElementById(`tipo-${v}`)
+          || document.querySelector(`#grupo-newsletters input[value="${v}"]`);
+        if (cb) cb.checked = true;
       });
     }
 
-    if (typeof atualizarPreview === 'function') atualizarPreview();
+    // mostra opt-in se tiver WhatsApp
+    _mostrarWhatsappOptin();
 
-    const status = document.getElementById('status-envio');
-    if (status) {
-      status.innerText = 'Formulário preenchido a partir do seu cadastro.';
-      status.style.color = '#006600';
-    }
+    const st = document.getElementById('status-envio');
+    if (st) { st.textContent = '✅ Dados preenchidos a partir do seu cadastro.'; st.style.color = '#16a34a'; }
 
     return lead;
   } catch (err) {
-    console.error('Erro ao buscar lead para prefill:', err);
+    console.error('[assinatura] Erro ao buscar lead:', err);
     return null;
   }
 }
 
-// -----------------------------
-// Processamento do envio do formulário de assinatura
-// -----------------------------
+// ─── Validações do formulário ─────────────────────────────────────────────────
+
+function clearErrors() {
+  document.querySelectorAll('#form-assinatura .field-error').forEach(el => {
+    el.textContent = '';
+    el.style.display = 'none';
+  });
+}
+
+function setError(id, msg) {
+  const el = document.getElementById(`error-${id}`);
+  if (el) { el.textContent = msg; el.style.display = 'block'; }
+}
+
+function validarCPF(cpf) {
+  cpf = cpf.replace(/\D/g, '');
+  if (cpf.length !== 11 || /^(\d)\1+$/.test(cpf)) return false;
+  let s = 0;
+  for (let i = 0; i < 9; i++) s += parseInt(cpf[i]) * (10 - i);
+  let r = (s * 10) % 11;
+  if (r === 10 || r === 11) r = 0;
+  if (r !== parseInt(cpf[9])) return false;
+  s = 0;
+  for (let i = 0; i < 10; i++) s += parseInt(cpf[i]) * (11 - i);
+  r = (s * 10) % 11;
+  if (r === 10 || r === 11) r = 0;
+  return r === parseInt(cpf[10]);
+}
+
+// ─── Submissão do formulário ──────────────────────────────────────────────────
+
 async function processarEnvioAssinatura(e) {
   e.preventDefault();
+  clearErrors();
+
+  const btn    = document.getElementById('btn-assinar');
   const status = document.getElementById('status-envio');
-  const botao = document.getElementById('btn-assinar');
-  clearFormErrors();
-  if (status) { status.innerText = ''; status.style.color = 'black'; }
+  const setStatus = (msg, cor = '#555') => { if (status) { status.textContent = msg; status.style.color = cor; } };
 
-  // --- validações (mantidas) ---
-  const nome = document.getElementById('nome').value.trim();
-  const cpf = document.getElementById('cpf').value.trim();
-  const email = document.getElementById('email').value.trim();
-  const telefone = document.getElementById('telefone').value.trim();
-  const perfil = document.getElementById('perfil').value;
-  const mensagem = document.getElementById('mensagem').value.trim();
-  const preferencia = document.getElementById('preferencia-contato').value;
-  const cupom = document.getElementById('cupom').value.trim();
-  const aceita = !!document.getElementById('aceita-termos').checked;
+  // ── Coleta de dados ──
+  const nome       = document.getElementById('nome')?.value.trim()             || '';
+  const cpf        = document.getElementById('cpf')?.value.trim()              || '';
+  const email      = document.getElementById('email')?.value.trim()            || '';
+  const telefone   = document.getElementById('telefone')?.value.trim()         || '';
+  const whatsapp   = document.getElementById('whatsapp')?.value.trim()         || '';
+  const wpOptin    = !!document.getElementById('whatsapp-optin')?.checked;
+  const perfil     = document.getElementById('perfil')?.value                  || '';
+  const mensagem   = document.getElementById('mensagem')?.value.trim()         || '';
+  const preferencia = document.getElementById('preferencia-contato')?.value    || '';
+  const cupomCod   = document.getElementById('cupom')?.value.trim()            || '';
+  const aceita     = !!document.getElementById('aceita-termos')?.checked;
+  const ciclo      = document.getElementById('planCiclo')?.value               || 'mensal';
 
-  const checks = document.querySelectorAll('#grupo-newsletters input[type="checkbox"]:checked');
-  const tiposSelecionados = Array.from(checks).map(cb => cb.value);
+  const tiposSelecionados = [...document.querySelectorAll('#grupo-newsletters input[type="checkbox"]:checked')]
+    .map(cb => cb.value);
 
-  if (nome.length < 3) { showFormError('nome', 'Nome deve ter pelo menos 3 caracteres.'); return; }
+  // ── Validações ──
+  let temErro = false;
+  const erro = (campo, msg) => { setError(campo, msg); temErro = true; };
 
-  if (!cpf) { showFormError('cpf', 'Informe seu CPF.'); return; }
-  if (!validarCPF(cpf)) { showFormError('cpf', 'CPF inválido.'); return; }
+  if (nome.length < 3)       erro('nome',  'Nome deve ter pelo menos 3 caracteres.');
+  if (!validarCPF(cpf))      erro('cpf',   'CPF inválido.');
+  if (!validarEmail(email))  erro('email', 'E-mail inválido.');
+  if (!perfil)               { mostrarMensagem('Selecione seu perfil.'); temErro = true; }
+  if (!aceita)               { setError('aceita_termos', 'Você precisa aceitar os termos.'); temErro = true; }
+  if (!tiposSelecionados.length) { mostrarMensagem('Selecione pelo menos um tipo de newsletter.'); temErro = true; }
+  if (!_planoAtual)          { mostrarMensagem('Selecione um plano.'); temErro = true; }
 
-  if (!perfil) { mostrarMensagem('Selecione seu perfil.'); return; }
+  if (temErro) return;
 
-  if (!preferencia) { mostrarMensagem('Selecione sua preferência de contato.'); return; }
-
-  if (!validarEmail(email)) { showFormError('email', 'E-mail inválido.'); return; }
-
-  // --- se já existe usuário com este e-mail ---
-  const usuarioSnap = await db.collection('usuarios')
-    .where('email', '==', email.toLowerCase())
-    .limit(1)
-    .get();
-
-  if (!usuarioSnap.empty) {
-    const userId = usuarioSnap.docs[0].id;
-    const assinaturasSnap = await db.collection('usuarios')
-      .doc(userId)
-      .collection('assinaturas')
-      .get();
-
-    const temAtiva = assinaturasSnap.docs.some(doc => {
-      const st = doc.data().status;
-      return st === 'ativa' || st === 'aprovada';
-    });
-
-    if (temAtiva) {
-      showFormError('email', 'Usuário já está cadastrado com este e-mail. Acesse a área do assinante e contate o suporte.');
-      mostrarMensagem('Usuário já está cadastrado com este e-mail. Acesse a área do assinante e contate o suporte.');
-      return;
+  // ── Verificar se já tem assinatura ativa ──
+  try {
+    const exSnap = await db.collection('usuarios').where('email', '==', email.toLowerCase()).limit(1).get();
+    if (!exSnap.empty) {
+      const uid = exSnap.docs[0].id;
+      const assSnap = await db.collection('usuarios').doc(uid).collection('assinaturas')
+        .where('status', 'in', ['ativa', 'aprovada']).get();
+      if (!assSnap.empty) {
+        mostrarMensagem('Você já possui uma assinatura ativa. Acesse a Área do Assinante.');
+        return;
+      }
     }
+  } catch (err) { console.warn('[assinatura] Verificação de ativo falhou:', err); }
 
-    // Se só existem assinaturas pendentes/canceladas, pode limpar
-    const pendentes = assinaturasSnap.docs.filter(doc => {
-      const st = doc.data().status;
-      return st !== 'ativa' && st !== 'aprovada';
-    });
-
-    for (const doc of pendentes) {
-      await db.collection('usuarios').doc(userId)
-        .collection('assinaturas').doc(doc.id).delete();
-    }
-  }
-
-  if (telefone) {
-    const telefoneNumerico = telefone.replace(/\D/g, "");
-    if (telefoneNumerico.length < 10 || !validarTelefoneFormato(telefone)) { showFormError('telefone', 'Telefone inválido.'); return; }
-  }
-  if (!tiposSelecionados.length) { if (status) status.innerText = "⚠️ Selecione pelo menos um interesse."; return; }
-  if (!aceita) { showFormError('aceita_termos', 'Você precisa aceitar os termos.'); return; }
-
-  // Obter UF / Município — usar API do helper (capturaLead.js)
+  // ── UF / Município ──
   let dadosUf = null;
   try {
-    if (typeof validarUfMunicipio === 'function') {
-      dadosUf = await validarUfMunicipio();
-    } else if (validarUfMunicipio && typeof validarUfMunicipio.getValues === 'function') {
-      dadosUf = validarUfMunicipio.getValues();
-    } else {
-      dadosUf = null;
-    }
-  } catch (err) {
-    console.warn('Erro ao obter dados UF/Mun via validarUfMunicipio():', err);
-    dadosUf = null;
-  }
+    dadosUf = typeof validarUfMunicipio === 'function' ? validarUfMunicipio() : null;
+    if (!dadosUf) return; // validarUfMunicipio já mostra a mensagem de erro
+  } catch (err) { console.warn('[assinatura] UF/Mun:', err); }
 
-  // calcular preview (IMPORTANTE: aguardar)
+  // ── Preview final ──
+  btn.disabled = true;
+  setStatus('Calculando valores...', '#555');
+
   let preview;
   try {
-    preview = await calcularPreview(window._currentPlan || {}, tiposSelecionados, cupom);
+    preview = await calcularPreview(_planoAtual, tiposSelecionados, _cupomAplicado);
   } catch (err) {
-    console.error('Erro ao calcular preview:', err);
-    if (status) { status.innerText = "Erro ao calcular o valor. Tente novamente."; status.style.color = 'red'; }
+    setStatus('Erro ao calcular valores. Tente novamente.', '#c00');
+    btn.disabled = false;
     return;
   }
 
-  // checagem extra
-  if (!preview || typeof preview.amountCentavos !== 'number' || preview.amountCentavos <= 0) {
-    if (status) { status.innerText = "Valor inválido para pagamento."; status.style.color = 'red'; }
+  if (!preview || preview.amountCentavos <= 0) {
+    setStatus('Valor inválido para pagamento.', '#c00');
+    btn.disabled = false;
     return;
   }
 
-  botao.disabled = true;
-  if (status) { status.innerText = "Processando..."; status.style.color = 'black'; }
+  setStatus('Registrando dados...', '#555');
 
   try {
-    // 1) upsert do usuário
+    // 1. Upsert do usuário
     const userId = await upsertUsuario({
-      nome, cpf, email, telefone, perfil, mensagem,
-      preferencia, cod_uf: dadosUf ? dadosUf.cod_uf : null, cod_municipio: dadosUf ? dadosUf.cod_municipio : null, nome_municipio: dadosUf ? dadosUf.nome_municipio : null
+      nome, cpf, email, telefone, whatsapp, whatsappOptin: wpOptin,
+      perfil, mensagem, preferencia,
+      cod_uf:        dadosUf?.cod_uf,
+      cod_municipio: dadosUf?.cod_municipio,
+      nome_municipio: dadosUf?.nome_municipio,
+      plano_slug:    _planoAtual.plano_slug,
+      ciclo,
+      features:      _planoAtual.features || null,
     });
 
-    // payload básico para registrar assinatura localmente
-    const payloadAssin = {
-      userId,
-      planId: document.getElementById('planId').value || null,
+    // 2. Registrar assinatura
+    const assinaturaId = await registrarAssinatura(userId, {
+      planId:           _planoAtual.id,
+      plano_slug:       _planoAtual.plano_slug || null,
+      plano_nome:       _planoAtual.nome       || null,
       tipos_selecionados: tiposSelecionados,
-      cupom: cupom || null,
-      origem
-    };
+      cupom:            cupomCod || null,
+      features:         _planoAtual.features   || null,
+    }, preview);
 
-    // 2) registrar assinatura localmente e obter assinaturaId
-    const assinaturaId = await registrarAssinatura(userId, payloadAssin, preview);
-    if (!assinaturaId) {
-      throw new Error('Falha ao criar registro de assinatura local.');
-    }
+    // 3. Criar pedido no backend
+    setStatus('Iniciando pagamento...', '#555');
 
-    // 3) criar order no backend (incluir assinaturaId para rastreabilidade)
-    const backendPayload = {
+    const backendResp = await criarPedidoBackend({
       userId,
       assinaturaId,
-      amountCentavos: preview.amountCentavos,
+      amountCentavos:  preview.amountCentavos,
       cpf,
       nome,
       email,
-      descricao: window._currentPlan?.nome || 'Assinatura',
-      installmentsMax: window._currentPlan?.parcelas_sem_juros || 1,
-      dataPrimeiroVencimento: new Date().toISOString().split('T')[0]
-    };
+      descricao:       _planoAtual.nome || 'Assinatura Radar SIOPE',
+      installmentsMax: _planoAtual.parcelas_sem_juros || 1,
+      dataPrimeiroVencimento: new Date().toISOString().split('T')[0],
+      ciclo,
+      plano_slug:      _planoAtual.plano_slug || null,
+    });
 
-    const backendResp = await createOrderBackend(backendPayload);
-
-    console.log("Resposta do backend:", backendResp);
-
-    if (!backendResp || backendResp.ok === false) {
-      const msg = (backendResp && backendResp.message) ? backendResp.message : 'Erro ao criar pedido no servidor.';
-      throw new Error(msg);
+    // 4. Salvar pedidoId localmente (opcional — webhook é a fonte de verdade)
+    if (backendResp?.pedidoId) {
+      db.collection('usuarios').doc(userId).collection('assinaturas').doc(assinaturaId)
+        .update({ pedidoId: backendResp.pedidoId, updatedAt: firebase.firestore.FieldValue.serverTimestamp() })
+        .catch(() => {});
     }
 
-    // 4) opcional: salvar pedidoId localmente (use backendResp.pedidoId)
-    // Recomendação: o backend já gravou pedidos_mp; não é obrigatório que o cliente escreva novamente.
-    // Se quiser gravar localmente (ex.: exibir no painel), use pedidoId retornado:
-    if (backendResp.pedidoId) {
-      try {
-        // se suas regras permitirem, atualize a assinatura local com o pedidoId
-        await db.collection('usuarios').doc(userId).collection('assinaturas').doc(assinaturaId).set({ pedidoId: backendResp.pedidoId }, { merge: true });
-      } catch (err) {
-        console.warn('Não foi possível salvar pedidoId localmente (opcional):', err);
-      }
-    }
-
-    // 5) NÃO gerar parcelas no cliente antes do redirecionamento.
-    //    O ideal é que a geração de parcelas seja feita no backend ou após confirmação (webhook).
-    //    Se você optar por gerar no cliente, saiba que o redirecionamento pode interromper a execução.
-    //    Aqui eu removi a chamada a gerarParcelasAssinatura para evitar perda de execução.
-
-    // 6) redirecionamento / fluxo de pagamento conforme backend
-    if (backendResp.redirectUrl) {
+    // 5. Redirecionar para o Checkout
+    if (backendResp?.redirectUrl) {
       window.location.href = backendResp.redirectUrl;
-      return;
     } else {
-      // fallback: mostrar modal com instruções
-      mostrarMensagem && mostrarMensagem('Pedido criado. Aguardando confirmação.');
-      const modal = document.getElementById('modalConfirmacao');
-      if (modal) {
-        modal.style.display = 'flex';
-        const msg = document.getElementById('modal-msg');
-        if (msg) msg.textContent = 'Pedido criado. Aguardando confirmação.';
-      }
-      return;
+      document.getElementById('modalConfirmacao').style.display = 'flex';
     }
+
   } catch (err) {
-    console.error('Erro no processo de assinatura', err);
-    if (status) { status.innerText = err.message || 'Erro ao processar assinatura. Veja console.'; status.style.color = 'red'; }
+    console.error('[assinatura] Erro no processamento:', err);
+    setStatus(err.message || 'Erro ao processar. Tente novamente.', '#c00');
   } finally {
-    botao.disabled = false;
+    btn.disabled = false;
   }
 }
 
-// -----------------------------
-// Validação / UI helpers
-// -----------------------------
-function clearFormErrors() {
-  document.querySelectorAll('#form-assinatura .field-error').forEach(s => { s.textContent = ''; s.style.display = 'none'; });
-}
-function showFormError(id, msg) {
-  const el = document.getElementById('error-' + id);
-  if (el) { el.textContent = msg; el.style.display = 'block'; }
-  else console.warn('Erro form', id, msg);
-}
-function showGlobalMessage(msg, color = '#000') {
-  const status = document.getElementById('status-envio');
-  if (status) { status.innerText = msg; status.style.color = color; }
-}
+// ─── Inicialização ────────────────────────────────────────────────────────────
 
-async function atualizarEstadoBotaoCupom() {
-  const aplicarCupomBtn = document.getElementById('aplicar-cupom');
-  const cupomEl = document.getElementById('cupom');
-  if (!aplicarCupomBtn || !cupomEl) return;
-
-  const codigo = cupomEl.value.trim();
-  const planoSelecionado = !!window._currentPlanId;
-
-  if (planoSelecionado && codigo) {
-    const cupomData = await validarCupom(codigo);
-  }
-}
-
-// função simples para validar CPF (formato e dígitos)
-function validarCPF(cpf) {
-  cpf = cpf.replace(/\D/g, '');
-  if (cpf.length !== 11) return false;
-  // descarta CPFs inválidos conhecidos
-  if (/^(\d)\1+$/.test(cpf)) return false;
-  // cálculo dos dígitos verificadores
-  let soma = 0;
-  for (let i = 0; i < 9; i++) soma += parseInt(cpf.charAt(i)) * (10 - i);
-  let resto = (soma * 10) % 11;
-  if (resto === 10 || resto === 11) resto = 0;
-  if (resto !== parseInt(cpf.charAt(9))) return false;
-  soma = 0;
-  for (let i = 0; i < 10; i++) soma += parseInt(cpf.charAt(i)) * (11 - i);
-  resto = (soma * 10) % 11;
-  if (resto === 10 || resto === 11) resto = 0;
-  if (resto !== parseInt(cpf.charAt(10))) return false;
-  return true;
-}
-
-// -----------------------------
-// Inicialização (busca lead antes de inserir campos UF/Mun para permitir prefill do município)
-// -----------------------------
 async function initAssinatura() {
-  aplicarMascaraTelefone(document.getElementById("telefone"));
+  // Máscaras
+  const telEl = document.getElementById('telefone');
+  const wpEl  = document.getElementById('whatsapp');
+  if (telEl && typeof aplicarMascaraTelefone === 'function') aplicarMascaraTelefone(telEl);
+  if (wpEl  && typeof aplicarMascaraTelefone === 'function') aplicarMascaraTelefone(wpEl);
 
-  document.getElementById('cpf').addEventListener('input', function (e) {
-    let value = e.target.value.replace(/\D/g, ''); // só dígitos
-    if (value.length > 11) value = value.slice(0, 11); // limita a 11 dígitos
-
-    value = value.replace(/(\d{3})(\d)/, '$1.$2');
-    value = value.replace(/(\d{3})(\d)/, '$1.$2');
-    value = value.replace(/(\d{3})(\d{1,2})$/, '$1-$2');
-    e.target.value = value;
+  // Máscara CPF
+  document.getElementById('cpf')?.addEventListener('input', function () {
+    let v = this.value.replace(/\D/g, '').slice(0, 11);
+    v = v.replace(/(\d{3})(\d)/, '$1.$2').replace(/(\d{3})(\d)/, '$1.$2').replace(/(\d{3})(\d{1,2})$/, '$1-$2');
+    this.value = v;
   });
 
-  // tentar obter leadId antecipadamente para passar UF/Mun como padrão ao helper
-  const leadId = getParametro('leadId') || getParametro('idLead') || null;
-  let leadDataForUf = null;
-
-  if (leadId) {
+  // UF / Município — busca lead antecipado para pré-preencher
+  let leadPreload = null;
+  if (_leadIdUrl) {
     try {
-      const leadDoc = await db.collection('leads').doc(leadId).get();
-      if (leadDoc.exists) {
-        leadDataForUf = leadDoc.data();
-      } else {
-        console.warn('leadId informado não encontrado (initAssinatura):', leadId);
-      }
-    } catch (err) {
-      console.warn('Erro ao buscar lead preliminar para UF/Mun:', err);
-    }
+      const d = await db.collection('leads').doc(_leadIdUrl).get();
+      if (d.exists) leadPreload = d.data();
+    } catch (e) {}
   }
 
-  // inserir UF e Município passando valores padrão do lead (se houver)
-  const ufPadrao = leadDataForUf && leadDataForUf.cod_uf ? leadDataForUf.cod_uf : "";
-  const municipioPadrao = leadDataForUf && leadDataForUf.cod_municipio ? leadDataForUf.cod_municipio : "";
   window.validarUfMunicipio = await inserirCamposUfMunicipio(
-    document.getElementById("campo-uf-municipio"),
-    ufPadrao,
-    municipioPadrao
+    document.getElementById('campo-uf-municipio'),
+    leadPreload?.cod_uf        || '',
+    leadPreload?.cod_municipio || ''
   );
 
-  // carregar plano se houver planId
-  const planId = planIdFromUrl;
-  document.getElementById('planId').value = planId || '';
-  if (planId) {
-    const plan = await carregarPlano(planId);
-    if (!plan) {
-      showGlobalMessage('Plano não encontrado.', 'red');
-      return;
+  // Carregar planos ou plano específico da URL
+  if (_planIdUrl) {
+    const plano = await carregarPlano(_planIdUrl);
+    if (plano && plano.tipo === 'assinatura') {
+      await _onPlanoSelecionado(_planIdUrl);
+      // Esconde a seção de seleção se veio planId — o usuário já escolheu
+      // (opcional — remova se quiser permitir troca)
+      // document.getElementById('secao-planos').style.display = 'none';
+    } else {
+      await carregarListaPlanos();
     }
-    // se o planId não for do tipo assinatura, interromper e mostrar mensagem
-    if (plan.tipo && plan.tipo !== 'assinatura') {
-      const container = document.getElementById('planos-lista') || document.body;
-      container.innerHTML = '';
-      renderarMensagemServicos(container.id || 'planos-lista');
-      showGlobalMessage('O plano selecionado não é do tipo assinatura.', 'red');
-      return;
-    }
-    window._currentPlan = plan;
-    atualizarCampoParcelas(plan);
-    const preselected = Array.isArray(plan.tipos_inclusos) ? plan.tipos_inclusos : [];
-    await carregarTiposNewsletterParaAssinatura('campo-newsletters', preselected);
-    atualizarPreview();
   } else {
-    // sem planId: mostrar lista de planos de assinatura
-    await carregarListaPlanos('planos-lista');
-    await carregarTiposNewsletterParaAssinatura('campo-newsletters', []);
+    await carregarListaPlanos();
+    await carregarTiposNewsletter([]);
   }
 
-  // preencher o restante do formulário a partir do lead (se houver)
-  await prefillFromLeadIfPresent();
+  // Prefill lead
+  await prefillFromLead();
 
-  // listeners e bindings
-  const cupomEl = document.getElementById('cupom');
-  if (cupomEl) {
-    cupomEl.addEventListener('input', atualizarEstadoBotaoCupom);
-  }
+  // Cupom
+  document.getElementById('aplicar-cupom')?.addEventListener('click', async () => {
+    const codigo = document.getElementById('cupom')?.value.trim();
+    const fb     = document.getElementById('cupom-feedback');
+    if (!_planoAtual) { mostrarMensagem('Selecione um plano antes de aplicar o cupom.'); return; }
+    if (!codigo)       { mostrarMensagem('Digite um código de cupom.'); return; }
+    const cupom = await validarCupom(codigo);
+    if (cupom) {
+      _cupomAplicado = cupom;
+      if (fb) { fb.textContent = `✅ Cupom "${codigo}" aplicado!`; fb.style.color = '#16a34a'; }
+      await atualizarPreview();
+    } else {
+      _cupomAplicado = null;
+      if (fb) { fb.textContent = ''; }
+    }
+  });
 
-  // Botão aplicar cupom → sempre habilitado
-  const aplicarCupomBtn = document.getElementById('aplicar-cupom');
-  if (aplicarCupomBtn) {
-    aplicarCupomBtn.addEventListener('click', async () => {
-      const cupomEl = document.getElementById('cupom');
-      const codigo = cupomEl ? cupomEl.value.trim() : '';
+  // Parcelas → atualiza preview
+  document.getElementById('parcelas')?.addEventListener('change', atualizarPreview);
 
-      console.log('Cupom digitado:', codigo); // debug
-
-      if (!window._currentPlan) {
-        mostrarMensagem('Selecione um plano antes de aplicar o cupom.');
-        return;
-      }
-
-      if (!codigo || codigo.length === 0) {
-        mostrarMensagem('Digite um código de cupom.');
-        return;
-      }
-
-      const cupomData = await validarCupom(codigo);
-      if (!cupomData) {
-        mostrarMensagem('Cupom inválido, inativo ou expirado.');
-        return;
-      }
-
-      atualizarPreview();
-    });
-  }
-
-  const formaEl = document.getElementById('forma-pagamento');
-  if (formaEl) formaEl.addEventListener('change', atualizarPreview);
-  const form = document.getElementById('form-assinatura');
-  if (form) form.addEventListener('submit', processarEnvioAssinatura);
-  const parcelasEl = document.getElementById('parcelas');
-  if (parcelasEl) {
-    parcelasEl.addEventListener('change', atualizarPreview);
-  }
-
-  // Carregar plano inicial se já houver 
-  if (window._currentPlanId) {
-    onPlanoSelecionado(window._currentPlanId);
-  }
+  // Submit
+  document.getElementById('form-assinatura')?.addEventListener('submit', processarEnvioAssinatura);
 }
 
-// inicializa automaticamente
-initAssinatura();
+// ── Exporta selecionarCiclo para o HTML (chamado via onclick) ──
+window.selecionarCiclo = selecionarCiclo;
+
+// ── Auto-init ──
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initAssinatura);
+} else {
+  initAssinatura();
+}
