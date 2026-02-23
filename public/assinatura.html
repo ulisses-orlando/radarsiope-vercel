@@ -1,290 +1,575 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
-
 <head>
-    <meta charset="UTF-8" />
-    <title>Assinatura – Radar SIOPE</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <link rel="stylesheet" href="css/capturaLead.css" />
-</head>
-<style>
-    /* Estilo específico para o checkbox de aceite */
-    label.aceite-termos {
-        display: inline-flex;
-        align-items: center;
-        gap: 8px;
-        /* espaço entre checkbox e texto */
-        cursor: pointer;
-        user-select: none;
+  <meta charset="UTF-8" />
+  <title>Assinatura – Radar SIOPE</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="manifest" href="/manifest.json" />
+  <meta name="theme-color" content="#0A3D62" />
+  <link rel="stylesheet" href="css/capturaLead.css" />
+  <style>
+    /* ── Reset base ── */
+    *, *::before, *::after { box-sizing: border-box; }
+
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      background: #f4f6f9;
+      margin: 0;
+      padding: 0;
+      color: #1a1a2e;
     }
 
-    /* Garante que o input não seja deslocado por regras globais */
-    label.aceite-termos input[type="checkbox"] {
-        order: 0;
-        margin: 0;
-        width: 16px;
-        height: 16px;
-        flex: 0 0 auto;
+    /* ── Container principal ── */
+    .rs-container {
+      max-width: 680px;
+      margin: 0 auto;
+      padding: 24px 16px 60px;
     }
 
-    /* Texto do label */
-    label.aceite-termos span {
-        display: inline-block;
-        line-height: 1;
-        color: inherit;
+    /* ── Cabeçalho ── */
+    .rs-header {
+      text-align: center;
+      margin-bottom: 28px;
+    }
+    .rs-header img {
+      height: 48px;
+      margin-bottom: 12px;
+    }
+    .rs-header h1 {
+      font-size: 22px;
+      font-weight: 700;
+      color: #0A3D62;
+      margin: 0 0 6px;
+    }
+    .rs-header p {
+      font-size: 14px;
+      color: #666;
+      margin: 0;
     }
 
-    /* Grid responsivo para os cartões de plano */
+    /* ── Seções do formulário ── */
+    .rs-section {
+      background: #fff;
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 16px;
+      box-shadow: 0 1px 4px rgba(0,0,0,.06);
+    }
+    .rs-section-title {
+      font-size: 13px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .5px;
+      color: #0A3D62;
+      margin: 0 0 16px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid #e8f0fe;
+    }
+
+    /* ── Campos ── */
+    .rs-field { margin-bottom: 14px; }
+    .rs-field label {
+      display: block;
+      font-size: 13px;
+      font-weight: 600;
+      color: #444;
+      margin-bottom: 5px;
+    }
+    .rs-field input,
+    .rs-field select,
+    .rs-field textarea {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1.5px solid #dde1e9;
+      border-radius: 8px;
+      font-size: 14px;
+      color: #1a1a2e;
+      background: #fff;
+      transition: border-color .15s;
+      outline: none;
+    }
+    .rs-field input:focus,
+    .rs-field select:focus,
+    .rs-field textarea:focus {
+      border-color: #0A3D62;
+      box-shadow: 0 0 0 3px rgba(10,61,98,.1);
+    }
+    .rs-field textarea { resize: vertical; min-height: 72px; }
+    .rs-field .field-error {
+      display: none;
+      font-size: 11px;
+      color: #c62828;
+      margin-top: 4px;
+    }
+
+    /* ── Grid 2 colunas ── */
+    .rs-grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+    @media (max-width: 480px) { .rs-grid-2 { grid-template-columns: 1fr; } }
+
+    /* ── Toggle ciclo mensal/anual ── */
+    .rs-ciclo-toggle {
+      display: flex;
+      background: #f0f4f8;
+      border-radius: 10px;
+      padding: 4px;
+      gap: 4px;
+      margin-bottom: 20px;
+    }
+    .rs-ciclo-toggle button {
+      flex: 1;
+      padding: 9px;
+      border: none;
+      border-radius: 7px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      background: transparent;
+      color: #666;
+      transition: all .2s;
+      position: relative;
+    }
+    .rs-ciclo-toggle button.ativo {
+      background: #fff;
+      color: #0A3D62;
+      box-shadow: 0 1px 4px rgba(0,0,0,.1);
+    }
+    .rs-ciclo-toggle .rs-badge-economia {
+      position: absolute;
+      top: -8px;
+      right: -4px;
+      background: #16a34a;
+      color: #fff;
+      font-size: 10px;
+      font-weight: 700;
+      padding: 2px 5px;
+      border-radius: 10px;
+      white-space: nowrap;
+    }
+
+    /* ── Cards de plano ── */
     #planos-cards {
-        display: grid;
-        gap: 12px;
-        grid-template-columns: repeat(1, 1fr);
-        /* mobile por padrão */
-        margin-top: 8px;
+      display: grid;
+      gap: 12px;
+      grid-template-columns: 1fr;
     }
+    @media (min-width: 560px) { #planos-cards { grid-template-columns: 1fr 1fr; } }
+    @media (min-width: 900px) { #planos-cards { grid-template-columns: repeat(3, 1fr); } }
 
-    /* 2 colunas em telas médias */
-    @media (min-width: 600px) {
-        #planos-cards {
-            grid-template-columns: repeat(2, 1fr);
-        }
-    }
-
-    /* 3 colunas em telas maiores */
-    @media (min-width: 1000px) {
-        #planos-cards {
-            grid-template-columns: repeat(3, 1fr);
-        }
-    }
-
-    /* Estilo do cartão */
     .plano-card {
-        display: flex;
-        flex-direction: column;
-        justify-content: space-between;
-        border: 1px solid #e0e0e0;
-        border-radius: 8px;
-        padding: 12px;
-        background: #ffffff;
-        transition: box-shadow 160ms ease, transform 160ms ease;
-        cursor: pointer;
-        min-height: 110px;
+      position: relative;
+      display: block;
+      border: 2px solid #e0e6f0;
+      border-radius: 12px;
+      padding: 16px;
+      background: #fff;
+      cursor: pointer;
+      transition: all .2s;
     }
-
-    /* Hover / foco */
-    .plano-card:hover,
-    .plano-card:focus-within {
-        box-shadow: 0 6px 18px rgba(20, 20, 20, 0.08);
-        transform: translateY(-4px);
+    .plano-card:hover { box-shadow: 0 4px 16px rgba(0,0,0,.1); transform: translateY(-2px); }
+    .plano-card input[type="radio"] { position: absolute; opacity: 0; pointer-events: none; }
+    .plano-card.selecionado {
+      border-color: var(--plano-cor, #0A3D62);
+      box-shadow: 0 0 0 3px rgba(10,61,98,.12);
     }
+    .plano-card.destaque { border-color: var(--plano-cor, #0A3D62); }
 
-    /* Cabeçalho do cartão: título e preço */
-    .plano-card .plano-top {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 8px;
+    .plano-badge-destaque {
+      position: absolute;
+      top: -11px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: var(--plano-cor, #0A3D62);
+      color: #fff;
+      font-size: 11px;
+      font-weight: 700;
+      padding: 3px 12px;
+      border-radius: 20px;
+      white-space: nowrap;
     }
-
-    /* Título */
-    .plano-card .plano-titulo {
-        font-weight: 700;
-        font-size: 15px;
-        color: #222;
+    .plano-nome {
+      font-size: 15px;
+      font-weight: 700;
+      color: #1a1a2e;
+      margin-bottom: 4px;
     }
-
-    /* Preço destacado */
-    .plano-card .plano-preco {
-        font-weight: 700;
-        color: #0a66c2;
-        font-size: 14px;
-        white-space: nowrap;
+    .plano-preco-wrap { margin: 8px 0; }
+    .plano-preco-valor {
+      font-size: 22px;
+      font-weight: 800;
+      color: var(--plano-cor, #0A3D62);
+      line-height: 1;
     }
-
-    /* Descrição com truncamento */
-    .plano-card .plano-descricao {
-        margin-top: 8px;
-        color: #555;
-        font-size: 13px;
-        line-height: 1.3;
-        display: -webkit-box;
-        -webkit-line-clamp: 3;
-        -webkit-box-orient: vertical;
-        overflow: hidden;
+    .plano-preco-ciclo {
+      font-size: 12px;
+      color: #888;
+      margin-left: 2px;
     }
-
-    /* Input radio escondido visualmente mas acessível */
-    .plano-card input[type="radio"] {
-        position: absolute;
-        opacity: 0;
-        pointer-events: none;
+    .plano-preco-anual-economia {
+      font-size: 11px;
+      color: #16a34a;
+      font-weight: 600;
+      margin-top: 2px;
     }
-
-    /* Indicador visual quando selecionado */
-    .plano-card input[type="radio"]:checked+.plano-content {
-        outline: 2px solid #0a66c2;
-        outline-offset: 2px;
-    }
-
-    /* Estrutura interna para permitir o seletor + .plano-content funcionar */
-    .plano-card .plano-content {
-        display: flex;
-        flex-direction: column;
-        height: 100%;
-    }
-
-    /* Badge ou nota inferior */
-    .plano-card .plano-note {
-        margin-top: 10px;
-        font-size: 12px;
-        color: #777;
-    }
-
-    /* Cartão não deve cortar conteúdo expandido */
-    .plano-card {
-        overflow: visible;
-    }
-
-    /* Descrição: respeita quebras de linha do Firestore e aplica clamp */
     .plano-descricao {
-        margin-top: 8px;
-        color: #555;
-        font-size: 13px;
-        line-height: 1.4;
-        white-space: pre-line;
-        /* respeita \n do banco */
-        display: -webkit-box;
-        /* necessário para line-clamp */
-        -webkit-box-orient: vertical;
-        -webkit-line-clamp: 2;
-        /* mostra só 2 linhas */
-        overflow: hidden;
+      font-size: 12px;
+      color: #666;
+      line-height: 1.4;
+      margin: 6px 0 10px;
+    }
+    .plano-features {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+      font-size: 12px;
+    }
+    .plano-features li {
+      padding: 3px 0;
+      color: #444;
+      display: flex;
+      align-items: flex-start;
+      gap: 5px;
+    }
+    .plano-features li::before {
+      content: '✓';
+      color: #16a34a;
+      font-weight: 700;
+      flex-shrink: 0;
+    }
+    .plano-features li.inativo { color: #bbb; }
+    .plano-features li.inativo::before { content: '–'; color: #ccc; }
 
-        /* Fallback para navegadores sem -webkit-line-clamp (ex.: Firefox) */
-        max-height: calc(2 * 1.4em);
+    /* ── WhatsApp opt-in ── */
+    .rs-whatsapp-wrap {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 12px;
+      background: #f0fdf4;
+      border: 1.5px solid #86efac;
+      border-radius: 8px;
+      margin-top: 8px;
+      font-size: 13px;
+    }
+    .rs-whatsapp-wrap input[type="checkbox"] { width: 16px; height: 16px; cursor: pointer; flex-shrink: 0; }
+
+    /* ── Cupom ── */
+    .rs-cupom-row {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+    .rs-cupom-row input { flex: 1; }
+    .rs-cupom-row button {
+      padding: 10px 16px;
+      background: #0A3D62;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .rs-cupom-row button:hover { background: #1A5276; }
+
+    /* ── Preview resumo ── */
+    #preview-breakdown {
+      display: none;
+      background: #f0f7ff;
+      border: 1.5px solid #bfdbfe;
+      border-radius: 10px;
+      padding: 14px 16px;
+    }
+    #preview-breakdown strong { font-size: 14px; color: #0A3D62; }
+    .preview-row {
+      display: flex;
+      justify-content: space-between;
+      font-size: 13px;
+      padding: 4px 0;
+      color: #555;
+    }
+    .preview-row.total {
+      border-top: 1px solid #bfdbfe;
+      margin-top: 6px;
+      padding-top: 8px;
+      font-weight: 700;
+      font-size: 15px;
+      color: #0A3D62;
+    }
+    .preview-row.desconto { color: #16a34a; }
+
+    /* ── Termos ── */
+    .rs-termos {
+      background: #f9fafb;
+      border-radius: 8px;
+      padding: 12px;
+    }
+    .rs-termos label {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      font-size: 13px;
+      color: #444;
+      cursor: pointer;
+      line-height: 1.5;
+    }
+    .rs-termos input[type="checkbox"] { width: 16px; height: 16px; margin-top: 2px; flex-shrink: 0; }
+    .rs-termos a { color: #0A3D62; }
+
+    /* ── Botão submeter ── */
+    #btn-assinar {
+      width: 100%;
+      padding: 15px;
+      background: #0A3D62;
+      color: #fff;
+      border: none;
+      border-radius: 10px;
+      font-size: 16px;
+      font-weight: 700;
+      cursor: pointer;
+      margin-top: 4px;
+      transition: background .2s;
+    }
+    #btn-assinar:hover:not(:disabled) { background: #1A5276; }
+    #btn-assinar:disabled { opacity: .6; cursor: not-allowed; }
+
+    #status-envio {
+      text-align: center;
+      font-size: 13px;
+      margin-top: 8px;
+      min-height: 20px;
     }
 
-    /* Ao passar o mouse ou focar, remover o clamp e liberar o texto */
-    .plano-card:hover .plano-descricao,
-    .plano-card:focus-within .plano-descricao {
-        -webkit-line-clamp: unset;
-        /* WebKit */
-        max-height: none;
-        /* Fallback */
-        overflow: visible;
-        white-space: normal;
-        /* libera layout normal */
+    /* ── Modal confirmação ── */
+    #modalConfirmacao {
+      display: none;
+      position: fixed;
+      inset: 0;
+      align-items: center;
+      justify-content: center;
+      background: rgba(0,0,0,.45);
+      z-index: 9999;
+      padding: 16px;
     }
-</style>
+    .modal-box {
+      background: #fff;
+      border-radius: 14px;
+      padding: 28px 24px;
+      max-width: 440px;
+      width: 100%;
+      text-align: center;
+    }
+    .modal-box h3 { color: #0A3D62; font-size: 20px; margin: 0 0 10px; }
+    .modal-box p { color: #555; font-size: 14px; margin: 0 0 20px; line-height: 1.5; }
+    .modal-box button {
+      padding: 10px 28px;
+      background: #0A3D62;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    /* ── Segurança / rodapé ── */
+    .rs-seguranca {
+      text-align: center;
+      font-size: 11px;
+      color: #aaa;
+      margin-top: 20px;
+      line-height: 1.6;
+    }
+    .rs-seguranca span { margin: 0 6px; }
+  </style>
+</head>
 
 <body>
-    <div class="container">
-        <h2>🔒 Assinatura / Contratação - Radar Siope</h2>
-        <p>Confirme seus dados e escolha os tipos de newsletter que deseja assinar.</p>
+<div class="rs-container">
 
-        <form id="form-assinatura">
-            <!-- hidden planId vindo da query string ?planId=... -->
-            <input type="hidden" id="planId" />
+  <!-- Cabeçalho -->
+  <div class="rs-header">
+    <img src="icons/icon-192x192.png" alt="Radar SIOPE" onerror="this.style.display='none'">
+    <h1>📡 Assine o Radar SIOPE</h1>
+    <p>Inteligência fiscal da educação do seu município, toda semana.</p>
+  </div>
 
-            <label>Nome:</label>
-            <input type="text" id="nome" required />
-            <span id="error-nome" class="field-error" style="display:none;color:#b00020;font-size:12px"></span>
+  <form id="form-assinatura" novalidate>
+    <input type="hidden" id="planId" />
+    <input type="hidden" id="planCiclo" value="mensal" />
 
-            <label>CPF:</label>
-            <input type="text" id="cpf" maxlength="14" required placeholder="Digite seu CPF" />
-            <span id="error-cpf" class="field-error" style="display:none;color:#b00020;font-size:12px"></span>
+    <!-- ── SEÇÃO 1: Escolha do Plano ── -->
+    <div class="rs-section" id="secao-planos">
+      <div class="rs-section-title">📋 Escolha seu plano</div>
 
-            <label>E-mail:</label>
-            <input type="email" id="email" required />
-            <span id="error-email" class="field-error" style="display:none;color:#b00020;font-size:12px"></span>
+      <!-- Toggle mensal / anual -->
+      <div class="rs-ciclo-toggle">
+        <button type="button" id="btn-ciclo-mensal" class="ativo" onclick="selecionarCiclo('mensal')">
+          Mensal
+        </button>
+        <button type="button" id="btn-ciclo-anual" onclick="selecionarCiclo('anual')">
+          Anual
+          <span class="rs-badge-economia">2 meses grátis</span>
+        </button>
+      </div>
 
-            <label>Telefone:</label>
-            <input type="tel" id="telefone" />
-            <span id="error-telefone" class="field-error" style="display:none;color:#b00020;font-size:12px"></span>
-
-            <div id="campo-uf-municipio"></div>
-
-            <label>Como prefere ser contatado?</label>
-            <select id="preferencia-contato">
-                <option value="">Selecione...</option>
-                <option value="E-mail">📧 E-mail</option>
-                <option value="WhatsApp">🟢 WhatsApp</option>
-                <option value="Ligação">📞 Ligação</option>
-            </select>
-
-            <label>Qual o seu Perfil?</label>
-            <select id="perfil">
-                <option value="">Selecione...</option>
-                <option value="prefeito">Prefeito</option>
-                <option value="secretario">Secretário</option>
-                <option value="tecnico">Técnico</option>
-                <option value="contador">Contador</option>
-                <option value="pesquisador">Pesquisador</option>
-                <option value="cacs">CACS</option>
-                <option value="cidadao">Cidadão</option>
-            </select>
-
-            <label>Mensagem / Observações (opcional):</label>
-            <textarea id="mensagem" rows="3"></textarea>
-
-            <div id="campo-newsletters"></div>
-
-            <label for="cupom">Cupom (opcional)</label>
-            <div style="display:flex;gap:8px;align-items:center">
-                <input type="text" id="cupom" placeholder="Digite seu cupom">
-                <button type="button" id="aplicar-cupom">Aplicar</button>
-            </div>
-            <span id="error-cupom" class="field-error" style="display:none;color:#b00020;font-size:12px"></span>
-
-            <div style="margin-top:12px; padding:10px; background:#f9f9f9; border-radius:6px;">
-                <strong>📜 Termos da Assinatura RadarSiope</strong>
-                <label for="aceita-termos" class="aceite-termos" style="display:flex;align-items:center;gap:8px;">
-                    <input id="aceita-termos" type="checkbox" required />
-                    <span>Li e concordo com os Termos da Assinatura <a href="https://www.radarsiope.com.br/termos"
-                            target="_blank">Radar Siope</a></span>
-                </label>
-                <span id="error-aceita_termos" class="field-error"
-                    style="display:none;color:#b00020;font-size:12px"></span>
-            </div>
-
-            <div id="preview-breakdown"
-                style="margin-top:12px;background:#fafafa;padding:10px;border-radius:6px;display:none">
-                <strong>📊 Resumo da sua assinatura RadarSiope</strong>
-                <p style="margin:6px 0;color:#555;font-size:14px">
-                    Confira abaixo os valores e descontos aplicados.
-                </p>
-                <div id="preview-items" style="margin-top:8px"></div>
-                <div id="preview-total" style="margin-top:8px;font-weight:700"></div>
-            </div>
-
-            <button type="submit" id="btn-assinar" style="margin-top:12px">Confirmar e Pagar</button>
-            <p id="status-envio"></p>
-        </form>
+      <!-- Cards de plano renderizados pelo JS -->
+      <div id="planos-lista">
+        <div id="planos-cards"></div>
+      </div>
     </div>
 
-    <!-- Modal de confirmação simples -->
-    <div id="modalConfirmacao"
-        style="display:none;position:fixed;inset:0;align-items:center;justify-content:center;background:rgba(0,0,0,0.4)">
-        <div style="background:#fff;padding:20px;border-radius:8px;max-width:480px">
-            <h3>Obrigado!</h3>
-            <p id="modal-msg">Processando seu pedido...</p>
-            <button onclick="document.getElementById('modalConfirmacao').style.display='none'">Fechar</button>
+    <!-- ── SEÇÃO 2: Seus dados ── -->
+    <div class="rs-section">
+      <div class="rs-section-title">👤 Seus dados</div>
+
+      <div class="rs-field">
+        <label for="nome">Nome completo *</label>
+        <input type="text" id="nome" autocomplete="name" placeholder="Seu nome" required />
+        <span id="error-nome" class="field-error"></span>
+      </div>
+
+      <div class="rs-grid-2">
+        <div class="rs-field">
+          <label for="cpf">CPF *</label>
+          <input type="text" id="cpf" maxlength="14" placeholder="000.000.000-00" required />
+          <span id="error-cpf" class="field-error"></span>
         </div>
+        <div class="rs-field">
+          <label for="email">E-mail *</label>
+          <input type="email" id="email" autocomplete="email" placeholder="seu@email.com" required />
+          <span id="error-email" class="field-error"></span>
+        </div>
+      </div>
+
+      <div class="rs-grid-2">
+        <div class="rs-field">
+          <label for="telefone">Telefone</label>
+          <input type="tel" id="telefone" autocomplete="tel" placeholder="(00) 00000-0000" />
+          <span id="error-telefone" class="field-error"></span>
+        </div>
+        <div class="rs-field">
+          <label for="whatsapp">WhatsApp</label>
+          <input type="tel" id="whatsapp" placeholder="(00) 00000-0000" />
+          <span id="error-whatsapp" class="field-error"></span>
+          <!-- opt-in WhatsApp -->
+          <div class="rs-whatsapp-wrap" id="whatsapp-optin-wrap" style="display:none">
+            <input type="checkbox" id="whatsapp-optin" checked />
+            <label for="whatsapp-optin">
+              Aceito receber alertas e novidades pelo WhatsApp
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <!-- UF e Município — injetado pelo functions.js -->
+      <div id="campo-uf-municipio"></div>
+
+      <div class="rs-grid-2">
+        <div class="rs-field">
+          <label for="perfil">Perfil *</label>
+          <select id="perfil" required>
+            <option value="">Selecione...</option>
+            <option value="prefeito">Prefeito</option>
+            <option value="secretario">Secretário(a) de Educação</option>
+            <option value="tecnico">Técnico de Educação</option>
+            <option value="contador">Contador(a)</option>
+            <option value="pesquisador">Pesquisador(a)</option>
+            <option value="cacs">Conselheiro CACS</option>
+            <option value="cidadao">Cidadão</option>
+          </select>
+        </div>
+        <div class="rs-field">
+          <label for="preferencia-contato">Preferência de contato</label>
+          <select id="preferencia-contato">
+            <option value="">Selecione...</option>
+            <option value="E-mail">📧 E-mail</option>
+            <option value="WhatsApp">🟢 WhatsApp</option>
+            <option value="Ligação">📞 Ligação</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="rs-field">
+        <label for="mensagem">Mensagem / Observações <span style="font-weight:400;color:#999">(opcional)</span></label>
+        <textarea id="mensagem" placeholder="Alguma dúvida ou informação adicional?"></textarea>
+      </div>
     </div>
 
-    <!-- Firebase -->
-    <script src="https://www.gstatic.com/firebasejs/10.0.0/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.0.0/firebase-firestore-compat.js"></script>
-    <script src="js/firebase-init.js"></script>
+    <!-- ── SEÇÃO 3: Tipos de newsletter ── -->
+    <div class="rs-section" id="secao-newsletters">
+      <div class="rs-section-title">📰 Tipos de newsletter</div>
+      <div id="campo-newsletters"></div>
+    </div>
 
-    <!-- Funções utilitárias existentes -->
-    <script src="js/functions.js"></script>
+    <!-- ── SEÇÃO 4: Cupom ── -->
+    <div class="rs-section">
+      <div class="rs-section-title">🎟️ Cupom de desconto</div>
+      <div class="rs-field">
+        <div class="rs-cupom-row">
+          <input type="text" id="cupom" placeholder="Digite seu cupom (opcional)" />
+          <button type="button" id="aplicar-cupom">Aplicar</button>
+        </div>
+        <span id="error-cupom" class="field-error"></span>
+        <div id="cupom-feedback" style="font-size:12px;margin-top:6px"></div>
+      </div>
+    </div>
 
-    <!-- Lógica de assinatura (cole o JS abaixo em js/assinatura.js) -->
-    <script src="js/assinatura.js"></script>
+    <!-- ── SEÇÃO 5: Resumo / Preview ── -->
+    <div id="preview-breakdown" class="rs-section">
+      <div class="rs-section-title">📊 Resumo da assinatura</div>
+      <div id="preview-items"></div>
+      <div id="preview-total"></div>
+    </div>
+
+    <!-- ── SEÇÃO 6: Termos e pagamento ── -->
+    <div class="rs-section">
+      <div class="rs-section-title">✅ Confirmação</div>
+      <div class="rs-termos">
+        <label>
+          <input type="checkbox" id="aceita-termos" />
+          <span>Li e concordo com os <a href="https://www.radarsiope.com.br/termos" target="_blank">Termos de Assinatura</a> do Radar SIOPE.</span>
+        </label>
+        <span id="error-aceita_termos" class="field-error"></span>
+      </div>
+
+      <button type="submit" id="btn-assinar" style="margin-top:16px">
+        🔒 Confirmar e Pagar
+      </button>
+      <p id="status-envio"></p>
+    </div>
+
+  </form><!-- /form-assinatura -->
+
+  <!-- Rodapé segurança -->
+  <div class="rs-seguranca">
+    <span>🔒 Pagamento seguro via Mercado Pago</span>
+    <span>·</span>
+    <span>🛡️ Dados protegidos pela LGPD</span>
+    <span>·</span>
+    <span>📧 Cancele quando quiser</span>
+  </div>
+
+</div><!-- /rs-container -->
+
+<!-- Modal de confirmação -->
+<div id="modalConfirmacao">
+  <div class="modal-box">
+    <h3>🎉 Pedido recebido!</h3>
+    <p id="modal-msg">Seu pedido foi criado. Você será redirecionado para o pagamento.</p>
+    <button onclick="document.getElementById('modalConfirmacao').style.display='none'">Fechar</button>
+  </div>
+</div>
+
+<!-- Firebase -->
+<script src="https://www.gstatic.com/firebasejs/10.0.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.0.0/firebase-firestore-compat.js"></script>
+<script src="js/firebase-init.js"></script>
+<script src="js/functions.js"></script>
+<script src="js/assinatura.js"></script>
 </body>
-
 </html>
-
-<!-- links para chamar o formulario
-http://127.0.0.1:5500/public/assinatura.html?planId=plano1&leadId=Jo7QOWUrfT16MmGYRlwX&origem=newsletter_janeiro -->
