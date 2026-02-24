@@ -13,13 +13,13 @@
    - window._radarUser (definido após autenticação/token)
    
    CONFIGURAÇÃO:
-   Substitua 'SEU_APP_ID_ONESIGNAL' pelo App ID gerado no painel OneSignal.
+   App ID configurado. REST API Key → Vercel Environment Variables.
    ========================================================================== */
 
 'use strict';
 
 // ─── Configuração ─────────────────────────────────────────────────────────────
-const ONESIGNAL_APP_ID = '040469b1-fa2a-499f-9911-aa417b0cd4bd'; // ← substituir após criar conta
+const ONESIGNAL_APP_ID = 'abcdefgh-fa2a-499f-9911-aa417b0cd4bd';
 
 // Chave no localStorage para controle de consentimento LGPD
 const LS_CONSENT_KEY     = 'rs_push_consent';     // 'granted' | 'denied' | null
