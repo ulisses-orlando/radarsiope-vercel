@@ -1,252 +1,257 @@
 /* ==========================================================================
-   supabase-municipio.js — Radar SIOPE
-   Módulo frontend de acesso público aos dados SIOPE/FUNDEB por município.
-   Usa window.supabase (exposto pelo exposeSupabase.js via supabaseClient.js)
-   com a anon key — dados públicos, sem risco de exposição.
+   supabase-municipio.js — Radar SIOPE  (v2 — novo schema)
+   Tabelas: indicadores + siope_municipios + municipio_indicadores
+            + view vw_municipio_resumo
+   Expõe: window.SupabaseMunicipio
    ========================================================================== */
 
 'use strict';
 
-const _SUPABASE_READY_KEY = '__supabaseMunicipioReady';
-
-// ─── Verifica disponibilidade ────────────────────────────────────────────────
-function _supabase() {
-  if (!window.supabase) throw new Error('[supabase-municipio] window.supabase não disponível.');
+function _sb() {
+  if (!window.supabase) throw new Error('[SM] window.supabase não disponível.');
   return window.supabase;
 }
 
-// ─── Último registro SIOPE do município ──────────────────────────────────────
-// Retorna o bimestre mais recente disponível (pode ser retificado — sempre busca fresco)
-async function getUltimoSIOPE(cod_municipio) {
+// Códigos dos indicadores principais (conforme seed do SQL)
+const IND = {
+  PERCENTUAL_MDE:    1,
+  PERCENTUAL_MINIMO: 2,
+  RECEITA_IMPOSTOS:  3,
+  DESPESA_MDE:       4,
+  FUNDEB_RECEBIDO:   5,
+  VAAT_MUNICIPAL:    6,
+  VAAT_MEDIA_UF:     7,
+};
+
+const SITUACAO_CONFIG = {
+  regular:      { label: 'Regular',        icon: '✅', cor: '#16a34a' },
+  insuficiente: { label: 'Abaixo do mín.', icon: '⚠️', cor: '#dc2626' },
+  nao_enviado:  { label: 'Não enviado',    icon: '📭', cor: '#d97706' },
+  retificado:   { label: 'Retificado',     icon: '🔄', cor: '#0891b2' },
+  homologado:   { label: 'Homologado',     icon: '🏛️', cor: '#16a34a' },
+  em_analise:   { label: 'Em análise',     icon: '🔍', cor: '#7c3aed' },
+};
+
+function _sitConfig(s) {
+  return SITUACAO_CONFIG[s] || { label: s || '—', icon: '❓', cor: '#94a3b8' };
+}
+function _fmtBRL(v) {
+  return v != null ? Number(v).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : null;
+}
+function _fmtPct(v) {
+  return v != null ? `${Number(v).toFixed(2)}%` : null;
+}
+function _esc(s) {
+  return String(s || '').replace(/[&<>"']/g, m =>
+    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[m]);
+}
+
+// ── Query principal: usa a view desnormalizada ────────────────────────────────
+async function getResumoMunicipio(cod_municipio) {
   if (!cod_municipio) return null;
   try {
-    const { data, error } = await _supabase()
-      .from('siope_municipios')
-      .select(`
-        municipio_cod, uf, ano, bimestre,
-        receita_impostos, despesa_mde,
-        percentual_aplicado, percentual_minimo,
-        situacao, data_envio, prazo_envio,
-        enviado_no_prazo, homologado
-      `)
-      .eq('municipio_cod', String(cod_municipio))
+    const { data, error } = await _sb()
+      .from('vw_municipio_resumo')
+      .select('*')
+      .eq('cod_municipio', String(cod_municipio))
       .order('ano',      { ascending: false })
       .order('bimestre', { ascending: false })
       .limit(1)
-      .single();
-
-    if (error && error.code !== 'PGRST116') { // PGRST116 = nenhum resultado
-      console.warn('[supabase-municipio] SIOPE query error:', error.message);
-      return null;
-    }
-    return data || null;
-  } catch (err) {
-    console.warn('[supabase-municipio] getUltimoSIOPE falhou:', err.message);
-    return null;
-  }
+      .maybeSingle();
+    if (error) { console.warn('[SM] erro:', error.message); return null; }
+    return data;
+  } catch (e) { console.warn('[SM] getResumoMunicipio:', e.message); return null; }
 }
 
-// ─── Histórico SIOPE (últimos N bimestres) ───────────────────────────────────
-async function getHistoricoSIOPE(cod_municipio, limite = 6) {
+// ── Todos os indicadores de um período ───────────────────────────────────────
+async function getIndicadoresPeriodo(cod_municipio, ano, bimestre) {
   if (!cod_municipio) return [];
   try {
-    const { data, error } = await _supabase()
-      .from('siope_municipios')
-      .select('ano, bimestre, percentual_aplicado, percentual_minimo, situacao')
-      .eq('municipio_cod', String(cod_municipio))
+    const { data, error } = await _sb()
+      .from('municipio_indicadores')
+      .select('cod_indicador, valor, indicadores(nome, unidade, categoria, ordem_exibicao)')
+      .eq('cod_municipio', String(cod_municipio))
+      .eq('ano', ano).eq('bimestre', bimestre);
+    if (error) { console.warn('[SM] getIndicadoresPeriodo:', error.message); return []; }
+    return (data || []).map(r => ({
+      cod_indicador:  r.cod_indicador,
+      valor:          r.valor,
+      nome:           r.indicadores?.nome            || '—',
+      unidade:        r.indicadores?.unidade         || '',
+      categoria:      r.indicadores?.categoria       || '',
+      ordem_exibicao: r.indicadores?.ordem_exibicao || 99,
+    }));
+  } catch (e) { console.warn('[SM] getIndicadoresPeriodo:', e.message); return []; }
+}
+
+// ── Histórico % MDE (últimos N bimestres) ────────────────────────────────────
+async function getHistoricoMDE(cod_municipio, limite = 6) {
+  if (!cod_municipio) return [];
+  try {
+    const { data, error } = await _sb()
+      .from('municipio_indicadores')
+      .select('ano, bimestre, valor, siope_municipios!inner(situacao)')
+      .eq('cod_municipio', String(cod_municipio))
+      .eq('cod_indicador', IND.PERCENTUAL_MDE)
       .order('ano',      { ascending: false })
       .order('bimestre', { ascending: false })
       .limit(limite);
-
-    if (error) { console.warn('[supabase-municipio] Histórico SIOPE error:', error.message); return []; }
-    return data || [];
-  } catch (err) {
-    console.warn('[supabase-municipio] getHistoricoSIOPE falhou:', err.message);
-    return [];
-  }
+    if (error) { console.warn('[SM] getHistoricoMDE:', error.message); return []; }
+    return (data || []).map(r => ({
+      ano: r.ano, bimestre: r.bimestre, pct: r.valor,
+      situacao: r.siope_municipios?.situacao || 'nao_enviado',
+    }));
+  } catch (e) { console.warn('[SM] getHistoricoMDE:', e.message); return []; }
 }
 
-// ─── Último repasse FUNDEB do município ──────────────────────────────────────
-async function getUltimoFUNDEB(cod_municipio) {
-  if (!cod_municipio) return null;
-  try {
-    const { data, error } = await _supabase()
-      .from('fundeb_municipios')
-      .select('municipio_cod, ano, mes, valor_creditado, valor_previsto, data_credito, vaat_municipio, vaat_media_uf')
-      .eq('municipio_cod', String(cod_municipio))
-      .order('ano', { ascending: false })
-      .order('mes', { ascending: false })
-      .limit(1)
-      .single();
-
-    if (error && error.code !== 'PGRST116') {
-      console.warn('[supabase-municipio] FUNDEB query error:', error.message);
-      return null;
-    }
-    return data || null;
-  } catch (err) {
-    console.warn('[supabase-municipio] getUltimoFUNDEB falhou:', err.message);
-    return null;
-  }
-}
-
-// ─── Renderizar seção município ───────────────────────────────────────────────
-// container : elemento DOM onde renderizar
-// blur      : true = dados borrados (lead sem acesso)
-// dadosSiope: objeto retornado por getUltimoSIOPE()
-// dadosFundeb: objeto retornado por getUltimoFUNDEB()
-// nomeMunicipio, uf: strings do destinatário
-
-function renderSecaoMunicipio({ container, blur, dadosSiope, dadosFundeb, nomeMunicipio, uf }) {
-  if (!container) return;
-
-  // ── Sem tabelas ainda (B = tabelas não existem) ───────────────────────────
-  if (!dadosSiope && !dadosFundeb) {
-    container.innerHTML = _htmlSemDados(nomeMunicipio, uf, blur);
-    return;
-  }
-
-  // ── Com dados ─────────────────────────────────────────────────────────────
-  const siope  = dadosSiope  || {};
-  const fundeb = dadosFundeb || {};
-
-  const pct     = Number(siope.percentual_aplicado || 0).toFixed(1);
-  const min     = Number(siope.percentual_minimo   || 25).toFixed(1);
-  const sit     = siope.situacao || 'nao_enviado';
-  const bim     = siope.bimestre ? `${siope.bimestre}º bimestre/${siope.ano}` : '—';
-  const barW    = Math.min(100, (Number(pct) / 30) * 100).toFixed(1); // 30% = escala máx visual
-  const barCor  = sit === 'regular' ? '#16a34a' : sit === 'insuficiente' ? '#dc2626' : '#d97706';
-  const sitIcon = sit === 'regular' ? '✅' : sit === 'insuficiente' ? '⚠️' : '📭';
-  const sitLabel = { regular: 'Regular', insuficiente: 'Abaixo do mínimo', nao_enviado: 'Não enviado' }[sit] || sit;
-
-  const fundebVal = fundeb.valor_creditado
-    ? Number(fundeb.valor_creditado).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
-    : null;
-  const fundebMes = fundeb.mes && fundeb.ano
-    ? `${String(fundeb.mes).padStart(2,'0')}/${fundeb.ano}`
-    : null;
-
-  const blurStyle  = blur ? 'filter:blur(5px);user-select:none;pointer-events:none' : '';
-  const blurClass  = blur ? 'rs-blur' : '';
-
-  container.innerHTML = `
-    <div class="rs-municipio-card ${blurClass}" style="position:relative">
-
-      <div class="rs-mun-header">
-        <div>
-          <span class="rs-mun-nome">${_esc(nomeMunicipio || '—')}/${_esc(uf || '—')}</span>
-          <span class="rs-mun-ref">${_esc(bim)}</span>
-        </div>
-        <span class="rs-mun-status" style="background:${barCor}20;color:${barCor}">${sitIcon} ${sitLabel}</span>
-      </div>
-
-      <!-- Barra MDE -->
-      <div class="rs-mde-wrap" style="${blurStyle}">
-        <div class="rs-mde-label">
-          <span>MDE aplicado</span>
-          <strong style="color:${barCor}">${pct}%</strong>
-        </div>
-        <div class="rs-mde-track">
-          <div class="rs-mde-fill" style="width:${barW}%;background:${barCor}"></div>
-          <div class="rs-mde-min" style="left:${((Number(min)/30)*100).toFixed(1)}%" title="Mínimo: ${min}%"></div>
-        </div>
-        <div class="rs-mde-meta">
-          <span>0%</span>
-          <span style="color:#888;font-size:11px">Mínimo constitucional: ${min}%</span>
-          <span>30%+</span>
-        </div>
-      </div>
-
-      <!-- FUNDEB -->
-      ${fundebVal ? `
-      <div class="rs-fundeb-row" style="${blurStyle}">
-        <span class="rs-fundeb-label">💰 FUNDEB creditado em ${_esc(fundebMes)}</span>
-        <span class="rs-fundeb-valor">${fundebVal}</span>
-      </div>` : ''}
-
-      <!-- Overlay CTA para lead -->
-      ${blur ? _htmlBlurOverlay() : ''}
-    </div>
-  `;
-}
-
-// ─── Skeleton de carregamento ─────────────────────────────────────────────────
-function renderSkeletonMunicipio(container) {
+// ── Skeleton ──────────────────────────────────────────────────────────────────
+function renderSkeleton(container) {
   if (!container) return;
   container.innerHTML = `
     <div class="rs-municipio-card">
       <div class="rs-skeleton rs-sk-title"></div>
-      <div class="rs-skeleton rs-sk-bar"></div>
+      <div class="rs-skeleton rs-sk-bar" style="margin:10px 0"></div>
       <div class="rs-skeleton rs-sk-line"></div>
-    </div>
-  `;
+    </div>`;
 }
 
-// ─── HTML sem dados (tabelas ainda não populadas) ────────────────────────────
-function _htmlSemDados(nome, uf, blur) {
-  if (blur) {
-    // Lead vê teaser borrado
-    return `
-      <div class="rs-municipio-card" style="position:relative">
-        <div style="filter:blur(6px);user-select:none;padding:12px 0">
-          <div class="rs-mun-header">
-            <span class="rs-mun-nome">████████████/██</span>
-            <span class="rs-mun-status" style="background:#16a34a20;color:#16a34a">✅ Regular</span>
-          </div>
-          <div class="rs-mde-track" style="margin-top:12px">
-            <div class="rs-mde-fill" style="width:68%;background:#16a34a"></div>
-          </div>
-          <div style="margin-top:8px;font-size:13px;color:#888">██% aplicados · ██/████</div>
+// ── Renderizar seção município ────────────────────────────────────────────────
+function renderSecaoMunicipio({ container, blur, resumo, nomeMunicipio, uf }) {
+  if (!container) return;
+  if (!resumo) { container.innerHTML = _htmlSemDados(nomeMunicipio, uf, blur); return; }
+
+  const sit     = _sitConfig(resumo.situacao);
+  const pct     = resumo.percentual_aplicado;
+  const min     = resumo.percentual_minimo ?? 25;
+  const bimRef  = resumo.bimestre ? `${resumo.bimestre}º bimestre/${resumo.ano}` : '—';
+  const ESCALA  = 30;
+  const barW    = pct != null ? Math.min(100, (pct / ESCALA) * 100).toFixed(1) : 0;
+  const minW    = Math.min(100, (min / ESCALA) * 100).toFixed(1);
+  const blurSt  = blur ? 'filter:blur(5px);user-select:none;pointer-events:none' : '';
+
+  container.innerHTML = `
+    <div class="rs-municipio-card" style="position:relative">
+      <div class="rs-mun-header">
+        <div>
+          <span class="rs-mun-nome">${_esc(nomeMunicipio || '—')}/${_esc(uf || '—')}</span>
+          <span class="rs-mun-ref">${_esc(bimRef)}</span>
         </div>
-        ${_htmlBlurOverlay()}
+        <span class="rs-mun-status" style="background:${sit.cor}20;color:${sit.cor}">
+          ${sit.icon} ${_esc(sit.label)}
+        </span>
       </div>
-    `;
-  }
-  // Assinante vê aviso amigável
+      <div style="${blurSt}">
+        <div class="rs-mde-label">
+          <span>MDE aplicado</span>
+          <strong style="color:${sit.cor}">${_fmtPct(pct) || '—'}</strong>
+        </div>
+        <div class="rs-mde-track">
+          <div class="rs-mde-fill" style="width:${barW}%;background:${sit.cor}"></div>
+          <div class="rs-mde-min" style="left:${minW}%" title="Mínimo: ${_fmtPct(min)}"></div>
+        </div>
+        <div class="rs-mde-meta">
+          <span>0%</span>
+          <span style="font-size:10px;color:#94a3b8">Mínimo: ${_fmtPct(min)}</span>
+          <span>${ESCALA}%+</span>
+        </div>
+        ${resumo.receita_impostos || resumo.despesa_mde ? `
+        <div style="margin-top:12px;display:grid;grid-template-columns:1fr 1fr;gap:8px">
+          ${resumo.receita_impostos ? `
+          <div style="background:#f8fafc;border-radius:6px;padding:8px">
+            <div style="font-size:10px;color:#94a3b8;text-transform:uppercase;letter-spacing:.4px">Receita impostos</div>
+            <div style="font-size:13px;font-weight:700;margin-top:2px">${_fmtBRL(resumo.receita_impostos)}</div>
+          </div>` : ''}
+          ${resumo.despesa_mde ? `
+          <div style="background:#f8fafc;border-radius:6px;padding:8px">
+            <div style="font-size:10px;color:#94a3b8;text-transform:uppercase;letter-spacing:.4px">Despesa MDE</div>
+            <div style="font-size:13px;font-weight:700;margin-top:2px">${_fmtBRL(resumo.despesa_mde)}</div>
+          </div>` : ''}
+        </div>` : ''}
+        ${resumo.fundeb_recebido ? `
+        <div class="rs-fundeb-row">
+          <span>💰 FUNDEB recebido</span>
+          <span class="rs-fundeb-valor">${_fmtBRL(resumo.fundeb_recebido)}</span>
+        </div>` : ''}
+        ${resumo.homologado ? `<div style="margin-top:8px;font-size:11px;color:#16a34a;font-weight:600">🏛️ Homologado pela SASE/MEC</div>` : ''}
+      </div>
+      ${blur ? _htmlBlurOverlay() : ''}
+    </div>`;
+}
+
+// ── Tabela detalhada de indicadores ──────────────────────────────────────────
+function renderTabelaIndicadores(container, indicadores) {
+  if (!container || !indicadores?.length) return;
+  const porCat = {};
+  indicadores.forEach(i => { (porCat[i.categoria || 'outros'] ||= []).push(i); });
+  const CATS = {
+    mde:     '📚 MDE', fundeb: '💰 FUNDEB', receita: '📈 Receitas',
+    despesa: '📉 Despesas', prazo: '📅 Prazos', outros: '📊 Outros',
+  };
+  let html = '';
+  Object.entries(CATS).forEach(([cat, label]) => {
+    const itens = porCat[cat];
+    if (!itens?.length) return;
+    html += `<div style="margin-bottom:16px">
+      <div style="font-size:11px;font-weight:700;text-transform:uppercase;
+                  letter-spacing:.5px;color:#0A3D62;margin-bottom:8px">${label}</div>
+      <table style="width:100%;border-collapse:collapse;font-size:13px">
+        ${itens.sort((a,b) => a.ordem_exibicao - b.ordem_exibicao).map(i => {
+          const v = i.unidade === 'percentual' ? _fmtPct(i.valor)
+                  : i.unidade === 'valor_brl'  ? _fmtBRL(i.valor)
+                  : i.valor ?? '—';
+          return `<tr style="border-bottom:1px solid #f1f5f9">
+            <td style="padding:6px 0;color:#444">${_esc(i.nome)}</td>
+            <td style="padding:6px 0;text-align:right;font-weight:600">${_esc(String(v))}</td>
+          </tr>`;
+        }).join('')}
+      </table></div>`;
+  });
+  container.innerHTML = html || '<p style="color:#94a3b8;font-size:13px">Sem dados.</p>';
+}
+
+function _htmlSemDados(nome, uf, blur) {
+  if (blur) return `
+    <div class="rs-municipio-card" style="position:relative">
+      <div style="filter:blur(6px);user-select:none;padding:8px 0">
+        <div class="rs-mun-header">
+          <span class="rs-mun-nome">████████/██</span>
+          <span class="rs-mun-status" style="background:#16a34a20;color:#16a34a">✅ Regular</span>
+        </div>
+        <div class="rs-mde-track" style="margin-top:12px">
+          <div class="rs-mde-fill" style="width:72%;background:#16a34a"></div>
+        </div>
+      </div>
+      ${_htmlBlurOverlay()}
+    </div>`;
   return `
-    <div class="rs-municipio-card rs-mun-em-breve">
-      <div style="text-align:center;padding:8px 0">
-        <div style="font-size:24px;margin-bottom:8px">📡</div>
-        <strong style="color:#0A3D62;font-size:14px">Dados de ${_esc(nome||'seu município')}/${_esc(uf||'')} em breve</strong>
-        <p style="font-size:12px;color:#888;margin:6px 0 0;line-height:1.5">
-          Estamos carregando o histórico SIOPE 2021–2025.<br>
-          Esta seção acende automaticamente quando os dados estiverem disponíveis.
-        </p>
-      </div>
-    </div>
-  `;
+    <div class="rs-municipio-card" style="text-align:center;padding:20px">
+      <div style="font-size:28px;margin-bottom:10px">📡</div>
+      <strong style="color:#0A3D62;font-size:14px">Dados de ${_esc(nome || 'seu município')}/${_esc(uf || '')} em breve</strong>
+      <p style="font-size:12px;color:#94a3b8;margin:8px 0 0;line-height:1.6">
+        Histórico SIOPE sendo carregado.<br>Esta seção acende automaticamente.
+      </p>
+    </div>`;
 }
 
 function _htmlBlurOverlay() {
   return `
-    <div style="
-      position:absolute;inset:0;display:flex;flex-direction:column;
+    <div style="position:absolute;inset:0;display:flex;flex-direction:column;
       align-items:center;justify-content:center;gap:10px;
-      background:rgba(255,255,255,0.55);border-radius:12px;
-      backdrop-filter:blur(2px);padding:16px;text-align:center
-    ">
-      <span style="font-size:13px;font-weight:700;color:#0A3D62;line-height:1.4">
+      background:rgba(255,255,255,0.6);border-radius:12px;
+      backdrop-filter:blur(2px);padding:20px;text-align:center">
+      <span style="font-size:13px;font-weight:700;color:#0A3D62;line-height:1.5">
         🔒 Assine para ver os dados fiscais do seu município
       </span>
-      <a href="/assinatura.html" style="
-        display:inline-block;padding:9px 20px;background:#0A3D62;color:#fff;
-        border-radius:8px;font-size:13px;font-weight:700;text-decoration:none
-      ">Ver planos →</a>
-    </div>
-  `;
+      <a href="/assinatura.html"
+        style="display:inline-block;padding:9px 20px;background:#0A3D62;color:#fff;
+               border-radius:8px;font-size:13px;font-weight:700;text-decoration:none">
+        Ver planos →
+      </a>
+    </div>`;
 }
 
-function _esc(s) {
-  return String(s||'').replace(/[&<>"']/g, m =>
-    ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[m]
-  );
-}
-
-// ─── Exporta globalmente ──────────────────────────────────────────────────────
 window.SupabaseMunicipio = {
-  getUltimoSIOPE,
-  getHistoricoSIOPE,
-  getUltimoFUNDEB,
-  renderSecaoMunicipio,
-  renderSkeletonMunicipio,
+  getResumoMunicipio, getIndicadoresPeriodo, getHistoricoMDE,
+  renderSecaoMunicipio, renderTabelaIndicadores, renderSkeleton,
+  IND, SITUACAO_CONFIG,
 };
