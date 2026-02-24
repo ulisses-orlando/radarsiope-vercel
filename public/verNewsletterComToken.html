@@ -2,60 +2,64 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>Radar SIOPE</title>
 
   <!-- PWA -->
   <link rel="manifest" href="/manifest.json">
   <meta name="theme-color" content="#0A3D62">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
 
   <style>
-    /* ── Reset & Base ─────────────────────────────────────────── */
+    /* ── Reset & Tokens ─────────────────────────────────────────────────── */
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
     :root {
-      --azul:      #0A3D62;
-      --azul-mid:  #1A5276;
-      --azul-light:#EBF5FB;
-      --verde:     #16a34a;
-      --vermelho:  #dc2626;
-      --amarelo:   #d97706;
-      --cinza:     #f4f6f9;
-      --borda:     #e2e8f0;
-      --texto:     #1a1a2e;
-      --subtexto:  #64748b;
-      --radius:    12px;
+      --azul:       #0A3D62;
+      --azul-mid:   #1A5276;
+      --azul-light: #EBF5FB;
+      --verde:      #16a34a;
+      --vermelho:   #dc2626;
+      --amarelo:    #d97706;
+      --cinza:      #f4f6f9;
+      --borda:      #e2e8f0;
+      --texto:      #1a1a2e;
+      --subtexto:   #64748b;
+      --radius:     12px;
+      --shadow:     0 1px 4px rgba(0,0,0,.07);
     }
 
-    html { scroll-behavior: smooth; }
+    html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; }
 
     body {
-      font-family: system-ui, -apple-system, sans-serif;
+      font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
       background: var(--cinza);
       color: var(--texto);
-      min-height: 100vh;
+      min-height: 100dvh;
       -webkit-font-smoothing: antialiased;
     }
 
     a { color: var(--azul); }
-    img { max-width: 100%; height: auto; }
+    img { max-width: 100%; height: auto; display: block; }
 
-    /* ── Layout principal ─────────────────────────────────────── */
+    /* ── Layout ─────────────────────────────────────────────────────────── */
     .rs-page {
-      max-width: 700px;
+      max-width: 680px;
       margin: 0 auto;
-      padding: 0 0 80px;
+      padding-bottom: 80px;
     }
 
-    /* ── Header ───────────────────────────────────────────────── */
+    /* ── Header ─────────────────────────────────────────────────────────── */
     .rs-header {
       background: var(--azul);
       color: #fff;
-      padding: 16px 20px 20px;
+      padding: 14px 16px 18px;
       position: sticky;
       top: 0;
       z-index: 100;
+      box-shadow: 0 2px 8px rgba(0,0,0,.18);
     }
     .rs-header-top {
       display: flex;
@@ -63,411 +67,234 @@
       justify-content: space-between;
       margin-bottom: 10px;
     }
-    .rs-logo {
-      height: 32px;
-      filter: brightness(0) invert(1);
-    }
+    .rs-logo { height: 30px; filter: brightness(0) invert(1); }
     .rs-header-meta {
       font-size: 11px;
-      color: rgba(255,255,255,.65);
+      color: rgba(255,255,255,.6);
       text-align: right;
-      line-height: 1.4;
+      line-height: 1.5;
     }
     .rs-header-titulo {
-      font-size: 16px;
+      font-size: 15px;
       font-weight: 700;
-      line-height: 1.3;
+      line-height: 1.35;
       color: #fff;
     }
     .rs-header-saudacao {
       font-size: 12px;
-      color: rgba(255,255,255,.75);
-      margin-top: 3px;
+      color: rgba(255,255,255,.7);
+      margin-top: 2px;
     }
 
-    /* ── Seções genéricas ─────────────────────────────────────── */
+    /* ── Seções ─────────────────────────────────────────────────────────── */
     .rs-section {
       background: #fff;
       border-radius: var(--radius);
-      margin: 12px 12px 0;
+      margin: 10px 10px 0;
       overflow: hidden;
-      box-shadow: 0 1px 3px rgba(0,0,0,.06);
+      box-shadow: var(--shadow);
     }
     .rs-section-header {
       display: flex;
       align-items: center;
-      gap: 8px;
-      padding: 14px 16px 10px;
+      gap: 7px;
+      padding: 12px 14px 8px;
       border-bottom: 1px solid var(--borda);
     }
     .rs-section-header h2 {
-      font-size: 12px;
+      font-size: 11px;
       font-weight: 700;
       text-transform: uppercase;
-      letter-spacing: .5px;
+      letter-spacing: .6px;
       color: var(--azul);
     }
-    .rs-section-body { padding: 14px 16px; }
+    .rs-section-body { padding: 12px 14px; }
 
-    /* ── Seção município ──────────────────────────────────────── */
-    #secao-municipio { position: relative; }
-
-    .rs-municipio-card {
-      padding: 14px 16px;
-      position: relative;
-    }
+    /* ── Município ──────────────────────────────────────────────────────── */
+    .rs-municipio-card { padding: 12px 14px; position: relative; }
     .rs-mun-header {
       display: flex;
       justify-content: space-between;
       align-items: flex-start;
       gap: 8px;
-      margin-bottom: 12px;
+      margin-bottom: 10px;
     }
-    .rs-mun-nome {
-      font-size: 14px;
-      font-weight: 700;
-      color: var(--azul);
-      display: block;
-    }
-    .rs-mun-ref {
-      font-size: 11px;
-      color: var(--subtexto);
-      display: block;
-      margin-top: 2px;
-    }
+    .rs-mun-nome  { font-size: 14px; font-weight: 700; color: var(--azul); display: block; }
+    .rs-mun-ref   { font-size: 11px; color: var(--subtexto); display: block; margin-top: 2px; }
     .rs-mun-status {
-      font-size: 11px;
-      font-weight: 700;
-      padding: 3px 10px;
-      border-radius: 20px;
-      white-space: nowrap;
-      flex-shrink: 0;
+      font-size: 11px; font-weight: 700;
+      padding: 3px 10px; border-radius: 20px;
+      white-space: nowrap; flex-shrink: 0;
     }
     .rs-mde-label {
-      display: flex;
-      justify-content: space-between;
-      font-size: 12px;
-      color: var(--subtexto);
-      margin-bottom: 5px;
+      display: flex; justify-content: space-between;
+      font-size: 12px; color: var(--subtexto); margin-bottom: 5px;
     }
     .rs-mde-label strong { font-size: 15px; }
     .rs-mde-track {
-      height: 10px;
-      background: #e2e8f0;
-      border-radius: 5px;
-      position: relative;
-      overflow: visible;
+      height: 10px; background: #e2e8f0;
+      border-radius: 5px; position: relative; overflow: visible;
     }
-    .rs-mde-fill {
-      height: 100%;
-      border-radius: 5px;
-      transition: width .6s ease;
-    }
-    .rs-mde-min {
-      position: absolute;
-      top: -3px;
-      width: 2px;
-      height: 16px;
-      background: #94a3b8;
-      border-radius: 1px;
+    .rs-mde-fill  { height: 100%; border-radius: 5px; transition: width .7s ease; }
+    .rs-mde-min   {
+      position: absolute; top: -3px;
+      width: 2px; height: 16px;
+      background: #94a3b8; border-radius: 1px;
     }
     .rs-mde-min::after {
-      content: attr(title);
-      position: absolute;
-      top: 18px;
-      left: 50%;
-      transform: translateX(-50%);
-      font-size: 9px;
-      color: #94a3b8;
-      white-space: nowrap;
+      content: attr(title); position: absolute;
+      top: 18px; left: 50%; transform: translateX(-50%);
+      font-size: 9px; color: #94a3b8; white-space: nowrap;
     }
     .rs-mde-meta {
-      display: flex;
-      justify-content: space-between;
-      font-size: 10px;
-      color: #94a3b8;
-      margin-top: 14px;
+      display: flex; justify-content: space-between;
+      font-size: 10px; color: #94a3b8; margin-top: 14px;
     }
     .rs-fundeb-row {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-top: 12px;
-      padding-top: 10px;
-      border-top: 1px solid var(--borda);
+      display: flex; justify-content: space-between; align-items: center;
+      margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--borda);
       font-size: 12px;
     }
-    .rs-fundeb-valor {
-      font-weight: 700;
-      color: var(--verde);
-      font-size: 13px;
-    }
-
-    /* Blur para lead */
-    .rs-blur { filter: blur(5px); user-select: none; pointer-events: none; }
+    .rs-fundeb-valor { font-weight: 700; color: var(--verde); font-size: 13px; }
 
     /* Skeleton */
     .rs-skeleton {
       background: linear-gradient(90deg, #f0f4f8 25%, #e2e8f0 50%, #f0f4f8 75%);
       background-size: 200% 100%;
-      animation: rs-shimmer 1.4s infinite;
+      animation: shimmer 1.4s infinite;
       border-radius: 6px;
     }
-    .rs-sk-title { height: 16px; width: 60%; margin-bottom: 10px; }
-    .rs-sk-bar   { height: 10px; width: 100%; margin-bottom: 14px; }
-    .rs-sk-line  { height: 12px; width: 45%; }
-    @keyframes rs-shimmer {
+    .rs-sk-title { height: 16px; width: 55%; margin-bottom: 10px; }
+    .rs-sk-bar   { height: 10px; width: 100%; margin-bottom: 12px; }
+    .rs-sk-line  { height: 12px; width: 40%; }
+    @keyframes shimmer {
       0%   { background-position: 200% 0; }
       100% { background-position: -200% 0; }
     }
 
-    /* ── Toggle modo rápido / completo ───────────────────────── */
+    /* ── Toggle ─────────────────────────────────────────────────────────── */
     .rs-toggle {
-      display: flex;
-      background: var(--cinza);
-      border-radius: 10px;
-      padding: 4px;
-      gap: 4px;
-      margin: 12px 12px 0;
+      display: flex; background: var(--cinza);
+      border-radius: 10px; padding: 4px; gap: 4px;
+      margin: 10px 10px 0;
     }
     .rs-toggle button {
-      flex: 1;
-      padding: 10px;
-      border: none;
-      border-radius: 7px;
-      font-size: 13px;
-      font-weight: 600;
-      cursor: pointer;
-      background: transparent;
-      color: var(--subtexto);
-      transition: all .18s;
+      flex: 1; padding: 10px; border: none; border-radius: 7px;
+      font-size: 13px; font-weight: 600; cursor: pointer;
+      background: transparent; color: var(--subtexto); transition: all .18s;
     }
     .rs-toggle button.ativo {
-      background: #fff;
-      color: var(--azul);
-      box-shadow: 0 1px 4px rgba(0,0,0,.1);
+      background: #fff; color: var(--azul);
+      box-shadow: 0 1px 5px rgba(0,0,0,.1);
     }
 
-    /* ── Modo Rápido — bullets ────────────────────────────────── */
-    #modo-rapido { display: none; }
-    #modo-rapido.visivel { display: block; }
-    .rs-bullets {
-      list-style: none;
-      padding: 0;
-    }
+    /* ── Modo rápido ────────────────────────────────────────────────────── */
+    #modo-rapido, #modo-completo { display: none; }
+    #modo-rapido.visivel, #modo-completo.visivel { display: block; }
+
+    .rs-bullets { list-style: none; }
     .rs-bullets li {
-      display: flex;
-      align-items: flex-start;
-      gap: 10px;
-      padding: 9px 0;
-      border-bottom: 1px solid var(--borda);
-      font-size: 14px;
-      line-height: 1.45;
-      color: var(--texto);
+      display: flex; align-items: flex-start; gap: 10px;
+      padding: 9px 0; border-bottom: 1px solid var(--borda);
+      font-size: 14px; line-height: 1.5; color: var(--texto);
     }
     .rs-bullets li:last-child { border-bottom: none; }
     .rs-bullets li::before {
-      content: '→';
-      color: var(--azul);
-      font-weight: 700;
-      flex-shrink: 0;
-      margin-top: 1px;
+      content: '→'; color: var(--azul); font-weight: 700;
+      flex-shrink: 0; margin-top: 1px;
     }
-    .rs-bullets-truncado {
-      position: relative;
-    }
+    .rs-bullets-truncado { position: relative; }
     .rs-bullets-truncado::after {
-      content: '';
-      position: absolute;
-      bottom: 0; left: 0; right: 0;
-      height: 60px;
-      background: linear-gradient(transparent, #fff);
+      content: ''; position: absolute; bottom: 0; left: 0; right: 0;
+      height: 56px; background: linear-gradient(transparent, #fff);
       pointer-events: none;
     }
 
-    /* ── Modo Completo — conteúdo HTML ───────────────────────── */
-    #modo-completo { display: none; }
-    #modo-completo.visivel { display: block; }
+    /* ── Modo completo ──────────────────────────────────────────────────── */
     #conteudo-newsletter {
-      font-size: 15px;
-      line-height: 1.7;
-      color: var(--texto);
+      font-size: 15px; line-height: 1.75; color: var(--texto);
     }
     #conteudo-newsletter h1,
     #conteudo-newsletter h2,
-    #conteudo-newsletter h3 {
-      color: var(--azul);
-      margin: 18px 0 8px;
-    }
-    #conteudo-newsletter p { margin-bottom: 12px; }
+    #conteudo-newsletter h3 { color: var(--azul); margin: 18px 0 8px; }
+    #conteudo-newsletter p  { margin-bottom: 12px; }
     #conteudo-newsletter img { border-radius: 8px; margin: 8px 0; }
-    #conteudo-newsletter a { color: var(--azul); }
+    #conteudo-newsletter a  { color: var(--azul); }
     #conteudo-newsletter blockquote {
-      border-left: 3px solid var(--azul);
-      padding: 8px 14px;
-      margin: 12px 0;
-      background: var(--azul-light);
-      border-radius: 0 8px 8px 0;
-      font-style: italic;
-      color: var(--azul-mid);
+      border-left: 3px solid var(--azul); padding: 8px 14px;
+      margin: 12px 0; background: var(--azul-light);
+      border-radius: 0 8px 8px 0; font-style: italic; color: var(--azul-mid);
     }
+    #conteudo-newsletter table {
+      width: 100%; border-collapse: collapse; margin: 12px 0;
+    }
+    #conteudo-newsletter th { background: var(--azul); color: #fff; padding: 8px 10px; font-size: 13px; }
+    #conteudo-newsletter td { padding: 7px 10px; border-bottom: 1px solid var(--borda); font-size: 13px; }
 
-    /* Truncamento para lead no modo completo */
-    .rs-conteudo-truncado {
-      max-height: 320px;
-      overflow: hidden;
-      position: relative;
-    }
-    .rs-conteudo-truncado::after {
-      content: '';
-      position: absolute;
-      bottom: 0; left: 0; right: 0;
-      height: 120px;
-      background: linear-gradient(transparent, #fff);
-      pointer-events: none;
-    }
-
-    /* ── Mídia (áudio, vídeo, infográfico) ───────────────────── */
+    /* ── Mídia ──────────────────────────────────────────────────────────── */
     .rs-media-item {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      padding: 12px 0;
-      border-bottom: 1px solid var(--borda);
+      display: flex; align-items: center; gap: 12px;
+      padding: 11px 0; border-bottom: 1px solid var(--borda);
     }
     .rs-media-item:last-child { border-bottom: none; padding-bottom: 0; }
     .rs-media-icon {
-      width: 42px;
-      height: 42px;
-      border-radius: 10px;
-      background: var(--azul-light);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 20px;
-      flex-shrink: 0;
+      width: 42px; height: 42px; border-radius: 10px;
+      background: var(--azul-light); display: flex;
+      align-items: center; justify-content: center;
+      font-size: 20px; flex-shrink: 0;
     }
-    .rs-media-info { flex: 1; min-width: 0; }
-    .rs-media-titulo {
-      font-size: 13px;
-      font-weight: 700;
-      color: var(--texto);
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-    .rs-media-sub { font-size: 11px; color: var(--subtexto); margin-top: 2px; }
+    .rs-media-info   { flex: 1; min-width: 0; }
+    .rs-media-titulo { font-size: 13px; font-weight: 700; color: var(--texto); }
+    .rs-media-sub    { font-size: 11px; color: var(--subtexto); margin-top: 2px; }
     .rs-media-btn {
-      padding: 8px 14px;
-      border-radius: 8px;
-      font-size: 12px;
-      font-weight: 700;
-      border: none;
-      cursor: pointer;
-      text-decoration: none;
-      display: inline-block;
-      white-space: nowrap;
+      padding: 8px 13px; border-radius: 8px; font-size: 12px;
+      font-weight: 700; border: none; cursor: pointer;
+      text-decoration: none; display: inline-block; white-space: nowrap;
     }
     .rs-media-btn-primary { background: var(--azul); color: #fff; }
-    .rs-media-btn-lock {
-      background: #f1f5f9;
-      color: var(--subtexto);
-      cursor: default;
-    }
+    .rs-media-btn-lock    { background: #f1f5f9; color: var(--subtexto); cursor: default; }
 
-    /* Player áudio */
-    audio {
-      width: 100%;
-      margin-top: 8px;
-      border-radius: 8px;
-    }
-
-    /* ── FAQ accordion ────────────────────────────────────────── */
-    .rs-faq-item {
-      border-bottom: 1px solid var(--borda);
-    }
+    /* ── FAQ ────────────────────────────────────────────────────────────── */
+    .rs-faq-item { border-bottom: 1px solid var(--borda); }
     .rs-faq-item:last-child { border-bottom: none; }
     .rs-faq-pergunta {
-      width: 100%;
-      background: none;
-      border: none;
-      text-align: left;
-      padding: 13px 0;
-      font-size: 14px;
-      font-weight: 600;
-      color: var(--texto);
-      cursor: pointer;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      gap: 10px;
+      width: 100%; background: none; border: none; text-align: left;
+      padding: 12px 0; font-size: 14px; font-weight: 600;
+      color: var(--texto); cursor: pointer;
+      display: flex; justify-content: space-between; align-items: center; gap: 10px;
     }
-    .rs-faq-pergunta .rs-faq-icon {
-      font-size: 16px;
-      color: var(--azul);
-      transition: transform .2s;
-      flex-shrink: 0;
-    }
+    .rs-faq-icon { font-size: 18px; color: var(--azul); transition: transform .2s; flex-shrink: 0; }
     .rs-faq-item.aberto .rs-faq-icon { transform: rotate(45deg); }
     .rs-faq-resposta {
-      display: none;
-      font-size: 13px;
-      color: var(--subtexto);
-      line-height: 1.6;
-      padding: 0 0 13px;
+      display: none; font-size: 13px; color: var(--subtexto);
+      line-height: 1.65; padding: 0 0 12px;
     }
     .rs-faq-item.aberto .rs-faq-resposta { display: block; }
 
-    /* ── Reactions ────────────────────────────────────────────── */
+    /* ── Reactions ──────────────────────────────────────────────────────── */
     .rs-reactions {
-      display: flex;
-      gap: 10px;
-      justify-content: center;
-      flex-wrap: wrap;
-      padding: 4px 0;
+      display: flex; gap: 8px; justify-content: center;
+      flex-wrap: wrap; padding: 4px 0;
     }
     .rs-reaction-btn {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 3px;
-      padding: 10px 18px;
-      border: 2px solid var(--borda);
-      border-radius: 12px;
-      background: #fff;
-      cursor: pointer;
-      transition: all .18s;
-      font-size: 22px;
-      min-width: 70px;
+      display: flex; flex-direction: column; align-items: center; gap: 3px;
+      padding: 10px 14px; border: 2px solid var(--borda);
+      border-radius: 12px; background: #fff; cursor: pointer;
+      transition: all .18s; font-size: 22px; min-width: 68px;
     }
-    .rs-reaction-btn:hover { border-color: var(--azul); transform: scale(1.08); }
-    .rs-reaction-btn.ativo {
-      border-color: var(--azul);
-      background: var(--azul-light);
-    }
-    .rs-reaction-count {
-      font-size: 12px;
-      font-weight: 700;
-      color: var(--subtexto);
-    }
-    .rs-reaction-label {
-      font-size: 10px;
-      color: var(--subtexto);
-    }
+    .rs-reaction-btn:hover  { border-color: var(--azul); transform: scale(1.06); }
+    .rs-reaction-btn.ativo  { border-color: var(--azul); background: var(--azul-light); }
+    .rs-reaction-count { font-size: 12px; font-weight: 700; color: var(--subtexto); }
+    .rs-reaction-label { font-size: 10px; color: var(--subtexto); }
     .rs-reaction-feedback {
-      text-align: center;
-      font-size: 12px;
-      color: var(--verde);
-      margin-top: 8px;
-      min-height: 18px;
+      text-align: center; font-size: 12px; color: var(--verde);
+      margin-top: 8px; min-height: 16px;
     }
 
-    /* ── CTA por segmento ─────────────────────────────────────── */
+    /* ── CTA ────────────────────────────────────────────────────────────── */
     .rs-cta {
-      margin: 12px 12px 0;
-      border-radius: var(--radius);
-      padding: 20px;
-      text-align: center;
+      margin: 10px 10px 0; border-radius: var(--radius);
+      padding: 20px; text-align: center;
     }
     .rs-cta-lead {
       background: linear-gradient(135deg, var(--azul) 0%, var(--azul-mid) 100%);
@@ -477,93 +304,67 @@
       background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
       border: 1px solid #bae6fd;
     }
-    .rs-cta h3 { font-size: 16px; margin-bottom: 6px; }
-    .rs-cta p  { font-size: 13px; margin-bottom: 14px; opacity: .85; line-height: 1.5; }
+    .rs-cta h3 { font-size: 16px; margin-bottom: 6px; line-height: 1.3; }
+    .rs-cta p  { font-size: 13px; margin-bottom: 14px; opacity: .85; line-height: 1.55; }
     .rs-cta-btn {
-      display: inline-block;
-      padding: 12px 28px;
-      border-radius: 8px;
-      font-size: 14px;
-      font-weight: 700;
-      text-decoration: none;
-      cursor: pointer;
-      border: none;
+      display: inline-block; padding: 12px 28px; border-radius: 8px;
+      font-size: 14px; font-weight: 700; text-decoration: none;
+      border: none; cursor: pointer;
     }
-    .rs-cta-lead .rs-cta-btn {
-      background: #fff;
-      color: var(--azul);
-    }
-    .rs-cta-basico .rs-cta-btn {
-      background: var(--azul);
-      color: #fff;
-    }
+    .rs-cta-lead   .rs-cta-btn { background: #fff;           color: var(--azul); }
+    .rs-cta-basico .rs-cta-btn { background: var(--azul);    color: #fff; }
 
-    /* ── Watermark ────────────────────────────────────────────── */
+    /* ── Watermark ──────────────────────────────────────────────────────── */
     .rs-watermark {
-      font-size: 11px;
-      color: #cbd5e1;
-      text-align: center;
-      padding: 10px 16px;
-      line-height: 1.5;
-      user-select: none;
+      font-size: 10px; color: #c8d6e0; text-align: center;
+      padding: 12px 16px; line-height: 1.5; user-select: none;
+      margin: 10px 10px 0;
     }
 
-    /* ── Banner PWA install ───────────────────────────────────── */
-    /* (injetado pelo onesignal-init.js) */
-
-    /* ── Loading / Erro ───────────────────────────────────────── */
+    /* ── Loading / Erro ─────────────────────────────────────────────────── */
     #rs-loading {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      min-height: 60vh;
-      gap: 14px;
-      color: var(--subtexto);
-      font-size: 14px;
+      display: flex; flex-direction: column; align-items: center;
+      justify-content: center; min-height: 70dvh; gap: 14px;
+      color: var(--subtexto); font-size: 14px;
     }
     .rs-spinner {
-      width: 36px;
-      height: 36px;
+      width: 36px; height: 36px;
       border: 3px solid var(--borda);
       border-top-color: var(--azul);
       border-radius: 50%;
-      animation: rs-spin .7s linear infinite;
+      animation: spin .7s linear infinite;
     }
-    @keyframes rs-spin { to { transform: rotate(360deg); } }
+    @keyframes spin { to { transform: rotate(360deg); } }
 
     #rs-erro {
-      display: none;
-      margin: 40px 20px;
-      padding: 20px;
-      background: #fff;
-      border-radius: var(--radius);
+      display: none; margin: 32px 16px; padding: 20px;
+      background: #fff; border-radius: var(--radius);
       border-left: 4px solid var(--vermelho);
-      font-size: 14px;
-      line-height: 1.6;
+      box-shadow: var(--shadow);
     }
-    #rs-erro h3 { color: var(--vermelho); margin-bottom: 8px; }
+    #rs-erro h3  { color: var(--vermelho); margin-bottom: 8px; font-size: 16px; }
+    #rs-erro-msg { font-size: 14px; line-height: 1.6; color: var(--subtexto); }
 
-    /* ── Proteção de conteúdo ─────────────────────────────────── */
+    /* ── Proteção ───────────────────────────────────────────────────────── */
     .rs-protegido { user-select: none; -webkit-user-select: none; }
   </style>
 </head>
 
 <body>
 
-<!-- ── Loading inicial ───────────────────────────────────────── -->
+<!-- ── Loading ─────────────────────────────────────────────────────────────── -->
 <div id="rs-loading">
   <div class="rs-spinner"></div>
   <span>Carregando sua edição…</span>
 </div>
 
-<!-- ── Erro ──────────────────────────────────────────────────── -->
+<!-- ── Erro ────────────────────────────────────────────────────────────────── -->
 <div id="rs-erro">
   <h3>⚠️ Acesso não disponível</h3>
   <p id="rs-erro-msg">Ocorreu um erro ao carregar esta edição.</p>
 </div>
 
-<!-- ── Página principal (oculta até carregar) ─────────────────── -->
+<!-- ── App (oculto até carregar) ───────────────────────────────────────────── -->
 <div id="rs-app" class="rs-page" style="display:none">
 
   <!-- HEADER -->
@@ -581,13 +382,12 @@
   </header>
 
   <!-- MUNICÍPIO -->
-  <section class="rs-section" id="secao-municipio">
+  <section class="rs-section">
     <div class="rs-section-header">
       <span>📍</span>
       <h2 id="municipio-titulo">Seu Município</h2>
     </div>
     <div id="municipio-conteudo">
-      <!-- preenchido pelo supabase-municipio.js -->
       <div class="rs-municipio-card">
         <div class="rs-skeleton rs-sk-title"></div>
         <div class="rs-skeleton rs-sk-bar" style="margin-top:10px"></div>
@@ -598,7 +398,7 @@
 
   <!-- TOGGLE MODO -->
   <div class="rs-toggle" id="rs-toggle-modo">
-    <button id="btn-rapido"   class="ativo" onclick="trocarModo('rapido')">
+    <button id="btn-rapido" class="ativo" onclick="trocarModo('rapido')">
       ⚡ Modo Rápido
     </button>
     <button id="btn-completo" onclick="trocarModo('completo')">
@@ -658,7 +458,7 @@
     </div>
   </section>
 
-  <!-- CTA (injetado pelo JS) -->
+  <!-- CTA dinâmico -->
   <div id="rs-cta-wrap"></div>
 
   <!-- WATERMARK -->
@@ -666,34 +466,46 @@
 
 </div><!-- /rs-app -->
 
-<!-- Firebase v10 compat -->
+<!-- ── Scripts ──────────────────────────────────────────────────────────────── -->
+
+<!-- Firebase v10 compat (mesma versão do restante do projeto) -->
 <script src="https://www.gstatic.com/firebasejs/10.0.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.0.0/firebase-firestore-compat.js"></script>
 <script src="/js/firebase-init.js"></script>
 
-<!-- Supabase (anon key — dados públicos) -->
+<!-- Supabase UMD via CDN (expõe `supabase` globalmente) -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="/js/exposeSupabase.js" type="module"></script>
+<!-- Inicializa window.supabase sem Vite/bundler -->
+<script src="/js/supabase-browser.js"></script>
 
-<!-- Utilitários -->
+<!-- Utilitários do projeto -->
 <script src="/js/functions.js"></script>
 
-<!-- Módulo Supabase município -->
+<!-- Módulo Supabase município (v2 — usa vw_municipio_resumo) -->
 <script src="/js/supabase-municipio.js"></script>
 
-<!-- Lógica principal -->
+<!-- Lógica principal do web app -->
 <script src="/js/verNewsletterComToken.js"></script>
 
-<!-- PWA / OneSignal (carrega por último — não bloqueante) -->
+<!-- PWA Service Worker -->
+<script>
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/sw.js').catch(() => {});
+  }
+</script>
+
+<!-- OneSignal (carrega por último, não bloqueia render) -->
 <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
 <script src="/js/onesignal-init.js" defer></script>
 
-<!-- Proteções -->
+<!-- Proteções de conteúdo -->
 <script>
   document.addEventListener('contextmenu', e => e.preventDefault());
   document.addEventListener('keydown', e => {
-    if ((e.ctrlKey || e.metaKey) && ['c','u','s','p'].includes(e.key.toLowerCase()))
+    if ((e.ctrlKey || e.metaKey) &&
+        ['c','u','s','p','a'].includes(e.key.toLowerCase())) {
       e.preventDefault();
+    }
   });
 </script>
 
