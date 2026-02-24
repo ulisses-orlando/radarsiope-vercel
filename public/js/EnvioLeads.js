@@ -1355,7 +1355,7 @@ async function listarLotesEnvio(newsletterId, envioId) {
 }
 window.listarLotesEnvio = listarLotesEnvio; // para acesso global
 
-async function enviarLoteIndividual(newsletterId, envioDocId, loteId) {    
+async function enviarLoteIndividual(newsletterId, envioDocId, loteId) {
     try {
         const loteRef = db.collection("newsletters")
             .doc(newsletterId)
@@ -1391,16 +1391,11 @@ async function enviarLoteIndividual(newsletterId, envioDocId, loteId) {
 
         for (const dest of destinatarios) {
             const tipo = dest.tipo || (dest.assinaturaId ? "usuarios" : "leads");
-
-            // 🔹 Identificador consistente para logs
             const emailDest = (dest.email || "").trim();
             const idDest = dest.id || "-";
             const identificador = emailDest || `ID:${idDest}`;
-
-            // Determina segmento
             const segmento = tipo === "leads" ? "leads" : "assinantes";
 
-            // Monta HTML final com blocos + segmentação + placeholders
             const htmlMontado = montarHtmlNewsletterParaEnvio(
                 newsletter,
                 {
@@ -1416,97 +1411,82 @@ async function enviarLoteIndividual(newsletterId, envioDocId, loteId) {
             );
 
             try {
-                // Gera token de acesso e data de expiração antes da inserção
                 const token = gerarTokenAcesso();
-                const expiraEm = firebase.firestore.Timestamp.fromDate(
-                    new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) // 30 dias
-                );
+                const expiraEm = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
 
-                let envioRef;
-                let envioId; // id do registro criado no Supabase (ou Firestore para assinantes)
+                // ID do registro de envio — será preenchido abaixo
+                let registroEnvioId;
 
                 if (tipo === "leads") {
-                    // Chama a Edge Function que insere em leads_envios no Supabase
-                    const FUNCTION_URL = "https://ekrtekidjuwxfspjmmvl.supabase.co/functions/v1/insert-lead-envio";
+                    // ─── Insere direto no Supabase via window.supabase (service_role) ───
+                    // window.supabase no admin.html já é o cliente admin (exposeSupabaseAdmin.js)
+                    const { data, error } = await window.supabase
+                        .from("leads_envios")
+                        .insert({
+                            lead_id:       idDest,
+                            newsletter_id: newsletterId,
+                            data_envio:    new Date().toISOString(),
+                            status:        "enviado",
+                            token_acesso:  token,
+                            expira_em:     expiraEm.toISOString()
+                        })
+                        .select("id")
+                        .single();
 
-                    // expiraEm é um firebase.Timestamp; converte para ISO
-                    const expiraEmISO = expiraEm ? expiraEm.toDate().toISOString() : null;
-
-                    const payload = {
-                        lead_id: idDest,
-                        newsletter_id: newsletterId,
-                        data_envio: new Date().toISOString(),
-                        status: "enviado",
-                        token_acesso: token,
-                        expira_em: expiraEmISO
-                    };
-
-                    const resp = await fetch(FUNCTION_URL, {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify(payload)
-                    });
-
-                    const json = await resp.json().catch(() => null);
-                    if (!resp.ok || !json || !json.ok) {
-                        // lança para cair no catch externo e registrar erro
-                        throw new Error((json && json.error) || "Falha ao criar envio no Supabase via Edge Function");
+                    if (error) {
+                        throw new Error("Falha ao registrar envio no Supabase: " + error.message);
                     }
-                    // Guarda o id retornado pela Edge Function
-                    envioId = json.id;
+                    registroEnvioId = data.id;
+
                 } else {
-                    envioRef = await db
+                    // ─── Assinantes: continua no Firestore ───────────────────────────────
+                    const envioRef = await db
                         .collection("usuarios")
                         .doc(idDest)
                         .collection("assinaturas")
                         .doc(dest.assinaturaId)
                         .collection("envios")
                         .add({
-                        newsletter_id: newsletterId,
-                        data_envio: firebase.firestore.Timestamp.now(),
-                        status: "enviado",
-                        destinatarioId: idDest,
-                        assinaturaId: dest.assinaturaId,
-                        token_acesso: token,
-                        expira_em: expiraEm,
-                        ultimo_acesso: null,
-                        acessos_totais: 0
+                            newsletter_id:  newsletterId,
+                            data_envio:     firebase.firestore.Timestamp.now(),
+                            status:         "enviado",
+                            destinatarioId: idDest,
+                            assinaturaId:   dest.assinaturaId,
+                            token_acesso:   token,
+                            expira_em:      firebase.firestore.Timestamp.fromDate(expiraEm),
+                            ultimo_acesso:  null,
+                            acessos_totais: 0
                         });
-                    envioId = envioRef.id;
+                    registroEnvioId = envioRef.id;
                 }
 
-                // Define assinaturaId para passar à função (null se não existir)
-                const assinaturaId = dest && dest.assinaturaId ? dest.assinaturaId : null;
+                const assinaturaId = dest.assinaturaId || null;
 
-                // Aplica rastreamento usando o envioId obtido
                 const htmlFinal = aplicarRastreamento(
                     htmlMontado,
-                    envioId,
+                    registroEnvioId,
                     idDest,
                     newsletterId,
                     assinaturaId,
                     token
                 );
 
-                // 🔹 Endpoint SES no backend
                 const response = await fetch("https://api.radarsiope.com.br/api/sendViaSES", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({
-                        nome: dest.nome,
-                        email: emailDest,
+                        nome:         dest.nome,
+                        email:        emailDest,
                         mensagemHtml: htmlFinal,
-                        assunto: newsletter.titulo || "Newsletter Radar SIOPE"
+                        assunto:      newsletter.titulo || "Newsletter Radar SIOPE"
                     })
                 });
 
                 const text = await response.text();
-
                 let result;
                 try {
                     result = JSON.parse(text);
                 } catch (e) {
-                    console.error("Falha ao converter resposta em JSON:", e);
                     throw new Error("Resposta inválida do backend: " + text);
                 }
 
@@ -1516,56 +1496,47 @@ async function enviarLoteIndividual(newsletterId, envioDocId, loteId) {
 
                 enviados++;
 
-
             } catch (err) {
                 console.error(`❌ Falha ao enviar para ${identificador}`, err);
 
-                const registroErro = {
-                    newsletter_id: newsletterId,
-                    data_envio: firebase.firestore.Timestamp.now(),
-                    status: "erro",
-                    erro: err.message || "Falha desconhecida"
-                };
-
+                // Registra erro no mesmo destino (Supabase para leads, Firestore para assinantes)
                 if (tipo === "leads") {
-                    // registra erro no Supabase via Edge Function (status: "erro")
-                    const FUNCTION_URL = "https://ekrtekidjuwxfspjmmvl.supabase.co/functions/v1/insert-lead-envio";
-
-                    const payloadErro = {
-                        lead_id: idDest,
-                        newsletter_id: newsletterId,
-                        data_envio: new Date().toISOString(),
-                        status: "erro",
-                        token_acesso: null,
-                        expira_em: null,
-                        // opcional: incluir campo 'erro' se a sua tabela aceitar; caso não aceite, remova
-                        // erro: registroErro.erro
-                    };
-
-                    try {
-                        const respErr = await fetch(FUNCTION_URL, {
-                            method: "POST",
-                            headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify(payloadErro)
-                            });
-                        const jsonErr = await respErr.json().catch(() => null);
-                        if (!respErr.ok || !jsonErr || !jsonErr.ok) {
-                            // se falhar, grava fallback no Firestore para não perder o log
-                            await db.collection("leads").doc(idDest).collection("envios").add(registroErro);
-                        }
-                    } catch (e) {
-                        // fallback: grava no Firestore local
-                        await db.collection("leads").doc(idDest).collection("envios").add(registroErro);
-                    }
+                    await window.supabase
+                        .from("leads_envios")
+                        .insert({
+                            lead_id:       idDest,
+                            newsletter_id: newsletterId,
+                            data_envio:    new Date().toISOString(),
+                            status:        "erro",
+                            token_acesso:  null,
+                            expira_em:     null
+                        })
+                        .then(({ error }) => {
+                            // se Supabase falhar, fallback no Firestore
+                            if (error) {
+                                return db.collection("leads").doc(idDest).collection("envios").add({
+                                    newsletter_id: newsletterId,
+                                    data_envio:    firebase.firestore.Timestamp.now(),
+                                    status:        "erro",
+                                    erro:          err.message || "Falha desconhecida"
+                                });
+                            }
+                        });
                 } else {
                     await db.collection("usuarios").doc(idDest)
                         .collection("assinaturas").doc(dest.assinaturaId)
-                        .collection("envios").add(registroErro);
+                        .collection("envios").add({
+                            newsletter_id: newsletterId,
+                            data_envio:    firebase.firestore.Timestamp.now(),
+                            status:        "erro",
+                            erro:          err.message || "Falha desconhecida"
+                        });
                 }
                 continue;
             }
         }
 
+        // ── Atualiza metadados do lote no Firestore ──────────────────────────
         const usuarioLogado = JSON.parse(localStorage.getItem("usuarioLogado"));
         const feitoPor = usuarioLogado?.nome || usuarioLogado?.email || "Desconhecido";
 
@@ -1573,41 +1544,42 @@ async function enviarLoteIndividual(newsletterId, envioDocId, loteId) {
             data_envio: firebase.firestore.Timestamp.now(),
             quantidade: destinatarios.length,
             enviados,
-            origem: "manual",
-            operador: feitoPor,
-            status: enviados === destinatarios.length ? "completo" : "parcial"
+            origem:     "manual",
+            operador:   feitoPor,
+            status:     enviados === destinatarios.length ? "completo" : "parcial"
         });
 
         await loteRef.update({
             enviados,
-            status: enviados === destinatarios.length ? "completo" : "parcial",
+            status:     enviados === destinatarios.length ? "completo" : "parcial",
             data_envio: firebase.firestore.Timestamp.now()
         });
 
+        // ── Atualiza lotes_gerais (usa envioDocId — parâmetro correto) ───────
         const loteGeralSnap = await db.collection("lotes_gerais")
-            .where("loteId", "==", loteId)
-            .where("envioId", "==", envioId)
+            .where("loteId",  "==", loteId)
+            .where("envioId", "==", envioDocId)   // ← corrigido: era envioId (undefined)
             .limit(1)
             .get();
 
         if (!loteGeralSnap.empty) {
-            const loteGeralRef = loteGeralSnap.docs[0].ref;
-            await loteGeralRef.update({
+            await loteGeralSnap.docs[0].ref.update({
                 enviados,
-                status: enviados === destinatarios.length ? "completo" : "parcial",
+                status:     enviados === destinatarios.length ? "completo" : "parcial",
                 data_envio: firebase.firestore.Timestamp.now()
             });
         }
-        // 🔥 Marca a newsletter como enviada/publicada
+
         await db.collection("newsletters").doc(newsletterId).update({
-            enviada: true,
-            data_publicacao: firebase.firestore.Timestamp.now()
+            enviada:          true,
+            data_publicacao:  firebase.firestore.Timestamp.now()
         });
 
-        mostrarMensagem(`✅ Lote nº ${numeroLote} enviado com sucesso!`);
+        mostrarMensagem(`✅ Lote nº ${numeroLote} enviado com sucesso! (${enviados}/${destinatarios.length})`);
+
     } catch (err) {
         console.error("Erro ao enviar lote:", err);
-        mostrarMensagem("❌ Erro ao enviar lote.");
+        mostrarMensagem("❌ Erro ao enviar lote: " + err.message);
     }
 }
 window.enviarLoteIndividual = enviarLoteIndividual;
@@ -2273,157 +2245,179 @@ async function verDestinatariosLoteUnificado(loteId) {
 window.verDestinatariosLoteUnificado = verDestinatariosLoteUnificado; // para acesso global
 
 async function enviarLoteEmMassa(newsletterId, envioId, loteId, tipo) {
-    const loteRef = db.collection("newsletters")
-        .doc(newsletterId).collection("envios")
-        .doc(envioId).collection("lotes").doc(loteId);
+    try {
+        const loteRef = db.collection("newsletters")
+            .doc(newsletterId)
+            .collection("envios")
+            .doc(envioId)
+            .collection("lotes")
+            .doc(loteId);
 
-    const loteSnap = await loteRef.get();
-    if (!loteSnap.exists) {
-        mostrarMensagem("❌ Lote não encontrado.");
-        return;
-    }
-
-    const lote = loteSnap.data();
-    const newsletterSnap = await db.collection("newsletters").doc(newsletterId).get();
-    const newsletter = newsletterSnap.data();
-
-    const destinatarios = lote.destinatarios || [];
-    const payloadEmails = [];
-    let enviados = 0;
-
-    for (const dest of destinatarios) {
-        const idDest = dest.id;
-        const assinaturaId = dest.assinaturaId || null;
-        const token = gerarTokenAcesso();
-        const expiraEm = firebase.firestore.Timestamp.fromDate(
-            new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
-        );
-
-        let envioRef;
-        let envioRefId;
-
-        if (tipo === "leads") {
-            // Chama a Edge Function que insere em leads_envios no Supabase
-            const FUNCTION_URL = "https://ekrtekidjuwxfspjmmvl.supabase.co/functions/v1/insert-lead-envio";
-
-            // expiraEm é um firebase.Timestamp; converte para ISO
-            const expiraEmISO = expiraEm ? expiraEm.toDate().toISOString() : null;
-
-            const payload = {
-                        lead_id: idDest,
-                        newsletter_id: newsletterId,
-                        data_envio: new Date().toISOString(),
-                        status: "enviado",
-                        token_acesso: token,
-                        expira_em: expiraEmISO
-            };
-
-            const resp = await fetch(FUNCTION_URL, {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify(payload)
-            });
-
-            const json = await resp.json().catch(() => null);
-            if (!resp.ok || !json || !json.ok) {
-               // lança para cair no catch externo e registrar erro
-               throw new Error((json && json.error) || "Falha ao criar envio no Supabase via Edge Function");
-            }
-            // Guarda o id retornado pela Edge Function
-            envioRefId = json.id;
-        } else {
-            envioRef = await db
-                .collection("usuarios")
-                .doc(idDest)
-                .collection("assinaturas")
-                .doc(dest.assinaturaId)
-                .collection("envios")
-                .add({
-                    newsletter_id: newsletterId,
-                    data_envio: firebase.firestore.Timestamp.now(),
-                    status: "enviado",
-                    destinatarioId: idDest,
-                    assinaturaId: dest.assinaturaId,
-                    token_acesso: token,
-                    expira_em: expiraEm,
-                    ultimo_acesso: null,
-                    acessos_totais: 0
-                });
-            envioRefId = envioRef.id;
+        const loteSnap = await loteRef.get();
+        if (!loteSnap.exists) {
+            mostrarMensagem("❌ Lote não encontrado.");
+            return;
         }
 
-        const htmlMontado = montarHtmlNewsletterParaEnvio(newsletter, {
-            nome: dest.nome,
-            email: dest.email,
-            edicao: newsletter.edicao,
-            tipo: newsletter.tipo,
-            titulo: newsletter.titulo,
-            data_publicacao: newsletter.data_publicacao,
-            newsletterId
-        }, dest.tipo);
-        const htmlFinal = aplicarRastreamento(htmlMontado, envioRefId, idDest, newsletterId, assinaturaId, token);
-        payloadEmails.push({
-            nome: dest.nome,
-            email: dest.email,
-            mensagemHtml: htmlFinal,
-            assunto: newsletter.titulo || "Newsletter Radar SIOPE",
-            envioId: envioRefId,
-            destinatarioId: idDest,
-            tipo: dest.tipo || "leads",
-            assinaturaId: assinaturaId
+        const lote = loteSnap.data();
+        const newsletterSnap = await db.collection("newsletters").doc(newsletterId).get();
+        const newsletter = newsletterSnap.data();
+
+        const destinatarios = lote.destinatarios || [];
+
+        // ── 1. Criar todos os registros de envio ANTES de montar os e-mails ──
+        //    (precisamos do registroEnvioId para aplicar rastreamento)
+        const payloadEmails = [];
+
+        for (const dest of destinatarios) {
+            const idDest    = dest.id;
+            const tipoLocal = dest.tipo || (dest.assinaturaId ? "usuarios" : "leads");
+            const assinaturaId = dest.assinaturaId || null;
+            const token    = gerarTokenAcesso();
+            const expiraEm = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+
+            let registroEnvioId;
+
+            if (tipoLocal === "leads") {
+                // ─── Insere direto no Supabase via window.supabase (service_role) ───
+                const { data, error } = await window.supabase
+                    .from("leads_envios")
+                    .insert({
+                        lead_id:       idDest,
+                        newsletter_id: newsletterId,
+                        data_envio:    new Date().toISOString(),
+                        status:        "enviado",
+                        token_acesso:  token,
+                        expira_em:     expiraEm.toISOString()
+                    })
+                    .select("id")
+                    .single();
+
+                if (error) {
+                    console.error(`❌ Falha ao criar envio Supabase para ${dest.email}:`, error.message);
+                    continue; // pula esse destinatário, não aborta o lote todo
+                }
+                registroEnvioId = data.id;
+
+            } else {
+                // ─── Assinantes: Firestore ────────────────────────────────────────────
+                const envioRef = await db
+                    .collection("usuarios")
+                    .doc(idDest)
+                    .collection("assinaturas")
+                    .doc(dest.assinaturaId)
+                    .collection("envios")
+                    .add({
+                        newsletter_id:  newsletterId,
+                        data_envio:     firebase.firestore.Timestamp.now(),
+                        status:         "enviado",
+                        destinatarioId: idDest,
+                        assinaturaId:   dest.assinaturaId,
+                        token_acesso:   token,
+                        expira_em:      firebase.firestore.Timestamp.fromDate(expiraEm),
+                        ultimo_acesso:  null,
+                        acessos_totais: 0
+                    });
+                registroEnvioId = envioRef.id;
+            }
+
+            const segmento = tipoLocal === "leads" ? "leads" : "assinantes";
+            const htmlMontado = montarHtmlNewsletterParaEnvio(newsletter, {
+                nome:            dest.nome,
+                email:           dest.email,
+                edicao:          newsletter.edicao,
+                tipo:            newsletter.tipo,
+                titulo:          newsletter.titulo,
+                data_publicacao: newsletter.data_publicacao,
+                newsletterId
+            }, segmento);
+
+            const htmlFinal = aplicarRastreamento(
+                htmlMontado,
+                registroEnvioId,
+                idDest,
+                newsletterId,
+                assinaturaId,
+                token
+            );
+
+            payloadEmails.push({
+                nome:           dest.nome,
+                email:          dest.email,
+                mensagemHtml:   htmlFinal,
+                assunto:        newsletter.titulo || "Newsletter Radar SIOPE",
+                envioId:        registroEnvioId,
+                destinatarioId: idDest,
+                tipo:           tipoLocal,
+                assinaturaId:   assinaturaId
+            });
+        }
+
+        if (payloadEmails.length === 0) {
+            mostrarMensagem("⚠️ Nenhum destinatário pôde ser processado.");
+            return;
+        }
+
+        // ── 2. Envia em massa para o backend SES ─────────────────────────────
+        const response = await fetch("https://api.radarsiope.com.br/api/sendBatchViaSES", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ newsletterId, envioId, loteId, emails: payloadEmails })
         });
-        enviados++;
-    }
-    // envia payload em massa para backend
-    const response = await fetch("https://api.radarsiope.com.br/api/sendBatchViaSES", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ newsletterId, envioId, loteId, emails: payloadEmails })
-    });
 
-    const usuarioLogado = JSON.parse(localStorage.getItem("usuarioLogado"));
-    const feitoPor = usuarioLogado?.nome || usuarioLogado?.email || "Desconhecido";
+        const result = await response.json().catch(() => ({}));
+        if (!response.ok) {
+            throw new Error(result.error || `Erro no backend SES: ${response.status}`);
+        }
 
-    await loteRef.collection("envios_log").add({
-        data_envio: firebase.firestore.Timestamp.now(),
-        quantidade: destinatarios.length,
-        enviados,
-        origem: "manual",
-        operador: feitoPor,
-        status: enviados === destinatarios.length ? "completo" : "parcial"
-    });
+        // ── 3. Atualiza metadados no Firestore ───────────────────────────────
+        const enviados = payloadEmails.length;
+        const usuarioLogado = JSON.parse(localStorage.getItem("usuarioLogado"));
+        const feitoPor = usuarioLogado?.nome || usuarioLogado?.email || "Desconhecido";
 
-    await loteRef.update({
-        enviados,
-        status: enviados === destinatarios.length ? "completo" : "parcial",
-        data_envio: firebase.firestore.Timestamp.now()
-    });
-
-    const loteGeralSnap = await db.collection("lotes_gerais")
-        .where("loteId", "==", loteId)
-        .where("envioId", "==", envioId)
-        .limit(1)
-        .get();
-
-    if (!loteGeralSnap.empty) {
-        const loteGeralRef = loteGeralSnap.docs[0].ref;
-        await loteGeralRef.update({
+        await loteRef.collection("envios_log").add({
+            data_envio: firebase.firestore.Timestamp.now(),
+            quantidade: destinatarios.length,
             enviados,
-            status: enviados === destinatarios.length ? "completo" : "parcial",
+            origem:     "manual",
+            operador:   feitoPor,
+            status:     enviados === destinatarios.length ? "completo" : "parcial"
+        });
+
+        await loteRef.update({
+            enviados,
+            status:     enviados === destinatarios.length ? "completo" : "parcial",
             data_envio: firebase.firestore.Timestamp.now()
         });
-    }
-    // 🔥 Marca a newsletter como enviada/publicada
-    await db.collection("newsletters").doc(newsletterId).update({
-        enviada: true,
-        data_publicacao: firebase.firestore.Timestamp.now()
-    });
 
-    const result = await response.json();
-    mostrarMensagem(`✅ Lote nº ${lote.numero_lote} enviado com sucesso!`);
-    return result; // log de retorno do backend
+        const loteGeralSnap = await db.collection("lotes_gerais")
+            .where("loteId",  "==", loteId)
+            .where("envioId", "==", envioId)
+            .limit(1)
+            .get();
+
+        if (!loteGeralSnap.empty) {
+            await loteGeralSnap.docs[0].ref.update({
+                enviados,
+                status:     enviados === destinatarios.length ? "completo" : "parcial",
+                data_envio: firebase.firestore.Timestamp.now()
+            });
+        }
+
+        await db.collection("newsletters").doc(newsletterId).update({
+            enviada:         true,
+            data_publicacao: firebase.firestore.Timestamp.now()
+        });
+
+        mostrarMensagem(`✅ Lote nº ${lote.numero_lote} enviado com sucesso! (${enviados}/${destinatarios.length})`);
+        return result;
+
+    } catch (err) {
+        console.error("Erro ao enviar lote em massa:", err);
+        mostrarMensagem("❌ Erro ao enviar lote em massa: " + err.message);
+    }
 }
-window.enviarLoteEmMassa = enviarLoteEmMassa; // para acesso global
+window.enviarLoteEmMassa = enviarLoteEmMassa;
 
 async function atualizarRetornoSES(newsletterId, envioId, loteId, logResultados) {
     try {
