@@ -334,6 +334,218 @@ async function abrirModalNewsletter(docId = null, isEdit = false) {
     }
   };
 
+  // Separador visual
+  const sepWebApp = document.createElement('div');
+  sepWebApp.style.cssText = `
+    margin: 20px 0 12px;
+    padding: 10px 12px;
+    background: #EBF5FB;
+    border-left: 4px solid #0A3D62;
+    border-radius: 0 6px 6px 0;
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .5px;
+    color: #0A3D62;
+  `;
+  sepWebApp.textContent = '📡 Campos do Web App (verNewsletterComToken)';
+  col1.appendChild(sepWebApp);
+
+  // ── Número da edição (campo "numero" — usado na URL /edicao/001) ──────────
+  const numeroWrap = document.createElement('div');
+  numeroWrap.className = 'field';
+  numeroWrap.innerHTML = `
+    <label style="font-weight:600">Número da edição
+      <span style="font-weight:400;color:#888;font-size:11px"> — usado na URL /edicao/001</span>
+    </label>
+    <input type="text" data-field-name="numero"
+      value="${data.numero || ''}"
+      placeholder="Ex: 001"
+      style="font-family:monospace;letter-spacing:1px">
+  `;
+  col1.appendChild(numeroWrap);
+
+  // ── Resumo bullets (modo rápido) ───────────────────────────────────────────
+  const bulletsWrap = document.createElement('div');
+  bulletsWrap.className = 'field';
+  bulletsWrap.style.marginTop = '14px';
+
+  const bulletsLabel = document.createElement('label');
+  bulletsLabel.style.fontWeight = '600';
+  bulletsLabel.innerHTML = `Pontos-chave (Modo Rápido)
+    <span style="font-weight:400;color:#888;font-size:11px"> — um por linha</span>`;
+  bulletsWrap.appendChild(bulletsLabel);
+
+  const bulletsHelp = document.createElement('p');
+  bulletsHelp.style.cssText = 'font-size:11px;color:#888;margin:3px 0 5px';
+  bulletsHelp.textContent = 'Leads veem apenas os 2 primeiros. Assinantes veem todos.';
+  bulletsWrap.appendChild(bulletsHelp);
+
+  const bulletsTA = document.createElement('textarea');
+  bulletsTA.rows = 6;
+  bulletsTA.style.width = '100%';
+  bulletsTA.style.fontFamily = 'system-ui, sans-serif';
+  bulletsTA.style.fontSize = '13px';
+  bulletsTA.id = 'campo-resumo-bullets';
+  bulletsTA.placeholder = 'Ponto 1: ...\nPonto 2: ...\nPonto 3: ...';
+  // Converte array → texto (uma linha por bullet)
+  bulletsTA.value = Array.isArray(data.resumo_bullets) ? data.resumo_bullets.join('\n') : (data.resumo_bullets || '');
+  bulletsWrap.appendChild(bulletsTA);
+
+  // Contador de bullets
+  const bulletsCount = document.createElement('div');
+  bulletsCount.style.cssText = 'font-size:11px;color:#888;margin-top:3px;text-align:right';
+  const atualizarContadorBullets = () => {
+    const linhas = bulletsTA.value.split('\n').filter(l => l.trim());
+    bulletsCount.textContent = `${linhas.length} ponto(s)`;
+  };
+  bulletsTA.addEventListener('input', atualizarContadorBullets);
+  atualizarContadorBullets();
+  bulletsWrap.appendChild(bulletsCount);
+  col1.appendChild(bulletsWrap);
+
+  // ── URLs de mídia ──────────────────────────────────────────────────────────
+  const midiaLabel = document.createElement('div');
+  midiaLabel.style.cssText = 'font-weight:600;margin:16px 0 8px;font-size:13px';
+  midiaLabel.textContent = '🎧 URLs de Mídia';
+  col1.appendChild(midiaLabel);
+
+  // Áudio
+  const audioWrap = document.createElement('div');
+  audioWrap.className = 'field';
+  audioWrap.innerHTML = `
+    <label>URL do Podcast (áudio)
+      <span style="font-weight:400;color:#888;font-size:11px"> — Essence+</span>
+    </label>
+    <input type="url" data-field-name="audio_url"
+      value="${data.audio_url || ''}"
+      placeholder="https://...">
+  `;
+  col1.appendChild(audioWrap);
+
+  // Vídeo
+  const videoWrap = document.createElement('div');
+  videoWrap.className = 'field';
+  videoWrap.innerHTML = `
+    <label>URL do Vídeo
+      <span style="font-weight:400;color:#888;font-size:11px"> — todos os planos</span>
+    </label>
+    <input type="url" data-field-name="video_url"
+      value="${data.video_url || ''}"
+      placeholder="https://youtube.com/...">
+  `;
+  col1.appendChild(videoWrap);
+
+  // Infográfico
+  const infoWrap = document.createElement('div');
+  infoWrap.className = 'field';
+  infoWrap.innerHTML = `
+    <label>URL do Infográfico
+      <span style="font-weight:400;color:#888;font-size:11px"> — Profissional+</span>
+    </label>
+    <input type="url" data-field-name="infografico_url"
+      value="${data.infografico_url || ''}"
+      placeholder="https://...">
+  `;
+  col1.appendChild(infoWrap);
+
+  // ── FAQ ───────────────────────────────────────────────────────────────────
+  const faqSection = document.createElement('div');
+  faqSection.style.marginTop = '18px';
+
+  const faqLabel = document.createElement('div');
+  faqLabel.style.cssText = 'font-weight:600;font-size:13px;margin-bottom:6px';
+  faqLabel.innerHTML = `❓ FAQ
+    <span style="font-weight:400;color:#888;font-size:11px"> — Leads veem apenas a 1ª pergunta</span>`;
+  faqSection.appendChild(faqLabel);
+
+  const faqContainer = document.createElement('div');
+  faqContainer.id = 'faq-editor-container';
+  faqContainer.style.cssText = 'display:flex;flex-direction:column;gap:8px';
+  faqSection.appendChild(faqContainer);
+
+  const btnAddFaq = document.createElement('button');
+  btnAddFaq.type = 'button';
+  btnAddFaq.innerText = '➕ Adicionar pergunta';
+  btnAddFaq.style.cssText = 'margin-top:8px;padding:6px 12px;background:#0A3D62;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:12px';
+  faqSection.appendChild(btnAddFaq);
+
+  col1.appendChild(faqSection);
+
+  // Renderiza itens do FAQ
+  const faqInicial = Array.isArray(data.faq) ? data.faq : [];
+
+  function renderFaqItem(pergunta = '', resposta = '') {
+    const item = document.createElement('div');
+    item.className = 'faq-editor-item';
+    item.style.cssText = `
+      border:1px solid #dde1e9;border-radius:8px;padding:10px;
+      background:#f9fafb;position:relative
+    `;
+    item.innerHTML = `
+      <button type="button" title="Remover"
+        style="position:absolute;top:6px;right:8px;background:none;border:none;
+               color:#dc2626;cursor:pointer;font-size:16px;line-height:1"
+        onclick="this.closest('.faq-editor-item').remove()">×</button>
+      <div style="margin-bottom:6px">
+        <label style="font-size:11px;font-weight:600;color:#666;display:block;margin-bottom:3px">PERGUNTA</label>
+        <input type="text" class="faq-pergunta"
+          style="width:100%;padding:7px 10px;border:1.5px solid #dde1e9;border-radius:6px;font-size:13px"
+          value="${pergunta.replace(/"/g, '&quot;')}"
+          placeholder="Qual é a pergunta?">
+      </div>
+      <div>
+        <label style="font-size:11px;font-weight:600;color:#666;display:block;margin-bottom:3px">RESPOSTA</label>
+        <textarea class="faq-resposta" rows="2"
+          style="width:100%;padding:7px 10px;border:1.5px solid #dde1e9;border-radius:6px;font-size:13px;resize:vertical"
+          placeholder="Resposta...">${resposta}</textarea>
+      </div>
+    `;
+    faqContainer.appendChild(item);
+  }
+
+  faqInicial.forEach(item => renderFaqItem(item.pergunta, item.resposta));
+  btnAddFaq.onclick = () => renderFaqItem();
+
+  // ── Acesso pro temporário para leads ──────────────────────────────────────
+  const proTempSection = document.createElement('div');
+  proTempSection.style.cssText = `
+    margin-top:18px;padding:12px;border:1.5px solid #fbbf24;
+    border-radius:8px;background:#fffbeb
+  `;
+  proTempSection.innerHTML = `
+    <div style="font-weight:600;font-size:13px;color:#92400e;margin-bottom:8px">
+      ⏳ Acesso Pro Temporário para Leads
+    </div>
+    <div style="font-size:12px;color:#78350f;margin-bottom:10px;line-height:1.5">
+      Quando ativo, leads verão esta edição sem blur e sem truncamento
+      pelo período definido — estratégia de conversão.
+    </div>
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px">
+      <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer">
+        <input type="checkbox" id="chk-acesso-pro-temp"
+          data-field-name="acesso_pro_temporario"
+          ${data.acesso_pro_temporario ? 'checked' : ''}
+          style="width:16px;height:16px">
+        Ativar acesso pro temporário
+      </label>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;font-size:13px">
+      <label style="white-space:nowrap">Duração (horas):</label>
+      <input type="number" data-field-name="acesso_pro_horas"
+        min="1" max="168" value="${data.acesso_pro_horas || 24}"
+        style="width:70px;padding:5px 8px;border:1.5px solid #fbbf24;border-radius:6px;font-size:13px">
+    </div>
+    <div style="margin-top:8px">
+      <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer">
+        <input type="checkbox" data-field-name="acesso_audio_leads"
+          ${data.acesso_audio_leads ? 'checked' : ''}
+          style="width:16px;height:16px">
+        Liberar áudio para leads nesta edição
+      </label>
+    </div>
+  `;
+  col1.appendChild(proTempSection);
 
   const tiposSnap = await db.collection("tipo_newsletters").get();
   const tiposArr = tiposSnap.docs.map(doc => doc.data().nome).filter(Boolean);
@@ -667,40 +879,64 @@ async function abrirModalNewsletter(docId = null, isEdit = false) {
     const payload = {};
 
     body.querySelectorAll('[data-field-name]').forEach(el => {
-      if (el.type === 'date') {
-        payload[el.dataset.fieldName] = el.value
+      const field = el.dataset.fieldName;
+
+      // Checkboxes
+      if (el.type === 'checkbox') {
+        payload[field] = el.checked;
+      }
+      // Datas
+      else if (el.type === 'date') {
+        payload[field] = el.value
           ? firebase.firestore.Timestamp.fromDate(new Date(el.value + 'T00:00:00'))
           : null;
-      } else {
-        payload[el.dataset.fieldName] = el.value;
+      }
+      // Número de horas (acesso_pro_horas)
+      else if (el.type === 'number') {
+        const n = parseInt(el.value, 10);
+        payload[field] = isNaN(n) ? null : n;
+      }
+      // Demais campos de texto
+      else {
+        payload[field] = el.value;
       }
     });
 
+    // ── Bullets: textarea → array (filtra linhas vazias) ─────────────────
+    const bulletsEl = document.getElementById('campo-resumo-bullets');
+    if (bulletsEl) {
+      payload.resumo_bullets = bulletsEl.value
+        .split('\n')
+        .map(l => l.trim())
+        .filter(l => l.length > 0);
+      delete payload['campo-resumo-bullets']; // garante que não sobra chave suja
+    }
+
+    // ── FAQ: lê os pares pergunta/resposta do editor ──────────────────────
+    const faqItems = document.querySelectorAll('#faq-editor-container .faq-editor-item');
+    payload.faq = Array.from(faqItems).map(item => ({
+      pergunta: item.querySelector('.faq-pergunta')?.value?.trim() || '',
+      resposta: item.querySelector('.faq-resposta')?.value?.trim() || '',
+    })).filter(i => i.pergunta); // descarta itens sem pergunta
+
+    // ── Blocos ────────────────────────────────────────────────────────────
     payload.blocos = coletarBlocosEdicao();
 
-    const htmlNewsletter = payload['html_conteudo'] || "";
-    const blocos = payload.blocos || [];
+    // ── Validações existentes ─────────────────────────────────────────────
+    const htmlNewsletter      = payload['html_conteudo'] || "";
+    const htmlCompleto        = payload['conteudo_html_completo'] || "";
+    const blocos              = payload.blocos || [];
 
     if (!validarNewsletter(htmlNewsletter, blocos)) return;
+    if (!validarPlaceholders(htmlNewsletter))       return;
+    if (!validarNewsletter(htmlCompleto, blocos))   return;
+    if (!validarPlaceholders(htmlCompleto))         return;
 
-    if (!validarPlaceholders(htmlNewsletter)) {
-      // interrompe o processo se houver placeholders inválidos
-      return;
-    }
-
-    const htmlNewsletterCompleta = payload['conteudo_html_completo'] || "";
-
-    if (!validarNewsletter(htmlNewsletterCompleta, blocos)) return;
-
-    if (!validarPlaceholders(htmlNewsletterCompleta)) {
-      // interrompe o processo se houver placeholders inválidos
-      return;
-    }
-
+    // ── Data de publicação ────────────────────────────────────────────────
     const inputData = document.getElementById("data_publicacao");
-    // payload.data_publicacao = inputData?.value ? firebase.firestore.Timestamp.fromDate(new Date(inputData.value)) : null;
     payload.data_publicacao = dateStringToLocalTimestamp(inputData?.value);
 
+    // ── Salvar ────────────────────────────────────────────────────────────
     const ref = db.collection('newsletters');
     if (isEdit && docId) {
       await ref.doc(docId).set(payload, { merge: true });
