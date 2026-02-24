@@ -560,50 +560,111 @@ async function VerNewsletterComToken() {
 
   try {
     // 1. Buscar envio
-    const envioRef = assinaturaId
-      ? db.collection('usuarios').doc(uid)
-           .collection('assinaturas').doc(assinaturaId)
-           .collection('envios').doc(env)
-      : db.collection('leads').doc(uid).collection('envios').doc(env);
+    // Assinantes → Firestore (usuarios/{uid}/assinaturas/{aid}/envios/{env})
+    // Leads      → Supabase  (tabela leads_envios, id = env)
+    let envio;
 
-    const envioSnap = await envioRef.get();
-    if (!envioSnap.exists) {
-      mostrarErro('Envio não encontrado.',
-        'O link pode ter expirado. Acesse a <a href="/login.html">Área do Assinante</a>.');
-      return;
-    }
-    const envio = envioSnap.data();
+    if (assinaturaId) {
+      // ── Assinante: Firestore ──────────────────────────────────────────────
+      const envioRef  = db.collection('usuarios').doc(uid)
+                          .collection('assinaturas').doc(assinaturaId)
+                          .collection('envios').doc(env);
+      const envioSnap = await envioRef.get();
+      if (!envioSnap.exists) {
+        mostrarErro('Envio não encontrado.',
+          'O link pode ter expirado. Acesse a <a href="/login.html">Área do Assinante</a>.');
+        return;
+      }
+      envio = envioSnap.data();
 
-    // 2. Validar token
-    if (!envio.token_acesso || envio.token_acesso !== token) {
-      mostrarErro('Acesso negado.', 'Token inválido.');
-      return;
-    }
+      // Validar token
+      if (!envio.token_acesso || envio.token_acesso !== token) {
+        mostrarErro('Acesso negado.', 'Token inválido.'); return;
+      }
 
-    // 3. Validar expiração
-    if (envio.expira_em) {
-      const exp = envio.expira_em.toDate ? envio.expira_em.toDate() : new Date(envio.expira_em);
-      if (new Date() > exp) {
+      // Validar expiração
+      if (envio.expira_em) {
+        const exp = envio.expira_em.toDate ? envio.expira_em.toDate() : new Date(envio.expira_em);
+        if (new Date() > exp) {
+          mostrarErro('Este link expirou.',
+            'Acesse a <a href="/login.html">Área do Assinante</a> para ler edições anteriores.');
+          return;
+        }
+      }
+
+      // Atualizar metadados (fire & forget)
+      envioRef.update({
+        ultimo_acesso:  new Date(),
+        acessos_totais: firebase.firestore.FieldValue.increment(1),
+      }).catch(() => {});
+
+      // Verificar compartilhamento excessivo
+      const envioAtual = (await envioRef.get()).data() || envio;
+      if (Number(envioAtual.acessos_totais || 0) > 5) {
+        envioRef.update({ sinalizacao_compartilhamento: true }).catch(() => {});
+        mostrarErro('<strong>Conteúdo exclusivo.</strong>',
+          'Identificamos múltiplos acessos. ' +
+          '<a href="/login.html">Acesse a Área do Assinante</a> para ler com segurança.');
+        return;
+      }
+
+    } else {
+      // ── Lead: Supabase (leads_envios) ─────────────────────────────────────
+      // env = id numérico do registro em leads_envios
+      // Usa anon key — a policy "le_select_by_token" permite SELECT onde token IS NOT NULL
+      const { data: leRow, error: leErr } = await window.supabase
+        .from('leads_envios')
+        .select('*')
+        .eq('id', env)
+        .eq('lead_id', uid)
+        .maybeSingle();
+
+      if (leErr || !leRow) {
+        mostrarErro('Envio não encontrado.',
+          'O link pode ter expirado. Acesse a <a href="/login.html">Área do Assinante</a>.');
+        return;
+      }
+
+      // Validar token
+      if (!leRow.token_acesso || leRow.token_acesso !== token) {
+        mostrarErro('Acesso negado.', 'Token inválido.'); return;
+      }
+
+      // Validar expiração
+      if (leRow.expira_em && new Date() > new Date(leRow.expira_em)) {
         mostrarErro('Este link expirou.',
           'Acesse a <a href="/login.html">Área do Assinante</a> para ler edições anteriores.');
         return;
       }
-    }
 
-    // 4. Atualizar metadados (fire & forget)
-    envioRef.update({
-      ultimo_acesso:  new Date(),
-      acessos_totais: firebase.firestore.FieldValue.increment(1),
-    }).catch(() => {});
+      // Atualizar metadados (fire & forget) — anon pode UPDATE via policy le_update_acesso
+      const novoTotal = (leRow.acessos_totais || 0) + 1;
+      window.supabase
+        .from('leads_envios')
+        .update({ ultimo_acesso: new Date().toISOString(), acessos_totais: novoTotal })
+        .eq('id', env)
+        .then(() => {})
+        .catch(() => {});
 
-    // 5. Verificar compartilhamento excessivo
-    const envioAtual = (await envioRef.get()).data() || envio;
-    if (Number(envioAtual.acessos_totais || 0) > 5) {
-      envioRef.update({ sinalizacao_compartilhamento: true }).catch(() => {});
-      mostrarErro('<strong>Conteúdo exclusivo.</strong>',
-        'Identificamos múltiplos acessos. ' +
-        '<a href="/login.html">Acesse a Área do Assinante</a> para ler com segurança.');
-      return;
+      // Verificar compartilhamento excessivo
+      if (novoTotal > 5) {
+        window.supabase
+          .from('leads_envios')
+          .update({ sinalizacao_compartilhamento: true })
+          .eq('id', env)
+          .then(() => {}).catch(() => {});
+        mostrarErro('<strong>Conteúdo exclusivo.</strong>',
+          'Identificamos múltiplos acessos. ' +
+          '<a href="/login.html">Acesse a Área do Assinante</a> para ler com segurança.');
+        return;
+      }
+
+      // Normaliza para o mesmo formato usado no restante do fluxo
+      envio = {
+        token_acesso:   leRow.token_acesso,
+        expira_em:      leRow.expira_em,
+        acessos_totais: novoTotal,
+      };
     }
 
     // 6. Buscar newsletter
