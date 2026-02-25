@@ -680,11 +680,30 @@ async function VerNewsletterComToken() {
     const nid = newsletter.id;
 
     // 7. Buscar destinatário
-    const segmento  = assinaturaId ? 'assinantes' : 'leads';
-    const colecao   = assinaturaId ? 'usuarios'   : 'leads';
-    const destSnap  = await db.collection(colecao).doc(uid).get();
-    if (!destSnap.exists) { mostrarErro('Destinatário não encontrado.'); return; }
-    const destinatario = { _uid: uid, ...destSnap.data() };
+    let destinatario = null;
+    let segmento = null;
+
+    if (assinaturaId) {
+        // ✅ Assinante → Firebase
+        const destinatarioSnap = await db.collection("usuarios").doc(uid).get();
+        
+        if (!destinatarioSnap.exists) {mostrarErro('Destinatário não encontrado.'); return; }
+        
+        destinatario = destinatarioSnap.data();
+        segmento = "assinantes";
+    } else {
+        // ✅ Lead → Supabase
+        const { data: leadData, error: leadError } = await window.supabase
+            .from('leads')
+            .select('*')
+            .eq('id', uid)
+            .single();
+        
+        if (leadError || !leadData) {mostrarErro('Destinatário não encontrado.'); return; }
+        
+        destinatario = leadData;
+        segmento = "leads";
+    }
 
     // 8. Regras de acesso
     const acesso = detectarAcesso(destinatario, newsletter, segmento);
