@@ -774,9 +774,109 @@ async function VerNewsletterComToken() {
   }
 }
 
+// ══════════════════════════════════════════════════════════════════════════
+// CONTROLE DE HISTÓRICO DO MUNICÍPIO
+// ══════════════════════════════════════════════════════════════════════════
+
+async function verHistoricoCompleto() {
+  console.log('[verNL] verHistoricoCompleto chamado, dados:', dadosMunicipioAtual);
+
+  if (!dadosMunicipioAtual || !dadosMunicipioAtual.cod_municipio) {
+    alert('Município não identificado');
+    console.warn('[verNL] Dados do município:', dadosMunicipioAtual);
+    return;
+  }
+
+  const resumo = document.getElementById('municipio-resumo');
+  const historico = document.getElementById('municipio-historico');
+
+  if (!resumo || !historico) {
+    console.error('[verNL] Elementos não encontrados');
+    return;
+  }
+
+  // Ocultar resumo, mostrar histórico
+  resumo.style.display = 'none';
+  historico.style.display = 'block';
+
+  // Loading
+  historico.innerHTML = `
+    <div style="text-align:center;padding:40px">
+      <div class="rs-spinner" style="margin:0 auto 16px"></div>
+      <div style="color:var(--subtexto);font-size:14px">Carregando histórico...</div>
+    </div>
+  `;
+
+  try {
+    // Aguardar módulo estar pronto
+    if (!window.SupabaseMunicipio) {
+      throw new Error('Módulo SupabaseMunicipio não carregado');
+    }
+
+    // Buscar histórico
+    console.log('[verNL] Buscando histórico para:', dadosMunicipioAtual.cod_municipio);
+    const dados = await window.SupabaseMunicipio.getHistoricoCompleto(
+      dadosMunicipioAtual.cod_municipio
+    );
+
+    console.log('[verNL] Histórico carregado:', dados?.length || 0, 'registros');
+
+    // Renderizar
+    window.SupabaseMunicipio.renderHistoricoCompleto(
+      historico,
+      dados,
+      dadosMunicipioAtual.nome,
+      dadosMunicipioAtual.uf
+    );
+  } catch (err) {
+    console.error('[verNL] Erro ao carregar histórico:', err);
+    historico.innerHTML = `
+      <div style="text-align:center;padding:40px;color:#dc2626">
+        <div style="font-size:18px;margin-bottom:12px">❌</div>
+        <div style="font-weight:600;margin-bottom:8px">Erro ao carregar histórico</div>
+        <div style="font-size:13px;color:#94a3b8;margin-bottom:16px">${err.message}</div>
+        <button onclick="voltarResumo()" style="padding:8px 16px;background:var(--azul);
+                color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px">
+          ← Voltar ao resumo
+        </button>
+      </div>
+    `;
+  }
+}
+
+function voltarResumo() {
+  console.log('[verNL] voltarResumo chamado');
+  const resumo = document.getElementById('municipio-resumo');
+  const historico = document.getElementById('municipio-historico');
+
+  if (historico) historico.style.display = 'none';
+  if (resumo) resumo.style.display = 'block';
+}
+
+// Inicializar listener do botão quando DOM estiver pronto
+function initHistoricoButton() {
+  const btn = document.getElementById('btn-ver-historico');
+  if (btn) {
+    btn.addEventListener('click', verHistoricoCompleto);
+    console.log('[verNL] Listener do botão histórico registrado');
+  }
+}
+
+// Expor funções globalmente
+window.verHistoricoCompleto = verHistoricoCompleto;
+window.voltarResumo = voltarResumo;
+
+// Inicializar quando DOM carregar
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initHistoricoButton);
+} else {
+  initHistoricoButton();
+}
+
 // ─── Expõe para inline handlers ──────────────────────────────────────────────
 window.trocarModo = trocarModo;
 window.toggleFaq = toggleFaq;
 
 // ─── Inicia ───────────────────────────────────────────────────────────────────
 VerNewsletterComToken();
+
