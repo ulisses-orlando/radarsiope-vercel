@@ -15,7 +15,7 @@ function normalizeParam(value) {
   if (!value) return null;
   const t = String(value).trim();
   if (!t || t.toLowerCase().includes('sem envioid') ||
-      t.includes('{{') || t.includes('}}')) return null;
+    t.includes('{{') || t.includes('}}')) return null;
   return t;
 }
 
@@ -51,7 +51,7 @@ function mostrarLoading(sim) {
 
 function mostrarErro(msg, detalhe = '') {
   mostrarLoading(false);
-  const el    = document.getElementById('rs-erro');
+  const el = document.getElementById('rs-erro');
   const msgEl = document.getElementById('rs-erro-msg');
   if (el) el.style.display = 'block';
   if (msgEl) msgEl.innerHTML = msg +
@@ -62,9 +62,9 @@ function mostrarApp() {
   mostrarLoading(false);
   const el = document.getElementById('rs-app');
   if (!el) return;
-  el.style.opacity    = '0';
+  el.style.opacity = '0';
   el.style.transition = 'opacity .35s ease';
-  el.style.display    = 'block';
+  el.style.display = 'block';
   requestAnimationFrame(() => requestAnimationFrame(() => { el.style.opacity = '1'; }));
 }
 
@@ -87,10 +87,10 @@ function _set(id, txt) {
 // ─── Toggle modo rápido / completo ────────────────────────────────────────────
 
 function trocarModo(modo) {
-  const rapido   = document.getElementById('modo-rapido');
+  const rapido = document.getElementById('modo-rapido');
   const completo = document.getElementById('modo-completo');
-  const btnR     = document.getElementById('btn-rapido');
-  const btnC     = document.getElementById('btn-completo');
+  const btnR = document.getElementById('btn-rapido');
+  const btnC = document.getElementById('btn-completo');
 
   if (modo === 'rapido') {
     rapido?.classList.add('visivel');
@@ -116,14 +116,14 @@ function registrarClique(env, uid, nid) {
     `&newsletterId=${encodeURIComponent(nid)}` +
     `&url=${encodeURIComponent(window.location.href)}`,
     { method: 'GET', keepalive: true }
-  ).catch(() => {});
+  ).catch(() => { });
 }
 
 // ─── Montagem de blocos (idêntico ao original) ────────────────────────────────
 
 async function montarBlocos(newsletter, dados, segmento) {
-  let htmlBase   = newsletter.conteudo_html_completo || '';
-  const blocos   = newsletter.blocos || [];
+  let htmlBase = newsletter.conteudo_html_completo || '';
+  const blocos = newsletter.blocos || [];
   let htmlBlocos = '';
 
   blocos.forEach(b => {
@@ -144,8 +144,8 @@ async function montarBlocos(newsletter, dados, segmento) {
 
 function detectarAcesso(destinatario, newsletter, segmento) {
   const isAssinante = segmento === 'assinantes';
-  const plano_slug  = destinatario.plano_slug || null;
-  const features    = destinatario.features   || {};
+  const plano_slug = destinatario.plano_slug || null;
+  const features = destinatario.features || {};
 
   const acessoProTemp = !isAssinante
     && newsletter.acesso_pro_temporario === true
@@ -156,26 +156,26 @@ function detectarAcesso(destinatario, newsletter, segmento) {
     plano_slug,
     features,
     acessoProTemp,
-    temAudio:       isAssinante ? !!features.newsletter_audio
-                                : (!!newsletter.acesso_audio_leads || acessoProTemp),
+    temAudio: isAssinante ? !!features.newsletter_audio
+      : (!!newsletter.acesso_audio_leads || acessoProTemp),
     temInfografico: isAssinante ? !!features.newsletter_infografico : acessoProTemp,
-    temAlertas:     isAssinante && !!features.alertas_prioritarios,
-    blurMunicipio:  !isAssinante && !acessoProTemp,
-    truncarTexto:   !isAssinante && !acessoProTemp,
-    modoPadrao:     isAssinante ? 'completo' : 'rapido',
+    temAlertas: isAssinante && !!features.alertas_prioritarios,
+    blurMunicipio: !isAssinante && !acessoProTemp,
+    truncarTexto: !isAssinante && !acessoProTemp,
+    modoPadrao: isAssinante ? 'completo' : 'rapido',
   };
 }
 
 // ─── Header ───────────────────────────────────────────────────────────────────
 
 function renderHeader(newsletter, destinatario) {
-  const num    = newsletter.numero || newsletter.edicao || '—';
+  const num = newsletter.numero || newsletter.edicao || '—';
   const titulo = newsletter.titulo || 'Radar SIOPE';
-  const nome   = (destinatario.nome || '').split(' ')[0];
+  const nome = (destinatario.nome || '').split(' ')[0];
 
-  _set('hd-edicao',   `Edição ${num}`);
-  _set('hd-data',     _fmtData(newsletter.data_publicacao));
-  _set('hd-titulo',   titulo);
+  _set('hd-edicao', `Edição ${num}`);
+  _set('hd-data', _fmtData(newsletter.data_publicacao));
+  _set('hd-titulo', titulo);
   _set('hd-saudacao', nome ? `Olá, ${nome}!` : '');
   document.title = `Radar SIOPE · Ed. ${num} · ${titulo}`;
 }
@@ -183,7 +183,7 @@ function renderHeader(newsletter, destinatario) {
 // ─── Modo rápido — bullets ────────────────────────────────────────────────────
 
 function renderModoRapido(newsletter, acesso) {
-  const lista   = document.getElementById('lista-bullets');
+  const lista = document.getElementById('lista-bullets');
   const bullets = newsletter.resumo_bullets || [];
 
   if (!bullets.length) {
@@ -192,7 +192,7 @@ function renderModoRapido(newsletter, acesso) {
     return;
   }
 
-  const visiveis    = (acesso.isAssinante || acesso.acessoProTemp) ? bullets : bullets.slice(0, 2);
+  const visiveis = (acesso.isAssinante || acesso.acessoProTemp) ? bullets : bullets.slice(0, 2);
   const temRestante = !acesso.isAssinante && !acesso.acessoProTemp && bullets.length > 2;
 
   if (lista) lista.innerHTML = visiveis.map(b => `<li>${_esc(b)}</li>`).join('');
@@ -224,7 +224,7 @@ async function renderModoCompleto(newsletter, dados, segmento, acesso) {
 
   if (acesso.truncarTexto) {
     const wrap = container.parentElement;
-    container.innerHTML   = html;
+    container.innerHTML = html;
     container.style.cssText = 'max-height:300px;overflow:hidden;position:relative';
 
     // Fade overlay
@@ -251,10 +251,10 @@ async function renderModoCompleto(newsletter, dados, segmento, acesso) {
 
 async function renderMunicipio(destinatario, acesso) {
   const container = document.getElementById('municipio-conteudo');
-  const titulo    = document.getElementById('municipio-titulo');
-  const nome      = destinatario.nome_municipio || '';
-  const uf        = destinatario.cod_uf         || '';
-  const cod       = destinatario.cod_municipio  || null;
+  const titulo = document.getElementById('municipio-titulo');
+  const nome = destinatario.nome_municipio || '';
+  const uf = destinatario.cod_uf || '';
+  const cod = destinatario.cod_municipio || null;
 
   if (titulo && nome) titulo.textContent = `${nome}/${uf}`;
 
@@ -285,7 +285,7 @@ async function renderMunicipio(destinatario, acesso) {
 
 function renderMidia(newsletter, acesso) {
   const secao = document.getElementById('secao-midia');
-  const wrap  = document.getElementById('midia-conteudo');
+  const wrap = document.getElementById('midia-conteudo');
   if (!secao || !wrap) return;
 
   const itens = [];
@@ -352,11 +352,11 @@ function renderMidia(newsletter, acesso) {
 
 function renderFAQ(newsletter, acesso) {
   const secao = document.getElementById('secao-faq');
-  const wrap  = document.getElementById('faq-conteudo');
-  const faq   = newsletter.faq || [];
+  const wrap = document.getElementById('faq-conteudo');
+  const faq = newsletter.faq || [];
   if (!faq.length || !secao || !wrap) return;
 
-  const visiveis    = (acesso.isAssinante || acesso.acessoProTemp) ? faq : faq.slice(0, 1);
+  const visiveis = (acesso.isAssinante || acesso.acessoProTemp) ? faq : faq.slice(0, 1);
   const temRestante = !acesso.isAssinante && !acesso.acessoProTemp && faq.length > 1;
 
   secao.style.display = 'block';
@@ -385,10 +385,10 @@ function toggleFaq(idx) {
 // ─── Reactions ────────────────────────────────────────────────────────────────
 
 const REACTIONS = [
-  { emoji: '🔥', label: 'Imperdível', key: 'fogo'    },
+  { emoji: '🔥', label: 'Imperdível', key: 'fogo' },
   { emoji: '😮', label: 'Surpreende', key: 'surpresa' },
-  { emoji: '🚀', label: 'Muito útil', key: 'util'    },
-  { emoji: '👍', label: 'Ótimo',      key: 'otimo'   },
+  { emoji: '🚀', label: 'Muito útil', key: 'util' },
+  { emoji: '👍', label: 'Ótimo', key: 'otimo' },
 ];
 
 async function renderReactions(nid, uid) {
@@ -396,12 +396,12 @@ async function renderReactions(nid, uid) {
   if (!wrap) return;
 
   let counts = {};
-  let minha  = null;
+  let minha = null;
 
   try {
     const snap = await db.collection('newsletters').doc(nid).get();
     counts = snap.data()?.reactions || {};
-    minha  = localStorage.getItem(`rs_rx_${nid}`);
+    minha = localStorage.getItem(`rs_rx_${nid}`);
   } catch (e) { /* não fatal */ }
 
   function pintar() {
@@ -417,7 +417,7 @@ async function renderReactions(nid, uid) {
   pintar();
 
   window.votar = async (newsletterId, key) => {
-    const fb       = document.getElementById('reaction-feedback');
+    const fb = document.getElementById('reaction-feedback');
     const anterior = localStorage.getItem(`rs_rx_${newsletterId}`);
 
     if (anterior === key) {
@@ -455,7 +455,7 @@ function renderCTA(acesso, newsletter) {
   const plano = acesso.plano_slug;
 
   // Profissional, Premium, Supreme → sem CTA
-  if (acesso.isAssinante && ['profissional','premium','supreme'].includes(plano)) {
+  if (acesso.isAssinante && ['profissional', 'premium', 'supreme'].includes(plano)) {
     wrap.innerHTML = ''; return;
   }
 
@@ -515,17 +515,17 @@ function renderWatermark(destinatario, newsletter) {
 
 function publicarRadarUser(destinatario, segmento, assinaturaId) {
   window._radarUser = {
-    uid:            destinatario._uid           || null,
-    email:          destinatario.email          || '',
-    nome:           destinatario.nome           || '',
-    segmento:       segmento === 'assinantes' ? 'assinante' : 'lead',
-    plano_slug:     destinatario.plano_slug     || null,
-    features:       destinatario.features       || {},
-    uf:             destinatario.cod_uf         || '',
-    municipio_cod:  destinatario.cod_municipio  || '',
+    uid: destinatario._uid || null,
+    email: destinatario.email || '',
+    nome: destinatario.nome || '',
+    segmento: segmento === 'assinantes' ? 'assinante' : 'lead',
+    plano_slug: destinatario.plano_slug || null,
+    features: destinatario.features || {},
+    uf: destinatario.cod_uf || '',
+    municipio_cod: destinatario.cod_municipio || '',
     municipio_nome: destinatario.nome_municipio || '',
-    perfil:         destinatario.perfil         || '',
-    assinaturaId:   assinaturaId                || null,
+    perfil: destinatario.perfil || '',
+    assinaturaId: assinaturaId || null,
   };
 }
 
@@ -541,13 +541,13 @@ async function buscarPorNumero(numero) {
 // ─── FLUXO PRINCIPAL ──────────────────────────────────────────────────────────
 
 async function VerNewsletterComToken() {
-  const params       = getParams();
-  const d_nid        = normalizeParam(params.get('nid'));
-  const env          = normalizeParam(params.get('env'));
-  const uid          = normalizeParam(params.get('uid'));
-  const token        = params.get('token');
+  const params = getParams();
+  const d_nid = normalizeParam(params.get('nid'));
+  const env = normalizeParam(params.get('env'));
+  const uid = normalizeParam(params.get('uid'));
+  const token = params.get('token');
   const assinaturaId = normalizeParam(params.get('assinaturaId'));
-  const edicaoNum    = params.get('edicao_numero');
+  const edicaoNum = params.get('edicao_numero');
 
   // 0. Validação inicial
   if ((!d_nid && !edicaoNum) || !env || !uid || !token) {
@@ -566,9 +566,9 @@ async function VerNewsletterComToken() {
 
     if (assinaturaId) {
       // ── Assinante: Firestore ──────────────────────────────────────────────
-      const envioRef  = db.collection('usuarios').doc(uid)
-                          .collection('assinaturas').doc(assinaturaId)
-                          .collection('envios').doc(env);
+      const envioRef = db.collection('usuarios').doc(uid)
+        .collection('assinaturas').doc(assinaturaId)
+        .collection('envios').doc(env);
       const envioSnap = await envioRef.get();
       if (!envioSnap.exists) {
         mostrarErro('Envio não encontrado.',
@@ -594,14 +594,14 @@ async function VerNewsletterComToken() {
 
       // Atualizar metadados (fire & forget)
       envioRef.update({
-        ultimo_acesso:  new Date(),
+        ultimo_acesso: new Date(),
         acessos_totais: firebase.firestore.FieldValue.increment(1),
-      }).catch(() => {});
+      }).catch(() => { });
 
       // Verificar compartilhamento excessivo
       const envioAtual = (await envioRef.get()).data() || envio;
       if (Number(envioAtual.acessos_totais || 0) > 5) {
-        envioRef.update({ sinalizacao_compartilhamento: true }).catch(() => {});
+        envioRef.update({ sinalizacao_compartilhamento: true }).catch(() => { });
         mostrarErro('<strong>Conteúdo exclusivo.</strong>',
           'Identificamos múltiplos acessos. ' +
           '<a href="/login.html">Acesse a Área do Assinante</a> para ler com segurança.');
@@ -643,8 +643,8 @@ async function VerNewsletterComToken() {
         .from('leads_envios')
         .update({ ultimo_acesso: new Date().toISOString(), acessos_totais: novoTotal })
         .eq('id', env)
-        .then(() => {})
-        .catch(() => {});
+        .then(() => { })
+        .catch(() => { });
 
       // Verificar compartilhamento excessivo
       if (novoTotal > 5) {
@@ -652,7 +652,7 @@ async function VerNewsletterComToken() {
           .from('leads_envios')
           .update({ sinalizacao_compartilhamento: true })
           .eq('id', env)
-          .then(() => {}).catch(() => {});
+          .then(() => { }).catch(() => { });
         mostrarErro('<strong>Conteúdo exclusivo.</strong>',
           'Identificamos múltiplos acessos. ' +
           '<a href="/login.html">Acesse a Área do Assinante</a> para ler com segurança.');
@@ -661,8 +661,8 @@ async function VerNewsletterComToken() {
 
       // Normaliza para o mesmo formato usado no restante do fluxo
       envio = {
-        token_acesso:   leRow.token_acesso,
-        expira_em:      leRow.expira_em,
+        token_acesso: leRow.token_acesso,
+        expira_em: leRow.expira_em,
         acessos_totais: novoTotal,
       };
     }
@@ -684,25 +684,25 @@ async function VerNewsletterComToken() {
     let segmento = null;
 
     if (assinaturaId) {
-        // ✅ Assinante → Firebase
-        const destinatarioSnap = await db.collection("usuarios").doc(uid).get();
-        
-        if (!destinatarioSnap.exists) {mostrarErro('Destinatário não encontrado.'); return; }
-        
-        destinatario = destinatarioSnap.data();
-        segmento = "assinantes";
+      // ✅ Assinante → Firebase
+      const destinatarioSnap = await db.collection("usuarios").doc(uid).get();
+
+      if (!destinatarioSnap.exists) { mostrarErro('Destinatário não encontrado.'); return; }
+
+      destinatario = destinatarioSnap.data();
+      segmento = "assinantes";
     } else {
-        // ✅ Lead → Supabase
-        const { data: leadData, error: leadError } = await window.supabase
-            .from('leads')
-            .select('*')
-            .eq('id', uid)
-            .single();
-        
-        if (leadError || !leadData) {mostrarErro('Destinatário não encontrado.'); return; }
-        
-        destinatario = leadData;
-        segmento = "leads";
+      // ✅ Lead → Supabase
+      const { data: leadData, error: leadError } = await window.supabase
+        .from('leads')
+        .select('*')
+        .eq('id', uid)
+        .single();
+
+      if (leadError || !leadData) { mostrarErro('Destinatário não encontrado.'); return; }
+
+      destinatario = leadData;
+      segmento = "leads";
     }
 
     // 8. Regras de acesso
@@ -714,15 +714,15 @@ async function VerNewsletterComToken() {
 
     // 10. Dados para placeholders
     const dados = {
-      nome:            destinatario.nome           || '',
-      email:           destinatario.email          || '',
-      edicao:          newsletter.numero           || newsletter.edicao || '',
-      titulo:          newsletter.titulo           || '',
-      data_publicacao: newsletter.data_publicacao  || null,
-      cod_uf:          destinatario.cod_uf         || '',
-      nome_municipio:  destinatario.nome_municipio || '',
-      perfil:          destinatario.perfil         || '',
-      plano:           destinatario.plano_slug     || '',
+      nome: destinatario.nome || '',
+      email: destinatario.email || '',
+      edicao: newsletter.numero || newsletter.edicao || '',
+      titulo: newsletter.titulo || '',
+      data_publicacao: newsletter.data_publicacao || null,
+      cod_uf: destinatario.cod_uf || '',
+      nome_municipio: destinatario.nome_municipio || '',
+      perfil: destinatario.perfil || '',
+      plano: destinatario.plano_slug || '',
     };
 
     // 11. Render (header + conteúdo primeiro para UX)
@@ -736,6 +736,30 @@ async function VerNewsletterComToken() {
 
     // Município em paralelo — não bloqueia o conteúdo principal
     renderMunicipio(destinatario, acesso);
+
+    // Após carregar o resumo do município
+    const resumo = await window.SupabaseMunicipio.getResumoMunicipio(cod_municipio);
+
+    if (resumo) {
+      // Salvar dados para histórico
+      dadosMunicipioAtual = {
+        cod_municipio: resumo.cod_municipio,
+        nome: nomeMunicipio, // de onde vier
+        uf: resumo.uf
+      };
+
+      // Renderizar resumo
+      window.SupabaseMunicipio.renderSecaoMunicipio({
+        container: document.getElementById('municipio-conteudo'),
+        blur: isLead, // se for lead
+        resumo: resumo,
+        nomeMunicipio: nomeMunicipio,
+        uf: resumo.uf
+      });
+
+      // Mostrar botão de histórico (apenas se tiver dados)
+      document.getElementById('btn-ver-historico').style.display = 'inline-block';
+    }
 
     renderMidia(newsletter, acesso);
     renderFAQ(newsletter, acesso);
@@ -754,7 +778,7 @@ async function VerNewsletterComToken() {
 
 // ─── Expõe para inline handlers ──────────────────────────────────────────────
 window.trocarModo = trocarModo;
-window.toggleFaq  = toggleFaq;
+window.toggleFaq = toggleFaq;
 
 // ─── Inicia ───────────────────────────────────────────────────────────────────
 VerNewsletterComToken();

@@ -89,6 +89,36 @@ async function getResumoMunicipio(cod_municipio) {
   } catch (e) { console.warn('[SM] getResumoMunicipio:', e.message); return null; }
 }
 
+// Buscar histórico completo de um município (todos os anos disponíveis)
+async function getHistoricoCompleto(cod_municipio) {
+  if (!cod_municipio) return [];
+  try {
+    const { data, error } = await _sb()
+      .from('vw_municipio_resumo')
+      .select('*')
+      .eq('cod_municipio', String(cod_municipio))
+      .eq('bimestre', 6) // Apenas 6º bimestre (anual)
+      .order('ano', { ascending: false }); // Mais recente primeiro
+    
+    if (error) { 
+      console.warn('[SM] getHistoricoCompleto:', error.message); 
+      return []; 
+    }
+    
+    return data || [];
+  } catch (e) { 
+    console.warn('[SM] getHistoricoCompleto:', e.message); 
+    return []; 
+  }
+}
+
+// Calcular variação percentual entre anos
+function calcularVariacao(valorAtual, valorAnterior) {
+  if (!valorAtual || !valorAnterior) return null;
+  const variacao = ((valorAtual - valorAnterior) / valorAnterior) * 100;
+  return variacao;
+}
+
 // Todos os indicadores de um período específico (com nome e metadados)
 async function getIndicadoresPeriodo(cod_municipio, ano, bimestre) {
   if (!cod_municipio) return [];
@@ -371,6 +401,216 @@ function _htmlBlurOverlay() {
     </div>`;
 }
 
+// Renderizar painel de histórico completo
+function renderHistoricoCompleto(container, historico, nomeMunicipio, uf) {
+  if (!container || !historico || historico.length === 0) {
+    container.innerHTML = `
+      <div style="text-align:center;padding:20px;color:var(--subtexto)">
+        📊 Histórico não disponível para ${_esc(nomeMunicipio)}/${_esc(uf)}
+      </div>`;
+    return;
+  }
+  
+  // Ordenar do mais antigo ao mais recente (para o gráfico)
+  const dadosOrdenados = [...historico].reverse();
+  
+  // Preparar dados para o gráfico
+  const anos = dadosOrdenados.map(d => d.ano);
+  const valoresMDE = dadosOrdenados.map(d => d.pct_mde_aplicado || 0);
+  const valoresFundeb = dadosOrdenados.map(d => d.pct_fundeb_remuneracao || 0);
+  
+  // Encontrar max/min para escala
+  const maxMDE = Math.max(...valoresMDE, 30);
+  
+  container.innerHTML = `
+    <!-- Cabeçalho -->
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;padding:0 4px">
+      <div>
+        <div style="font-size:16px;font-weight:700;color:var(--azul)">
+          ${_esc(nomeMunicipio)}/${_esc(uf)}
+        </div>
+        <div style="font-size:12px;color:var(--subtexto)">
+          Série histórica ${anos[0]} - ${anos[anos.length - 1]}
+        </div>
+      </div>
+      <button onclick="voltarResumo()" 
+              style="padding:8px 16px;background:var(--bg-page);border:1px solid var(--borda);
+                     border-radius:8px;cursor:pointer;font-size:13px;font-weight:600;
+                     color:var(--azul)">
+        ← Resumo
+      </button>
+    </div>
+    
+    <!-- Gráfico MDE (SVG simples) -->
+    <div style="background:var(--bg-page);padding:16px;border-radius:12px;margin-bottom:16px">
+      <div style="font-size:13px;font-weight:700;color:var(--texto);margin-bottom:12px">
+        📊 Evolução do Indicador 1.1 — MDE Aplicado
+      </div>
+      ${_renderGraficoLinhaMDE(anos, valoresMDE, maxMDE)}
+    </div>
+    
+    <!-- Tabela comparativa -->
+    <div style="background:var(--bg-page);padding:16px;border-radius:12px">
+      <div style="font-size:13px;font-weight:700;color:var(--texto);margin-bottom:12px">
+        📋 Comparativo Anual — Principais Indicadores
+      </div>
+      ${_renderTabelaComparativa(historico)}
+    </div>
+  `;
+}
+
+// Renderizar gráfico de linha SVG (MDE)
+function _renderGraficoLinhaMDE(anos, valores, maxValor) {
+  const width = 600;
+  const height = 200;
+  const padding = 40;
+  const chartWidth = width - (padding * 2);
+  const chartHeight = height - (padding * 2);
+  
+  // Escala X (anos)
+  const stepX = chartWidth / (anos.length - 1);
+  
+  // Escala Y (valores)
+  const scaleY = chartHeight / maxValor;
+  
+  // Calcular pontos da linha
+  const pontos = valores.map((v, i) => {
+    const x = padding + (i * stepX);
+    const y = height - padding - (v * scaleY);
+    return `${x},${y}`;
+  }).join(' ');
+  
+  // Linha do mínimo (25%)
+  const yMin = height - padding - (25 * scaleY);
+  
+  return `
+    <svg viewBox="0 0 ${width} ${height}" style="width:100%;height:auto;max-width:600px">
+      <!-- Grid horizontal -->
+      <line x1="${padding}" y1="${yMin}" x2="${width - padding}" y2="${yMin}" 
+            stroke="#94a3b8" stroke-width="1" stroke-dasharray="4,4" opacity="0.5"/>
+      
+      <!-- Eixos -->
+      <line x1="${padding}" y1="${padding}" x2="${padding}" y2="${height - padding}" 
+            stroke="var(--borda)" stroke-width="2"/>
+      <line x1="${padding}" y1="${height - padding}" x2="${width - padding}" y2="${height - padding}" 
+            stroke="var(--borda)" stroke-width="2"/>
+      
+      <!-- Linha de dados -->
+      <polyline points="${pontos}" fill="none" stroke="var(--azul)" stroke-width="3" 
+                stroke-linejoin="round" stroke-linecap="round"/>
+      
+      <!-- Pontos -->
+      ${valores.map((v, i) => {
+        const x = padding + (i * stepX);
+        const y = height - padding - (v * scaleY);
+        const cor = v >= 25 ? '#16a34a' : '#dc2626';
+        return `
+          <circle cx="${x}" cy="${y}" r="5" fill="${cor}" stroke="#fff" stroke-width="2"/>
+          <text x="${x}" y="${y - 12}" text-anchor="middle" 
+                font-size="12" font-weight="700" fill="${cor}">
+            ${v.toFixed(1)}%
+          </text>
+        `;
+      }).join('')}
+      
+      <!-- Labels anos -->
+      ${anos.map((ano, i) => {
+        const x = padding + (i * stepX);
+        return `
+          <text x="${x}" y="${height - padding + 20}" text-anchor="middle" 
+                font-size="13" font-weight="600" fill="var(--texto)">
+            ${ano}
+          </text>
+        `;
+      }).join('')}
+      
+      <!-- Label mínimo -->
+      <text x="${padding - 8}" y="${yMin + 4}" text-anchor="end" 
+            font-size="11" fill="#94a3b8">Mín: 25%</text>
+    </svg>
+  `;
+}
+
+// Renderizar tabela comparativa
+function _renderTabelaComparativa(historico) {
+  // Já vem ordenado do mais recente
+  const linhas = historico.map((h, idx) => {
+    const sit = _sit(h.situacao);
+    
+    // Calcular variação (se não for o último/primeiro ano)
+    let variacaoMDE = null;
+    if (idx < historico.length - 1) {
+      const anterior = historico[idx + 1];
+      if (h.pct_mde_aplicado && anterior.pct_mde_aplicado) {
+        variacaoMDE = calcularVariacao(h.pct_mde_aplicado, anterior.pct_mde_aplicado);
+      }
+    }
+    
+    return `
+      <tr style="border-bottom:1px solid var(--borda)">
+        <!-- Ano -->
+        <td style="padding:10px 8px;font-weight:700;color:var(--azul)">
+          ${h.ano}
+        </td>
+        
+        <!-- MDE Aplicado -->
+        <td style="padding:10px 8px;text-align:right">
+          <div style="font-weight:700;color:${h.pct_mde_aplicado >= 25 ? '#16a34a' : '#dc2626'}">
+            ${_fmtPct(h.pct_mde_aplicado) || '—'}
+          </div>
+          ${variacaoMDE !== null ? `
+            <div style="font-size:10px;color:${variacaoMDE >= 0 ? '#16a34a' : '#dc2626'}">
+              ${variacaoMDE >= 0 ? '↗' : '↘'} ${Math.abs(variacaoMDE).toFixed(1)}%
+            </div>
+          ` : ''}
+        </td>
+        
+        <!-- FUNDEB Remuneração -->
+        <td style="padding:10px 8px;text-align:right;font-weight:600">
+          ${_fmtPct(h.pct_fundeb_remuneracao) || '—'}
+        </td>
+        
+        <!-- Invest/Aluno -->
+        <td style="padding:10px 8px;text-align:right;font-weight:600">
+          ${_fmtBRL(h.invest_aluno_basica) || '—'}
+        </td>
+        
+        <!-- Situação -->
+        <td style="padding:10px 8px;text-align:center">
+          <span style="font-size:11px;padding:4px 8px;border-radius:12px;
+                       background:${sit.cor}20;color:${sit.cor};font-weight:700;
+                       white-space:nowrap">
+            ${sit.icon} ${sit.label}
+          </span>
+        </td>
+      </tr>
+    `;
+  }).join('');
+  
+  return `
+    <div style="overflow-x:auto">
+      <table style="width:100%;border-collapse:collapse;font-size:13px;min-width:500px">
+        <thead>
+          <tr style="border-bottom:2px solid var(--azul);background:var(--azul-light)">
+            <th style="padding:8px;text-align:left;font-size:11px;text-transform:uppercase;
+                       letter-spacing:0.5px;color:var(--azul)">Ano</th>
+            <th style="padding:8px;text-align:right;font-size:11px;text-transform:uppercase;
+                       letter-spacing:0.5px;color:var(--azul)">MDE (1.1)</th>
+            <th style="padding:8px;text-align:right;font-size:11px;text-transform:uppercase;
+                       letter-spacing:0.5px;color:var(--azul)">FUNDEB (1.2)</th>
+            <th style="padding:8px;text-align:right;font-size:11px;text-transform:uppercase;
+                       letter-spacing:0.5px;color:var(--azul)">Invest/Aluno</th>
+            <th style="padding:8px;text-align:center;font-size:11px;text-transform:uppercase;
+                       letter-spacing:0.5px;color:var(--azul)">Situação</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${linhas}
+        </tbody>
+      </table>
+    </div>
+  `;
+}
 // =============================================================================
 // API PÚBLICA
 // =============================================================================
@@ -380,10 +620,12 @@ window.SupabaseMunicipio = {
   getResumoMunicipio,
   getIndicadoresPeriodo,
   getHistoricoMDE,
+  getHistoricoCompleto, 
   getIndicador,
   // Render
   renderSecaoMunicipio,
   renderTabelaIndicadores,
+  renderHistoricoCompleto, 
   renderSkeleton,
   // Constantes
   IND,
