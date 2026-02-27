@@ -810,7 +810,7 @@
 
         <!-- Botão para ver histórico -->
         <div style="text-align:center;padding:12px">
-          <button id="btn-ver-historico" onclick="verHistoricoCompleto()" style="padding:10px 20px;background:var(--azul);color:#fff;
+          <button id="btn-ver-historico" style="padding:10px 20px;background:var(--azul);color:#fff;
                      border:none;border-radius:8px;font-size:13px;font-weight:600;
                      cursor:pointer;display:none">
             📈 Ver série histórica completa
@@ -934,61 +934,7 @@
       }
     });
   </script>
-  <script>
-    // ══════════════════════════════════════════════════════════════
-    // CONTROLE DE HISTÓRICO DO MUNICÍPIO
-    // ══════════════════════════════════════════════════════════════
 
-    let dadosMunicipioAtual = {
-      cod_municipio: null,
-      nome: null,
-      uf: null
-    };
-
-    // Ver histórico completo
-    async function verHistoricoCompleto() {
-      if (!dadosMunicipioAtual.cod_municipio) {
-        alert('Município não identificado');
-        return;
-      }
-
-      // Ocultar resumo, mostrar histórico
-      document.getElementById('municipio-resumo').style.display = 'none';
-      document.getElementById('municipio-historico').style.display = 'block';
-
-      // Loading
-      const container = document.getElementById('municipio-historico');
-      container.innerHTML = `
-    <div style="text-align:center;padding:40px">
-      <div class="rs-spinner" style="margin:0 auto 16px"></div>
-      <div style="color:var(--subtexto);font-size:14px">Carregando histórico...</div>
-    </div>
-  `;
-
-      // Buscar histórico
-      const historico = await window.SupabaseMunicipio.getHistoricoCompleto(
-        dadosMunicipioAtual.cod_municipio
-      );
-
-      // Renderizar
-      window.SupabaseMunicipio.renderHistoricoCompleto(
-        container,
-        historico,
-        dadosMunicipioAtual.nome,
-        dadosMunicipioAtual.uf
-      );
-    }
-
-    // Voltar ao resumo
-    function voltarResumo() {
-      document.getElementById('municipio-historico').style.display = 'none';
-      document.getElementById('municipio-resumo').style.display = 'block';
-    }
-
-    // Expor globalmente
-    window.verHistoricoCompleto = verHistoricoCompleto;
-    window.voltarResumo = voltarResumo;
-  </script>
 </body>
 
 </html>
