@@ -9,6 +9,13 @@
 
 'use strict';
 
+// Variável global para dados do município (histórico)
+let dadosMunicipioAtual = {
+  cod_municipio: null,
+  nome: null,
+  uf: null
+};
+
 // ─── Parâmetros da URL ────────────────────────────────────────────────────────
 
 function normalizeParam(value) {
@@ -275,16 +282,16 @@ async function renderMunicipio(destinatario, acesso) {
   try {
     const resumo = cod ? await SM.getResumoMunicipio(cod) : null;
     SM.renderSecaoMunicipio({ container, blur: acesso.blurMunicipio, resumo, nomeMunicipio: nome, uf });
-    
-    // ⭐ NOVO: Salvar dados do município para o histórico
+
+    // Salvar dados do município para o histórico
     if (resumo && cod) {
-      window.dadosMunicipioAtual = {
+      dadosMunicipioAtual = {  // ⭐ SEM window.
         cod_municipio: cod,
         nome: nome,
         uf: uf
       };
-      
-      // ⭐ NOVO: Mostrar botão de histórico
+
+      // Mostrar botão de histórico
       const btnHistorico = document.getElementById('btn-ver-historico');
       if (btnHistorico) {
         btnHistorico.style.display = 'inline-block';
