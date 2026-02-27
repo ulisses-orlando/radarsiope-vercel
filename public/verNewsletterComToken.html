@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
@@ -14,35 +15,53 @@
 
   <style>
     /* ── Reset & Tokens ─────────────────────────────────────────────────── */
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-    :root {
-      --azul:       #0A3D62;
-      --azul-mid:   #1A5276;
-      --azul-light: #EBF5FB;
-      --verde:      #16a34a;
-      --vermelho:   #dc2626;
-      --amarelo:    #d97706;
-      --cinza:      #f4f6f9;
-      --borda:      #e2e8f0;
-      --texto:      #1a1a2e;
-      --subtexto:   #64748b;
-      --radius:     12px;
-      --shadow:     0 1px 4px rgba(0,0,0,.07);
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
     }
 
-    html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; }
+    :root {
+      --azul: #0A3D62;
+      --azul-mid: #1A5276;
+      --azul-light: #EBF5FB;
+      --verde: #16a34a;
+      --vermelho: #dc2626;
+      --amarelo: #d97706;
+      --cinza: #f4f6f9;
+      --borda: #e2e8f0;
+      --texto: #1a1a2e;
+      --subtexto: #64748b;
+      --radius: 12px;
+      --shadow: 0 1px 4px rgba(0, 0, 0, .07);
+    }
+
+    html {
+      scroll-behavior: smooth;
+      -webkit-text-size-adjust: 100%;
+    }
 
     body {
       font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
       background: var(--cinza);
       color: var(--texto);
+      font-size: 16px;
+      line-height: 1.6;
       min-height: 100dvh;
       -webkit-font-smoothing: antialiased;
     }
 
-    a { color: var(--azul); }
-    img { max-width: 100%; height: auto; display: block; }
+    a {
+      color: var(--azul);
+    }
+
+    img {
+      max-width: 100%;
+      height: auto;
+      display: block;
+    }
 
     /* ── Layout ─────────────────────────────────────────────────────────── */
     .rs-page {
@@ -59,30 +78,38 @@
       position: sticky;
       top: 0;
       z-index: 100;
-      box-shadow: 0 2px 8px rgba(0,0,0,.18);
+      box-shadow: 0 2px 8px rgba(0, 0, 0, .18);
     }
+
     .rs-header-top {
       display: flex;
       align-items: center;
       justify-content: space-between;
       margin-bottom: 10px;
     }
-    .rs-logo { height: 30px; filter: brightness(0) invert(1); }
+
+    .rs-logo {
+      height: 30px;
+      filter: brightness(0) invert(1);
+    }
+
     .rs-header-meta {
-      font-size: 11px;
-      color: rgba(255,255,255,.6);
+      font-size: 12px;
+      color: rgba(255, 255, 255, .6);
       text-align: right;
       line-height: 1.5;
     }
+
     .rs-header-titulo {
-      font-size: 15px;
+      font-size: 17px;
       font-weight: 700;
       line-height: 1.35;
       color: #fff;
     }
+
     .rs-header-saudacao {
-      font-size: 12px;
-      color: rgba(255,255,255,.7);
+      font-size: 13px;
+      color: rgba(255, 255, 255, .7);
       margin-top: 2px;
     }
 
@@ -94,6 +121,7 @@
       overflow: hidden;
       box-shadow: var(--shadow);
     }
+
     .rs-section-header {
       display: flex;
       align-items: center;
@@ -101,17 +129,25 @@
       padding: 12px 14px 8px;
       border-bottom: 1px solid var(--borda);
     }
+
     .rs-section-header h2 {
-      font-size: 11px;
+      font-size: 12px;
       font-weight: 700;
       text-transform: uppercase;
       letter-spacing: .6px;
       color: var(--azul);
     }
-    .rs-section-body { padding: 12px 14px; }
+
+    .rs-section-body {
+      padding: 12px 14px;
+    }
 
     /* ── Município ──────────────────────────────────────────────────────── */
-    .rs-municipio-card { padding: 12px 14px; position: relative; }
+    .rs-municipio-card {
+      padding: 12px 14px;
+      position: relative;
+    }
+
     .rs-mun-header {
       display: flex;
       justify-content: space-between;
@@ -119,43 +155,99 @@
       gap: 8px;
       margin-bottom: 10px;
     }
-    .rs-mun-nome  { font-size: 14px; font-weight: 700; color: var(--azul); display: block; }
-    .rs-mun-ref   { font-size: 11px; color: var(--subtexto); display: block; margin-top: 2px; }
+
+    .rs-mun-nome {
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--azul);
+      display: block;
+    }
+
+    .rs-mun-ref {
+      font-size: 12px;
+      color: var(--subtexto);
+      display: block;
+      margin-top: 2px;
+    }
+
     .rs-mun-status {
-      font-size: 11px; font-weight: 700;
-      padding: 3px 10px; border-radius: 20px;
-      white-space: nowrap; flex-shrink: 0;
+      font-size: 12px;
+      font-weight: 700;
+      padding: 3px 10px;
+      border-radius: 20px;
+      white-space: nowrap;
+      flex-shrink: 0;
     }
+
     .rs-mde-label {
-      display: flex; justify-content: space-between;
-      font-size: 12px; color: var(--subtexto); margin-bottom: 5px;
+      display: flex;
+      justify-content: space-between;
+      font-size: 13px;
+      color: var(--subtexto);
+      margin-bottom: 5px;
     }
-    .rs-mde-label strong { font-size: 15px; }
+
+    .rs-mde-label strong {
+      font-size: 17px;
+    }
+
     .rs-mde-track {
-      height: 10px; background: #e2e8f0;
-      border-radius: 5px; position: relative; overflow: visible;
+      height: 10px;
+      background: #e2e8f0;
+      border-radius: 5px;
+      position: relative;
+      overflow: visible;
     }
-    .rs-mde-fill  { height: 100%; border-radius: 5px; transition: width .7s ease; }
-    .rs-mde-min   {
-      position: absolute; top: -3px;
-      width: 2px; height: 16px;
-      background: #94a3b8; border-radius: 1px;
+
+    .rs-mde-fill {
+      height: 100%;
+      border-radius: 5px;
+      transition: width .7s ease;
     }
+
+    .rs-mde-min {
+      position: absolute;
+      top: -3px;
+      width: 2px;
+      height: 16px;
+      background: #94a3b8;
+      border-radius: 1px;
+    }
+
     .rs-mde-min::after {
-      content: attr(title); position: absolute;
-      top: 18px; left: 50%; transform: translateX(-50%);
-      font-size: 9px; color: #94a3b8; white-space: nowrap;
+      content: attr(title);
+      position: absolute;
+      top: 18px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 9px;
+      color: #94a3b8;
+      white-space: nowrap;
     }
+
     .rs-mde-meta {
-      display: flex; justify-content: space-between;
-      font-size: 10px; color: #94a3b8; margin-top: 14px;
+      display: flex;
+      justify-content: space-between;
+      font-size: 10px;
+      color: #94a3b8;
+      margin-top: 14px;
     }
+
     .rs-fundeb-row {
-      display: flex; justify-content: space-between; align-items: center;
-      margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--borda);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 10px;
+      padding-top: 8px;
+      border-top: 1px solid var(--borda);
       font-size: 12px;
     }
-    .rs-fundeb-valor { font-weight: 700; color: var(--verde); font-size: 13px; }
+
+    .rs-fundeb-valor {
+      font-weight: 700;
+      color: var(--verde);
+      font-size: 13px;
+    }
 
     /* Skeleton */
     .rs-skeleton {
@@ -164,350 +256,629 @@
       animation: shimmer 1.4s infinite;
       border-radius: 6px;
     }
-    .rs-sk-title { height: 16px; width: 55%; margin-bottom: 10px; }
-    .rs-sk-bar   { height: 10px; width: 100%; margin-bottom: 12px; }
-    .rs-sk-line  { height: 12px; width: 40%; }
+
+    .rs-sk-title {
+      height: 16px;
+      width: 55%;
+      margin-bottom: 10px;
+    }
+
+    .rs-sk-bar {
+      height: 10px;
+      width: 100%;
+      margin-bottom: 12px;
+    }
+
+    .rs-sk-line {
+      height: 12px;
+      width: 40%;
+    }
+
     @keyframes shimmer {
-      0%   { background-position: 200% 0; }
-      100% { background-position: -200% 0; }
+      0% {
+        background-position: 200% 0;
+      }
+
+      100% {
+        background-position: -200% 0;
+      }
     }
 
     /* ── Toggle ─────────────────────────────────────────────────────────── */
     .rs-toggle {
-      display: flex; background: var(--cinza);
-      border-radius: 10px; padding: 4px; gap: 4px;
+      display: flex;
+      background: var(--cinza);
+      border-radius: 10px;
+      padding: 4px;
+      gap: 4px;
       margin: 10px 10px 0;
     }
+
     .rs-toggle button {
-      flex: 1; padding: 10px; border: none; border-radius: 7px;
-      font-size: 13px; font-weight: 600; cursor: pointer;
-      background: transparent; color: var(--subtexto); transition: all .18s;
+      flex: 1;
+      padding: 10px;
+      border: none;
+      border-radius: 7px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      background: transparent;
+      color: var(--subtexto);
+      transition: all .18s;
     }
+
     .rs-toggle button.ativo {
-      background: #fff; color: var(--azul);
-      box-shadow: 0 1px 5px rgba(0,0,0,.1);
+      background: #fff;
+      color: var(--azul);
+      box-shadow: 0 1px 5px rgba(0, 0, 0, .1);
     }
 
     /* ── Modo rápido ────────────────────────────────────────────────────── */
-    #modo-rapido, #modo-completo { display: none; }
-    #modo-rapido.visivel, #modo-completo.visivel { display: block; }
+    #modo-rapido,
+    #modo-completo {
+      display: none;
+    }
 
-    .rs-bullets { list-style: none; }
+    #modo-rapido.visivel,
+    #modo-completo.visivel {
+      display: block;
+    }
+
+    .rs-bullets {
+      list-style: none;
+    }
+
     .rs-bullets li {
-      display: flex; align-items: flex-start; gap: 10px;
-      padding: 9px 0; border-bottom: 1px solid var(--borda);
-      font-size: 14px; line-height: 1.5; color: var(--texto);
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      padding: 9px 0;
+      border-bottom: 1px solid var(--borda);
+      font-size: 15px;
+      line-height: 1.6;
+      color: var(--texto);
     }
-    .rs-bullets li:last-child { border-bottom: none; }
+
+    .rs-bullets li:last-child {
+      border-bottom: none;
+    }
+
     .rs-bullets li::before {
-      content: '→'; color: var(--azul); font-weight: 700;
-      flex-shrink: 0; margin-top: 1px;
+      content: '→';
+      color: var(--azul);
+      font-weight: 700;
+      flex-shrink: 0;
+      margin-top: 1px;
     }
-    .rs-bullets-truncado { position: relative; }
+
+    .rs-bullets-truncado {
+      position: relative;
+    }
+
     .rs-bullets-truncado::after {
-      content: ''; position: absolute; bottom: 0; left: 0; right: 0;
-      height: 56px; background: linear-gradient(transparent, #fff);
+      content: '';
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 56px;
+      background: linear-gradient(transparent, #fff);
       pointer-events: none;
     }
 
     /* ── Modo completo ──────────────────────────────────────────────────── */
     #conteudo-newsletter {
-      font-size: 15px; line-height: 1.75; color: var(--texto);
+      font-size: 16px;
+      line-height: 1.8;
+      color: var(--texto);
     }
+
     #conteudo-newsletter h1,
     #conteudo-newsletter h2,
-    #conteudo-newsletter h3 { color: var(--azul); margin: 18px 0 8px; }
-    #conteudo-newsletter p  { margin-bottom: 12px; }
-    #conteudo-newsletter img { border-radius: 8px; margin: 8px 0; }
-    #conteudo-newsletter a  { color: var(--azul); }
+    #conteudo-newsletter h3 {
+      color: var(--azul);
+      margin: 18px 0 8px;
+    }
+
+    #conteudo-newsletter h1 {
+      font-size: 24px;
+    }
+
+    #conteudo-newsletter h2 {
+      font-size: 20px;
+    }
+
+    #conteudo-newsletter h3 {
+      font-size: 18px;
+    }
+
+    #conteudo-newsletter p {
+      margin-bottom: 12px;
+    }
+
+    #conteudo-newsletter img {
+      border-radius: 8px;
+      margin: 8px 0;
+    }
+
+    #conteudo-newsletter a {
+      color: var(--azul);
+    }
+
     #conteudo-newsletter blockquote {
-      border-left: 3px solid var(--azul); padding: 8px 14px;
-      margin: 12px 0; background: var(--azul-light);
-      border-radius: 0 8px 8px 0; font-style: italic; color: var(--azul-mid);
+      border-left: 3px solid var(--azul);
+      padding: 8px 14px;
+      margin: 12px 0;
+      background: var(--azul-light);
+      border-radius: 0 8px 8px 0;
+      font-style: italic;
+      color: var(--azul-mid);
     }
+
     #conteudo-newsletter table {
-      width: 100%; border-collapse: collapse; margin: 12px 0;
+      width: 100%;
+      border-collapse: collapse;
+      margin: 12px 0;
     }
-    #conteudo-newsletter th { background: var(--azul); color: #fff; padding: 8px 10px; font-size: 13px; }
-    #conteudo-newsletter td { padding: 7px 10px; border-bottom: 1px solid var(--borda); font-size: 13px; }
+
+    #conteudo-newsletter th {
+      background: var(--azul);
+      color: #fff;
+      padding: 8px 10px;
+      font-size: 13px;
+    }
+
+    #conteudo-newsletter td {
+      padding: 7px 10px;
+      border-bottom: 1px solid var(--borda);
+      font-size: 13px;
+    }
 
     /* ── Mídia ──────────────────────────────────────────────────────────── */
     .rs-media-item {
-      display: flex; align-items: center; gap: 12px;
-      padding: 11px 0; border-bottom: 1px solid var(--borda);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 11px 0;
+      border-bottom: 1px solid var(--borda);
     }
-    .rs-media-item:last-child { border-bottom: none; padding-bottom: 0; }
+
+    .rs-media-item:last-child {
+      border-bottom: none;
+      padding-bottom: 0;
+    }
+
     .rs-media-icon {
-      width: 42px; height: 42px; border-radius: 10px;
-      background: var(--azul-light); display: flex;
-      align-items: center; justify-content: center;
-      font-size: 20px; flex-shrink: 0;
+      width: 42px;
+      height: 42px;
+      border-radius: 10px;
+      background: var(--azul-light);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+      flex-shrink: 0;
     }
-    .rs-media-info   { flex: 1; min-width: 0; }
-    .rs-media-titulo { font-size: 13px; font-weight: 700; color: var(--texto); }
-    .rs-media-sub    { font-size: 11px; color: var(--subtexto); margin-top: 2px; }
+
+    .rs-media-info {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .rs-media-titulo {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--texto);
+    }
+
+    .rs-media-sub {
+      font-size: 11px;
+      color: var(--subtexto);
+      margin-top: 2px;
+    }
+
     .rs-media-btn {
-      padding: 8px 13px; border-radius: 8px; font-size: 12px;
-      font-weight: 700; border: none; cursor: pointer;
-      text-decoration: none; display: inline-block; white-space: nowrap;
+      padding: 8px 13px;
+      border-radius: 8px;
+      font-size: 12px;
+      font-weight: 700;
+      border: none;
+      cursor: pointer;
+      text-decoration: none;
+      display: inline-block;
+      white-space: nowrap;
     }
-    .rs-media-btn-primary { background: var(--azul); color: #fff; }
-    .rs-media-btn-lock    { background: #f1f5f9; color: var(--subtexto); cursor: default; }
+
+    .rs-media-btn-primary {
+      background: var(--azul);
+      color: #fff;
+    }
+
+    .rs-media-btn-lock {
+      background: #f1f5f9;
+      color: var(--subtexto);
+      cursor: default;
+    }
 
     /* ── FAQ ────────────────────────────────────────────────────────────── */
-    .rs-faq-item { border-bottom: 1px solid var(--borda); }
-    .rs-faq-item:last-child { border-bottom: none; }
+    .rs-faq-item {
+      border-bottom: 1px solid var(--borda);
+    }
+
+    .rs-faq-item:last-child {
+      border-bottom: none;
+    }
+
     .rs-faq-pergunta {
-      width: 100%; background: none; border: none; text-align: left;
-      padding: 12px 0; font-size: 14px; font-weight: 600;
-      color: var(--texto); cursor: pointer;
-      display: flex; justify-content: space-between; align-items: center; gap: 10px;
+      width: 100%;
+      background: none;
+      border: none;
+      text-align: left;
+      padding: 12px 0;
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--texto);
+      cursor: pointer;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
     }
-    .rs-faq-icon { font-size: 18px; color: var(--azul); transition: transform .2s; flex-shrink: 0; }
-    .rs-faq-item.aberto .rs-faq-icon { transform: rotate(45deg); }
+
+    .rs-faq-icon {
+      font-size: 18px;
+      color: var(--azul);
+      transition: transform .2s;
+      flex-shrink: 0;
+    }
+
+    .rs-faq-item.aberto .rs-faq-icon {
+      transform: rotate(45deg);
+    }
+
     .rs-faq-resposta {
-      display: none; font-size: 13px; color: var(--subtexto);
-      line-height: 1.65; padding: 0 0 12px;
+      display: none;
+      font-size: 13px;
+      color: var(--subtexto);
+      line-height: 1.65;
+      padding: 0 0 12px;
     }
-    .rs-faq-item.aberto .rs-faq-resposta { display: block; }
+
+    .rs-faq-item.aberto .rs-faq-resposta {
+      display: block;
+    }
 
     /* ── Reactions ──────────────────────────────────────────────────────── */
     .rs-reactions {
-      display: flex; gap: 8px; justify-content: center;
-      flex-wrap: wrap; padding: 4px 0;
+      display: flex;
+      gap: 8px;
+      justify-content: center;
+      flex-wrap: wrap;
+      padding: 4px 0;
     }
+
     .rs-reaction-btn {
-      display: flex; flex-direction: column; align-items: center; gap: 3px;
-      padding: 10px 14px; border: 2px solid var(--borda);
-      border-radius: 12px; background: #fff; cursor: pointer;
-      transition: all .18s; font-size: 22px; min-width: 68px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 3px;
+      padding: 10px 14px;
+      border: 2px solid var(--borda);
+      border-radius: 12px;
+      background: #fff;
+      cursor: pointer;
+      transition: all .18s;
+      font-size: 22px;
+      min-width: 68px;
     }
-    .rs-reaction-btn:hover  { border-color: var(--azul); transform: scale(1.06); }
-    .rs-reaction-btn.ativo  { border-color: var(--azul); background: var(--azul-light); }
-    .rs-reaction-count { font-size: 12px; font-weight: 700; color: var(--subtexto); }
-    .rs-reaction-label { font-size: 10px; color: var(--subtexto); }
+
+    .rs-reaction-btn:hover {
+      border-color: var(--azul);
+      transform: scale(1.06);
+    }
+
+    .rs-reaction-btn.ativo {
+      border-color: var(--azul);
+      background: var(--azul-light);
+    }
+
+    .rs-reaction-count {
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--subtexto);
+    }
+
+    .rs-reaction-label {
+      font-size: 10px;
+      color: var(--subtexto);
+    }
+
     .rs-reaction-feedback {
-      text-align: center; font-size: 12px; color: var(--verde);
-      margin-top: 8px; min-height: 16px;
+      text-align: center;
+      font-size: 12px;
+      color: var(--verde);
+      margin-top: 8px;
+      min-height: 16px;
     }
 
     /* ── CTA ────────────────────────────────────────────────────────────── */
     .rs-cta {
-      margin: 10px 10px 0; border-radius: var(--radius);
-      padding: 20px; text-align: center;
+      margin: 10px 10px 0;
+      border-radius: var(--radius);
+      padding: 20px;
+      text-align: center;
     }
+
     .rs-cta-lead {
       background: linear-gradient(135deg, var(--azul) 0%, var(--azul-mid) 100%);
       color: #fff;
     }
+
     .rs-cta-basico {
       background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
       border: 1px solid #bae6fd;
     }
-    .rs-cta h3 { font-size: 16px; margin-bottom: 6px; line-height: 1.3; }
-    .rs-cta p  { font-size: 13px; margin-bottom: 14px; opacity: .85; line-height: 1.55; }
-    .rs-cta-btn {
-      display: inline-block; padding: 12px 28px; border-radius: 8px;
-      font-size: 14px; font-weight: 700; text-decoration: none;
-      border: none; cursor: pointer;
+
+    .rs-cta h3 {
+      font-size: 18px;
+      margin-bottom: 6px;
+      line-height: 1.3;
     }
-    .rs-cta-lead   .rs-cta-btn { background: #fff;           color: var(--azul); }
-    .rs-cta-basico .rs-cta-btn { background: var(--azul);    color: #fff; }
+
+    .rs-cta p {
+      font-size: 14px;
+      margin-bottom: 14px;
+      opacity: .85;
+      line-height: 1.55;
+    }
+
+    .rs-cta-btn {
+      display: inline-block;
+      padding: 12px 28px;
+      border-radius: 8px;
+      font-size: 15px;
+      font-weight: 700;
+      text-decoration: none;
+      border: none;
+      cursor: pointer;
+    }
+
+    .rs-cta-lead .rs-cta-btn {
+      background: #fff;
+      color: var(--azul);
+    }
+
+    .rs-cta-basico .rs-cta-btn {
+      background: var(--azul);
+      color: #fff;
+    }
 
     /* ── Watermark ──────────────────────────────────────────────────────── */
     .rs-watermark {
-      font-size: 10px; color: #c8d6e0; text-align: center;
-      padding: 12px 16px; line-height: 1.5; user-select: none;
+      font-size: 10px;
+      color: #c8d6e0;
+      text-align: center;
+      padding: 12px 16px;
+      line-height: 1.5;
+      user-select: none;
       margin: 10px 10px 0;
     }
 
     /* ── Loading / Erro ─────────────────────────────────────────────────── */
     #rs-loading {
-      display: flex; flex-direction: column; align-items: center;
-      justify-content: center; min-height: 70dvh; gap: 14px;
-      color: var(--subtexto); font-size: 14px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 70dvh;
+      gap: 14px;
+      color: var(--subtexto);
+      font-size: 14px;
     }
+
     .rs-spinner {
-      width: 36px; height: 36px;
+      width: 36px;
+      height: 36px;
       border: 3px solid var(--borda);
       border-top-color: var(--azul);
       border-radius: 50%;
       animation: spin .7s linear infinite;
     }
-    @keyframes spin { to { transform: rotate(360deg); } }
+
+    @keyframes spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
 
     #rs-erro {
-      display: none; margin: 32px 16px; padding: 20px;
-      background: #fff; border-radius: var(--radius);
+      display: none;
+      margin: 32px 16px;
+      padding: 20px;
+      background: #fff;
+      border-radius: var(--radius);
       border-left: 4px solid var(--vermelho);
       box-shadow: var(--shadow);
     }
-    #rs-erro h3  { color: var(--vermelho); margin-bottom: 8px; font-size: 16px; }
-    #rs-erro-msg { font-size: 14px; line-height: 1.6; color: var(--subtexto); }
+
+    #rs-erro h3 {
+      color: var(--vermelho);
+      margin-bottom: 8px;
+      font-size: 16px;
+    }
+
+    #rs-erro-msg {
+      font-size: 14px;
+      line-height: 1.6;
+      color: var(--subtexto);
+    }
 
     /* ── Proteção ───────────────────────────────────────────────────────── */
-    .rs-protegido { user-select: none; -webkit-user-select: none; }
+    .rs-protegido {
+      user-select: none;
+      -webkit-user-select: none;
+    }
   </style>
 </head>
 
 <body>
 
-<!-- ── Loading ─────────────────────────────────────────────────────────────── -->
-<div id="rs-loading">
-  <div class="rs-spinner"></div>
-  <span>Carregando sua edição…</span>
-</div>
-
-<!-- ── Erro ────────────────────────────────────────────────────────────────── -->
-<div id="rs-erro">
-  <h3>⚠️ Acesso não disponível</h3>
-  <p id="rs-erro-msg">Ocorreu um erro ao carregar esta edição.</p>
-</div>
-
-<!-- ── App (oculto até carregar) ───────────────────────────────────────────── -->
-<div id="rs-app" class="rs-page" style="display:none">
-
-  <!-- HEADER -->
-  <header class="rs-header">
-    <div class="rs-header-top">
-      <img src="/icons/icon-192x192.png" class="rs-logo" alt="Radar SIOPE"
-           onerror="this.style.display='none'">
-      <div class="rs-header-meta">
-        <div id="hd-edicao">Edição —</div>
-        <div id="hd-data">—</div>
-      </div>
-    </div>
-    <div id="hd-titulo" class="rs-header-titulo">Radar SIOPE</div>
-    <div id="hd-saudacao" class="rs-header-saudacao"></div>
-  </header>
-
-  <!-- MUNICÍPIO -->
-  <section class="rs-section">
-    <div class="rs-section-header">
-      <span>📍</span>
-      <h2 id="municipio-titulo">Seu Município</h2>
-    </div>
-    <div id="municipio-conteudo">
-      <div class="rs-municipio-card">
-        <div class="rs-skeleton rs-sk-title"></div>
-        <div class="rs-skeleton rs-sk-bar" style="margin-top:10px"></div>
-        <div class="rs-skeleton rs-sk-line" style="margin-top:8px"></div>
-      </div>
-    </div>
-  </section>
-
-  <!-- TOGGLE MODO -->
-  <div class="rs-toggle" id="rs-toggle-modo">
-    <button id="btn-rapido" class="ativo" onclick="trocarModo('rapido')">
-      ⚡ Modo Rápido
-    </button>
-    <button id="btn-completo" onclick="trocarModo('completo')">
-      📖 Leitura Completa
-    </button>
+  <!-- ── Loading ─────────────────────────────────────────────────────────────── -->
+  <div id="rs-loading">
+    <div class="rs-spinner"></div>
+    <span>Carregando sua edição…</span>
   </div>
 
-  <!-- MODO RÁPIDO -->
-  <section class="rs-section" id="modo-rapido">
-    <div class="rs-section-header">
-      <span>⚡</span>
-      <h2>Pontos-chave desta edição</h2>
+  <!-- ── Erro ────────────────────────────────────────────────────────────────── -->
+  <div id="rs-erro">
+    <h3>⚠️ Acesso não disponível</h3>
+    <p id="rs-erro-msg">Ocorreu um erro ao carregar esta edição.</p>
+  </div>
+
+  <!-- ── App (oculto até carregar) ───────────────────────────────────────────── -->
+  <div id="rs-app" class="rs-page" style="display:none">
+
+    <!-- HEADER -->
+    <header class="rs-header">
+      <div class="rs-header-top">
+        <img src="/icons/icon-192x192.png" class="rs-logo" alt="Radar SIOPE" onerror="this.style.display='none'">
+        <div class="rs-header-meta">
+          <div id="hd-edicao">Edição —</div>
+          <div id="hd-data">—</div>
+        </div>
+      </div>
+      <div id="hd-titulo" class="rs-header-titulo">Radar SIOPE</div>
+      <div id="hd-saudacao" class="rs-header-saudacao"></div>
+    </header>
+
+    <!-- MUNICÍPIO -->
+    <section class="rs-section">
+      <div class="rs-section-header">
+        <span>📍</span>
+        <h2 id="municipio-titulo">Seu Município</h2>
+      </div>
+      <div id="municipio-conteudo">
+        <div class="rs-municipio-card">
+          <div class="rs-skeleton rs-sk-title"></div>
+          <div class="rs-skeleton rs-sk-bar" style="margin-top:10px"></div>
+          <div class="rs-skeleton rs-sk-line" style="margin-top:8px"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- TOGGLE MODO -->
+    <div class="rs-toggle" id="rs-toggle-modo">
+      <button id="btn-rapido" class="ativo" onclick="trocarModo('rapido')">
+        ⚡ Modo Rápido
+      </button>
+      <button id="btn-completo" onclick="trocarModo('completo')">
+        📖 Leitura Completa
+      </button>
     </div>
-    <div class="rs-section-body">
-      <ul class="rs-bullets rs-protegido" id="lista-bullets"></ul>
-    </div>
-  </section>
 
-  <!-- MODO COMPLETO -->
-  <section class="rs-section" id="modo-completo">
-    <div class="rs-section-header">
-      <span>📖</span>
-      <h2>Edição Completa</h2>
-    </div>
-    <div class="rs-section-body rs-protegido">
-      <div id="conteudo-newsletter"></div>
-    </div>
-  </section>
+    <!-- MODO RÁPIDO -->
+    <section class="rs-section" id="modo-rapido">
+      <div class="rs-section-header">
+        <span>⚡</span>
+        <h2>Pontos-chave desta edição</h2>
+      </div>
+      <div class="rs-section-body">
+        <ul class="rs-bullets rs-protegido" id="lista-bullets"></ul>
+      </div>
+    </section>
 
-  <!-- MÍDIA -->
-  <section class="rs-section" id="secao-midia" style="display:none">
-    <div class="rs-section-header">
-      <span>🎧</span>
-      <h2>Mídia desta edição</h2>
-    </div>
-    <div class="rs-section-body" id="midia-conteudo"></div>
-  </section>
+    <!-- MODO COMPLETO -->
+    <section class="rs-section" id="modo-completo">
+      <div class="rs-section-header">
+        <span>📖</span>
+        <h2>Edição Completa</h2>
+      </div>
+      <div class="rs-section-body rs-protegido">
+        <div id="conteudo-newsletter"></div>
+      </div>
+    </section>
 
-  <!-- FAQ -->
-  <section class="rs-section" id="secao-faq" style="display:none">
-    <div class="rs-section-header">
-      <span>❓</span>
-      <h2>Perguntas frequentes</h2>
-    </div>
-    <div class="rs-section-body" id="faq-conteudo"></div>
-  </section>
+    <!-- MÍDIA -->
+    <section class="rs-section" id="secao-midia" style="display:none">
+      <div class="rs-section-header">
+        <span>🎧</span>
+        <h2>Mídia desta edição</h2>
+      </div>
+      <div class="rs-section-body" id="midia-conteudo"></div>
+    </section>
 
-  <!-- REACTIONS -->
-  <section class="rs-section">
-    <div class="rs-section-header">
-      <span>💬</span>
-      <h2>O que você achou desta edição?</h2>
-    </div>
-    <div class="rs-section-body">
-      <div class="rs-reactions" id="reactions-wrap"></div>
-      <div class="rs-reaction-feedback" id="reaction-feedback"></div>
-    </div>
-  </section>
+    <!-- FAQ -->
+    <section class="rs-section" id="secao-faq" style="display:none">
+      <div class="rs-section-header">
+        <span>❓</span>
+        <h2>Perguntas frequentes</h2>
+      </div>
+      <div class="rs-section-body" id="faq-conteudo"></div>
+    </section>
 
-  <!-- CTA dinâmico -->
-  <div id="rs-cta-wrap"></div>
+    <!-- REACTIONS -->
+    <section class="rs-section">
+      <div class="rs-section-header">
+        <span>💬</span>
+        <h2>O que você achou desta edição?</h2>
+      </div>
+      <div class="rs-section-body">
+        <div class="rs-reactions" id="reactions-wrap"></div>
+        <div class="rs-reaction-feedback" id="reaction-feedback"></div>
+      </div>
+    </section>
 
-  <!-- WATERMARK -->
-  <div class="rs-watermark rs-protegido" id="rs-watermark"></div>
+    <!-- CTA dinâmico -->
+    <div id="rs-cta-wrap"></div>
 
-</div><!-- /rs-app -->
+    <!-- WATERMARK -->
+    <div class="rs-watermark rs-protegido" id="rs-watermark"></div>
 
-<!-- ── Scripts ──────────────────────────────────────────────────────────────── -->
+  </div><!-- /rs-app -->
 
-<!-- Firebase v10 compat (mesma versão do restante do projeto) -->
-<script src="https://www.gstatic.com/firebasejs/10.0.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.0.0/firebase-firestore-compat.js"></script>
-<script src="/js/firebase-init.js"></script>
+  <!-- ── Scripts ──────────────────────────────────────────────────────────────── -->
 
-<!-- Supabase UMD via CDN (expõe `supabase` globalmente) -->
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<!-- Inicializa window.supabase sem Vite/bundler -->
-<script src="/js/supabase-browser.js"></script>
+  <!-- Firebase v10 compat (mesma versão do restante do projeto) -->
+  <script src="https://www.gstatic.com/firebasejs/10.0.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.0.0/firebase-firestore-compat.js"></script>
+  <script src="/js/firebase-init.js"></script>
 
-<!-- Utilitários do projeto -->
-<script src="/js/functions.js"></script>
+  <!-- Supabase UMD via CDN (expõe `supabase` globalmente) -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <!-- Inicializa window.supabase sem Vite/bundler -->
+  <script src="/js/supabase-browser.js"></script>
 
-<!-- Módulo Supabase município (v2 — usa vw_municipio_resumo) -->
-<script src="/js/supabase-municipio.js"></script>
+  <!-- Utilitários do projeto -->
+  <script src="/js/functions.js"></script>
 
-<!-- Lógica principal do web app -->
-<script src="/js/verNewsletterComToken.js"></script>
+  <!-- Módulo Supabase município (v2 — usa vw_municipio_resumo) -->
+  <script src="/js/supabase-municipio.js"></script>
 
-<!-- PWA Service Worker -->
-<script>
-  if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('/sw.js').catch(() => {});
-  }
-</script>
+  <!-- Lógica principal do web app -->
+  <script src="/js/verNewsletterComToken.js"></script>
 
-<!-- OneSignal (carrega por último, não bloqueia render) -->
-<script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
-<script src="/js/onesignal-init.js" defer></script>
-
-<!-- Proteções de conteúdo -->
-<script>
-  document.addEventListener('contextmenu', e => e.preventDefault());
-  document.addEventListener('keydown', e => {
-    if ((e.ctrlKey || e.metaKey) &&
-        ['c','u','s','p','a'].includes(e.key.toLowerCase())) {
-      e.preventDefault();
+  <!-- PWA Service Worker -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js').catch(() => { });
     }
-  });
-</script>
+  </script>
+
+  <!-- OneSignal (carrega por último, não bloqueia render) -->
+  <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
+  <script src="/js/onesignal-init.js" defer></script>
+
+  <!-- Proteções de conteúdo -->
+  <script>
+    document.addEventListener('contextmenu', e => e.preventDefault());
+    document.addEventListener('keydown', e => {
+      if ((e.ctrlKey || e.metaKey) &&
+        ['c', 'u', 's', 'p', 'a'].includes(e.key.toLowerCase())) {
+        e.preventDefault();
+      }
+    });
+  </script>
 
 </body>
+
 </html>
