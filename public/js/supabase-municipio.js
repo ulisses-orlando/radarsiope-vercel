@@ -445,7 +445,7 @@ function renderHistoricoCompleto(container, historico, nomeMunicipio, uf) {
     <!-- Gráfico MDE (SVG simples) -->
     <div style="background:var(--bg-page);padding:16px;border-radius:12px;margin-bottom:16px">
       <div style="font-size:13px;font-weight:700;color:var(--texto);margin-bottom:12px">
-        📊 Evolução do Indicador 1.1 — MDE Aplicado
+        📊 Evolução MDE e Fundeb
       </div>
       ${_renderGraficoLinhaMDE(anos, valoresMDE, valoresFundeb, maxValor)}
     </div>
@@ -568,12 +568,12 @@ function _renderGraficoLinhaMDE(anos, valoresMDE, valoresFundeb, maxValor) {
         <!-- MDE (1.1) -->
         <line x1="0" y1="0" x2="20" y2="0" stroke="#16a34a" stroke-width="3"/>
         <circle cx="10" cy="0" r="3" fill="#16a34a" stroke="#fff" stroke-width="1"/>
-        <text x="25" y="4" font-size="11" fill="var(--texto)">Indicador 1.1 — MDE Aplicado (mín 25%)</text>
+        <text x="25" y="4" font-size="11" fill="var(--texto)">MDE Aplicado (mín 25%)</text>
         
         <!-- FUNDEB (1.2) -->
         <line x1="240" y1="0" x2="260" y2="0" stroke="#0891b2" stroke-width="3"/>
         <circle cx="250" cy="0" r="3" fill="#0891b2" stroke="#fff" stroke-width="1"/>
-        <text x="265" y="4" font-size="11" fill="var(--texto)">Indicador 1.2 — FUNDEB Remuneração (mín 70%)</text>
+        <text x="265" y="4" font-size="11" fill="var(--texto)">FUNDEB Remuneração (mín 70%)</text>
       </g>
     </svg>
   `;
