@@ -877,6 +877,84 @@ if (document.readyState === 'loading') {
 window.trocarModo = trocarModo;
 window.toggleFaq = toggleFaq;
 
+// ══════════════════════════════════════════════════════════════════════════
+// SISTEMA DE TEMAS
+// ══════════════════════════════════════════════════════════════════════════
+
+// Temas disponíveis
+const TEMAS_DISPONIVEIS = ['claro', 'escuro', 'suave', 'minimalista', 'exito', 'aurora'];
+
+// Carregar tema salvo (ou usar 'claro' como padrão)
+function carregarTema() {
+  const temaSalvo = localStorage.getItem('radar-tema');
+  
+  // Verificar se o tema salvo é válido
+  if (temaSalvo && TEMAS_DISPONIVEIS.includes(temaSalvo)) {
+    aplicarTema(temaSalvo);
+  } else {
+    // Tema padrão: claro
+    aplicarTema('claro');
+  }
+}
+
+// Aplicar tema ao documento
+function aplicarTema(tema) {
+  if (!TEMAS_DISPONIVEIS.includes(tema)) {
+    console.warn('[Tema] Tema inválido:', tema);
+    tema = 'claro';
+  }
+  
+  document.body.setAttribute('data-theme', tema);
+  
+  // Atualizar botões ativos (se existirem)
+  document.querySelectorAll('[data-theme-btn]').forEach(btn => {
+    const btnTema = btn.getAttribute('data-theme-btn');
+    if (btnTema === tema) {
+      btn.classList.add('ativo');
+    } else {
+      btn.classList.remove('ativo');
+    }
+  });
+  
+  console.log('[Tema] Aplicado:', tema);
+}
+
+// Trocar tema (chamado pelo onclick dos botões)
+function setTheme(tema) {
+  console.log('[Tema] Mudando para:', tema);
+  
+  if (!TEMAS_DISPONIVEIS.includes(tema)) {
+    console.warn('[Tema] Tema inválido:', tema);
+    return;
+  }
+  
+  // Aplicar tema
+  aplicarTema(tema);
+  
+  // Salvar no localStorage
+  localStorage.setItem('radar-tema', tema);
+  
+  // Feedback visual (opcional)
+  const btn = document.querySelector(`[data-theme-btn="${tema}"]`);
+  if (btn) {
+    btn.style.transform = 'scale(1.1)';
+    setTimeout(() => {
+      btn.style.transform = '';
+    }, 200);
+  }
+}
+
+// Expor função globalmente (para onclick do HTML)
+window.setTheme = setTheme;
+window.carregarTema = carregarTema;
+
+// Carregar tema ao iniciar (imediatamente)
+carregarTema();
+
+// Também carregar quando DOM estiver pronto (por segurança)
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', carregarTema);
+}
 // ─── Inicia ───────────────────────────────────────────────────────────────────
 VerNewsletterComToken();
 
