@@ -275,37 +275,25 @@ async function renderMunicipio(destinatario, acesso) {
   try {
     const resumo = cod ? await SM.getResumoMunicipio(cod) : null;
     SM.renderSecaoMunicipio({ container, blur: acesso.blurMunicipio, resumo, nomeMunicipio: nome, uf });
+    
+    // ⭐ NOVO: Salvar dados do município para o histórico
+    if (resumo && cod) {
+      window.dadosMunicipioAtual = {
+        cod_municipio: cod,
+        nome: nome,
+        uf: uf
+      };
+      
+      // ⭐ NOVO: Mostrar botão de histórico
+      const btnHistorico = document.getElementById('btn-ver-historico');
+      if (btnHistorico) {
+        btnHistorico.style.display = 'inline-block';
+      }
+    }
   } catch (err) {
     console.warn('[verNL] Município falhou (não fatal):', err);
     container.innerHTML = '';
   }
-
-  // Após carregar o resumo do município
-  const res = await window.SupabaseMunicipio.getResumoMunicipio(cod);
-
-  if (res) {
-    // Salvar dados para histórico
-    dadosMunicipioAtual = {
-      cod_municipio: res.cod_municipio,
-      nome: nome,
-      uf: res.uf
-    };
-
-    // Renderizar resumo
-    window.SupabaseMunicipio.renderSecaoMunicipio({
-      container: document.getElementById('municipio-conteudo'),
-      blur: isLead, // se for lead
-      resumo: res,
-      nomeMunicipio: nomeMunicipio,
-      uf: res.uf
-    });
-
-    // Mostrar botão de histórico (apenas se tiver dados)
-    document.getElementById('btn-ver-historico').style.display = 'inline-block';
-  }
-
-
-
 }
 
 // ─── Mídia ────────────────────────────────────────────────────────────────────
