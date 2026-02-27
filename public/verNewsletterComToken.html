@@ -758,6 +758,101 @@
         padding: 6px 4px !important;
       }
     }
+
+    /* ══════════════════════════════════════════════════════════════
+   SISTEMA DE TEMAS (6 temas)
+   ══════════════════════════════════════════════════════════════ */
+
+    /* Tema Claro (padrão) */
+    body[data-theme="claro"],
+    body:not([data-theme]) {
+      --bg-page: #f4f6f9;
+      --bg-section: #ffffff;
+      --texto: #1a1a2e;
+      --subtexto: #64748b;
+      --borda: #e2e8f0;
+      --shadow: 0 1px 4px rgba(0, 0, 0, .07);
+    }
+
+    /* Tema Escuro */
+    body[data-theme="escuro"] {
+      --bg-page: #0f172a;
+      --bg-section: #1e293b;
+      --texto: #f1f5f9;
+      --subtexto: #94a3b8;
+      --borda: #334155;
+      --shadow: 0 1px 4px rgba(0, 0, 0, .3);
+      --azul-light: #1e3a5f;
+    }
+
+    /* Tema Suave */
+    body[data-theme="suave"] {
+      --bg-page: #faf8f3;
+      --bg-section: #ffffff;
+      --texto: #4a4a4a;
+      --subtexto: #8b8b8b;
+      --borda: #e8e3d8;
+      --shadow: 0 1px 3px rgba(0, 0, 0, .05);
+    }
+
+    /* Tema Minimalista */
+    body[data-theme="minimalista"] {
+      --bg-page: #ffffff;
+      --bg-section: #fafafa;
+      --texto: #2d2d2d;
+      --subtexto: #717171;
+      --borda: #e0e0e0;
+      --shadow: 0 1px 2px rgba(0, 0, 0, .04);
+    }
+
+    /* Tema Êxito */
+    body[data-theme="exito"] {
+      --bg-page: #f0fdf4;
+      --bg-section: #ffffff;
+      --texto: #14532d;
+      --subtexto: #16a34a;
+      --borda: #bbf7d0;
+      --shadow: 0 1px 4px rgba(22, 163, 74, .1);
+      --azul: #16a34a;
+      --azul-mid: #15803d;
+      --azul-light: #dcfce7;
+    }
+
+    /* Tema Aurora */
+    body[data-theme="aurora"] {
+      --bg-page: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      --bg-section: rgba(255, 255, 255, 0.95);
+      --texto: #2d3748;
+      --subtexto: #667eea;
+      --borda: #cbd5e0;
+      --shadow: 0 4px 12px rgba(102, 126, 234, .15);
+      --azul: #667eea;
+      --azul-mid: #764ba2;
+      --azul-light: #e9d5ff;
+    }
+
+    /* Aplicar background no body */
+    body {
+      background: var(--bg-page);
+      color: var(--texto);
+      transition: background-color 0.3s ease, color 0.3s ease;
+    }
+
+    /* Seções */
+    .rs-section {
+      background: var(--bg-section);
+      border: 1px solid var(--borda);
+    }
+
+    /* Ajustes específicos para tema Aurora (gradiente) */
+    body[data-theme="aurora"] {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      background-attachment: fixed;
+    }
+
+    body[data-theme="aurora"] .rs-page {
+      background: transparent;
+    }
   </style>
 </head>
 
@@ -889,7 +984,95 @@
 
     <!-- WATERMARK -->
     <div class="rs-watermark rs-protegido" id="rs-watermark"></div>
+    <!-- SELETOR DE TEMAS -->
+    <div id="theme-selector" style="position:fixed;bottom:20px;right:20px;z-index:200;
+            background:var(--bg-section);border-radius:12px;padding:12px;
+            box-shadow:0 4px 16px rgba(0,0,0,0.15);border:1px solid var(--borda)">
 
+      <div style="display:flex;gap:8px;flex-wrap:wrap;max-width:200px">
+        <!-- Tema Claro -->
+        <div onclick="setTheme('claro')" data-theme-btn="claro" style="width:40px;height:40px;border-radius:8px;cursor:pointer;
+                border:2px solid var(--borda);display:flex;align-items:center;
+                justify-content:center;background:#ffffff;transition:all 0.2s">
+          <div style="width:24px;height:24px;border-radius:50%;
+                  background:linear-gradient(135deg, #f4f6f9 50%, #ffffff 50%)"></div>
+        </div>
+
+        <!-- Tema Escuro -->
+        <div onclick="setTheme('escuro')" data-theme-btn="escuro" style="width:40px;height:40px;border-radius:8px;cursor:pointer;
+                border:2px solid var(--borda);display:flex;align-items:center;
+                justify-content:center;background:#0f172a;transition:all 0.2s">
+          <div style="width:24px;height:24px;border-radius:50%;
+                  background:linear-gradient(135deg, #1e293b 50%, #0f172a 50%)"></div>
+        </div>
+
+        <!-- Tema Suave -->
+        <div onclick="setTheme('suave')" data-theme-btn="suave" style="width:40px;height:40px;border-radius:8px;cursor:pointer;
+                border:2px solid var(--borda);display:flex;align-items:center;
+                justify-content:center;background:#faf8f3;transition:all 0.2s">
+          <div style="width:24px;height:24px;border-radius:50%;
+                  background:linear-gradient(135deg, #e8e3d8 50%, #faf8f3 50%)"></div>
+        </div>
+
+        <!-- Tema Minimalista -->
+        <div onclick="setTheme('minimalista')" data-theme-btn="minimalista" style="width:40px;height:40px;border-radius:8px;cursor:pointer;
+                border:2px solid var(--borda);display:flex;align-items:center;
+                justify-content:center;background:#ffffff;transition:all 0.2s">
+          <div style="width:24px;height:24px;border-radius:50%;
+                  background:#e0e0e0"></div>
+        </div>
+
+        <!-- Tema Êxito -->
+        <div onclick="setTheme('exito')" data-theme-btn="exito" style="width:40px;height:40px;border-radius:8px;cursor:pointer;
+                border:2px solid var(--borda);display:flex;align-items:center;
+                justify-content:center;background:#f0fdf4;transition:all 0.2s">
+          <div style="width:24px;height:24px;border-radius:50%;
+                  background:linear-gradient(135deg, #16a34a 50%, #dcfce7 50%)"></div>
+        </div>
+
+        <!-- Tema Aurora -->
+        <div onclick="setTheme('aurora')" data-theme-btn="aurora" style="width:40px;height:40px;border-radius:8px;cursor:pointer;
+                border:2px solid var(--borda);display:flex;align-items:center;
+                justify-content:center;background:linear-gradient(135deg, #667eea, #764ba2);
+                transition:all 0.2s">
+          <div style="width:24px;height:24px;border-radius:50%;
+                  background:linear-gradient(135deg, #667eea 50%, #764ba2 50%)"></div>
+        </div>
+      </div>
+
+      <div style="font-size:10px;color:var(--subtexto);text-align:center;margin-top:8px;
+              text-transform:uppercase;letter-spacing:0.5px">
+        TEMA
+      </div>
+    </div>
+
+    <!-- CSS para botão ativo -->
+    <style>
+      [data-theme-btn].ativo {
+        border-color: var(--azul) !important;
+        transform: scale(1.1);
+        box-shadow: 0 0 0 3px rgba(10, 61, 98, 0.1);
+      }
+
+      [data-theme-btn]:hover {
+        transform: scale(1.05);
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+      }
+
+      /* Ocultar em mobile pequeno */
+      @media (max-width: 480px) {
+        #theme-selector {
+          bottom: 10px;
+          right: 10px;
+          padding: 8px;
+        }
+
+        [data-theme-btn] {
+          width: 36px !important;
+          height: 36px !important;
+        }
+      }
+    </style>
   </div><!-- /rs-app -->
 
   <!-- ── Scripts ──────────────────────────────────────────────────────────────── -->
