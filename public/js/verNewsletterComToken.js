@@ -279,6 +279,33 @@ async function renderMunicipio(destinatario, acesso) {
     console.warn('[verNL] Município falhou (não fatal):', err);
     container.innerHTML = '';
   }
+
+  // Após carregar o resumo do município
+  const res = await window.SupabaseMunicipio.getResumoMunicipio(cod);
+
+  if (res) {
+    // Salvar dados para histórico
+    dadosMunicipioAtual = {
+      cod_municipio: res.cod_municipio,
+      nome: nome,
+      uf: res.uf
+    };
+
+    // Renderizar resumo
+    window.SupabaseMunicipio.renderSecaoMunicipio({
+      container: document.getElementById('municipio-conteudo'),
+      blur: isLead, // se for lead
+      resumo: res,
+      nomeMunicipio: nomeMunicipio,
+      uf: res.uf
+    });
+
+    // Mostrar botão de histórico (apenas se tiver dados)
+    document.getElementById('btn-ver-historico').style.display = 'inline-block';
+  }
+
+
+
 }
 
 // ─── Mídia ────────────────────────────────────────────────────────────────────
@@ -736,30 +763,6 @@ async function VerNewsletterComToken() {
 
     // Município em paralelo — não bloqueia o conteúdo principal
     renderMunicipio(destinatario, acesso);
-
-    // Após carregar o resumo do município
-    const resumo = await window.SupabaseMunicipio.getResumoMunicipio(cod_municipio);
-
-    if (resumo) {
-      // Salvar dados para histórico
-      dadosMunicipioAtual = {
-        cod_municipio: resumo.cod_municipio,
-        nome: nomeMunicipio, // de onde vier
-        uf: resumo.uf
-      };
-
-      // Renderizar resumo
-      window.SupabaseMunicipio.renderSecaoMunicipio({
-        container: document.getElementById('municipio-conteudo'),
-        blur: isLead, // se for lead
-        resumo: resumo,
-        nomeMunicipio: nomeMunicipio,
-        uf: resumo.uf
-      });
-
-      // Mostrar botão de histórico (apenas se tiver dados)
-      document.getElementById('btn-ver-historico').style.display = 'inline-block';
-    }
 
     renderMidia(newsletter, acesso);
     renderFAQ(newsletter, acesso);
