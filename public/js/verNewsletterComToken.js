@@ -149,14 +149,30 @@ async function montarBlocos(newsletter, dados, segmento) {
 
 // ─── Regras de acesso por segmento / plano ────────────────────────────────────
 
-function detectarAcesso(destinatario, newsletter, segmento) {
+function detectarAcesso(destinatario, newsletter, segmento, envio) {
   const isAssinante = segmento === 'assinantes';
   const plano_slug = destinatario.plano_slug || null;
   const features = destinatario.features || {};
 
-  const acessoProTemp = !isAssinante
-    && newsletter.acesso_pro_temporario === true
-    && (newsletter.acesso_pro_horas || 0) > 0;
+  // ── Acesso temporário para leads: valida janela de horas real ────────────
+  // Leva em conta o horário de abertura (envio.primeiro_acesso ou envio.criado_em)
+  // versus acesso_pro_horas da newsletter.
+  let acessoProTemp = false;
+  if (!isAssinante
+      && newsletter.acesso_pro_temporario === true
+      && (newsletter.acesso_pro_horas || 0) > 0) {
+
+    // Tenta obter o timestamp de referência do envio (primeiro acesso ou data de criação)
+    const ref = envio?.primeiro_acesso || envio?.expira_em || null;
+    if (ref) {
+      // expira_em é mais direto: se existir e ainda não venceu, concede acesso
+      const expira = ref.toDate ? ref.toDate() : new Date(ref);
+      acessoProTemp = new Date() < expira;
+    } else {
+      // fallback: sem timestamp de referência, nega o acesso temporário
+      acessoProTemp = false;
+    }
+  }
 
   return {
     isAssinante,
@@ -175,7 +191,7 @@ function detectarAcesso(destinatario, newsletter, segmento) {
 
 // ─── Header ───────────────────────────────────────────────────────────────────
 
-function renderHeader(newsletter, destinatario, segmento, uid) {
+function renderHeader(newsletter, destinatario) {
   const num = newsletter.numero || newsletter.edicao || '—';
   const titulo = newsletter.titulo || 'Radar SIOPE';
   const nome = (destinatario.nome || '').split(' ')[0];
@@ -185,92 +201,7 @@ function renderHeader(newsletter, destinatario, segmento, uid) {
   _set('hd-titulo', titulo);
   _set('hd-saudacao', nome ? `Olá, ${nome}!` : '');
   document.title = `Radar SIOPE · Ed. ${num} · ${titulo}`;
-
-  // Botão contextual por segmento
-  renderBotaoArea(segmento, uid);
 }
-
-// ─── Botão contextual no header ───────────────────────────────────────────────
-//   assinantes → "👤 Minha Área"  → /painel.html
-//   leads      → "🚀 Quero Assinar" → /assinatura.html?leadId={uid}
-
-function renderBotaoArea(segmento, uid) {
-  const wrap = document.getElementById('rs-btn-area-wrap');
-  if (!wrap) return;
-
-  if (segmento === 'assinantes') {
-    wrap.innerHTML = `
-      <a href="/painel.html"
-         class="rs-btn-area rs-btn-area-assinante"
-         title="Acessar a Área do Assinante">
-        <span>👤</span><span>Minha Área</span>
-      </a>`;
-  } else {
-    // Lead: pré-preenche o formulário de assinatura com os dados do lead
-    const dest = uid ? `?leadId=${encodeURIComponent(uid)}` : '';
-    wrap.innerHTML = `
-      <a href="/assinatura.html${dest}"
-         class="rs-btn-area rs-btn-area-lead"
-         title="Ver planos e assinar o Radar SIOPE">
-        <span>🚀</span><span>Quero Assinar</span>
-      </a>`;
-  }
-}
-
-// ─── Banner soft-block (link compartilhado) ───────────────────────────────────
-//   Exibido a partir do 3º acesso ao mesmo link.
-//   Assina/lembra pelo sessionStorage para não incomodar na mesma aba.
-
-function renderBannerSoftBlock(segmento, acessosTotais, uid) {
-  // Só mostra a partir do 3º acesso
-  if (acessosTotais < 3) return;
-  // Não mostra de novo na mesma sessão se o usuário já fechou
-  if (sessionStorage.getItem('rs_sb_fechado')) return;
-
-  const jaExiste = document.getElementById('rs-softblock-banner');
-  if (jaExiste) return;
-
-  const isAssinante = segmento === 'assinantes';
-  const classe = isAssinante ? 'sb-assinante' : 'sb-lead';
-
-  let texto, btnLabel, btnHref;
-
-  if (isAssinante) {
-    texto    = `<strong>🔗 Este link é pessoal.</strong>
-                Para leitura segura e acesso ao histórico completo, use sua Área do Assinante.`;
-    btnLabel = '👤 Minha Área';
-    btnHref  = '/painel.html';
-  } else {
-    texto    = `<strong>📌 Recebeu este conteúdo de alguém?</strong>
-                Crie seu próprio acesso e receba todas as edições diretamente no seu e-mail.`;
-    btnLabel = '🚀 Quero meu acesso';
-    const dest = uid ? `?leadId=${encodeURIComponent(uid)}` : '';
-    btnHref  = `/assinatura.html${dest}`;
-  }
-
-  const banner = document.createElement('div');
-  banner.id = 'rs-softblock-banner';
-  banner.className = classe;
-  banner.innerHTML = `
-    <div class="rs-sb-texto">${texto}</div>
-    <a href="${btnHref}" class="rs-sb-btn">${btnLabel}</a>
-    <button class="rs-sb-fechar" onclick="fecharSoftBlock()" title="Fechar">×</button>
-  `;
-  document.body.appendChild(banner);
-}
-
-function fecharSoftBlock() {
-  const el = document.getElementById('rs-softblock-banner');
-  if (el) {
-    el.style.animation = 'none';
-    el.style.transition = 'opacity .25s, transform .25s';
-    el.style.opacity = '0';
-    el.style.transform = 'translateY(100%)';
-    setTimeout(() => el.remove(), 260);
-  }
-  sessionStorage.setItem('rs_sb_fechado', '1');
-}
-window.fecharSoftBlock = fecharSoftBlock;
 
 // ─── Modo rápido — bullets ────────────────────────────────────────────────────
 
@@ -670,7 +601,6 @@ async function VerNewsletterComToken() {
     // Assinantes → Firestore (usuarios/{uid}/assinaturas/{aid}/envios/{env})
     // Leads      → Supabase  (tabela leads_envios, id = env)
     let envio;
-    let acessosTotais = 0; // threadado pelo fluxo e usado no banner soft-block
 
     if (assinaturaId) {
       // ── Assinante: Firestore ──────────────────────────────────────────────
@@ -708,8 +638,7 @@ async function VerNewsletterComToken() {
 
       // Verificar compartilhamento excessivo
       const envioAtual = (await envioRef.get()).data() || envio;
-      acessosTotais = Number(envioAtual.acessos_totais || 0);
-      if (acessosTotais > 5) {
+      if (Number(envioAtual.acessos_totais || 0) > 5) {
         envioRef.update({ sinalizacao_compartilhamento: true }).catch(() => { });
         mostrarErro('<strong>Conteúdo exclusivo.</strong>',
           'Identificamos múltiplos acessos. ' +
@@ -756,7 +685,6 @@ async function VerNewsletterComToken() {
         .catch(() => { });
 
       // Verificar compartilhamento excessivo
-      acessosTotais = novoTotal;
       if (novoTotal > 5) {
         window.supabase
           .from('leads_envios')
@@ -816,7 +744,7 @@ async function VerNewsletterComToken() {
     }
 
     // 8. Regras de acesso
-    const acesso = detectarAcesso(destinatario, newsletter, segmento);
+    const acesso = detectarAcesso(destinatario, newsletter, segmento, envio);
 
     // 9. Side effects não bloqueantes
     registrarClique(env, uid, nid);
@@ -836,7 +764,7 @@ async function VerNewsletterComToken() {
     };
 
     // 11. Render (header + conteúdo primeiro para UX)
-    renderHeader(newsletter, destinatario, segmento, uid);
+    renderHeader(newsletter, destinatario);
 
     const modoPadrao = sessionStorage.getItem('rs_modo_leitura') || acesso.modoPadrao;
     trocarModo(modoPadrao);
@@ -855,9 +783,6 @@ async function VerNewsletterComToken() {
 
     // 12. Exibe com fade-in
     mostrarApp();
-
-    // 13. Banner soft-block — exibido após app aparecer (a partir do 3º acesso)
-    renderBannerSoftBlock(segmento, acessosTotais, uid);
 
   } catch (err) {
     console.error('[verNL] Erro geral:', err);
