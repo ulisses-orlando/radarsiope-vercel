@@ -853,6 +853,55 @@
     body[data-theme="aurora"] .rs-page {
       background: transparent;
     }
+
+    /* ══════════════════════════════════════════════════════════════
+   SELETOR DE TEMAS - VERSÃO COMPACTA NO TOPO
+   ══════════════════════════════════════════════════════════════ */
+
+    /* Botão ativo */
+    #theme-selector-compact [data-theme-btn].ativo {
+      border-color: #fff !important;
+      border-width: 2px !important;
+      transform: scale(1.15);
+      box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.3);
+    }
+
+    /* Hover */
+    #theme-selector-compact [data-theme-btn]:hover {
+      transform: scale(1.2);
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+      border-color: rgba(255, 255, 255, 0.6);
+    }
+
+    /* Animação suave */
+    #theme-selector-compact [data-theme-btn] {
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    /* Responsivo - ocultar em telas muito pequenas */
+    @media (max-width: 400px) {
+      #theme-selector-compact {
+        display: none !important;
+      }
+    }
+
+    /* Responsivo - ajustar layout em mobile */
+    @media (max-width: 640px) {
+      .rs-header-top {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+      }
+
+      .rs-header-meta {
+        text-align: left;
+      }
+
+      /* Manter seletor de tema visível em mobile >= 400px */
+      #theme-selector-compact {
+        margin-top: 4px;
+      }
+    }
   </style>
 </head>
 
@@ -883,7 +932,59 @@
         </div>
       </div>
       <div id="hd-titulo" class="rs-header-titulo">Radar SIOPE</div>
-      <div id="hd-saudacao" class="rs-header-saudacao"></div>
+
+      <!-- Linha com saudação + temas -->
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:6px">
+        <div id="hd-saudacao" class="rs-header-saudacao" style="margin:0"></div>
+
+        <!-- Seletor de temas (discreto) -->
+        <div id="theme-selector-compact" style="display:flex;gap:4px;padding:4px 6px;
+              background:rgba(255,255,255,0.15);border-radius:12px;
+              border:1px solid rgba(255,255,255,0.2)">
+
+          <!-- Ícone de tema (antes dos botões) -->
+          <div style="font-size:12px;color:rgba(255,255,255,0.7);display:flex;
+                align-items:center;padding:0 2px">🎨</div>
+
+          <!-- Botão Claro -->
+          <div onclick="setTheme('claro')" data-theme-btn="claro" title="Tema Claro" style="width:20px;height:20px;border-radius:6px;cursor:pointer;
+                border:1.5px solid rgba(255,255,255,0.3);
+                background:#ffffff;transition:all 0.2s;
+                box-shadow:0 1px 3px rgba(0,0,0,0.1)">
+          </div>
+
+          <!-- Botão Escuro -->
+          <div onclick="setTheme('escuro')" data-theme-btn="escuro" title="Tema Escuro" style="width:20px;height:20px;border-radius:6px;cursor:pointer;
+                border:1.5px solid rgba(255,255,255,0.3);
+                background:#0f172a;transition:all 0.2s">
+          </div>
+
+          <!-- Botão Suave -->
+          <div onclick="setTheme('suave')" data-theme-btn="suave" title="Tema Suave" style="width:20px;height:20px;border-radius:6px;cursor:pointer;
+                border:1.5px solid rgba(255,255,255,0.3);
+                background:#faf8f3;transition:all 0.2s">
+          </div>
+
+          <!-- Botão Minimalista -->
+          <div onclick="setTheme('minimalista')" data-theme-btn="minimalista" title="Tema Minimalista" style="width:20px;height:20px;border-radius:6px;cursor:pointer;
+                border:1.5px solid rgba(255,255,255,0.3);
+                background:#fafafa;transition:all 0.2s">
+          </div>
+
+          <!-- Botão Êxito -->
+          <div onclick="setTheme('exito')" data-theme-btn="exito" title="Tema Êxito" style="width:20px;height:20px;border-radius:6px;cursor:pointer;
+                border:1.5px solid rgba(255,255,255,0.3);
+                background:#f0fdf4;transition:all 0.2s">
+          </div>
+
+          <!-- Botão Aurora -->
+          <div onclick="setTheme('aurora')" data-theme-btn="aurora" title="Tema Aurora" style="width:20px;height:20px;border-radius:6px;cursor:pointer;
+                border:1.5px solid rgba(255,255,255,0.3);
+                background:linear-gradient(135deg, #667eea, #764ba2);
+                transition:all 0.2s">
+          </div>
+        </div>
+      </div>
     </header>
 
     <!-- MUNICÍPIO -->
@@ -984,67 +1085,6 @@
 
     <!-- WATERMARK -->
     <div class="rs-watermark rs-protegido" id="rs-watermark"></div>
-    <!-- SELETOR DE TEMAS -->
-    <div id="theme-selector" style="position:fixed;bottom:20px;right:20px;z-index:200;
-            background:var(--bg-section);border-radius:12px;padding:12px;
-            box-shadow:0 4px 16px rgba(0,0,0,0.15);border:1px solid var(--borda)">
-
-      <div style="display:flex;gap:8px;flex-wrap:wrap;max-width:200px">
-        <!-- Tema Claro -->
-        <div onclick="setTheme('claro')" data-theme-btn="claro" style="width:40px;height:40px;border-radius:8px;cursor:pointer;
-                border:2px solid var(--borda);display:flex;align-items:center;
-                justify-content:center;background:#ffffff;transition:all 0.2s">
-          <div style="width:24px;height:24px;border-radius:50%;
-                  background:linear-gradient(135deg, #f4f6f9 50%, #ffffff 50%)"></div>
-        </div>
-
-        <!-- Tema Escuro -->
-        <div onclick="setTheme('escuro')" data-theme-btn="escuro" style="width:40px;height:40px;border-radius:8px;cursor:pointer;
-                border:2px solid var(--borda);display:flex;align-items:center;
-                justify-content:center;background:#0f172a;transition:all 0.2s">
-          <div style="width:24px;height:24px;border-radius:50%;
-                  background:linear-gradient(135deg, #1e293b 50%, #0f172a 50%)"></div>
-        </div>
-
-        <!-- Tema Suave -->
-        <div onclick="setTheme('suave')" data-theme-btn="suave" style="width:40px;height:40px;border-radius:8px;cursor:pointer;
-                border:2px solid var(--borda);display:flex;align-items:center;
-                justify-content:center;background:#faf8f3;transition:all 0.2s">
-          <div style="width:24px;height:24px;border-radius:50%;
-                  background:linear-gradient(135deg, #e8e3d8 50%, #faf8f3 50%)"></div>
-        </div>
-
-        <!-- Tema Minimalista -->
-        <div onclick="setTheme('minimalista')" data-theme-btn="minimalista" style="width:40px;height:40px;border-radius:8px;cursor:pointer;
-                border:2px solid var(--borda);display:flex;align-items:center;
-                justify-content:center;background:#ffffff;transition:all 0.2s">
-          <div style="width:24px;height:24px;border-radius:50%;
-                  background:#e0e0e0"></div>
-        </div>
-
-        <!-- Tema Êxito -->
-        <div onclick="setTheme('exito')" data-theme-btn="exito" style="width:40px;height:40px;border-radius:8px;cursor:pointer;
-                border:2px solid var(--borda);display:flex;align-items:center;
-                justify-content:center;background:#f0fdf4;transition:all 0.2s">
-          <div style="width:24px;height:24px;border-radius:50%;
-                  background:linear-gradient(135deg, #16a34a 50%, #dcfce7 50%)"></div>
-        </div>
-
-        <!-- Tema Aurora -->
-        <div onclick="setTheme('aurora')" data-theme-btn="aurora" style="width:40px;height:40px;border-radius:8px;cursor:pointer;
-                border:2px solid var(--borda);display:flex;align-items:center;
-                justify-content:center;background:linear-gradient(135deg, #667eea, #764ba2);
-                transition:all 0.2s">
-          <div style="width:24px;height:24px;border-radius:50%;
-                  background:linear-gradient(135deg, #667eea 50%, #764ba2 50%)"></div>
-        </div>
-      </div>
-
-      <div style="font-size:10px;color:var(--subtexto);text-align:center;margin-top:8px;
-              text-transform:uppercase;letter-spacing:0.5px">
-        TEMA
-      </div>
-    </div>
 
     <!-- CSS para botão ativo -->
     <style>
@@ -1057,20 +1097,6 @@
       [data-theme-btn]:hover {
         transform: scale(1.05);
         box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-      }
-
-      /* Ocultar em mobile pequeno */
-      @media (max-width: 480px) {
-        #theme-selector {
-          bottom: 10px;
-          right: 10px;
-          padding: 8px;
-        }
-
-        [data-theme-btn] {
-          width: 36px !important;
-          height: 36px !important;
-        }
       }
     </style>
   </div><!-- /rs-app -->
