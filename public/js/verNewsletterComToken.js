@@ -603,6 +603,7 @@ async function VerNewsletterComToken() {
     let envio;
 
     if (assinaturaId) {
+      console.log('sou assinante');
       // ── Assinante: Firestore ──────────────────────────────────────────────
       const envioRef = db.collection('usuarios').doc(uid)
         .collection('assinaturas').doc(assinaturaId)
@@ -647,6 +648,7 @@ async function VerNewsletterComToken() {
       }
 
     } else {
+      console.log('sou lead');
       // ── Lead: Supabase (leads_envios) ─────────────────────────────────────
       // env = id numérico do registro em leads_envios
       // Usa anon key — a policy "le_select_by_token" permite SELECT onde token IS NOT NULL
