@@ -5,54 +5,45 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Radar SIOPE — Área do Assinante</title>
-
-  <!-- Fontes do web app -->
   <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=Lora:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
 
   <style>
-    /* ─── TEMAS — idêntico ao web app ──────────────────────────────────── */
+    /* ─── TEMAS — mesmo sistema do web app ──────────────────────────── */
     :root {
-      --bg:#0f172a; --card:#1e293b; --card2:#162032; --text:#f8fafc;
-      --accent:#38bdf8; --accent2:#818cf8; --muted:#94a3b8;
-      --cta:#10b981; --cta2:#059669; --border:rgba(148,163,184,.12);
-      --shadow:rgba(0,0,0,.4); --tag-txt:#fff;
-      --radius:16px; --font-head:'Syne',sans-serif; --font-body:'Lora',serif;
-      --accent-600:#0ea5e9; --danger:#ef4444;
-    }
-    [data-theme="claro"] {
       --bg:#f1f5f9; --card:#fff; --card2:#f8fafc; --text:#0f172a;
       --accent:#0284c7; --accent2:#6366f1; --muted:#475569;
-      --cta:#059669; --cta2:#047857; --border:rgba(0,0,0,.07);
-      --shadow:rgba(0,0,0,.08); --accent-600:#0369a1;
+      --border:rgba(0,0,0,.08); --shadow:rgba(0,0,0,.08);
+      --radius:14px; --font-head:'Syne',sans-serif; --font-body:'Lora',serif;
+    }
+    [data-theme="escuro"] {
+      --bg:#0f172a; --card:#1e293b; --card2:#162032; --text:#f8fafc;
+      --accent:#38bdf8; --accent2:#818cf8; --muted:#94a3b8;
+      --border:rgba(148,163,184,.14); --shadow:rgba(0,0,0,.4);
     }
     [data-theme="suave"] {
       --bg:#fdf6ee; --card:#fff8f1; --card2:#fff; --text:#2d1f0e;
       --accent:#e07a2f; --accent2:#c0533a; --muted:#8a6a4e;
-      --cta:#c0533a; --cta2:#a8422c; --border:rgba(160,100,60,.1);
-      --shadow:rgba(80,40,0,.1); --accent-600:#c0533a;
+      --border:rgba(160,100,60,.12); --shadow:rgba(80,40,0,.1);
     }
     [data-theme="minimalista"] {
       --bg:#f9f9f7; --card:#fff; --card2:#fafaf8; --text:#111;
-      --accent:#111; --accent2:#555; --muted:#666; --tag-txt:#fff;
-      --cta:#111; --cta2:#333; --border:rgba(0,0,0,.08);
-      --shadow:rgba(0,0,0,.06); --radius:6px; --accent-600:#333;
+      --accent:#111; --accent2:#555; --muted:#666;
+      --border:rgba(0,0,0,.07); --shadow:rgba(0,0,0,.05); --radius:6px;
     }
     [data-theme="exito"] {
       --bg:#021a0f; --card:#052e18; --card2:#042414; --text:#e8fdf0;
       --accent:#22c55e; --accent2:#4ade80; --muted:#86efac;
-      --cta:#15803d; --cta2:#166534; --border:rgba(34,197,94,.12);
-      --shadow:rgba(0,0,0,.5); --accent-600:#16a34a;
+      --border:rgba(34,197,94,.14); --shadow:rgba(0,0,0,.5);
     }
     [data-theme="aurora"] {
       --bg:#0d0d1a; --card:#13132b; --card2:#0f0f23; --text:#f0eeff;
       --accent:#a78bfa; --accent2:#f472b6; --muted:#c4b5fd;
-      --cta:#7c3aed; --cta2:#6d28d9; --border:rgba(167,139,250,.12);
-      --shadow:rgba(0,0,0,.5); --accent-600:#8b5cf6;
+      --border:rgba(167,139,250,.14); --shadow:rgba(0,0,0,.5);
     }
 
-    /* ─── BASE ──────────────────────────────────────────────────────────── */
+    /* ─── BASE ──────────────────────────────────────────────────────── */
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; }
+    html { -webkit-text-size-adjust: 100%; }
     body {
       font-family: var(--font-body);
       background: var(--bg);
@@ -60,16 +51,17 @@
       min-height: 100vh;
       -webkit-font-smoothing: antialiased;
       transition: background .3s, color .3s;
+      padding-bottom: 70px;
     }
 
-    /* ─── HEADER ────────────────────────────────────────────────────────── */
+    /* ─── HEADER ────────────────────────────────────────────────────── */
     header {
-      background: linear-gradient(135deg, #0A3D62, #1A5276);
+      background: linear-gradient(135deg,#0A3D62,#1A5276);
       color: #fff;
-      padding: 12px 16px 14px;
+      padding: 10px 16px 12px;
       position: sticky;
       top: 0;
-      z-index: 200;
+      z-index: 300;
       box-shadow: 0 2px 12px rgba(0,0,0,.3);
     }
     .header-top {
@@ -81,161 +73,42 @@
     .header-brand {
       display: flex;
       align-items: center;
-      gap: 10px;
+      gap: 9px;
     }
     .header-brand img {
-      height: 36px;
+      height: 34px;
       filter: brightness(0) invert(1);
-    }
-    .header-brand-text {
-      display: flex;
-      flex-direction: column;
-      line-height: 1.2;
+      flex-shrink: 0;
     }
     .header-brand-text strong {
+      display: block;
       font-family: var(--font-head);
       font-size: 13px;
       font-weight: 800;
       color: #fff;
-      letter-spacing: .3px;
+      line-height: 1.2;
     }
     .header-brand-text small {
+      display: block;
       font-size: 10px;
-      color: rgba(255,255,255,.65);
-      letter-spacing: .2px;
+      color: rgba(255,255,255,.6);
+      line-height: 1.2;
     }
-    #usuario-info {
+    .header-actions {
       display: flex;
       align-items: center;
-      gap: 8px;
+      gap: 6px;
     }
     #nome-usuario {
       font-family: var(--font-head);
-      font-size: 12px;
-      color: rgba(255,255,255,.85);
+      font-size: 11px;
+      color: rgba(255,255,255,.8);
       text-align: right;
+      max-width: 120px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
     }
-    .header-actions { display: flex; gap: 6px; align-items: center; }
-
-    /* ─── SELETOR DE TEMA no header ─────────────────────────────────────── */
-    #theme-bar-painel {
-      display: flex;
-      align-items: center;
-      gap: 4px;
-      background: rgba(255,255,255,.12);
-      border: 1px solid rgba(255,255,255,.2);
-      border-radius: 30px;
-      padding: 5px 10px;
-    }
-    #theme-bar-painel .tb-label {
-      font-family: var(--font-head);
-      font-size: 10px;
-      color: rgba(255,255,255,.6);
-      letter-spacing: 1px;
-      text-transform: uppercase;
-      margin-right: 2px;
-    }
-    .theme-dot-p {
-      width: 22px; height: 22px;
-      border-radius: 50%;
-      border: 2px solid transparent;
-      cursor: pointer;
-      transition: transform .2s, border-color .2s;
-      flex-shrink: 0;
-    }
-    .theme-dot-p:hover { transform: scale(1.25); }
-    .theme-dot-p.active { border-color: #fff; transform: scale(1.15); }
-    .theme-dot-p[data-t="escuro"]     { background: linear-gradient(135deg,#0f172a,#38bdf8); }
-    .theme-dot-p[data-t="claro"]      { background: linear-gradient(135deg,#f1f5f9,#0284c7); }
-    .theme-dot-p[data-t="suave"]      { background: linear-gradient(135deg,#fdf6ee,#e07a2f); }
-    .theme-dot-p[data-t="minimalista"]{ background: linear-gradient(135deg,#f9f9f7,#111); }
-    .theme-dot-p[data-t="exito"]      { background: linear-gradient(135deg,#021a0f,#22c55e); }
-    .theme-dot-p[data-t="aurora"]     { background: linear-gradient(135deg,#0d0d1a,#a78bfa); }
-
-    /* ─── LAYOUT ────────────────────────────────────────────────────────── */
-    .container {
-      display: flex;
-      min-height: calc(100vh - 70px);
-    }
-
-    /* ─── NAV lateral ───────────────────────────────────────────────────── */
-    nav {
-      width: 240px;
-      background: var(--card);
-      border-right: 1px solid var(--border);
-      padding: 16px 12px;
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-      flex-shrink: 0;
-      transition: background .3s;
-    }
-    .brand {
-      font-family: var(--font-head);
-      font-size: 11px;
-      font-weight: 700;
-      color: var(--muted);
-      letter-spacing: 1px;
-      text-transform: uppercase;
-      padding: 0 8px;
-      margin-bottom: 4px;
-    }
-    .menu { list-style: none; display: flex; flex-direction: column; gap: 4px; }
-    .menu button {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      width: 100%;
-      text-align: left;
-      padding: 11px 12px;
-      border-radius: 10px;
-      border: none;
-      background: transparent;
-      cursor: pointer;
-      color: var(--text);
-      font-family: var(--font-head);
-      font-size: 13px;
-      font-weight: 600;
-      transition: background .15s, color .15s;
-      letter-spacing: .3px;
-    }
-    .menu button:hover {
-      background: rgba(148,163,184,.1);
-    }
-    .menu button[aria-current="true"] {
-      background: linear-gradient(90deg, rgba(56,189,248,.15), rgba(56,189,248,.05));
-      color: var(--accent);
-    }
-    [data-theme="claro"] .menu button[aria-current="true"]      { background: rgba(2,132,199,.1); }
-    [data-theme="suave"] .menu button[aria-current="true"]       { background: rgba(224,122,47,.1); }
-    [data-theme="minimalista"] .menu button[aria-current="true"] { background: rgba(0,0,0,.06); }
-    [data-theme="exito"] .menu button[aria-current="true"]       { background: rgba(34,197,94,.12); }
-    [data-theme="aurora"] .menu button[aria-current="true"]      { background: rgba(167,139,250,.12); }
-
-    .nav-footer {
-      margin-top: auto;
-      padding: 0 8px;
-      font-family: var(--font-head);
-      font-size: 10px;
-      color: var(--muted);
-    }
-
-    /* ─── BTN LOGOUT ────────────────────────────────────────────────────── */
-    .btn-logout {
-      padding: 7px 12px;
-      border-radius: 20px;
-      border: 1.5px solid rgba(255,255,255,.25);
-      background: rgba(239,68,68,.15);
-      color: #fff;
-      cursor: pointer;
-      font-family: var(--font-head);
-      font-size: 11px;
-      font-weight: 700;
-      transition: background .15s;
-    }
-    .btn-logout:hover { background: rgba(239,68,68,.35); }
-
-    /* ─── MENU TOGGLE mobile ────────────────────────────────────────────── */
     .menu-toggle {
       display: none;
       padding: 7px 12px;
@@ -247,16 +120,94 @@
       font-family: var(--font-head);
       font-size: 11px;
       font-weight: 700;
+      touch-action: manipulation;
+    }
+    .btn-logout {
+      padding: 7px 12px;
+      border-radius: 20px;
+      border: 1.5px solid rgba(255,255,255,.25);
+      background: rgba(239,68,68,.18);
+      color: #fff;
+      cursor: pointer;
+      font-family: var(--font-head);
+      font-size: 11px;
+      font-weight: 700;
+      touch-action: manipulation;
+      transition: background .15s;
+    }
+    .btn-logout:hover { background: rgba(239,68,68,.38); }
+
+    /* ─── LAYOUT ────────────────────────────────────────────────────── */
+    .container {
+      display: flex;
+      min-height: calc(100vh - 66px);
     }
 
-    /* ─── MAIN ──────────────────────────────────────────────────────────── */
-    main {
-      flex: 1;
-      padding: 20px 16px;
-      min-width: 0;
+    /* ─── NAV lateral ───────────────────────────────────────────────── */
+    nav {
+      width: 230px;
+      flex-shrink: 0;
+      background: var(--card);
+      border-right: 1px solid var(--border);
+      padding: 14px 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      transition: background .3s, border-color .3s;
+    }
+    .brand {
+      font-family: var(--font-head);
+      font-size: 10px;
+      font-weight: 700;
+      color: var(--muted);
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      padding: 0 8px;
+      margin-bottom: 4px;
+    }
+    .menu { list-style: none; display: flex; flex-direction: column; gap: 3px; }
+    .menu button {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      width: 100%;
+      text-align: left;
+      padding: 10px 12px;
+      border-radius: 10px;
+      border: none;
+      background: transparent;
+      cursor: pointer;
+      color: var(--text);
+      font-family: var(--font-head);
+      font-size: 13px;
+      font-weight: 600;
+      letter-spacing: .2px;
+      transition: background .15s, color .15s;
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .menu button:hover { background: rgba(148,163,184,.1); }
+    .menu button[aria-current="true"] {
+      background: rgba(2,132,199,.12);
+      color: var(--accent);
+    }
+    [data-theme="escuro"] .menu button[aria-current="true"] { background: rgba(56,189,248,.12); }
+    [data-theme="exito"]  .menu button[aria-current="true"] { background: rgba(34,197,94,.12); }
+    [data-theme="aurora"] .menu button[aria-current="true"] { background: rgba(167,139,250,.12); }
+    [data-theme="suave"]  .menu button[aria-current="true"] { background: rgba(224,122,47,.1); }
+
+    .nav-footer {
+      margin-top: auto;
+      padding: 0 8px;
+      font-family: var(--font-head);
+      font-size: 10px;
+      color: var(--muted);
     }
 
-    /* ─── SECTION CARDS ─────────────────────────────────────────────────── */
+    /* ─── MAIN ──────────────────────────────────────────────────────── */
+    main { flex: 1; padding: 18px 14px; min-width: 0; }
+
+    /* ─── SECTIONS ──────────────────────────────────────────────────── */
     .section {
       display: none;
       background: var(--card);
@@ -264,35 +215,45 @@
       border-radius: var(--radius);
       border: 1px solid var(--border);
       box-shadow: 0 4px 20px var(--shadow);
-      animation: slideUp .35s ease;
+      animation: slideUp .3s ease;
     }
     .section.active { display: block; }
-    @keyframes slideUp { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:translateY(0); } }
+    @keyframes slideUp {
+      from { opacity:0; transform:translateY(10px); }
+      to   { opacity:1; transform:translateY(0); }
+    }
     .section h2 {
       margin-top: 0;
       margin-bottom: 16px;
       color: var(--accent);
       font-family: var(--font-head);
-      font-size: 1rem;
+      font-size: .95rem;
       font-weight: 800;
-      letter-spacing: .5px;
+      letter-spacing: .6px;
       text-transform: uppercase;
     }
+    .section h3 {
+      font-family: var(--font-head);
+      font-size: .88rem;
+      font-weight: 700;
+      color: var(--text);
+      margin-bottom: 8px;
+    }
 
-    /* ─── CARDS GENÉRICOS ───────────────────────────────────────────────── */
+    /* ─── CARDS ─────────────────────────────────────────────────────── */
     .card {
       background: var(--card2);
       padding: 14px;
-      border-radius: 12px;
+      border-radius: 10px;
       border: 1px solid var(--border);
       color: var(--text);
     }
 
-    /* ─── NEWSLETTER CARDS ──────────────────────────────────────────────── */
+    /* ─── NEWSLETTER CARDS ──────────────────────────────────────────── */
     .lista-newsletters {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-      gap: 14px;
+      grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+      gap: 12px;
     }
     .newsletter-card {
       display: flex;
@@ -301,66 +262,50 @@
       background: var(--card2);
       border: 1px solid var(--border);
       overflow: hidden;
-      box-shadow: 0 2px 10px var(--shadow);
       transition: transform .18s, box-shadow .18s;
     }
-    .newsletter-card:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 6px 20px var(--shadow);
-    }
+    .newsletter-card:hover { transform: translateY(-2px); box-shadow: 0 6px 20px var(--shadow); }
     .newsletter-card img.thumb {
       width: 100%;
       height: 80px;
       object-fit: cover;
       display: block;
     }
-    .newsletter-card .conteudo {
-      padding: 10px 12px;
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-    }
+    .newsletter-card .conteudo { padding: 10px 12px; display: flex; flex-direction: column; gap: 5px; }
     .newsletter-card .card-title {
       margin: 0;
       font-family: var(--font-head);
-      font-size: 0.88rem;
+      font-size: .85rem;
       font-weight: 700;
       color: var(--text);
       line-height: 1.2;
     }
     .meta {
       display: flex;
-      gap: 8px;
+      gap: 6px;
       align-items: center;
       font-family: var(--font-head);
-      font-size: 0.78rem;
+      font-size: .76rem;
       color: var(--muted);
       flex-wrap: wrap;
     }
     .meta .classificacao {
-      display: inline-flex;
-      align-items: center;
-      background: rgba(56,189,248,.12);
+      background: rgba(2,132,199,.1);
       color: var(--accent);
-      padding: 2px 8px;
+      padding: 2px 7px;
       border-radius: 20px;
       font-weight: 700;
-      font-size: 0.75rem;
     }
     .card-summary {
       color: var(--muted);
-      font-size: 0.85rem;
+      font-size: .83rem;
       line-height: 1.4;
       display: -webkit-box;
       -webkit-line-clamp: 2;
       -webkit-box-orient: vertical;
       overflow: hidden;
     }
-    .acoes-card {
-      display: flex;
-      justify-content: flex-end;
-      margin-top: 4px;
-    }
+    .acoes-card { display: flex; justify-content: flex-end; margin-top: 4px; }
     .acoes-card .btn-ver {
       padding: 6px 14px;
       border-radius: 8px;
@@ -370,12 +315,13 @@
       cursor: pointer;
       font-family: var(--font-head);
       font-weight: 700;
-      font-size: 0.82rem;
-      transition: background .15s;
+      font-size: .82rem;
+      touch-action: manipulation;
+      transition: opacity .15s;
     }
-    .acoes-card .btn-ver:hover { background: var(--accent-600); }
+    .acoes-card .btn-ver:hover { opacity: .85; }
 
-    /* ─── GRID SOLICITAÇÕES ─────────────────────────────────────────────── */
+    /* ─── GRID SOLICITAÇÕES ─────────────────────────────────────────── */
     .grid-solicitacoes {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
@@ -383,32 +329,57 @@
       margin-top: 12px;
     }
 
-    /* ─── FORMULÁRIOS ───────────────────────────────────────────────────── */
-    #bloco-suporte .form-row,
-    #bloco-perfil .form-row { display: flex; flex-direction: column; gap: 6px; max-width: 680px; }
+    /* ─── FILTROS ───────────────────────────────────────────────────── */
+    #filtros-solicitacoes {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+      margin-bottom: 12px;
+    }
+    #filtros-solicitacoes button {
+      padding: 5px 12px;
+      border-radius: 20px;
+      border: 1px solid var(--border);
+      background: var(--card2);
+      color: var(--text);
+      font-family: var(--font-head);
+      font-size: 11px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: .15s;
+      touch-action: manipulation;
+    }
+    #filtros-solicitacoes button:hover,
+    #filtros-solicitacoes button.ativo {
+      background: var(--accent);
+      color: #fff;
+      border-color: transparent;
+    }
+
+    /* ─── FORMULÁRIOS ───────────────────────────────────────────────── */
+    .form-row { display: flex; flex-direction: column; gap: 5px; max-width: 640px; margin-bottom: 12px; }
     label {
       display: block;
       font-family: var(--font-head);
       font-weight: 700;
-      font-size: 12px;
+      font-size: 11px;
       color: var(--text);
       letter-spacing: .3px;
-      margin-bottom: 2px;
     }
     input, select, textarea {
       width: 100%;
-      box-sizing: border-box;
       padding: 9px 12px;
       border-radius: 8px;
       border: 1px solid var(--border);
       background: var(--card2);
       color: var(--text);
-      font-size: 0.92rem;
+      font-size: .9rem;
       font-family: var(--font-body);
       outline: none;
       transition: border-color .15s;
     }
     input:focus, select:focus, textarea:focus { border-color: var(--accent); }
+    input[readonly] { opacity: .6; cursor: not-allowed; }
     .actions { display: flex; gap: 8px; align-items: center; margin-top: 10px; }
     .btn-primary {
       padding: 10px 18px;
@@ -420,11 +391,12 @@
       font-weight: 700;
       font-size: 13px;
       cursor: pointer;
-      transition: background .15s;
+      touch-action: manipulation;
+      transition: opacity .15s;
     }
-    .btn-primary:hover { background: var(--accent-600); }
+    .btn-primary:hover { opacity: .85; }
 
-    /* ─── MODAL ─────────────────────────────────────────────────────────── */
+    /* ─── MODAL ─────────────────────────────────────────────────────── */
     .modal-overlay {
       position: fixed;
       inset: 0;
@@ -437,7 +409,7 @@
     .modal-overlay.show { display: flex; }
     .modal-content {
       width: 100%;
-      max-width: 520px;
+      max-width: 500px;
       background: var(--card);
       color: var(--text);
       padding: 20px;
@@ -445,55 +417,138 @@
       border: 1px solid var(--border);
       box-shadow: 0 16px 40px var(--shadow);
     }
-
-    /* ─── FILTROS SUPORTE ───────────────────────────────────────────────── */
-    #filtros-solicitacoes { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
-    #filtros-solicitacoes button {
-      padding: 5px 12px;
-      border-radius: 20px;
+    .modal-content h3 {
+      font-family: var(--font-head);
+      color: var(--text);
+      margin-bottom: 12px;
+    }
+    .modal-content textarea {
+      width: 100%;
+      margin-top: 6px;
+      background: var(--card2);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 8px 10px;
+    }
+    .modal-btns {
+      margin-top: 10px;
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+    }
+    #fechar-edicao {
+      padding: 8px 14px;
+      border-radius: 8px;
       border: 1px solid var(--border);
       background: var(--card2);
       color: var(--text);
-      font-family: var(--font-head);
-      font-size: 11px;
-      font-weight: 700;
       cursor: pointer;
-      transition: .15s;
+      font-family: var(--font-head);
+      font-size: 13px;
     }
-    #filtros-solicitacoes button:hover,
-    #filtros-solicitacoes button.ativo { background: var(--accent); color: #fff; border-color: transparent; }
 
-    /* ─── RESPONSIVE ────────────────────────────────────────────────────── */
+    /* ─── SELETOR DE TEMAS — BARRA FIXA NO RODAPÉ ───────────────────── */
+    /* Idêntico ao verNewsletterComToken — sem display:none em nenhuma viewport */
+    .rs-theme-bar {
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 40px;
+      padding: 6px 14px;
+      box-shadow: 0 8px 32px var(--shadow);
+      z-index: 500;
+      transition: background .35s, border-color .35s;
+      white-space: nowrap;
+    }
+    .rs-theme-bar label {
+      font-family: var(--font-head);
+      font-size: 9px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--muted);
+      margin-right: 4px;
+      user-select: none;
+    }
+    .rs-theme-dot {
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      border: 2px solid transparent;
+      cursor: pointer;
+      transition: transform .2s, border-color .2s;
+      position: relative;
+      flex-shrink: 0;
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .rs-theme-dot:hover  { transform: scale(1.25); }
+    .rs-theme-dot.ativo  { border-color: var(--text); transform: scale(1.15); }
+    .rs-theme-dot[data-t="claro"]      { background: linear-gradient(135deg,#f1f5f9,#0284c7); }
+    .rs-theme-dot[data-t="escuro"]     { background: linear-gradient(135deg,#0f172a,#38bdf8); }
+    .rs-theme-dot[data-t="suave"]      { background: linear-gradient(135deg,#fdf6ee,#e07a2f); }
+    .rs-theme-dot[data-t="minimalista"]{ background: linear-gradient(135deg,#f9f9f7,#111); }
+    .rs-theme-dot[data-t="exito"]      { background: linear-gradient(135deg,#021a0f,#22c55e); }
+    .rs-theme-dot[data-t="aurora"]     { background: linear-gradient(135deg,#0d0d1a,#a78bfa); }
+    .rs-theme-dot[data-t="aurora"]::after {
+      content: '';
+      position: absolute;
+      inset: -2px;
+      border-radius: 50%;
+      background: conic-gradient(from 0deg,#a78bfa,#f472b6,#38bdf8,#a78bfa);
+      z-index: -1;
+      filter: blur(2px);
+    }
+    /* Estreito: esconde label mas NUNCA os dots */
+    @media (max-width: 480px) {
+      .rs-theme-bar label { display: none; }
+      .rs-theme-bar { padding: 6px 10px; gap: 5px; }
+    }
+
+    /* ─── RESPONSIVE ────────────────────────────────────────────────── */
     @media (max-width: 900px) {
       nav {
         position: fixed;
-        left: 0; top: 70px; bottom: 0;
-        width: 240px;
+        left: 0; top: 66px; bottom: 0;
+        width: 230px;
         transform: translateX(-110%);
         transition: transform .22s;
         z-index: 1100;
         box-shadow: 4px 0 20px var(--shadow);
+        overflow-y: auto;
       }
       nav.open { transform: translateX(0); }
       .menu-toggle { display: inline-flex; }
-      main { padding: 14px 12px; }
-      #theme-bar-painel .tb-label { display: none; }
-    }
-    @media (min-width: 901px) {
-      .menu-toggle { display: none; }
-    }
-    @media (max-width: 480px) {
+      main { padding: 12px 10px; }
       .header-brand-text small { display: none; }
     }
+    @media (min-width: 901px) { .menu-toggle { display: none; } }
 
-    button:focus { outline: 2px solid var(--accent); outline-offset: 2px; }
+    button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   </style>
 </head>
 
 <body>
+
+  <!-- Script de tema: aplicado antes do primeiro paint, evita flash -->
+  <script>
+    (function () {
+      const KEY = 'radar-tema';
+      const TEMAS = ['claro','escuro','suave','minimalista','exito','aurora'];
+      const t = TEMAS.includes(localStorage.getItem(KEY)) ? localStorage.getItem(KEY) : 'claro';
+      document.documentElement.setAttribute('data-theme', t);
+    })();
+  </script>
+
   <header>
     <div class="header-top">
-      <!-- Logo + nome do produto -->
       <div class="header-brand">
         <img src="/icons/icon-192x192.png" alt="Radar SIOPE"
              onerror="this.style.display='none'">
@@ -502,47 +557,26 @@
           <small>Guia Digital — FUNDEB e SIOPE</small>
         </div>
       </div>
-
-      <!-- Usuário + ações -->
-      <div id="usuario-info">
+      <div class="header-actions">
         <div id="nome-usuario" aria-live="polite">Usuário</div>
-        <div class="header-actions">
-          <!-- Seletor de temas (mesmo padrão do web app) -->
-          <div id="theme-bar-painel">
-            <span class="tb-label">Tema</span>
-            <div class="theme-dot-p active" data-t="escuro"      title="Escuro"      onclick="setPainelTheme(this)"></div>
-            <div class="theme-dot-p"        data-t="claro"       title="Claro"       onclick="setPainelTheme(this)"></div>
-            <div class="theme-dot-p"        data-t="suave"       title="Suave"       onclick="setPainelTheme(this)"></div>
-            <div class="theme-dot-p"        data-t="minimalista" title="Minimalista" onclick="setPainelTheme(this)"></div>
-            <div class="theme-dot-p"        data-t="exito"       title="Êxito"       onclick="setPainelTheme(this)"></div>
-            <div class="theme-dot-p"        data-t="aurora"      title="Aurora"      onclick="setPainelTheme(this)"></div>
-          </div>
-          <button id="menu-toggle" class="menu-toggle" aria-expanded="false"
-                  aria-controls="main-nav">☰ Menu</button>
-          <button id="btn-logout" class="btn-logout">⏏ Sair</button>
-        </div>
+        <button id="menu-toggle" class="menu-toggle"
+                aria-expanded="false" aria-controls="main-nav">☰ Menu</button>
+        <button id="btn-logout" class="btn-logout">⏏ Sair</button>
       </div>
     </div>
   </header>
 
   <div class="container">
     <nav id="main-nav" aria-label="Navegação principal">
-      <div class="brand">
-        <strong>Área do Assinante</strong>
-      </div>
-
+      <div class="brand">Área do Assinante</div>
       <ul class="menu" role="menu">
-        <li role="none"><button role="menuitem" data-target="bloco-assinaturas" aria-current="true">📄 Minhas
-            Assinaturas</button></li>
+        <li role="none"><button role="menuitem" data-target="bloco-assinaturas" aria-current="true">📄 Minhas Assinaturas</button></li>
         <li role="none"><button role="menuitem" data-target="bloco-pagamentos">💳 Pagamentos</button></li>
         <li role="none"><button role="menuitem" data-target="bloco-biblioteca">📚 Minhas Newsletters</button></li>
         <li role="none"><button role="menuitem" data-target="bloco-suporte">💬 Suporte</button></li>
         <li role="none"><button role="menuitem" data-target="bloco-perfil">⚙️ Perfil</button></li>
       </ul>
-
-      <div class="nav-footer">
-        <small style="color:var(--muted)">RadarSiope</small>
-      </div>
+      <div class="nav-footer">Radar SIOPE © 2025</div>
     </nav>
 
     <main>
@@ -563,7 +597,6 @@
 
       <section id="bloco-suporte" class="section" aria-labelledby="titulo-suporte">
         <h2 id="titulo-suporte">💬 Suporte</h2>
-
         <div id="form-suporte">
           <div class="form-row">
             <label for="tipo-suporte">Tipo</label>
@@ -572,150 +605,144 @@
               <option value="consultoria">Consultoria</option>
               <option value="newsletters">Newsletters</option>
               <option value="sugestao de tema">Sugestão de tema para newsletter</option>
-              <option value="cancelamento">Solicitar cancelamento de assinatura (informe os dados da assinatura abaixo)</option>
+              <option value="cancelamento">Solicitar cancelamento de assinatura</option>
               <option value="outros">Outros</option>
             </select>
           </div>
-
           <div class="form-row">
             <label for="mensagem-suporte">Descrição</label>
             <textarea id="mensagem-suporte" name="mensagem-suporte" rows="5"
               placeholder="Descreva sua solicitação..."></textarea>
           </div>
-
           <div class="actions">
-            <button id="btn-enviar-suporte"
-              class="btn-primary">Enviar
-              solicitação</button>
-            <div id="suporte-feedback" style="margin-left:8px;color:var(--muted)"></div>
+            <button id="btn-enviar-suporte" class="btn-primary">Enviar solicitação</button>
+            <div id="suporte-feedback" style="color:var(--muted)"></div>
           </div>
         </div>
-
-
-
         <h3 style="margin-top:24px">📜 Histórico de solicitações</h3>
-        <div id="filtros-solicitacoes" style="margin-bottom:10px;display:flex;gap:8px;flex-wrap:wrap">
+        <div id="filtros-solicitacoes">
           <button data-filter="todos">Todos</button>
           <button data-filter="pendente">Pendente</button>
           <button data-filter="aberta">Aberta</button>
           <button data-filter="atendida">Atendida</button>
           <button data-filter="cancelada">Cancelada</button>
         </div>
-
         <div id="historico-solicitacoes" class="grid-solicitacoes"></div>
-        <div id="suporte-feedback" style="margin-top:12px"></div>
-        </section>
+      </section>
 
-        <!-- Início: bloco Perfil (substitua o conteúdo atual de #bloco-perfil) -->
-        <section id="bloco-perfil" class="section" aria-labelledby="titulo-perfil">
-          <h2 id="titulo-perfil">⚙️ Perfil</h2>
-
-          <div id="perfil-dados" class="card">
-            <form id="perfil-form" autocomplete="off" novalidate>
-              <div style="display:flex;flex-direction:column;gap:10px;max-width:720px">
-                <!-- CPF (readonly) -->
-                <div>
-                  <label for="perfil-cpf" style="font-weight:600">CPF</label>
-                  <input id="perfil-cpf" name="cpf" type="text" readonly
-                    style="width:100%;padding:8px;border-radius:8px;border:1px solid rgba(15,23,42,0.08);background:#f3f4f6" />
-                </div>
-
-                <!-- Nome -->
-                <div>
-                  <label for="perfil-nome" style="font-weight:600">Nome</label>
-                  <input id="perfil-nome" name="nome" type="text" required
-                    style="width:100%;padding:8px;border-radius:8px;border:1px solid rgba(15,23,42,0.08)" />
-                </div>
-
-                <!-- E-mail -->
-                <div>
-                  <label for="perfil-email" style="font-weight:600">E‑mail</label>
-                  <input id="perfil-email" name="email" type="email" required
-                    style="width:100%;padding:8px;border-radius:8px;border:1px solid rgba(15,23,42,0.08)" />
-                </div>
-
-                <!-- Telefone -->
-                <div>
-                  <label for="perfil-telefone" style="font-weight:600">Telefone</label>
-                  <input id="perfil-telefone" name="telefone" type="tel"
-                    style="width:100%;padding:8px;border-radius:8px;border:1px solid rgba(15,23,42,0.08)" />
-                </div>
-
-                <!-- UF e Município (container preenchido por inserirCamposUfMunicipio) -->
-                <div id="perfil-uf-municipio"></div>
-
-                <!-- Preferência de contato -->
-                <div>
-                  <label for="perfil-preferencia" style="font-weight:600">Preferência de contato</label>
-                  <select id="perfil-preferencia" name="preferencia_contato"
-                    style="width:100%;padding:8px;border-radius:8px;border:1px solid rgba(15,23,42,0.08)">
-                    <option value="">Selecione...</option>
-                    <option value="E-mail">E-mail</option>
-                    <option value="WhatsApp">WhatsApp</option>
-                    <option value="Ligação">Ligação</option>
-                  </select>
-                </div>
-
-                <!-- Perfil profissional -->
-                <div>
-                  <label for="perfil-perfil" style="font-weight:600">Perfil</label>
-                  <select id="perfil-perfil" name="perfil"
-                    style="width:100%;padding:8px;border-radius:8px;border:1px solid rgba(15,23,42,0.08)">
-                    <option value="">Selecione...</option>
-                    <option value="secretario">Secretário</option>
-                    <option value="tecnico">Técnico</option>
-                    <option value="contador">Contador</option>
-                    <option value="pesquisador">Pesquisador</option>
-                    <option value="cacs">CACS</option>
-                    <option value="cidadao">Cidadão</option>
-                  </select>
-                </div>
-
-                <!-- Interesses (container preenchido por carregarTiposNewsletterParaPerfil) -->
-                <div>
-                  <label style="font-weight:600">Interesses</label>
-                  <div id="perfil-interesses" style="margin-top:6px"></div>
-                </div>
-
-                <!-- Ações -->
-                <div style="display:flex;gap:8px;align-items:center">
-                  <button id="perfil-salvar" type="button"
-                    class="btn-primary">Salvar</button>
-                  <div id="perfil-status" style="color:var(--muted)"></div>
-                </div>
+      <section id="bloco-perfil" class="section" aria-labelledby="titulo-perfil">
+        <h2 id="titulo-perfil">⚙️ Perfil</h2>
+        <div id="perfil-dados" class="card">
+          <form id="perfil-form" autocomplete="off" novalidate>
+            <div style="display:flex;flex-direction:column;gap:10px;max-width:640px">
+              <div class="form-row">
+                <label for="perfil-cpf">CPF</label>
+                <input id="perfil-cpf" name="cpf" type="text" readonly />
               </div>
-            </form>
-          </div>
-        </section>
+              <div class="form-row">
+                <label for="perfil-nome">Nome</label>
+                <input id="perfil-nome" name="nome" type="text" required />
+              </div>
+              <div class="form-row">
+                <label for="perfil-email">E‑mail</label>
+                <input id="perfil-email" name="email" type="email" required />
+              </div>
+              <div class="form-row">
+                <label for="perfil-telefone">Telefone</label>
+                <input id="perfil-telefone" name="telefone" type="tel" />
+              </div>
+              <div id="perfil-uf-municipio"></div>
+              <div class="form-row">
+                <label for="perfil-preferencia">Preferência de contato</label>
+                <select id="perfil-preferencia" name="preferencia_contato">
+                  <option value="">Selecione...</option>
+                  <option value="E-mail">E-mail</option>
+                  <option value="WhatsApp">WhatsApp</option>
+                  <option value="Ligação">Ligação</option>
+                </select>
+              </div>
+              <div class="form-row">
+                <label for="perfil-perfil">Perfil profissional</label>
+                <select id="perfil-perfil" name="perfil">
+                  <option value="">Selecione...</option>
+                  <option value="secretario">Secretário</option>
+                  <option value="tecnico">Técnico</option>
+                  <option value="contador">Contador</option>
+                  <option value="pesquisador">Pesquisador</option>
+                  <option value="cacs">CACS</option>
+                  <option value="cidadao">Cidadão</option>
+                </select>
+              </div>
+              <div class="form-row">
+                <label>Interesses</label>
+                <div id="perfil-interesses" style="margin-top:4px"></div>
+              </div>
+              <div class="actions">
+                <button id="perfil-salvar" type="button" class="btn-primary">Salvar</button>
+                <div id="perfil-status" style="color:var(--muted)"></div>
+              </div>
+            </div>
+          </form>
+        </div>
+      </section>
     </main>
   </div>
 
   <!-- Modal edição de solicitação -->
-  <div id="modal-editar-solicitacao" class="modal-overlay" role="dialog" aria-modal="true"
-    aria-labelledby="titulo-modal-editar">
+  <div id="modal-editar-solicitacao" class="modal-overlay" role="dialog"
+       aria-modal="true" aria-labelledby="titulo-modal-editar">
     <div class="modal-content" role="document">
       <h3 id="titulo-modal-editar">✏️ Editar Solicitação</h3>
       <label for="nova-descricao">Nova descrição</label>
-      <textarea id="nova-descricao" rows="4" style="width:100%"></textarea>
-      <div style="margin-top:10px;text-align:right">
-        <button id="salvar-edicao"
-          style="background:var(--accent);color:#fff;padding:8px 12px;border-radius:8px;border:none">💾 Salvar</button>
-        <button id="fechar-edicao"
-          style="margin-left:8px;padding:8px 12px;border-radius:8px;border:1px solid #ddd;background:#fff">❌
-          Cancelar</button>
+      <textarea id="nova-descricao" rows="4"></textarea>
+      <div class="modal-btns">
+        <button id="salvar-edicao" class="btn-primary">💾 Salvar</button>
+        <button id="fechar-edicao">❌ Cancelar</button>
       </div>
     </div>
   </div>
 
-  <!-- Scripts externos mantidos -->
+  <!-- ── BARRA DE TEMAS FIXA NO RODAPÉ ─────────────────────────────────── -->
+  <div class="rs-theme-bar" role="group" aria-label="Seletor de tema">
+    <label>Tema</label>
+    <div class="rs-theme-dot" data-t="claro"       title="Claro"       onclick="setPainelTheme('claro')"></div>
+    <div class="rs-theme-dot" data-t="escuro"      title="Escuro"      onclick="setPainelTheme('escuro')"></div>
+    <div class="rs-theme-dot" data-t="suave"       title="Suave"       onclick="setPainelTheme('suave')"></div>
+    <div class="rs-theme-dot" data-t="minimalista" title="Minimalista" onclick="setPainelTheme('minimalista')"></div>
+    <div class="rs-theme-dot" data-t="exito"       title="Êxito"       onclick="setPainelTheme('exito')"></div>
+    <div class="rs-theme-dot" data-t="aurora"      title="Aurora"      onclick="setPainelTheme('aurora')"></div>
+  </div>
+
+  <!-- Firebase -->
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
   <script src="js/firebase-init.js"></script>
 
-  <!-- Navegação e comportamento local -->
+  <!-- Navegação + tema -->
   <script>
     (function () {
+      const KEY = 'radar-tema';
+      const TEMAS = ['claro','escuro','suave','minimalista','exito','aurora'];
+
+      /* ── Tema ── */
+      function aplicarTema(tema) {
+        if (!TEMAS.includes(tema)) tema = 'claro';
+        document.body.setAttribute('data-theme', tema);
+        document.documentElement.setAttribute('data-theme', tema);
+        document.querySelectorAll('.rs-theme-dot').forEach(d => {
+          d.classList.toggle('ativo', d.dataset.t === tema);
+        });
+      }
+      window.setPainelTheme = function (tema) {
+        aplicarTema(tema);
+        localStorage.setItem(KEY, tema);
+      };
+      document.addEventListener('DOMContentLoaded', () => {
+        aplicarTema(localStorage.getItem(KEY) || 'claro');
+      });
+
+      /* ── Navegação de seções ── */
       const menu = document.querySelectorAll('.menu button[data-target]');
       const sections = document.querySelectorAll('.section');
       const menuToggle = document.getElementById('menu-toggle');
@@ -726,17 +753,17 @@
       function showSection(id, pushState = true) {
         sections.forEach(s => s.classList.toggle('active', s.id === id));
         menu.forEach(btn => {
-          const isActive = btn.dataset.target === id;
-          btn.setAttribute('aria-current', isActive ? 'true' : 'false');
+          btn.setAttribute('aria-current', btn.dataset.target === id ? 'true' : 'false');
         });
         document.dispatchEvent(new CustomEvent('section:shown', { detail: { id } }));
         if (pushState) history.replaceState(null, '', '#' + id);
-        if (window.innerWidth <= 900) nav.classList.remove('open'), menuToggle.setAttribute('aria-expanded', 'false');
+        if (window.innerWidth <= 900) {
+          nav.classList.remove('open');
+          menuToggle?.setAttribute('aria-expanded', 'false');
+        }
       }
 
-      menu.forEach(btn => {
-        btn.addEventListener('click', () => showSection(btn.dataset.target));
-      });
+      menu.forEach(btn => btn.addEventListener('click', () => showSection(btn.dataset.target)));
 
       document.addEventListener('DOMContentLoaded', () => {
         const hash = location.hash.replace('#', '');
@@ -748,16 +775,23 @@
           if (dados) {
             const nome = dados.nome || dados.email || 'Usuário';
             const el = document.getElementById('nome-usuario');
-            el.textContent = nome + (dados.tipo_perfil ? ' (' + dados.tipo_perfil + ')' : '');
+            if (el) el.textContent = nome + (dados.tipo_perfil ? ` (${dados.tipo_perfil})` : '');
           }
         } catch (e) { }
+
+        /* Logout */
+        document.getElementById('btn-logout').addEventListener('click', () => {
+          localStorage.removeItem('usuarioLogado');
+          window.location.href = 'login.html';
+        });
       });
 
-      menuToggle && menuToggle.addEventListener('click', () => {
+      menuToggle?.addEventListener('click', () => {
         const open = nav.classList.toggle('open');
         menuToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
       });
 
+      /* ── Modal ── */
       function openModal() {
         lastFocused = document.activeElement;
         modal.classList.add('show');
@@ -773,55 +807,19 @@
         document.dispatchEvent(new CustomEvent('solicitacao:edit:save', { detail: { text: newText } }));
         closeModal();
       });
-
-      document.addEventListener('keydown', (e) => {
+      document.addEventListener('keydown', e => {
         if (e.key === 'Escape' && modal.classList.contains('show')) closeModal();
       });
 
-      // helper to open newsletter viewer (integration point)
-      window.visualizarNewsletter = function (id) {
+      window.visualizarNewsletter = id =>
         document.dispatchEvent(new CustomEvent('newsletter:view', { detail: { id } }));
-      };
-
-      window.RadarSiopeUI = {
-        showSection,
-        openModal,
-        closeModal
-      };
+      window.RadarSiopeUI = { showSection, openModal, closeModal };
     })();
   </script>
 
-  <!-- Script de temas — inicializa antes do paint -->
-  <script>
-    (function () {
-      const TEMAS = ['escuro', 'claro', 'suave', 'minimalista', 'exito', 'aurora'];
-      const KEY = 'radar-tema';
-
-      function aplicarTemaPainel(tema) {
-        if (!TEMAS.includes(tema)) tema = 'escuro';
-        document.documentElement.setAttribute('data-theme', tema);
-        document.querySelectorAll('.theme-dot-p').forEach(d => {
-          d.classList.toggle('active', d.dataset.t === tema);
-        });
-        localStorage.setItem(KEY, tema);
-      }
-
-      window.setPainelTheme = function (el) {
-        aplicarTemaPainel(el.dataset.t);
-      };
-
-      // Carrega o tema salvo (sincronizado com o web app)
-      const saved = localStorage.getItem(KEY) || 'escuro';
-      aplicarTemaPainel(saved);
-
-      // Reaplicar após DOM estar pronto (para os dots ficarem corretos)
-      document.addEventListener('DOMContentLoaded', () => aplicarTemaPainel(localStorage.getItem(KEY) || 'escuro'));
-    })();
-  </script>
-
-  <!-- Seus scripts principais -->
   <script src="js/functions.js"></script>
+  <script src="js/perfil.js"></script>
   <script src="js/painel.js"></script>
-</body>
 
+</body>
 </html>
