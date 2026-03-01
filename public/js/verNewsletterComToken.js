@@ -603,7 +603,6 @@ async function VerNewsletterComToken() {
     let envio;
 
     if (assinaturaId) {
-      console.log('sou assinante');
       // ── Assinante: Firestore ──────────────────────────────────────────────
       const envioRef = db.collection('usuarios').doc(uid)
         .collection('assinaturas').doc(assinaturaId)
@@ -648,7 +647,6 @@ async function VerNewsletterComToken() {
       }
 
     } else {
-      console.log('sou lead');
       // ── Lead: Supabase (leads_envios) ─────────────────────────────────────
       // env = id numérico do registro em leads_envios
       // Usa anon key — a policy "le_select_by_token" permite SELECT onde token IS NOT NULL
@@ -661,7 +659,7 @@ async function VerNewsletterComToken() {
 
       if (leErr || !leRow) {
         mostrarErro('Envio não encontrado.',
-          'O link pode ter expirado. Acesse a <a href="/login.html">Área do Assinante</a>.');
+          'O link pode ter expirado. Assine agora <a href="/assinatura.html">Assine agora</a>.');
         return;
       }
 
@@ -673,7 +671,7 @@ async function VerNewsletterComToken() {
       // Validar expiração
       if (leRow.expira_em && new Date() > new Date(leRow.expira_em)) {
         mostrarErro('Este link expirou.',
-          'Acesse a <a href="/login.html">Área do Assinante</a> para ler edições anteriores.');
+          'Assine agora<a href="/assinatura.html">Assine agora</a> para continuar tendo acesso.');
         return;
       }
 
@@ -695,7 +693,7 @@ async function VerNewsletterComToken() {
           .then(() => { }).catch(() => { });
         mostrarErro('<strong>Conteúdo exclusivo.</strong>',
           'Identificamos múltiplos acessos. ' +
-          '<a href="/login.html">Acesse a Área do Assinante</a> para ler com segurança.');
+          '<a href="/assinatura.html">Assine agora</a> para continuar tendo acesso.');
         return;
       }
 
