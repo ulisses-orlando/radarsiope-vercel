@@ -1239,6 +1239,7 @@ async function abrirTipo(tipoId, tipoNome, tipoIcone) {
       edicoes = snap.docs.map(d => ({ id: d.id, ...d.data() }));
       _drawer.edicoesCache[tipoId] = edicoes;
     } catch (e) {
+      console.log('Newsletters do tipo', tipoId, 'não carregadas:', e);
       body.innerHTML = `${upSellBanner}
         <div style="padding:24px;text-align:center;color:var(--rs-muted);font-size:13px">
           Não foi possível carregar as edições.</div>`;
