@@ -4,6 +4,16 @@ window.tipoDestinatarioSelecionado = tipoDestinatarioSelecionado; // para acesso
 let leadsFiltraveis = [];
 window.leadsFiltraveis = leadsFiltraveis; // para acesso global
 
+// Adicione isto no topo ou antes da função de listagem
+async function obterMapaTiposNewsletter() {
+  const mapa = {};
+  const snap = await db.collection("tipo_newsletters").get();
+  snap.forEach(doc => {
+    mapa[doc.id] = doc.data().nome;
+  });
+  return mapa;
+}
+
 async function listarLeadsComPreferencias() {
   const corpo = document.querySelector("#tabela-leads-envio tbody");
   corpo.innerHTML = "<tr><td colspan='6'>Carregando leads...</td></tr>";
@@ -946,6 +956,9 @@ async function gerarPreviaEnvioUsuarios() {
 
     // Verifica status de envio para cada usuário/assinatura em paralelo
     const enviadosMap = {};
+    const interessesMap = {}; // Novo mapa para guardar os nomes dos interesses
+    const mapaNomesTipos = await obterMapaNomesTipos(); // Carrega os nomes (ID -> Nome)
+
     await Promise.all(selecionados.map(async (u) => {
         try {
             const snapEnvio = await db
@@ -963,6 +976,20 @@ async function gerarPreviaEnvioUsuarios() {
                 enviadosMap[`${u.usuarioId}|${u.assinaturaId}`] = status === "enviado" ? "enviado" : "erro";
             } else {
                 enviadosMap[`${u.usuarioId}|${u.assinaturaId}`] = "nao-enviado";
+            }
+            // BUSCA OS INTERESSES 
+            const docAssinatura = await db
+                .collection("usuarios")
+                .doc(u.usuarioId)
+                .collection("assinaturas")
+                .doc(u.assinaturaId)
+                .get();
+
+            if (docAssinatura.exists) {
+                const ids = docAssinatura.data().tipos_selecionados || [];
+                // Converte os IDs em nomes usando o mapa
+                const nomes = ids.map(id => mapaNomesTipos[id] || id).join(", ");
+                interessesMap[`${u.usuarioId}|${u.assinaturaId}`] = nomes || "Nenhum";
             }
         } catch (e) {
             console.warn("Erro ao consultar envios de usuário:", u.usuarioId, e);
@@ -992,6 +1019,7 @@ async function gerarPreviaEnvioUsuarios() {
         tr.dataset.perfil = u.perfil || "";
 
         tr.dataset.statusEnvio = statusEnvio;
+        const interesses = interessesMap[key] || "Não carregado";
 
         tr.innerHTML = `
             <td><input type="checkbox" class="chk-envio-final" ${precisaEnviar ? "checked" : ""} /></td>
@@ -999,7 +1027,7 @@ async function gerarPreviaEnvioUsuarios() {
             <td>${u.perfil || ""}</td>
             <td>${u.email}</td>
             <td>${tituloNewsletter}</td>
-            <td>-</td>
+            <td>${interesses}</td>
             <td class="col-pagamento">${u.emDia ? "✅ Sim" : "❌ Não"}</td>
             <td class="col-enviado">${statusTexto}</td>
         `;
