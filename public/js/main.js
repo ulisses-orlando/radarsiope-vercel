@@ -959,10 +959,10 @@ async function abrirModalNewsletter(docId = null, isEdit = false) {
   if (isEdit && docId) {
     const statusDiv = document.getElementById("status-envio-news");
 
-    if (statusDiv) {
+    /*if (statusDiv) {
       const enviosSnap = await db.collection("newsletters")
         .doc(docId)
-        .where('enviada', '==', true)
+        .collection("envios")
         .orderBy("data_envio", "desc")
         .limit(1)
         .get();
@@ -974,7 +974,16 @@ async function abrirModalNewsletter(docId = null, isEdit = false) {
         const dt = envio.data_envio.toDate().toLocaleDateString("pt-BR");
         statusDiv.innerHTML = `<span style="color:green;">✔️ Enviada em ${dt}</span>`;
       }
-    }
+    } */
+
+    if (data.enviada !== 'enviada') {
+        statusDiv.innerHTML = `<span style="color:red;">❌ Ainda não enviada</span>`;
+      } else {
+        const envio = enviosSnap.docs[0].data();
+        const dt = envio.data_envio.toDate().toLocaleDateString("pt-BR");
+        statusDiv.innerHTML = `<span style="color:green;">✔️ Enviada em ${dt}</span>`;
+      }
+
   }
 
   // -----------------------------
