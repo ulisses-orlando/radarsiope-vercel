@@ -779,7 +779,7 @@ async function listarUsuariosComAssinaturas(newsletterId) {
 
     // 🔹 Busca apenas assinaturas ativas da newsletter selecionada
     const snapAssinaturas = await db.collectionGroup("assinaturas")
-        .where("status", "==", "ativo")
+        .where("status", "==", "ativa")
         .where("tipo_newsletter", "==", newsletterSelecionada.tipo)
         .get();
 
