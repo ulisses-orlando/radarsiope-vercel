@@ -976,7 +976,7 @@ async function abrirModalNewsletter(docId = null, isEdit = false) {
       }
     } */
 
-    if (data.enviada !== 'enviada') {
+    if (!data.enviada) {
         statusDiv.innerHTML = `<span style="color:red;">❌ Ainda não enviada</span>`;
       } else {
         const envio = enviosSnap.docs[0].data();
