@@ -979,6 +979,12 @@ async function abrirModalNewsletter(docId = null, isEdit = false) {
     if (!data.enviada) {
         statusDiv.innerHTML = `<span style="color:red;">❌ Ainda não enviada</span>`;
       } else {
+        const enviosSnap = await db.collection("newsletters")
+        .doc(docId)
+        .collection("envios")
+        .orderBy("data_envio", "desc")
+        .limit(1)
+        .get();
         const envio = enviosSnap.docs[0].data();
         const dt = envio.data_envio.toDate().toLocaleDateString("pt-BR");
         statusDiv.innerHTML = `<span style="color:green;">✔️ Enviada em ${dt}</span>`;
