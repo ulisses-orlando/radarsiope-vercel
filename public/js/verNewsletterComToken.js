@@ -1231,7 +1231,7 @@ async function abrirTipo(tipoId, tipoNome, tipoIcone) {
   if (!edicoes) {
     try {
       const snap = await db.collection('newsletters')
-        .where('Tipo', '==', tipoId)
+        .where('tipo', '==', tipoId)
         .where('enviada', '==', true)
         .orderBy('data_publicacao', 'desc')
         .limit(8)
