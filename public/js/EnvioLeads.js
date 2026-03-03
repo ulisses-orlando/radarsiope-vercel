@@ -777,10 +777,17 @@ async function listarUsuariosComAssinaturas(newsletterId) {
         return;
     }
 
+    // 🔹 ID do tipo da newsletter (campo "Tipo" no Firestore — armazena o ID do tipo)
+    const tipoId = newsletterSelecionada.Tipo || newsletterSelecionada.tipo || null;
+    if (!tipoId) {
+        corpo.innerHTML = "<tr><td colspan='5'>⚠️ Newsletter sem tipo definido.</td></tr>";
+        return;
+    }
+
     // 🔹 Busca apenas assinaturas ativas da newsletter selecionada
     const snapAssinaturas = await db.collectionGroup("assinaturas")
         .where("status", "==", "ativa")
-        .where("tipo_newsletter", "==", newsletterSelecionada.tipo)
+        .where("tipos_selecionados", "array-contains", tipoId)
         .get();
 
     let linhas = "";
@@ -798,6 +805,8 @@ async function listarUsuariosComAssinaturas(newsletterId) {
         // 🔹 Busca todos os pagamentos do usuário
         const pagamentosSnap = await db.collection("usuarios")
             .doc(usuarioId)
+            .collection("assinaturas")
+            .doc(assinaturaId)
             .collection("pagamentos")
             .get();
 
@@ -2539,8 +2548,6 @@ function initGeracaoLotes() {
   window.fecharModal = fecharModal;
   window.fecharModalErrosEncontrados = fecharModalErrosEncontrados;
   window.prosseguirGeracao = prosseguirGeracao;
-
-  console.log("EnvioLeads: inicializador de geração de lotes registrado");
 }
 
 // registra init no DOMContentLoaded para garantir que elementos existam
