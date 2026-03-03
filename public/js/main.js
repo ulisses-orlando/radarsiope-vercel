@@ -959,37 +959,13 @@ async function abrirModalNewsletter(docId = null, isEdit = false) {
   if (isEdit && docId) {
     const statusDiv = document.getElementById("status-envio-news");
 
-    /*if (statusDiv) {
-      const enviosSnap = await db.collection("newsletters")
-        .doc(docId)
-        .collection("envios")
-        .orderBy("data_envio", "desc")
-        .limit(1)
-        .get();
-
-      if (enviosSnap.empty) {
+    if (statusDiv) {
+      if (!data || data.enviada !== true) {
         statusDiv.innerHTML = `<span style="color:red;">❌ Ainda não enviada</span>`;
       } else {
-        const envio = enviosSnap.docs[0].data();
-        const dt = envio.data_envio.toDate().toLocaleDateString("pt-BR");
-        statusDiv.innerHTML = `<span style="color:green;">✔️ Enviada em ${dt}</span>`;
+        statusDiv.innerHTML = `<span style="color:green;">✔️ Enviada</span>`;
       }
-    } */
-
-    if (!data.enviada) {
-        statusDiv.innerHTML = `<span style="color:red;">❌ Ainda não enviada</span>`;
-      } else {
-        const enviosSnap = await db.collection("newsletters")
-        .doc(docId)
-        .collection("envios")
-        .orderBy("data_envio", "desc")
-        .limit(1)
-        .get();
-        const envio = enviosSnap.docs[0].data();
-        const dt = envio.data_envio.toDate().toLocaleDateString("pt-BR");
-        statusDiv.innerHTML = `<span style="color:green;">✔️ Enviada em ${dt}</span>`;
-      }
-
+    }
   }
 
   // -----------------------------
