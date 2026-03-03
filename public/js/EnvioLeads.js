@@ -5,13 +5,13 @@ let leadsFiltraveis = [];
 window.leadsFiltraveis = leadsFiltraveis; // para acesso global
 
 // Adicione isto no topo ou antes da função de listagem
-async function obterMapaTiposNewsletter() {
-  const mapa = {};
-  const snap = await db.collection("tipo_newsletters").get();
-  snap.forEach(doc => {
-    mapa[doc.id] = doc.data().nome;
-  });
-  return mapa;
+async function obterMapaNomesTipos() {
+    const mapa = {};
+    const snap = await db.collection("tipo_newsletters").get();
+    snap.forEach(doc => {
+        mapa[doc.id] = doc.data().nome;
+    });
+    return mapa;
 }
 
 async function listarLeadsComPreferencias() {
