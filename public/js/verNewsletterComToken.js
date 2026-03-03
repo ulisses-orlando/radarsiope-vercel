@@ -454,6 +454,9 @@ async function renderReactions(nid, uid) {
 
   pintar();
 
+  // Renderizar campo de feedback abaixo das reações
+  renderFeedback(nid);
+
   window.votar = async (newsletterId, key) => {
     const fb = document.getElementById('reaction-feedback');
     const anterior = localStorage.getItem(`rs_rx_${newsletterId}`);
@@ -784,6 +787,14 @@ async function VerNewsletterComToken() {
     // 12. Exibe com fade-in
     mostrarApp();
 
+    // 13. Iniciar drawer (após app visível)
+    iniciarDrawer(newsletter);
+
+    // 14. Notificação de edição mais recente (somente assinante)
+    if (segmento === 'assinantes') {
+      verificarEdicaoMaisRecente(newsletter);
+    }
+
   } catch (err) {
     console.error('[verNL] Erro geral:', err);
     mostrarErro('Erro ao carregar a edição.', err.message);
@@ -971,6 +982,751 @@ carregarTema();
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', carregarTema);
 }
+// ══════════════════════════════════════════════════════════════════════════
+// DRAWER DE NAVEGAÇÃO DE EDIÇÕES
+// ══════════════════════════════════════════════════════════════════════════
+
+// ─── Estado do drawer ────────────────────────────────────────────────────────
+const _drawer = {
+  aberto:       false,
+  nivel:        1,          // 1 = tipos, 2 = edições do tipo
+  tipoAtivo:    null,       // { id, nome, icone }
+  edicaoAtual:  null,       // id da edição sendo lida
+  tipoAtual:    null,       // tipo da edição sendo lida
+  edicoesCache: {},         // { [tipoId]: [array de edições] } — memória de sessão
+  contadores:   [],         // refs dos setInterval dos contadores regressivos
+};
+
+// ─── Cache de tipos no localStorage (24h) ───────────────────────────────────
+const DRAWER_CACHE_KEY    = 'rs_tipos_cache';
+const DRAWER_CACHE_TS_KEY = 'rs_tipos_cache_ts';
+const DRAWER_CACHE_TTL    = 24 * 60 * 60 * 1000; // 24h em ms
+
+async function _getTipos() {
+  try {
+    const ts   = parseInt(localStorage.getItem(DRAWER_CACHE_TS_KEY) || '0', 10);
+    const raw  = localStorage.getItem(DRAWER_CACHE_KEY);
+    if (raw && (Date.now() - ts) < DRAWER_CACHE_TTL) {
+      return JSON.parse(raw);
+    }
+  } catch (e) { /* cache corrompido — vai buscar no Firestore */ }
+
+  const snap = await db.collection('tipo_newsletters')
+    .where('is_newsletter', '==', true)
+    .get();
+
+  const tipos = snap.docs.map(d => ({
+    id:    d.id,
+    nome:  d.data().nome  || d.id,
+    icone: d.data().icone || '📰',
+  }));
+
+  try {
+    localStorage.setItem(DRAWER_CACHE_KEY,    JSON.stringify(tipos));
+    localStorage.setItem(DRAWER_CACHE_TS_KEY, String(Date.now()));
+  } catch (e) { /* quota excedida — ignora */ }
+
+  return tipos;
+}
+
+// ─── Verificar acesso do assinante a um tipo ─────────────────────────────────
+function _assinanteTemAcesso(tipoId) {
+  const ctx = _getCtx();
+  if (!ctx || ctx.segmento !== 'assinante') return false;
+  // plano_tipos_inclusos vem do Firestore do plano — disponível via _radarUser.features
+  // Usamos a lista carregada em _drawer.tiposIncluso (preenchida em iniciarDrawer)
+  return (_drawer.tiposInclusos || []).includes(tipoId);
+}
+
+// ─── Contexto de identidade ──────────────────────────────────────────────────
+function _getCtx() {
+  if (window._radarUser) return window._radarUser;
+  try {
+    const raw = sessionStorage.getItem('rs_drawer_ctx');
+    return raw ? JSON.parse(raw) : null;
+  } catch (e) { return null; }
+}
+
+// ─── Inicializar drawer ──────────────────────────────────────────────────────
+async function iniciarDrawer(newsletter) {
+  // Salvar contexto de identidade no sessionStorage (proteção contra reload)
+  if (window._radarUser) {
+    try {
+      sessionStorage.setItem('rs_drawer_ctx', JSON.stringify({
+        uid:          _radarUser.uid,
+        segmento:     _radarUser.segmento,
+        plano_slug:   _radarUser.plano_slug,
+        features:     _radarUser.features,
+        assinaturaId: _radarUser.assinaturaId,
+        email:        _radarUser.email,
+      }));
+    } catch (e) { /* ignora */ }
+  }
+
+  // Guardar referência da edição atual
+  _drawer.edicaoAtual = newsletter.id;
+  _drawer.tipoAtual   = newsletter.Tipo || newsletter.tipo || null;
+
+  // Carregar tipos_inclusos do plano do assinante
+  const ctx = _getCtx();
+  if (ctx && ctx.segmento === 'assinante') {
+    try {
+      // Busca o plano do assinante para obter tipos_inclusos
+      const planosSnap = await db.collection('planos')
+        .where('slug', '==', ctx.plano_slug)
+        .limit(1).get();
+      if (!planosSnap.empty) {
+        _drawer.tiposInclusos = planosSnap.docs[0].data().tipos_inclusos || [];
+      }
+    } catch (e) {
+      _drawer.tiposInclusos = [];
+    }
+  }
+
+  // Registrar event listeners
+  document.getElementById('rs-drawer-btn')
+    ?.addEventListener('click', abrirDrawer);
+  document.getElementById('rs-drawer-overlay')
+    ?.addEventListener('click', fecharDrawer);
+  document.getElementById('rs-drawer-fechar')
+    ?.addEventListener('click', fecharDrawer);
+  document.getElementById('rs-drawer-voltar')
+    ?.addEventListener('click', voltarParaTipos);
+
+  // Swipe para fechar (mobile)
+  _initSwipeFechar();
+}
+
+// ─── Swipe para fechar ───────────────────────────────────────────────────────
+function _initSwipeFechar() {
+  const panel = document.getElementById('rs-drawer-panel');
+  if (!panel) return;
+  let startX = 0;
+  panel.addEventListener('touchstart', e => { startX = e.touches[0].clientX; }, { passive: true });
+  panel.addEventListener('touchend',   e => {
+    if (e.changedTouches[0].clientX - startX > 60) fecharDrawer();
+  }, { passive: true });
+}
+
+// ─── Abrir / fechar drawer ───────────────────────────────────────────────────
+function abrirDrawer() {
+  const ctx = _getCtx();
+  const overlay = document.getElementById('rs-drawer-overlay');
+  const panel   = document.getElementById('rs-drawer-panel');
+  if (!overlay || !panel) return;
+
+  // Edge case: sem identificação
+  if (!ctx) {
+    _renderDrawerSemContexto();
+    overlay.classList.add('rs-drawer-show');
+    panel.classList.add('rs-drawer-show');
+    _drawer.aberto = true;
+    document.body.style.overflow = 'hidden';
+    return;
+  }
+
+  overlay.classList.add('rs-drawer-show');
+  panel.classList.add('rs-drawer-show');
+  _drawer.aberto = true;
+  document.body.style.overflow = 'hidden';
+  _renderNivel1();
+}
+
+function fecharDrawer() {
+  document.getElementById('rs-drawer-overlay')?.classList.remove('rs-drawer-show');
+  document.getElementById('rs-drawer-panel')  ?.classList.remove('rs-drawer-show');
+  _drawer.aberto = false;
+  document.body.style.overflow = '';
+  _limparContadores();
+}
+
+// ─── Edge case sem contexto ──────────────────────────────────────────────────
+function _renderDrawerSemContexto() {
+  _setDrawerHeader('Edições', false);
+  document.getElementById('rs-drawer-body').innerHTML = `
+    <div style="padding:32px 20px;text-align:center;color:var(--rs-muted)">
+      <div style="font-size:40px;margin-bottom:16px">📬</div>
+      <p style="font-size:14px;line-height:1.7;margin-bottom:20px">
+        Para navegar pelas edições, acesse o link enviado para seu e-mail.
+      </p>
+      <p style="font-size:13px;line-height:1.6">
+        Quer conhecer todos os nossos produtos?<br>
+        <a href="https://radarsiope.com.br" target="_blank" rel="noopener"
+           style="color:var(--azul);font-weight:700">Visite radarsiope.com.br →</a>
+      </p>
+    </div>`;
+}
+
+// ─── Nível 1 — lista de tipos ────────────────────────────────────────────────
+async function _renderNivel1() {
+  _drawer.nivel = 1;
+  _setDrawerHeader('Edições por tipo', false);
+  const body = document.getElementById('rs-drawer-body');
+  body.innerHTML = `
+    <div style="padding:20px;text-align:center;color:var(--rs-muted);font-size:13px">
+      <div class="rs-spinner" style="margin:0 auto 12px;width:24px;height:24px;border-width:2px"></div>
+      Carregando tipos…
+    </div>`;
+
+  let tipos;
+  try {
+    tipos = await _getTipos();
+  } catch (e) {
+    body.innerHTML = `<div style="padding:24px;text-align:center;color:var(--rs-muted);font-size:13px">
+      Não foi possível carregar os tipos.</div>`;
+    return;
+  }
+
+  const ctx = _getCtx();
+  const isAssinante = ctx?.segmento === 'assinante';
+
+  const cards = tipos.map(tipo => {
+    const temAcesso = !isAssinante || _assinanteTemAcesso(tipo.id);
+    const isTipoAtual = tipo.id === _drawer.tipoAtual;
+    return `
+      <button class="rs-drawer-tipo-card ${isTipoAtual ? 'rs-drawer-tipo-atual' : ''}"
+              onclick="abrirTipo('${_esc(tipo.id)}','${_esc(tipo.nome)}','${_esc(tipo.icone)}')"
+              type="button">
+        <span class="rs-drawer-tipo-icone">${tipo.icone}</span>
+        <span class="rs-drawer-tipo-nome">${_esc(tipo.nome)}</span>
+        ${isTipoAtual ? '<span class="rs-drawer-tipo-badge">lendo agora</span>' : ''}
+        ${!temAcesso ? '<span class="rs-drawer-lock" title="Não incluso no plano">🔒</span>' : '<span class="rs-drawer-chevron">›</span>'}
+      </button>`;
+  }).join('');
+
+  body.innerHTML = `<div class="rs-drawer-tipos-lista">${cards}</div>`;
+}
+
+// ─── Nível 2 — lista de edições do tipo ─────────────────────────────────────
+async function abrirTipo(tipoId, tipoNome, tipoIcone) {
+  _drawer.nivel     = 2;
+  _drawer.tipoAtivo = { id: tipoId, nome: tipoNome, icone: tipoIcone };
+  _setDrawerHeader(`${tipoIcone} ${tipoNome}`, true);
+  _limparContadores();
+
+  const body = document.getElementById('rs-drawer-body');
+  body.innerHTML = `
+    <div style="padding:20px;text-align:center;color:var(--rs-muted);font-size:13px">
+      <div class="rs-spinner" style="margin:0 auto 12px;width:24px;height:24px;border-width:2px"></div>
+      Carregando edições…
+    </div>`;
+
+  const ctx         = _getCtx();
+  const isAssinante = ctx?.segmento === 'assinante';
+  const temAcesso   = !isAssinante || _assinanteTemAcesso(tipoId);
+
+  // Cabeçalho de up-sell para assinante sem acesso ao tipo
+  const upSellBanner = (!isAssinante || temAcesso) ? '' : `
+    <div class="rs-drawer-upsell">
+      🔒 Este tipo não está no seu plano atual.<br>
+      <a href="/contato.html" style="color:var(--azul);font-weight:700">
+        Entre em contato para fazer upgrade →
+      </a>
+    </div>`;
+
+  // Buscar edições (cache de memória por sessão)
+  let edicoes = _drawer.edicoesCache[tipoId];
+  if (!edicoes) {
+    try {
+      const snap = await db.collection('newsletters')
+        .where('Tipo', '==', tipoId)
+        .orderBy('data_publicacao', 'desc')
+        .limit(8)
+        .get();
+      edicoes = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      _drawer.edicoesCache[tipoId] = edicoes;
+    } catch (e) {
+      body.innerHTML = `${upSellBanner}
+        <div style="padding:24px;text-align:center;color:var(--rs-muted);font-size:13px">
+          Não foi possível carregar as edições.</div>`;
+      return;
+    }
+  }
+
+  // Para leads: buscar envios recebidos para cruzar com as edições
+  let enviosLead = {};
+  if (!isAssinante && ctx?.uid) {
+    try {
+      const { data } = await window.supabase
+        .from('leads_envios')
+        .select('newsletter_id, expira_em, acessos_totais')
+        .eq('lead_id', ctx.uid)
+        .in('newsletter_id', edicoes.map(e => e.id));
+      if (data) {
+        data.forEach(row => { enviosLead[row.newsletter_id] = row; });
+      }
+    } catch (e) { /* não fatal — trata como não recebido */ }
+  }
+
+  // Renderizar cards
+  const listaHTML = edicoes.map(ed => {
+    const isAtual = ed.id === _drawer.edicaoAtual;
+    if (isAssinante) {
+      return _cardEdicaoAssinante(ed, isAtual, temAcesso);
+    } else {
+      return _cardEdicaoLead(ed, isAtual, enviosLead[ed.id] || null);
+    }
+  }).join('');
+
+  const rodape = `
+    <div class="rs-drawer-rodape">
+      <a href="/painel.html#bloco-biblioteca" style="color:var(--azul);font-size:12px;font-weight:600">
+        Ver edições mais antigas → Área do Assinante
+      </a>
+    </div>`;
+
+  body.innerHTML = `${upSellBanner}<div class="rs-drawer-edicoes-lista">${listaHTML}</div>${rodape}`;
+
+  // Iniciar contadores regressivos para leads
+  if (!isAssinante) {
+    edicoes.forEach(ed => {
+      const envio = enviosLead[ed.id];
+      if (envio?.expira_em) {
+        iniciarContador(envio.expira_em, `rs-contador-${ed.id}`);
+      }
+    });
+  }
+}
+
+// ─── Card de edição — assinante ──────────────────────────────────────────────
+function _cardEdicaoAssinante(ed, isAtual, temAcesso) {
+  const num   = ed.numero || ed.edicao || '';
+  const titulo = _esc(ed.titulo || `Edição ${num}`);
+  const data   = _fmtData(ed.data_publicacao);
+  const classeAtual = isAtual ? 'rs-drawer-ed-atual' : '';
+  const bloqueado   = !temAcesso;
+
+  if (bloqueado) {
+    return `
+      <div class="rs-drawer-ed-card rs-drawer-ed-bloqueado">
+        <div class="rs-drawer-ed-info">
+          <div class="rs-drawer-ed-titulo">${titulo}</div>
+          <div class="rs-drawer-ed-data">${data}${num ? ` · Ed. ${num}` : ''}</div>
+        </div>
+        <span class="rs-drawer-ed-lock">🔒</span>
+      </div>`;
+  }
+
+  return `
+    <button class="rs-drawer-ed-card ${classeAtual}"
+            onclick="navegarParaEdicao('${_esc(ed.id)}')"
+            type="button">
+      <div class="rs-drawer-ed-info">
+        <div class="rs-drawer-ed-titulo">${titulo}</div>
+        <div class="rs-drawer-ed-data">${data}${num ? ` · Ed. ${num}` : ''}</div>
+      </div>
+      ${isAtual
+        ? '<span class="rs-drawer-ed-badge-atual">👁 lendo agora</span>'
+        : '<span class="rs-drawer-chevron">›</span>'}
+    </button>`;
+}
+
+// ─── Card de edição — lead ───────────────────────────────────────────────────
+function _cardEdicaoLead(ed, isAtual, envio) {
+  const num    = ed.numero || ed.edicao || '';
+  const titulo = _esc(ed.titulo || `Edição ${num}`);
+  const data   = _fmtData(ed.data_publicacao);
+
+  // Sem envio = edição nunca recebida
+  if (!envio) {
+    return `
+      <div class="rs-drawer-ed-card rs-drawer-ed-naorecebida">
+        <div class="rs-drawer-ed-info">
+          <div class="rs-drawer-ed-titulo">${titulo}</div>
+          <div class="rs-drawer-ed-data">${data}${num ? ` · Ed. ${num}` : ''}</div>
+          <div class="rs-drawer-ed-cta-text">Assine para receber esta e todas as próximas edições</div>
+        </div>
+        <span class="rs-drawer-ed-lock">🔒</span>
+      </div>`;
+  }
+
+  const expira  = envio.expira_em ? new Date(envio.expira_em) : null;
+  const agora   = new Date();
+  const expirou = expira && agora > expira;
+  const expira2h = expira && !expirou && (expira - agora) < 2 * 60 * 60 * 1000;
+
+  // Acesso expirado
+  if (expirou) {
+    const horas = ed.acesso_pro_horas || 24;
+    return `
+      <div class="rs-drawer-ed-card rs-drawer-ed-expirada"
+           onclick="_mostrarExpirado('${_esc(ed.id)}','${titulo}',${horas})">
+        <div class="rs-drawer-ed-info">
+          <div class="rs-drawer-ed-titulo">${titulo}</div>
+          <div class="rs-drawer-ed-data">${data}${num ? ` · Ed. ${num}` : ''}</div>
+          <div class="rs-drawer-ed-status rs-drawer-ed-status-exp">⏰ Acesso expirado</div>
+        </div>
+        <span class="rs-drawer-chevron" style="opacity:.4">›</span>
+      </div>`;
+  }
+
+  // Acesso ativo (normal ou expirando)
+  const classeExpirando = expira2h ? 'rs-drawer-ed-expirando' : '';
+  const badgeExpirando  = expira2h
+    ? '<div class="rs-drawer-ed-status rs-drawer-ed-status-warn">⚠️ Expira em breve</div>'
+    : '';
+  const contadorHTML = expira
+    ? `<div class="rs-drawer-ed-contador" id="rs-contador-${_esc(ed.id)}">—</div>`
+    : '';
+
+  return `
+    <button class="rs-drawer-ed-card rs-drawer-ed-ativa ${classeExpirando} ${isAtual ? 'rs-drawer-ed-atual' : ''}"
+            onclick="navegarParaEdicao('${_esc(ed.id)}')"
+            type="button">
+      <div class="rs-drawer-ed-info">
+        <div class="rs-drawer-ed-titulo">${titulo}</div>
+        <div class="rs-drawer-ed-data">${data}${num ? ` · Ed. ${num}` : ''}</div>
+        ${badgeExpirando}
+        ${contadorHTML}
+      </div>
+      ${isAtual
+        ? '<span class="rs-drawer-ed-badge-atual">👁 lendo agora</span>'
+        : '<span class="rs-drawer-chevron">›</span>'}
+    </button>`;
+}
+
+// ─── Modal de edição expirada ────────────────────────────────────────────────
+function _mostrarExpirado(edicaoId, titulo, horas) {
+  const modal = document.getElementById('rs-drawer-modal-expirado');
+  if (!modal) return;
+  document.getElementById('rs-modal-exp-titulo').textContent = titulo;
+  document.getElementById('rs-modal-exp-horas').textContent  = horas;
+  modal.classList.add('rs-drawer-show');
+}
+
+// ─── Voltar para nível 1 ─────────────────────────────────────────────────────
+function voltarParaTipos() {
+  _limparContadores();
+  _renderNivel1();
+}
+
+// ─── Utilitários de drawer ───────────────────────────────────────────────────
+function _setDrawerHeader(titulo, mostrarVoltar) {
+  const el = document.getElementById('rs-drawer-titulo');
+  const btnVoltar = document.getElementById('rs-drawer-voltar');
+  if (el) el.textContent = titulo;
+  if (btnVoltar) btnVoltar.style.display = mostrarVoltar ? 'flex' : 'none';
+}
+
+function _limparContadores() {
+  _drawer.contadores.forEach(id => clearInterval(id));
+  _drawer.contadores = [];
+}
+
+// ─── Contador regressivo ─────────────────────────────────────────────────────
+function iniciarContador(expiraEm, elementId) {
+  const expira = new Date(expiraEm);
+
+  function atualizar() {
+    const el   = document.getElementById(elementId);
+    if (!el) { clearInterval(intervId); return; }
+
+    const diff = expira - Date.now();
+    if (diff <= 0) {
+      el.textContent = 'Acesso expirado';
+      el.style.color = 'var(--vermelho)';
+      clearInterval(intervId);
+      // Atualizar o card para estado expirado
+      const card = el.closest('.rs-drawer-ed-ativa');
+      if (card) {
+        card.classList.remove('rs-drawer-ed-ativa', 'rs-drawer-ed-expirando');
+        card.classList.add('rs-drawer-ed-expirada');
+      }
+      return;
+    }
+
+    const h = Math.floor(diff / 3600000);
+    const m = Math.floor((diff % 3600000) / 60000);
+    const s = Math.floor((diff % 60000) / 1000);
+
+    if (h > 0) {
+      el.textContent = `Acesso em ${h}h ${String(m).padStart(2,'0')}m`;
+      el.style.color = 'var(--verde)';
+    } else if (m >= 10) {
+      el.textContent = `Expira em ${m}:${String(s).padStart(2,'0')}`;
+      el.style.color = 'var(--amarelo)';
+    } else {
+      el.textContent = `⚠ Expira em ${m}:${String(s).padStart(2,'0')}`;
+      el.style.color = 'var(--vermelho)';
+      el.style.animation = 'rs-pulso .8s ease infinite';
+    }
+  }
+
+  atualizar();
+  const intervId = setInterval(atualizar, 1000);
+  _drawer.contadores.push(intervId);
+}
+
+// ─── Navegar para edição via drawer ─────────────────────────────────────────
+async function navegarParaEdicao(edicaoId) {
+  if (edicaoId === _drawer.edicaoAtual) {
+    fecharDrawer();
+    return;
+  }
+
+  fecharDrawer();
+
+  // Mostrar loading
+  const appEl = document.getElementById('rs-app');
+  if (appEl) {
+    appEl.style.opacity = '.3';
+    appEl.style.transition = 'opacity .2s';
+  }
+  mostrarLoading(true);
+
+  try {
+    // Buscar edição
+    const snap = await db.collection('newsletters').doc(edicaoId).get();
+    if (!snap.exists) { mostrarErro('Edição não encontrada.'); return; }
+    const newsletter = { id: snap.id, ...snap.data() };
+
+    const ctx = _getCtx();
+    if (!ctx) { mostrarErro('Sessão expirada. Acesse pelo link do e-mail.'); return; }
+
+    // Verificar acesso para lead
+    if (ctx.segmento === 'lead') {
+      const { data: envio } = await window.supabase
+        .from('leads_envios')
+        .select('expira_em')
+        .eq('lead_id', ctx.uid)
+        .eq('newsletter_id', edicaoId)
+        .maybeSingle();
+
+      if (!envio) {
+        mostrarLoading(false);
+        if (appEl) appEl.style.opacity = '1';
+        _mostrarCTAConversao('nao_recebida');
+        return;
+      }
+      if (envio.expira_em && new Date() > new Date(envio.expira_em)) {
+        mostrarLoading(false);
+        if (appEl) appEl.style.opacity = '1';
+        _mostrarCTAConversao('expirada', newsletter.acesso_pro_horas || 24);
+        return;
+      }
+    }
+
+    // Reconstruir dados do destinatário a partir do contexto
+    const destinatario = {
+      _uid:            ctx.uid,
+      email:           ctx.email        || '',
+      nome:            ctx.nome         || '',
+      plano_slug:      ctx.plano_slug   || '',
+      features:        ctx.features     || {},
+      cod_uf:          ctx.uf           || '',
+      cod_municipio:   ctx.municipio_cod || '',
+      nome_municipio:  ctx.municipio_nome || '',
+      perfil:          ctx.perfil       || '',
+    };
+    const segmento = ctx.segmento === 'assinante' ? 'assinantes' : 'leads';
+
+    // Acesso sem envio real (drawer) — cria objeto envio mínimo
+    const envioDrawer = ctx.segmento === 'assinante'
+      ? { token_acesso: null, expira_em: null }
+      : null;
+
+    const acesso = detectarAcesso(destinatario, newsletter, segmento, envioDrawer);
+    const dados = {
+      nome:            destinatario.nome,
+      email:           destinatario.email,
+      edicao:          newsletter.numero || newsletter.edicao || '',
+      titulo:          newsletter.titulo || '',
+      data_publicacao: newsletter.data_publicacao || null,
+      cod_uf:          destinatario.cod_uf,
+      nome_municipio:  destinatario.nome_municipio,
+      perfil:          destinatario.perfil,
+      plano:           destinatario.plano_slug,
+    };
+
+    // Atualizar edição atual no estado do drawer
+    _drawer.edicaoAtual = edicaoId;
+    _drawer.tipoAtual   = newsletter.Tipo || newsletter.tipo || null;
+
+    // Limpar e re-renderizar
+    renderHeader(newsletter, destinatario);
+    const modoPadrao = sessionStorage.getItem('rs_modo_leitura') || acesso.modoPadrao;
+    trocarModo(modoPadrao);
+    renderModoRapido(newsletter, acesso);
+    await renderModoCompleto(newsletter, dados, segmento, acesso);
+    renderMunicipio(destinatario, acesso);
+    renderMidia(newsletter, acesso);
+    renderFAQ(newsletter, acesso);
+    await renderReactions(edicaoId, ctx.uid);
+    renderCTA(acesso, newsletter);
+    renderWatermark(destinatario, newsletter);
+
+    // Notificação de edição mais recente (apenas assinante)
+    if (ctx.segmento === 'assinante') {
+      verificarEdicaoMaisRecente(newsletter);
+    }
+
+    mostrarLoading(false);
+    if (appEl) {
+      appEl.style.display = 'block';
+      appEl.style.opacity = '1';
+    }
+
+    // Scroll ao topo
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+
+  } catch (err) {
+    console.error('[Drawer] Erro ao navegar:', err);
+    mostrarErro('Erro ao carregar a edição.', err.message);
+  }
+}
+
+// ─── CTA de conversão inline (para lead sem acesso via drawer) ───────────────
+function _mostrarCTAConversao(motivo, horas) {
+  const ctaWrap = document.getElementById('rs-cta-wrap');
+  if (!ctaWrap) return;
+
+  const msgs = {
+    nao_recebida: {
+      titulo: '📬 Conteúdo exclusivo para assinantes',
+      texto:  'Assine para receber esta e todas as próximas edições com acesso permanente.',
+      cta:    'Assinar agora →',
+    },
+    expirando: {
+      titulo: '⏳ Seu acesso está expirando',
+      texto:  'Não perca o próximo envio — assine agora e tenha acesso permanente.',
+      cta:    'Assinar e não perder →',
+    },
+    expirada: {
+      titulo: `⌛ Conteúdo disponível por ${horas}h após o envio`,
+      texto:  'Este conteúdo ficou disponível por tempo limitado. Assine para ter acesso permanente a todas as edições.',
+      cta:    'Assinar para acesso permanente →',
+    },
+  };
+
+  const m = msgs[motivo] || msgs.nao_recebida;
+  ctaWrap.innerHTML = `
+    <div class="rs-cta rs-cta-lead" style="margin-top:16px">
+      <h3>${m.titulo}</h3>
+      <p>${m.texto}</p>
+      <a href="/assinatura.html" class="rs-cta-btn">${m.cta}</a>
+    </div>`;
+  ctaWrap.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+// ─── Notificação de edição mais recente ──────────────────────────────────────
+async function verificarEdicaoMaisRecente(newsletter) {
+  if (!newsletter.Tipo && !newsletter.tipo) return;
+  const tipoId = newsletter.Tipo || newsletter.tipo;
+
+  try {
+    const snap = await db.collection('newsletters')
+      .where('Tipo', '==', tipoId)
+      .orderBy('data_publicacao', 'desc')
+      .limit(1)
+      .get();
+
+    if (snap.empty) return;
+    const maisRecente = snap.docs[0];
+    if (maisRecente.id === newsletter.id) return; // já é a mais recente
+
+    // Exibir notificação
+    const banner = document.getElementById('rs-banner-recente');
+    const link   = document.getElementById('rs-banner-recente-link');
+    if (!banner || !link) return;
+
+    banner.style.display = 'flex';
+    link.onclick = (e) => {
+      e.preventDefault();
+      banner.style.display = 'none';
+      navegarParaEdicao(maisRecente.id);
+    };
+  } catch (e) { /* não fatal */ }
+}
+
+// ─── Expor globalmente ───────────────────────────────────────────────────────
+window.abrirDrawer      = abrirDrawer;
+window.fecharDrawer     = fecharDrawer;
+window.abrirTipo        = abrirTipo;
+window.voltarParaTipos  = voltarParaTipos;
+window.navegarParaEdicao = navegarParaEdicao;
+window._mostrarExpirado = _mostrarExpirado;
+
+// ══════════════════════════════════════════════════════════════════════════
+// FEEDBACK (integrado ao bloco de reações)
+// ══════════════════════════════════════════════════════════════════════════
+
+async function renderFeedback(nid) {
+  const wrap = document.getElementById('rs-feedback-wrap');
+  if (!wrap) return;
+
+  // Verificar se já enviou feedback nesta edição
+  if (localStorage.getItem(`rs_fb_${nid}`)) {
+    wrap.innerHTML = `
+      <div class="rs-feedback-enviado">
+        ✅ Obrigado pelo seu feedback!
+      </div>`;
+    return;
+  }
+
+  wrap.innerHTML = `
+    <div class="rs-feedback-area">
+      <label class="rs-feedback-label" for="rs-feedback-txt">
+        Quer nos contar mais? <span style="font-weight:400;opacity:.7">(opcional)</span>
+      </label>
+      <textarea id="rs-feedback-txt" class="rs-feedback-textarea"
+                maxlength="500"
+                placeholder="O que achou desta edição? Sugestões, elogios ou críticas são bem-vindos…"
+                rows="3"></textarea>
+      <div class="rs-feedback-footer">
+        <span class="rs-feedback-contador" id="rs-feedback-chars">0/500</span>
+        <button id="rs-feedback-btn" class="rs-feedback-btn" disabled
+                onclick="enviarFeedback('${_esc(nid)}')">
+          Enviar
+        </button>
+      </div>
+    </div>`;
+
+  // Contador de caracteres + habilitar botão
+  document.getElementById('rs-feedback-txt')?.addEventListener('input', function () {
+    const len = this.value.length;
+    const counter = document.getElementById('rs-feedback-chars');
+    const btn     = document.getElementById('rs-feedback-btn');
+    if (counter) counter.textContent = `${len}/500`;
+    if (btn)     btn.disabled = len === 0;
+  });
+}
+
+async function enviarFeedback(nid) {
+  const textarea = document.getElementById('rs-feedback-txt');
+  const btn      = document.getElementById('rs-feedback-btn');
+  const texto    = textarea?.value?.trim();
+  if (!texto) return;
+
+  if (btn) { btn.disabled = true; btn.textContent = 'Enviando…'; }
+
+  const ctx = _getCtx();
+
+  try {
+    await db.collection('newsletters').doc(nid).update({
+      feedbacks: firebase.firestore.FieldValue.arrayUnion({
+        texto,
+        segmento: ctx?.segmento || 'desconhecido',
+        plano:    ctx?.plano_slug || null,
+        ts:       new Date().toISOString(),
+      }),
+    });
+
+    // Marcar como enviado
+    localStorage.setItem(`rs_fb_${nid}`, '1');
+
+    // Atualizar UI
+    const wrap = document.getElementById('rs-feedback-wrap');
+    if (wrap) wrap.innerHTML = `
+      <div class="rs-feedback-enviado">✅ Obrigado pelo seu feedback!</div>`;
+
+  } catch (e) {
+    if (btn) { btn.disabled = false; btn.textContent = 'Enviar'; }
+    console.warn('[Feedback] Erro ao enviar:', e);
+  }
+}
+
+window.enviarFeedback = enviarFeedback;
+
 // ─── Inicia ───────────────────────────────────────────────────────────────────
 VerNewsletterComToken();
 
