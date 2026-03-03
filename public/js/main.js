@@ -962,7 +962,7 @@ async function abrirModalNewsletter(docId = null, isEdit = false) {
     if (statusDiv) {
       const enviosSnap = await db.collection("newsletters")
         .doc(docId)
-        .collection("envios")
+        .where('enviada', '==', true)
         .orderBy("data_envio", "desc")
         .limit(1)
         .get();
