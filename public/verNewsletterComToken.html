@@ -962,8 +962,469 @@
     @media (max-width: 360px) {
       .rs-theme-bar-label { display: none; }
     }
+    /* ══════════════════════════════════════════════════════════════
+   DRAWER DE NAVEGAÇÃO DE EDIÇÕES
+   ══════════════════════════════════════════════════════════════ */
+
+    /* Botão de abertura do drawer — fixo no header */
+    #rs-drawer-btn {
+      position: fixed;
+      top: 14px;
+      right: 14px;
+      z-index: 200;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 14px;
+      background: var(--azul);
+      color: #fff;
+      border: none;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 700;
+      font-family: 'Syne', system-ui, sans-serif;
+      cursor: pointer;
+      box-shadow: 0 2px 10px rgba(0,0,0,.25);
+      transition: background .15s, transform .15s;
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
+      letter-spacing: .3px;
+    }
+    #rs-drawer-btn:hover { background: var(--azul-mid); transform: translateY(-1px); }
+    [data-theme="exito"]  #rs-drawer-btn { background: #22c55e; color: #021a0f; }
+    [data-theme="aurora"] #rs-drawer-btn { background: #a78bfa; color: #0d0d1a; }
+
+    /* Overlay */
+    #rs-drawer-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,.5);
+      z-index: 600;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity .25s;
+      backdrop-filter: blur(2px);
+    }
+    #rs-drawer-overlay.rs-drawer-show {
+      opacity: 1;
+      pointer-events: all;
+    }
+
+    /* Painel lateral */
+    #rs-drawer-panel {
+      position: fixed;
+      top: 0;
+      right: 0;
+      bottom: 0;
+      width: min(360px, 92vw);
+      background: var(--rs-card);
+      z-index: 700;
+      display: flex;
+      flex-direction: column;
+      transform: translateX(110%);
+      transition: transform .28s cubic-bezier(.4,0,.2,1);
+      box-shadow: -4px 0 32px rgba(0,0,0,.3);
+      overflow: hidden;
+    }
+    #rs-drawer-panel.rs-drawer-show { transform: translateX(0); }
+
+    /* Header do drawer */
+    #rs-drawer-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 16px 16px 14px;
+      border-bottom: 1px solid var(--rs-borda);
+      flex-shrink: 0;
+      background: var(--rs-card);
+    }
+    #rs-drawer-voltar {
+      display: none;
+      align-items: center;
+      gap: 4px;
+      background: none;
+      border: none;
+      color: var(--azul);
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      padding: 4px 8px 4px 0;
+      flex-shrink: 0;
+      touch-action: manipulation;
+    }
+    [data-theme="exito"]  #rs-drawer-voltar { color: #22c55e; }
+    [data-theme="aurora"] #rs-drawer-voltar { color: #a78bfa; }
+
+    #rs-drawer-titulo {
+      flex: 1;
+      font-family: 'Syne', system-ui, sans-serif;
+      font-size: 15px;
+      font-weight: 800;
+      color: var(--rs-text);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    #rs-drawer-fechar {
+      background: none;
+      border: none;
+      color: var(--rs-muted);
+      font-size: 22px;
+      cursor: pointer;
+      padding: 4px;
+      line-height: 1;
+      touch-action: manipulation;
+      flex-shrink: 0;
+    }
+
+    /* Body do drawer */
+    #rs-drawer-body {
+      flex: 1;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+      overscroll-behavior: contain;
+    }
+
+    /* Cards de TIPO (nível 1) */
+    .rs-drawer-tipos-lista {
+      padding: 10px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .rs-drawer-tipo-card {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      width: 100%;
+      padding: 13px 14px;
+      background: var(--rs-card2);
+      border: 1px solid var(--rs-borda);
+      border-radius: 12px;
+      cursor: pointer;
+      text-align: left;
+      transition: background .15s, transform .15s;
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
+      color: var(--rs-text);
+    }
+    .rs-drawer-tipo-card:hover {
+      background: var(--rs-card);
+      transform: translateX(2px);
+    }
+    .rs-drawer-tipo-card.rs-drawer-tipo-atual {
+      border-color: var(--azul);
+      background: var(--azul-light);
+    }
+    [data-theme="exito"]  .rs-drawer-tipo-card.rs-drawer-tipo-atual { border-color: #22c55e; background: rgba(34,197,94,.08); }
+    [data-theme="aurora"] .rs-drawer-tipo-card.rs-drawer-tipo-atual { border-color: #a78bfa; background: rgba(167,139,250,.08); }
+
+    .rs-drawer-tipo-icone { font-size: 22px; flex-shrink: 0; }
+    .rs-drawer-tipo-nome {
+      flex: 1;
+      font-family: 'Syne', system-ui, sans-serif;
+      font-size: 14px;
+      font-weight: 700;
+    }
+    .rs-drawer-tipo-badge {
+      font-size: 10px;
+      font-weight: 700;
+      background: var(--azul);
+      color: #fff;
+      padding: 2px 8px;
+      border-radius: 20px;
+      letter-spacing: .3px;
+    }
+    [data-theme="exito"]  .rs-drawer-tipo-badge { background: #22c55e; color: #021a0f; }
+    [data-theme="aurora"] .rs-drawer-tipo-badge { background: #a78bfa; color: #0d0d1a; }
+    .rs-drawer-lock  { font-size: 14px; opacity: .5; }
+    .rs-drawer-chevron { color: var(--rs-muted); font-size: 20px; font-weight: 300; }
+
+    /* Up-sell banner (nível 2 — tipo sem acesso) */
+    .rs-drawer-upsell {
+      margin: 12px 12px 0;
+      padding: 12px 14px;
+      background: rgba(220, 38, 38, .07);
+      border: 1px solid rgba(220, 38, 38, .2);
+      border-radius: 10px;
+      font-size: 13px;
+      line-height: 1.6;
+      color: var(--rs-text);
+    }
+
+    /* Lista de edições (nível 2) */
+    .rs-drawer-edicoes-lista {
+      padding: 10px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .rs-drawer-ed-card {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      width: 100%;
+      padding: 12px 14px;
+      background: var(--rs-card2);
+      border: 1px solid var(--rs-borda);
+      border-radius: 10px;
+      text-align: left;
+      cursor: pointer;
+      transition: background .15s;
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
+      color: var(--rs-text);
+    }
+    .rs-drawer-ed-card:hover { background: var(--rs-card); }
+
+    /* Edição atual */
+    .rs-drawer-ed-atual {
+      border-color: var(--azul) !important;
+      border-width: 2px !important;
+      background: var(--azul-light) !important;
+    }
+    [data-theme="exito"]  .rs-drawer-ed-atual { border-color: #22c55e !important; background: rgba(34,197,94,.08) !important; }
+    [data-theme="aurora"] .rs-drawer-ed-atual { border-color: #a78bfa !important; background: rgba(167,139,250,.08) !important; }
+
+    /* Edição ativa (lead com acesso) */
+    .rs-drawer-ed-ativa { cursor: pointer; }
+
+    /* Edição expirando */
+    .rs-drawer-ed-expirando { border-color: var(--amarelo) !important; }
+
+    /* Edição expirada */
+    .rs-drawer-ed-expirada { opacity: .65; cursor: pointer; }
+
+    /* Edição bloqueada / não recebida */
+    .rs-drawer-ed-bloqueado,
+    .rs-drawer-ed-naorecebida { opacity: .6; cursor: default; }
+
+    .rs-drawer-ed-info { flex: 1; min-width: 0; }
+    .rs-drawer-ed-titulo {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--rs-text);
+      line-height: 1.35;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .rs-drawer-ed-data {
+      font-size: 11px;
+      color: var(--rs-muted);
+      margin-top: 2px;
+    }
+    .rs-drawer-ed-cta-text {
+      font-size: 11px;
+      color: var(--azul);
+      margin-top: 4px;
+      font-weight: 600;
+    }
+    [data-theme="exito"]  .rs-drawer-ed-cta-text { color: #22c55e; }
+    [data-theme="aurora"] .rs-drawer-ed-cta-text { color: #a78bfa; }
+
+    .rs-drawer-ed-status {
+      font-size: 10px;
+      font-weight: 700;
+      margin-top: 4px;
+      border-radius: 4px;
+      display: inline-block;
+      padding: 1px 6px;
+    }
+    .rs-drawer-ed-status-exp  { background: rgba(220,38,38,.1);  color: var(--vermelho); }
+    .rs-drawer-ed-status-warn { background: rgba(217,119,6,.1);  color: var(--amarelo); }
+
+    .rs-drawer-ed-badge-atual {
+      font-size: 10px;
+      font-weight: 700;
+      background: var(--azul);
+      color: #fff;
+      padding: 3px 8px;
+      border-radius: 20px;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+    [data-theme="exito"]  .rs-drawer-ed-badge-atual { background: #22c55e; color: #021a0f; }
+    [data-theme="aurora"] .rs-drawer-ed-badge-atual { background: #a78bfa; color: #0d0d1a; }
+
+    .rs-drawer-ed-lock { font-size: 14px; opacity: .5; flex-shrink: 0; }
+
+    .rs-drawer-ed-contador {
+      font-size: 11px;
+      font-weight: 700;
+      margin-top: 4px;
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* Rodapé do nível 2 */
+    .rs-drawer-rodape {
+      padding: 14px 12px 20px;
+      text-align: center;
+      border-top: 1px solid var(--rs-borda);
+      margin-top: 4px;
+    }
+
+    /* Modal de edição expirada */
+    #rs-drawer-modal-expirado {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,.6);
+      z-index: 900;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    #rs-drawer-modal-expirado.rs-drawer-show { display: flex; }
+    .rs-modal-exp-box {
+      background: var(--rs-card);
+      border-radius: var(--radius);
+      padding: 24px 20px;
+      max-width: 360px;
+      width: 100%;
+      border: 1px solid var(--rs-borda);
+      text-align: center;
+    }
+    .rs-modal-exp-box h3 {
+      font-family: 'Syne', system-ui, sans-serif;
+      font-size: 16px;
+      color: var(--rs-text);
+      margin-bottom: 10px;
+      line-height: 1.4;
+    }
+    .rs-modal-exp-box p {
+      font-size: 13px;
+      color: var(--rs-muted);
+      line-height: 1.65;
+      margin-bottom: 18px;
+    }
+    .rs-modal-exp-btn-primary {
+      display: inline-block;
+      padding: 11px 24px;
+      background: var(--azul);
+      color: #fff;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 700;
+      text-decoration: none;
+      margin-right: 8px;
+    }
+    .rs-modal-exp-btn-fechar {
+      background: none;
+      border: 1px solid var(--rs-borda);
+      color: var(--rs-muted);
+      padding: 10px 16px;
+      border-radius: 8px;
+      font-size: 13px;
+      cursor: pointer;
+    }
+
+    /* Banner de edição mais recente */
+    #rs-banner-recente {
+      display: none;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 10px 14px;
+      background: linear-gradient(90deg, var(--azul), var(--azul-mid));
+      color: #fff;
+      font-size: 13px;
+      position: sticky;
+      top: 66px;
+      z-index: 90;
+    }
+    [data-theme="exito"]  #rs-banner-recente { background: linear-gradient(90deg,#052e18,#063d1f); }
+    [data-theme="aurora"] #rs-banner-recente { background: linear-gradient(90deg,#13132b,#1a1a35); }
+    #rs-banner-recente-link {
+      color: #fff;
+      font-weight: 700;
+      text-decoration: underline;
+      cursor: pointer;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+    #rs-banner-recente-fechar {
+      background: none;
+      border: none;
+      color: rgba(255,255,255,.7);
+      font-size: 18px;
+      cursor: pointer;
+      line-height: 1;
+      padding: 0 2px;
+      flex-shrink: 0;
+    }
+
+    /* ── Feedback (abaixo das reações) ──────────────────────────────────── */
+    #rs-feedback-wrap { margin-top: 14px; }
+
+    .rs-feedback-area {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .rs-feedback-label {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--rs-text);
+    }
+    .rs-feedback-textarea {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid var(--rs-borda);
+      border-radius: 10px;
+      background: var(--rs-card2);
+      color: var(--rs-text);
+      font-size: 14px;
+      line-height: 1.5;
+      resize: vertical;
+      font-family: system-ui, sans-serif;
+      transition: border-color .15s;
+      outline: none;
+    }
+    .rs-feedback-textarea:focus { border-color: var(--azul); }
+    [data-theme="exito"]  .rs-feedback-textarea:focus { border-color: #22c55e; }
+    [data-theme="aurora"] .rs-feedback-textarea:focus { border-color: #a78bfa; }
+
+    .rs-feedback-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .rs-feedback-contador {
+      font-size: 11px;
+      color: var(--rs-muted);
+    }
+    .rs-feedback-btn {
+      padding: 8px 20px;
+      background: var(--azul);
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: opacity .15s;
+    }
+    .rs-feedback-btn:disabled { opacity: .45; cursor: default; }
+    .rs-feedback-btn:not(:disabled):hover { opacity: .85; }
+    [data-theme="exito"]  .rs-feedback-btn { background: #22c55e; color: #021a0f; }
+    [data-theme="aurora"] .rs-feedback-btn { background: #a78bfa; color: #0d0d1a; }
+
+    .rs-feedback-enviado {
+      text-align: center;
+      font-size: 13px;
+      color: var(--verde);
+      font-weight: 600;
+      padding: 8px 0;
+    }
+
+    /* Animação pulso (contador expirando) */
+    @keyframes rs-pulso {
+      0%, 100% { opacity: 1; }
+      50%       { opacity: .5; }
+    }
+
   </style>
-</head>
 
 <body>
 
@@ -1011,6 +1472,15 @@
         <div id="rs-btn-area-wrap"></div>
       </div>
     </header>
+
+    <!-- Banner de edição mais recente (sticky, logo abaixo do header) -->
+    <div id="rs-banner-recente" role="alert">
+      <span>📬 Existe uma edição mais recente disponível</span>
+      <a id="rs-banner-recente-link" href="#" role="button">Ver agora →</a>
+      <button id="rs-banner-recente-fechar" type="button"
+              onclick="document.getElementById('rs-banner-recente').style.display='none'"
+              aria-label="Fechar">×</button>
+    </div>
 
     <!-- MUNICÍPIO -->
     <section class="rs-section">
@@ -1102,6 +1572,8 @@
       <div class="rs-section-body">
         <div class="rs-reactions" id="reactions-wrap"></div>
         <div class="rs-reaction-feedback" id="reaction-feedback"></div>
+        <!-- Feedback textual (renderizado pelo JS após as reações) -->
+        <div id="rs-feedback-wrap"></div>
       </div>
     </section>
 
@@ -1120,6 +1592,55 @@
       }
     </style>
   </div><!-- /rs-app -->
+
+  <!-- ── Botão de abertura do drawer (fixo, sempre visível) ───────────────── -->
+  <button id="rs-drawer-btn" type="button" aria-label="Ver edições">
+    📚 Edições
+  </button>
+
+  <!-- ── Overlay do drawer ────────────────────────────────────────────────── -->
+  <div id="rs-drawer-overlay" role="presentation"></div>
+
+  <!-- ── Painel do drawer ─────────────────────────────────────────────────── -->
+  <aside id="rs-drawer-panel" role="dialog" aria-modal="true"
+         aria-label="Navegação de edições">
+
+    <!-- Header do drawer -->
+    <div id="rs-drawer-header">
+      <button id="rs-drawer-voltar" type="button" aria-label="Voltar para tipos">
+        ‹ Tipos
+      </button>
+      <span id="rs-drawer-titulo">Edições por tipo</span>
+      <button id="rs-drawer-fechar" type="button" aria-label="Fechar">×</button>
+    </div>
+
+    <!-- Body do drawer (preenchido pelo JS) -->
+    <div id="rs-drawer-body"></div>
+
+  </aside>
+
+  <!-- ── Modal de edição expirada ─────────────────────────────────────────── -->
+  <div id="rs-drawer-modal-expirado" role="dialog" aria-modal="true"
+       aria-labelledby="rs-modal-exp-h">
+    <div class="rs-modal-exp-box">
+      <div style="font-size:36px;margin-bottom:12px">⌛</div>
+      <h3 id="rs-modal-exp-h" id="rs-modal-exp-titulo">Edição</h3>
+      <p>
+        Este conteúdo ficou disponível por
+        <strong id="rs-modal-exp-horas">24</strong> horas após o envio.<br>
+        Assine para ter acesso permanente a todas as edições.
+      </p>
+      <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap">
+        <a href="/assinatura.html" class="rs-modal-exp-btn-primary">
+          Assinar para acesso permanente →
+        </a>
+        <button class="rs-modal-exp-btn-fechar" type="button"
+                onclick="document.getElementById('rs-drawer-modal-expirado').classList.remove('rs-drawer-show')">
+          Fechar
+        </button>
+      </div>
+    </div>
+  </div>
 
   <!-- ── Barra de temas flutuante (sempre visível, inclusive no iPhone) ─────── -->
   <div class="rs-theme-bar" role="toolbar" aria-label="Seletor de tema">
