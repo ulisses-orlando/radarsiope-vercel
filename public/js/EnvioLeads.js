@@ -777,8 +777,8 @@ async function listarUsuariosComAssinaturas(newsletterId) {
         return;
     }
 
-    // 🔹 ID do tipo da newsletter (campo "Tipo" no Firestore — armazena o ID do tipo)
-    const tipoId = newsletterSelecionada.Tipo || newsletterSelecionada.tipo || null;
+    // 🔹 ID do tipo da newsletter 
+    const tipoId = newsletterSelecionada.tipo || null;
     if (!tipoId) {
         corpo.innerHTML = "<tr><td colspan='5'>⚠️ Newsletter sem tipo definido.</td></tr>";
         return;

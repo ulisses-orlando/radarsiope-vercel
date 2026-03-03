@@ -161,12 +161,25 @@ async function carregarNewsletters() {
   const classFiltro = document.getElementById('filtro-classificacao')?.value || '';
   const busca = (document.getElementById('filtro-busca')?.value || '').toLowerCase();
 
+  // Carrega mapa ID → nome dos tipos para resolver na coluna
+  const tiposSnap = await db.collection('tipo_newsletters').get();
+  const tiposMap = {};
+  tiposSnap.forEach(doc => { tiposMap[doc.id] = doc.data().nome || doc.id; });
+
   const snap = await db.collection('newsletters').orderBy('data_publicacao', 'desc').get();
 
   snap.forEach(doc => {
     const d = doc.data();
+
+    // Campo tipo contém o ID do tipo (novo padrão)
+    const tipoId   = d.tipo || '';
+    const tipoNome = tiposMap[tipoId] || tipoId || '-';
+
+    // Filtro pelo ID do tipo
+    const tipoMatch = !tipoFiltro || tipoId === tipoFiltro;
+
     if (
-      (tipoFiltro && d.tipo !== tipoFiltro) ||
+      !tipoMatch ||
       (classFiltro && d.classificacao !== classFiltro) ||
       (busca && !((d.titulo || '').toLowerCase().includes(busca) || (d.edicao || '').toLowerCase().includes(busca)))
     ) return;
@@ -184,7 +197,7 @@ async function carregarNewsletters() {
       <td>${dt}</td>
       <td>${d.edicao || ''}</td>
       <td>${d.titulo || ''}</td>
-      <td>${d.tipo || ''}</td>
+      <td>${tipoNome}</td>
       <td>${d.classificacao || 'Básica'}</td>
       <td style="text-align:center;">${enviadaIcon}</td>
       <td>
@@ -211,7 +224,6 @@ async function duplicarNewsletter(docId) {
 async function preencherFiltroTipoNewsletter(selectElement) {
   if (!selectElement || !(selectElement instanceof HTMLElement)) return;
 
-  // Limpa opções anteriores (exceto a primeira)
   selectElement.innerHTML = '<option value="">Todos os tipos</option>';
 
   try {
@@ -225,7 +237,7 @@ async function preencherFiltroTipoNewsletter(selectElement) {
       const nome = doc.data().nome;
       if (nome) {
         const opt = document.createElement("option");
-        opt.value = nome;
+        opt.value = doc.id;   // ID — alinhado com campo Tipo nas newsletters
         opt.textContent = nome;
         selectElement.appendChild(opt);
       }

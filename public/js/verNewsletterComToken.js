@@ -1614,12 +1614,12 @@ function _mostrarCTAConversao(motivo, horas) {
 
 // ─── Notificação de edição mais recente ──────────────────────────────────────
 async function verificarEdicaoMaisRecente(newsletter) {
-  if (!newsletter.Tipo && !newsletter.tipo) return;
-  const tipoId = newsletter.Tipo || newsletter.tipo;
+  if (!newsletter.tipo) return;
+  const tipoId = newsletter.tipo;
 
   try {
     const snap = await db.collection('newsletters')
-      .where('Tipo', '==', tipoId)
+      .where('tipo', '==', tipoId)
       .orderBy('data_publicacao', 'desc')
       .limit(1)
       .get();

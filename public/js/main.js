@@ -548,8 +548,32 @@ async function abrirModalNewsletter(docId = null, isEdit = false) {
   col1.appendChild(proTempSection);
 
   const tiposSnap = await db.collection("tipo_newsletters").get();
-  const tiposArr = tiposSnap.docs.map(doc => doc.data().nome).filter(Boolean);
-  col1.appendChild(generateDomainSelect("tipo", tiposArr, data.tipo));
+  const tiposDocs = tiposSnap.docs
+    .map(doc => ({ id: doc.id, nome: doc.data().nome }))
+    .filter(t => t.nome);
+  // tiposArr: só nomes — reutilizado pelo filtro de templates abaixo (que filtra por nome)
+  const tiposArr = tiposDocs.map(t => t.nome);
+
+  // Select de Tipo — value = ID do tipo (campo "Tipo" no Firestore, padrão das queries)
+  const tipoWrap = document.createElement('div');
+  tipoWrap.className = 'field';
+  const tipoLabel = document.createElement('label');
+  tipoLabel.innerText = 'Tipo';
+  const tipoSelect = document.createElement('select');
+  tipoSelect.dataset.fieldName = 'tipo'; // "Tipo" maiúsculo — alinhado com drawer e EnvioLeads
+  tipoSelect.style.width = '100%';
+  tipoSelect.innerHTML = '<option value="">Selecione...</option>';
+  tiposDocs.forEach(t => {
+    const opt = document.createElement('option');
+    opt.value = t.id;
+    opt.textContent = t.nome;
+    // Compatibilidade retroativa: data.Tipo (ID — novo) ou data.tipo (nome — legado)
+    if (t.id === data.Tipo || t.nome === data.tipo) opt.selected = true;
+    tipoSelect.appendChild(opt);
+  });
+  tipoWrap.appendChild(tipoLabel);
+  tipoWrap.appendChild(tipoSelect);
+  col1.appendChild(tipoWrap);
   col1.appendChild(generateDomainSelect('Classificação', ['Básica', 'Premium'], data.classificacao || 'Básica'));
 
   // Campo "Enviada" (somente leitura)
