@@ -572,7 +572,8 @@ tipoWrap.appendChild(tipoSelect);
 col1.appendChild(tipoWrap);
 
 // Classificação: passa 'classificacao' como fieldName para salvar no campo correto
-col1.appendChild(generateDomainSelect('Classificação', ['Básica', 'Premium'], data.classificacao || 'Básica', 'classificacao'));
+const selectClassificacao = generateDomainSelect('classificacao', ['Básica', 'Premium'], data.classificacao || 'Básica');
+col1.appendChild(selectClassificacao);
 
   // Campo "Enviada" (somente leitura)
   const enviadaDiv = document.createElement("div");

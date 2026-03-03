@@ -77,15 +77,33 @@ function generateBooleanSelect(name, value) {
   });
   wrap.appendChild(select); return wrap;
 }
-function generateDomainSelect(name, optionsArray, value) {
-  const wrap = document.createElement('div'); wrap.className = 'field';
-  const label = document.createElement('label'); label.innerText = name; wrap.appendChild(label);
-  const select = document.createElement('select'); select.dataset.fieldName = fieldName || name;
+function generateDomainSelect(name, optionsArray, value, fieldName = null) {
+  const wrap = document.createElement('div'); 
+  wrap.className = 'field';
+
+  const label = document.createElement('label'); 
+  label.innerHTML = `<strong>${name}:</strong>`; // Melhora a aparência
+  wrap.appendChild(label);
+
+  const select = document.createElement('select'); 
+  // Usa o fieldName (banco de dados) se existir, senão usa o name (label)
+  select.dataset.fieldName = fieldName || name; 
+  select.style.width = "100%"; // Garante que preencha o espaço
+
   optionsArray.forEach(optVal => {
-    const el = document.createElement('option'); el.value = optVal; el.text = optVal;
-    if (String(value) === String(optVal)) el.selected = true; select.appendChild(el);
+    const el = document.createElement('option'); 
+    el.value = optVal; 
+    el.text = optVal;
+    
+    // Comparação segura de strings para marcar o selecionado
+    if (value && String(value) === String(optVal)) {
+        el.selected = true;
+    }
+    select.appendChild(el);
   });
-  wrap.appendChild(select); return wrap;
+
+  wrap.appendChild(select); 
+  return wrap;
 }
 
 function generateDateInput(name, dateVal) {
