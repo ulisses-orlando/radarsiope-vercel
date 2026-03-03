@@ -422,11 +422,13 @@ function toggleFaq(idx) {
 
 // ─── Reactions ────────────────────────────────────────────────────────────────
 
+// Escala de avaliação — 5 níveis de progressão emocional
 const REACTIONS = [
-  { emoji: '🔥', label: 'Imperdível', key: 'fogo' },
-  { emoji: '😮', label: 'Surpreende', key: 'surpresa' },
-  { emoji: '🚀', label: 'Muito útil', key: 'util' },
-  { emoji: '👍', label: 'Ótimo', key: 'otimo' },
+  { emoji: '😞', label: 'Decepcionou', key: 'decepcionou' },
+  { emoji: '😐', label: 'Regular',     key: 'regular'     },
+  { emoji: '🙂', label: 'Bom',         key: 'bom'         },
+  { emoji: '😀', label: 'Muito bom',   key: 'muito_bom'   },
+  { emoji: '🤩', label: 'Excelente',   key: 'excelente'   },
 ];
 
 async function renderReactions(nid, uid) {
@@ -1230,6 +1232,7 @@ async function abrirTipo(tipoId, tipoNome, tipoIcone) {
     try {
       const snap = await db.collection('newsletters')
         .where('Tipo', '==', tipoId)
+        .where('enviada', '==', true)
         .orderBy('data_publicacao', 'desc')
         .limit(8)
         .get();
