@@ -548,33 +548,31 @@ async function abrirModalNewsletter(docId = null, isEdit = false) {
   col1.appendChild(proTempSection);
 
   const tiposSnap = await db.collection("tipo_newsletters").get();
-  const tiposDocs = tiposSnap.docs
-    .map(doc => ({ id: doc.id, nome: doc.data().nome }))
-    .filter(t => t.nome);
-  // tiposArr: só nomes — reutilizado pelo filtro de templates abaixo (que filtra por nome)
-  const tiposArr = tiposDocs.map(t => t.nome);
+const tiposDocs = tiposSnap.docs.map(doc => ({ id: doc.id, nome: doc.data().nome })).filter(t => t.nome);
+const tiposArr  = tiposDocs.map(t => t.nome); // só nomes — usado no filtro de templates abaixo
 
-  // Select de Tipo — value = ID do tipo (campo "Tipo" no Firestore, padrão das queries)
-  const tipoWrap = document.createElement('div');
-  tipoWrap.className = 'field';
-  const tipoLabel = document.createElement('label');
-  tipoLabel.innerText = 'Tipo';
-  const tipoSelect = document.createElement('select');
-  tipoSelect.dataset.fieldName = 'tipo'; // "Tipo" maiúsculo — alinhado com drawer e EnvioLeads
-  tipoSelect.style.width = '100%';
-  tipoSelect.innerHTML = '<option value="">Selecione...</option>';
-  tiposDocs.forEach(t => {
-    const opt = document.createElement('option');
-    opt.value = t.id;
-    opt.textContent = t.nome;
-    // Compatibilidade retroativa: data.Tipo (ID — novo) ou data.tipo (nome — legado)
-    if (t.id === data.Tipo || t.nome === data.tipo) opt.selected = true;
-    tipoSelect.appendChild(opt);
-  });
-  tipoWrap.appendChild(tipoLabel);
-  tipoWrap.appendChild(tipoSelect);
-  col1.appendChild(tipoWrap);
-  col1.appendChild(generateDomainSelect('Classificação', ['Básica', 'Premium'], data.classificacao || 'Básica'));
+// Select tipo: value = ID, label = nome, fieldName = 'tipo'
+const tipoWrap = document.createElement('div');
+tipoWrap.className = 'field';
+const tipoLabel = document.createElement('label');
+tipoLabel.innerText = 'Tipo';
+const tipoSelect = document.createElement('select');
+tipoSelect.dataset.fieldName = 'tipo';
+tipoSelect.style.width = '100%';
+tipoSelect.innerHTML = '<option value="">Selecione...</option>';
+tiposDocs.forEach(t => {
+  const opt = document.createElement('option');
+  opt.value = t.id;
+  opt.textContent = t.nome;
+  if (t.id === data.tipo) opt.selected = true; // data.tipo = ID gravado
+  tipoSelect.appendChild(opt);
+});
+tipoWrap.appendChild(tipoLabel);
+tipoWrap.appendChild(tipoSelect);
+col1.appendChild(tipoWrap);
+
+// Classificação: passa 'classificacao' como fieldName para salvar no campo correto
+col1.appendChild(generateDomainSelect('Classificação', ['Básica', 'Premium'], data.classificacao || 'Básica', 'classificacao'));
 
   // Campo "Enviada" (somente leitura)
   const enviadaDiv = document.createElement("div");

@@ -80,7 +80,7 @@ function generateBooleanSelect(name, value) {
 function generateDomainSelect(name, optionsArray, value) {
   const wrap = document.createElement('div'); wrap.className = 'field';
   const label = document.createElement('label'); label.innerText = name; wrap.appendChild(label);
-  const select = document.createElement('select'); select.dataset.fieldName = name;
+  const select = document.createElement('select'); select.dataset.fieldName = fieldName || name;
   optionsArray.forEach(optVal => {
     const el = document.createElement('option'); el.value = optVal; el.text = optVal;
     if (String(value) === String(optVal)) el.selected = true; select.appendChild(el);
