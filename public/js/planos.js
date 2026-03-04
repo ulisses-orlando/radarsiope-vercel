@@ -21,6 +21,7 @@ const PLANOS_CANON = {
     features: {
       newsletter_texto:    true,
       newsletter_audio:    false,
+      newsletter_video:    false,
       newsletter_infografico: false,
       alertas_prioritarios: false,
       grupo_whatsapp_vip:  false,
@@ -38,6 +39,7 @@ const PLANOS_CANON = {
     features: {
       newsletter_texto:    true,
       newsletter_audio:    true,
+      newsletter_video:    false,
       newsletter_infografico: false,
       alertas_prioritarios: false,
       grupo_whatsapp_vip:  false,
@@ -55,6 +57,7 @@ const PLANOS_CANON = {
     features: {
       newsletter_texto:    true,
       newsletter_audio:    true,
+      newsletter_video:    true,
       newsletter_infografico: true,
       alertas_prioritarios: true,
       grupo_whatsapp_vip:  false,
@@ -72,6 +75,7 @@ const PLANOS_CANON = {
     features: {
       newsletter_texto:    true,
       newsletter_audio:    true,
+      newsletter_video:    true,
       newsletter_infografico: true,
       alertas_prioritarios: true,
       grupo_whatsapp_vip:  true,
@@ -89,6 +93,7 @@ const PLANOS_CANON = {
     features: {
       newsletter_texto:    true,
       newsletter_audio:    true,
+      newsletter_video:    true,
       newsletter_infografico: true,
       alertas_prioritarios: true,
       grupo_whatsapp_vip:  true,
@@ -102,6 +107,7 @@ const PLANOS_CANON = {
 const FEATURES_LABELS = {
   newsletter_texto:       '📝 Newsletter em texto',
   newsletter_audio:       '🎧 Newsletter em áudio (podcast)',
+  newsletter_video:       '🎬 Newsletter em vídeo',
   newsletter_infografico: '📊 Infográfico por edição',
   alertas_prioritarios:   '🔔 Alertas prioritários',
   grupo_whatsapp_vip:     '💬 Grupo VIP WhatsApp',
@@ -134,6 +140,7 @@ function fmtFeatureBadges(features) {
   if (!features || typeof features !== 'object') return '—';
   const ativos = [];
   if (features.newsletter_audio)       ativos.push('🎧');
+  if (features.newsletter_video)       ativos.push('🎬');
   if (features.newsletter_infografico) ativos.push('📊');
   if (features.alertas_prioritarios)   ativos.push('🔔');
   if (features.grupo_whatsapp_vip)     ativos.push('💬');
@@ -261,6 +268,7 @@ async function abrirModalPlano(id = null, editar = false) {
     features: {
       newsletter_texto:       true,
       newsletter_audio:       false,
+      newsletter_video:       false,
       newsletter_infografico: false,
       alertas_prioritarios:   false,
       grupo_whatsapp_vip:     false,
