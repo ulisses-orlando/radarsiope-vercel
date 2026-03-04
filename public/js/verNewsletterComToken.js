@@ -1303,10 +1303,18 @@ async function abrirTipo(tipoId, tipoNome, tipoIcone) {
     }
   }).join('');
 
-  const rodape = `
+  const rodape = isAssinante ? `
     <div class="rs-drawer-rodape">
       <a href="/painel.html#bloco-biblioteca" style="color:var(--azul);font-size:12px;font-weight:600">
         Ver edições mais antigas → Área do Assinante
+      </a>
+    </div>` : `
+    <div class="rs-drawer-rodape">
+      <span style="font-size:12px;color:var(--rs-muted);display:block;margin-bottom:6px">
+        Quer acesso a todas as edições?
+      </span>
+      <a href="/assinatura.html" style="color:var(--azul);font-size:12px;font-weight:600">
+        Conheça nossos planos e assine →
       </a>
     </div>`;
 
