@@ -825,11 +825,19 @@ async function VerNewsletterComToken() {
 
     if (assinaturaId) {
       // ✅ Assinante → Firebase
-      const destinatarioSnap = await db.collection("usuarios").doc(uid).get();
+      const [destinatarioSnap, assinaturaSnap] = await Promise.all([
+        db.collection("usuarios").doc(uid).get(),
+        db.collection("usuarios").doc(uid).collection("assinaturas").doc(assinaturaId).get()
+      ]);
 
       if (!destinatarioSnap.exists) { mostrarErro('Destinatário não encontrado.'); return; }
 
-      destinatario = { _uid: destinatarioSnap.id, ...destinatarioSnap.data() };
+      // features_snapshot da assinatura é a fonte de verdade — ignora features do doc raiz
+      const featuresAtivas = assinaturaSnap.exists
+        ? (assinaturaSnap.data().features_snapshot || {})
+        : {};
+
+      destinatario = { _uid: destinatarioSnap.id, ...destinatarioSnap.data(), features: featuresAtivas };
       segmento = "assinantes";
     } else {
       // ✅ Lead → Supabase
