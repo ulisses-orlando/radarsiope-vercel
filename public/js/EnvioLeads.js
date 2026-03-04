@@ -379,6 +379,9 @@ async function listarNewslettersDisponiveis() {
     const corpo = document.querySelector("#tabela-newsletters-envio tbody");
     corpo.innerHTML = "<tr><td colspan='5'>Carregando newsletters...</td></tr>";
 
+    // Carrega o mapa de nomes (ID -> Nome) antes do loop
+    const mapaNomesTipos = await obterMapaNomesTipos();
+
     const snap = await db.collection("newsletters").orderBy("data_publicacao", "desc").get();
     let linhas = "";
 
@@ -388,11 +391,14 @@ async function listarNewslettersDisponiveis() {
         const data = n.data_publicacao?.toDate?.() || n.data_publicacao;
         const dataFormatada = data ? formatDateBR(data) : "-";
 
+        // Busca o nome amigável usando o ID guardado no campo 'tipo'
+        const nomeTipo = mapaNomesTipos[n.tipo] || n.tipo || "-";
+
         linhas += `
             <tr>
                 <td>${n.titulo || "(sem título)"}</td>
                 <td>${n.edicao || "-"}</td>
-                <td>${n.tipo || "-"}</td>
+                <td><span class="badge-tipo">${nomeTipo}</span></td>
                 <td>${n.classificacao || "-"}</td>
                 <td>${dataFormatada}</td>
                 <td>
