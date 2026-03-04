@@ -181,6 +181,7 @@ function detectarAcesso(destinatario, newsletter, segmento, envio) {
     acessoProTemp,
     temAudio: isAssinante ? !!features.newsletter_audio
       : (!!newsletter.acesso_audio_leads || acessoProTemp),
+    temVideo: isAssinante ? !!features.newsletter_video : acessoProTemp,
     temInfografico: isAssinante ? !!features.newsletter_infografico : acessoProTemp,
     temAlertas: isAssinante && !!features.alertas_prioritarios,
     blurMunicipio: !isAssinante && !acessoProTemp,
@@ -323,67 +324,163 @@ async function renderMunicipio(destinatario, acesso) {
 
 function renderMidia(newsletter, acesso) {
   const secao = document.getElementById('secao-midia');
-  const wrap = document.getElementById('midia-conteudo');
+  const wrap  = document.getElementById('midia-conteudo');
   if (!secao || !wrap) return;
+
+  // Campos aceitos (admin pode ter gravado com nome levemente diferente)
+  const audioUrl  = newsletter.audio_url      || newsletter.url_podcast      || '';
+  const videoUrl  = newsletter.video_url      || newsletter.url_video        || '';
+  const infoUrl   = newsletter.infografico_url || newsletter.url_infografico  || '';
+
+  if (!audioUrl && !videoUrl && !infoUrl) return; // nada a exibir
 
   const itens = [];
 
-  if (newsletter.audio_url) {
-    itens.push(acesso.temAudio ? `
-      <div class="rs-media-item">
-        <div class="rs-media-icon">🎧</div>
-        <div class="rs-media-info">
-          <div class="rs-media-titulo">Podcast desta edição</div>
-          <div class="rs-media-sub">Produzido com NotebookLM · Ouça enquanto trabalha</div>
-          <audio controls src="${_esc(newsletter.audio_url)}" preload="none"
-                 style="width:100%;margin-top:8px;border-radius:8px"></audio>
-        </div>
-      </div>` : `
-      <div class="rs-media-item">
-        <div class="rs-media-icon" style="opacity:.4">🎧</div>
-        <div class="rs-media-info">
-          <div class="rs-media-titulo">Podcast desta edição</div>
-          <div class="rs-media-sub">Disponível no plano Essence ou superior</div>
-        </div>
-        <a href="/assinatura.html?plano=essence" class="rs-media-btn rs-media-btn-lock">🔒 Desbloquear</a>
-      </div>`);
+  // ── 🎧 PODCAST ──────────────────────────────────────────────────────────────
+  if (audioUrl) {
+    if (acesso.temAudio) {
+      itens.push(`
+        <div class="rs-media-card rs-media-card-aberta">
+          <div class="rs-media-card-header">
+            <span class="rs-media-card-icon">🎧</span>
+            <div class="rs-media-card-info">
+              <div class="rs-media-titulo">Podcast desta edição</div>
+              <div class="rs-media-sub">Produzido com NotebookLM · Ouça enquanto trabalha</div>
+            </div>
+          </div>
+          <div class="rs-media-card-body">
+            <audio controls src="${_esc(audioUrl)}" preload="none"
+                   style="width:100%;border-radius:8px;margin-top:4px"></audio>
+          </div>
+        </div>`);
+    } else {
+      itens.push(`
+        <div class="rs-media-card rs-media-card-lock">
+          <div class="rs-media-card-header">
+            <span class="rs-media-card-icon" style="opacity:.4">🎧</span>
+            <div class="rs-media-card-info">
+              <div class="rs-media-titulo">Podcast desta edição</div>
+              <div class="rs-media-sub">Disponível no plano <strong>Essence</strong> ou superior</div>
+            </div>
+            <a href="/assinatura.html?plano=essence" class="rs-media-btn rs-media-btn-lock">🔒 Ver planos</a>
+          </div>
+        </div>`);
+    }
   }
 
-  if (newsletter.video_url) {
-    itens.push(`
-      <div class="rs-media-item">
-        <div class="rs-media-icon">📺</div>
-        <div class="rs-media-info">
-          <div class="rs-media-titulo">Vídeo explicativo</div>
-          <div class="rs-media-sub">Análise detalhada em vídeo</div>
-        </div>
-        <a href="${_esc(newsletter.video_url)}" target="_blank" rel="noopener noreferrer"
-           class="rs-media-btn rs-media-btn-primary">Assistir →</a>
-      </div>`);
+  // ── 🎬 VÍDEO ────────────────────────────────────────────────────────────────
+  if (videoUrl) {
+    if (acesso.temVideo) {
+      const embedUrl = _resolverEmbedVideo(videoUrl);
+      const conteudoVideo = embedUrl
+        ? `<div class="rs-media-video-wrap">
+             <iframe src="${embedUrl}" frameborder="0" allowfullscreen
+               allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+               style="position:absolute;top:0;left:0;width:100%;height:100%;border-radius:8px"></iframe>
+           </div>`
+        : `<a href="${_esc(videoUrl)}" target="_blank" rel="noopener noreferrer"
+              class="rs-media-btn rs-media-btn-primary" style="margin-top:10px;display:inline-block">
+             ▶ Assistir ao vídeo →
+           </a>`;
+      itens.push(`
+        <div class="rs-media-card rs-media-card-aberta">
+          <div class="rs-media-card-header">
+            <span class="rs-media-card-icon">🎬</span>
+            <div class="rs-media-card-info">
+              <div class="rs-media-titulo">Vídeo desta edição</div>
+              <div class="rs-media-sub">Análise completa em vídeo</div>
+            </div>
+          </div>
+          <div class="rs-media-card-body">${conteudoVideo}</div>
+        </div>`);
+    } else {
+      itens.push(`
+        <div class="rs-media-card rs-media-card-lock">
+          <div class="rs-media-card-header">
+            <span class="rs-media-card-icon" style="opacity:.4">🎬</span>
+            <div class="rs-media-card-info">
+              <div class="rs-media-titulo">Vídeo desta edição</div>
+              <div class="rs-media-sub">Disponível no plano <strong>Profissional</strong> ou superior</div>
+            </div>
+            <a href="/assinatura.html?plano=profissional" class="rs-media-btn rs-media-btn-lock">🔒 Ver planos</a>
+          </div>
+        </div>`);
+    }
   }
 
-  if (newsletter.infografico_url) {
-    itens.push(acesso.temInfografico ? `
-      <div class="rs-media-item">
-        <div class="rs-media-icon">📊</div>
-        <div class="rs-media-info">
-          <div class="rs-media-titulo">Infográfico da edição</div>
-          <div class="rs-media-sub">Visualização dos principais indicadores</div>
-        </div>
-        <a href="${_esc(newsletter.infografico_url)}" target="_blank" rel="noopener noreferrer"
-           class="rs-media-btn rs-media-btn-primary">Ver →</a>
-      </div>` : `
-      <div class="rs-media-item">
-        <div class="rs-media-icon" style="opacity:.4">📊</div>
-        <div class="rs-media-info">
-          <div class="rs-media-titulo">Infográfico da edição</div>
-          <div class="rs-media-sub">Disponível no plano Profissional ou superior</div>
-        </div>
-        <a href="/assinatura.html?plano=profissional" class="rs-media-btn rs-media-btn-lock">🔒 Desbloquear</a>
-      </div>`);
+  // ── 📊 INFOGRÁFICO ───────────────────────────────────────────────────────────
+  if (infoUrl) {
+    if (acesso.temInfografico) {
+      const isImagem = /\.(png|jpg|jpeg|webp|svg|gif)(\?.*)?$/i.test(infoUrl);
+      const conteudoInfo = isImagem
+        ? `<img src="${_esc(infoUrl)}" alt="Infográfico da edição"
+                style="width:100%;border-radius:8px;margin-top:8px;cursor:zoom-in"
+                onclick="abrirInfografico('${_esc(infoUrl)}')">`
+        : `<a href="${_esc(infoUrl)}" target="_blank" rel="noopener noreferrer"
+              class="rs-media-btn rs-media-btn-primary" style="margin-top:10px;display:inline-block">
+             📊 Abrir infográfico →
+           </a>`;
+      itens.push(`
+        <div class="rs-media-card rs-media-card-aberta">
+          <div class="rs-media-card-header">
+            <span class="rs-media-card-icon">📊</span>
+            <div class="rs-media-card-info">
+              <div class="rs-media-titulo">Infográfico desta edição</div>
+              <div class="rs-media-sub">Visualização dos principais indicadores</div>
+            </div>
+            ${isImagem ? `<a href="${_esc(infoUrl)}" target="_blank" rel="noopener noreferrer"
+                class="rs-media-btn rs-media-btn-primary">Ampliar →</a>` : ''}
+          </div>
+          <div class="rs-media-card-body">${conteudoInfo}</div>
+        </div>`);
+    } else {
+      itens.push(`
+        <div class="rs-media-card rs-media-card-lock">
+          <div class="rs-media-card-header">
+            <span class="rs-media-card-icon" style="opacity:.4">📊</span>
+            <div class="rs-media-card-info">
+              <div class="rs-media-titulo">Infográfico desta edição</div>
+              <div class="rs-media-sub">Disponível no plano <strong>Profissional</strong> ou superior</div>
+            </div>
+            <a href="/assinatura.html?plano=profissional" class="rs-media-btn rs-media-btn-lock">🔒 Ver planos</a>
+          </div>
+        </div>`);
+    }
   }
 
-  if (itens.length) { secao.style.display = 'block'; wrap.innerHTML = itens.join(''); }
+  secao.style.display = 'block';
+  wrap.innerHTML = itens.join('');
+}
+
+// ─── Resolver URL de embed para YouTube / Vimeo ───────────────────────────────
+function _resolverEmbedVideo(url) {
+  try {
+    const u = new URL(url);
+
+    // YouTube — formatos: watch?v=, youtu.be/, shorts/
+    const ytMatch =
+      u.hostname.includes('youtube.com') && u.searchParams.get('v') ||
+      u.hostname === 'youtu.be' && u.pathname.slice(1) ||
+      u.hostname.includes('youtube.com') && u.pathname.startsWith('/shorts/') && u.pathname.split('/shorts/')[1]?.split('/')[0];
+    if (ytMatch) return `https://www.youtube.com/embed/${ytMatch}?rel=0`;
+
+    // Vimeo — formato: vimeo.com/ID
+    const vimeoMatch = u.hostname.includes('vimeo.com') && u.pathname.match(/^\/(\d+)/);
+    if (vimeoMatch) return `https://player.vimeo.com/video/${vimeoMatch[1]}`;
+
+  } catch (e) { /* URL inválida */ }
+  return null; // URL não reconhecida — cai para botão de link
+}
+
+// ─── Abrir infográfico em lightbox simples ────────────────────────────────────
+function abrirInfografico(src) {
+  const overlay = document.createElement('div');
+  overlay.style.cssText = `
+    position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:9999;
+    display:flex;align-items:center;justify-content:center;padding:20px;cursor:zoom-out`;
+  overlay.innerHTML = `<img src="${src}" style="max-width:100%;max-height:90vh;border-radius:10px;box-shadow:0 4px 40px rgba(0,0,0,.5)">`;
+  overlay.onclick = () => overlay.remove();
+  document.body.appendChild(overlay);
 }
 
 // ─── FAQ ──────────────────────────────────────────────────────────────────────
