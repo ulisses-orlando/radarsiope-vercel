@@ -417,9 +417,21 @@ async function abrirModalNewsletter(docId = null, isEdit = false) {
     <label>URL do Podcast (áudio)
       <span style="font-weight:400;color:#888;font-size:11px"> — Essence+</span>
     </label>
-    <input type="url" data-field-name="audio_url"
-      value="${data.audio_url || ''}"
-      placeholder="https://...">
+    <div style="display:flex;gap:6px;align-items:center">
+      <input type="url" data-field-name="audio_url"
+        value="${data.audio_url || ''}"
+        placeholder="https://app.radarsiope.com.br/media/podcasts/edicao-XXX.mp3"
+        style="flex:1">
+      <button type="button" title="Gerar URL padrão"
+        style="padding:6px 10px;border-radius:6px;border:1px solid #ccc;background:#f5f5f5;cursor:pointer;font-size:12px;white-space:nowrap"
+        onclick="(function(){
+          const num = document.querySelector('[data-field-name=numero]')?.value || 'XXX';
+          const n = String(num).padStart(3,'0');
+          const el = this.closest('.field').querySelector('input');
+          el.value = 'https://app.radarsiope.com.br/media/podcasts/edicao-' + n + '.mp3';
+          el.dispatchEvent(new Event('input'));
+        }).call(this)">📎 Gerar</button>
+    </div>
   `;
   col1.appendChild(audioWrap);
 
@@ -428,11 +440,11 @@ async function abrirModalNewsletter(docId = null, isEdit = false) {
   videoWrap.className = 'field';
   videoWrap.innerHTML = `
     <label>URL do Vídeo
-      <span style="font-weight:400;color:#888;font-size:11px"> — todos os planos</span>
+      <span style="font-weight:400;color:#888;font-size:11px"> — Profissional+</span>
     </label>
     <input type="url" data-field-name="video_url"
       value="${data.video_url || ''}"
-      placeholder="https://youtube.com/...">
+      placeholder="https://youtube.com/watch?v=... ou https://youtu.be/...">
   `;
   col1.appendChild(videoWrap);
 
@@ -443,9 +455,21 @@ async function abrirModalNewsletter(docId = null, isEdit = false) {
     <label>URL do Infográfico
       <span style="font-weight:400;color:#888;font-size:11px"> — Profissional+</span>
     </label>
-    <input type="url" data-field-name="infografico_url"
-      value="${data.infografico_url || ''}"
-      placeholder="https://...">
+    <div style="display:flex;gap:6px;align-items:center">
+      <input type="url" data-field-name="infografico_url"
+        value="${data.infografico_url || ''}"
+        placeholder="https://app.radarsiope.com.br/media/infograficos/edicao-XXX.png"
+        style="flex:1">
+      <button type="button" title="Gerar URL padrão"
+        style="padding:6px 10px;border-radius:6px;border:1px solid #ccc;background:#f5f5f5;cursor:pointer;font-size:12px;white-space:nowrap"
+        onclick="(function(){
+          const num = document.querySelector('[data-field-name=numero]')?.value || 'XXX';
+          const n = String(num).padStart(3,'0');
+          const el = this.closest('.field').querySelector('input');
+          el.value = 'https://app.radarsiope.com.br/media/infograficos/edicao-' + n + '.png';
+          el.dispatchEvent(new Event('input'));
+        }).call(this)">📎 Gerar</button>
+    </div>
   `;
   col1.appendChild(infoWrap);
 
