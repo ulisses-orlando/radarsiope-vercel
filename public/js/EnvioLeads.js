@@ -165,14 +165,26 @@ function abrirEnvioNewsletterLeads() {
     listarNewslettersDisponiveis();
 }
 
-function mostrarDadosNewsletterSelecionada() {
-    const html = newsletterSelecionada ? `
-    <strong>📰 Newsletter Selecionada: </strong>
-    <b>Título: </b> ${newsletterSelecionada.titulo || "-"}
-    <b>Tipo: </b> ${newsletterSelecionada.tipo || "-"}
-    <b>Edição: </b> ${newsletterSelecionada.edicao || "-"}
-    <b>Data: </b> ${formatDateBR(newsletterSelecionada.data_publicacao?.toDate?.()) || "-"}
-  ` : "";
+async function mostrarDadosNewsletterSelecionada() {
+    if (!newsletterSelecionada) {
+        document.querySelectorAll("#dados-newsletter-selecionada").forEach(div => div.innerHTML = "");
+        return;
+    }
+
+    // 1. Carrega o mapa de nomes (ID -> Nome)
+    // Se já tiver esta variável global de outra função, pode reutilizar
+    const mapaNomesTipos = await obterMapaNomesTipos(); 
+    
+    // 2. Busca o nome usando o ID que está em .tipo
+    const nomeTipo = mapaNomesTipos[newsletterSelecionada.tipo] || newsletterSelecionada.tipo || "-";
+
+    const html = `
+        <strong>📰 Newsletter Selecionada: </strong>
+        <b>Título: </b> ${newsletterSelecionada.titulo || "-"}
+        <b>Tipo: </b> <span style="color: #007acc;">${nomeTipo}</span>
+        <b>Edição: </b> ${newsletterSelecionada.edicao || "-"}
+        <b>Data: </b> ${formatDateBR(newsletterSelecionada.data_publicacao?.toDate?.()) || "-"}
+    `;
 
     document.querySelectorAll("#dados-newsletter-selecionada").forEach(div => {
         div.innerHTML = html;
