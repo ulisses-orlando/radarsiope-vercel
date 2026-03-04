@@ -380,7 +380,7 @@ function _htmlSemDados(nome, uf, blur) {
       </strong>
       <p style="font-size:12px;color:#94a3b8;margin:8px 0 0;line-height:1.6">
         Histórico SIOPE sendo carregado.<br>
-        Esta seção acende automaticamente quando os dados estiverem disponíveis.
+        Esta seção carrega automaticamente quando os dados estiverem disponíveis.
       </p>
     </div>`;
 }
