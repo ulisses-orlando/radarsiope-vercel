@@ -987,6 +987,8 @@ async function gerarPreviaEnvioUsuarios() {
 
             if (docAssinatura.exists) {
                 const ids = docAssinatura.data().tipos_selecionados || [];
+                u.interessesIds = ids; // Guardamos os IDs para a comparação técnica
+                
                 // Converte os IDs em nomes usando o mapa
                 const nomes = ids.map(id => mapaNomesTipos[id] || id).join(", ");
                 interessesMap[`${u.usuarioId}|${u.assinaturaId}`] = nomes || "Nenhum";
@@ -1004,13 +1006,18 @@ async function gerarPreviaEnvioUsuarios() {
 
     for (const u of selecionados) {
 
-
         const key = `${u.usuarioId}|${u.assinaturaId}`;
         const statusEnvio = enviadosMap[key];
         const enviada = statusEnvio === "enviado";
         const erroEnvio = statusEnvio === "erro";
         const precisaEnviar = u.emDia && !enviada;
         const statusTexto = enviada ? "Sim" : (erroEnvio ? "Erro ao enviar" : "Não");
+
+        // Pega o ID do tipo da newsletter selecionada
+        const tipoNewsletterId = newsletterSelecionada.tipo_id || newsletterSelecionada.tipo;
+
+        // Verifica se o ID da newsletter está nos interesses do usuário (IDs que guardamos no Promise.all)
+        const ehCompativel = u.interessesIds && u.interessesIds.includes(tipoNewsletterId);
 
         const tr = document.createElement("tr");
         tr.dataset.usuarioId = u.usuarioId;
@@ -1020,6 +1027,7 @@ async function gerarPreviaEnvioUsuarios() {
 
         tr.dataset.statusEnvio = statusEnvio;
         const interesses = interessesMap[key] || "Não carregado";
+        tr.dataset.compativel = ehCompativel ? "true" : "false";
 
         tr.innerHTML = `
             <td><input type="checkbox" class="chk-envio-final" ${precisaEnviar ? "checked" : ""} /></td>
@@ -1027,7 +1035,7 @@ async function gerarPreviaEnvioUsuarios() {
             <td>${u.perfil || ""}</td>
             <td>${u.email}</td>
             <td>${tituloNewsletter}</td>
-            <td>${interesses}</td>
+            <td>${interessesMap[key] || "-"}</td>
             <td class="col-pagamento">${u.emDia ? "✅ Sim" : "❌ Não"}</td>
             <td class="col-enviado">${statusTexto}</td>
         `;
