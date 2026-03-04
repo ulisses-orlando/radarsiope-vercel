@@ -1448,8 +1448,18 @@
       <div class="rs-header-top">
         <!-- Logo + brand -->
         <div class="rs-header-brand">
-          <img src="icons/icon-192x192.png" class="rs-logo" alt="Radar SIOPE"
-               onerror="this.style.display='none'">
+          <img src="/icons/icon-192x192.png"
+              class="rs-logo"
+              alt="Radar SIOPE"
+              onerror="
+                if(!this.dataset.retry) {
+                  this.dataset.retry = '1';
+                  this.src = 'public/icons/icon-192x192.png';
+                } else {
+                  this.style.display='none';
+                  console.error('Logo não encontrada em nenhum caminho');
+                }
+              ">
           <div class="rs-header-brand-text">
             <strong>Radar SIOPE</strong>
             <small>Guia Digital — FUNDEB e SIOPE</small>
