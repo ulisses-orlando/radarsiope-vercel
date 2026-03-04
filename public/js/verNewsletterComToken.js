@@ -732,7 +732,7 @@ async function VerNewsletterComToken() {
 
       if (!destinatarioSnap.exists) { mostrarErro('Destinatário não encontrado.'); return; }
 
-      destinatario = destinatarioSnap.data();
+      destinatario = { _uid: destinatarioSnap.id, ...destinatarioSnap.data() };
       segmento = "assinantes";
     } else {
       // ✅ Lead → Supabase
