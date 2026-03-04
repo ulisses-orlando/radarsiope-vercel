@@ -1035,9 +1035,8 @@ async function _getTipos() {
 function _assinanteTemAcesso(tipoId) {
   const ctx = _getCtx();
   if (!ctx || ctx.segmento !== 'assinante') return false;
-  // plano_tipos_inclusos vem do Firestore do plano — disponível via _radarUser.features
-  // Usamos a lista carregada em _drawer.tiposIncluso (preenchida em iniciarDrawer)
-  return (_drawer.tiposInclusos || []).includes(tipoId);
+  // Normaliza para String para evitar mismatch number vs string do Firestore
+  return (_drawer.tiposInclusos || []).map(String).includes(String(tipoId));
 }
 
 // ─── Contexto de identidade ──────────────────────────────────────────────────
@@ -1069,18 +1068,50 @@ async function iniciarDrawer(newsletter) {
   _drawer.edicaoAtual = newsletter.id;
   _drawer.tipoAtual   = newsletter.Tipo || newsletter.tipo || null;
 
-  // Carregar tipos_inclusos do plano do assinante
+  // Carregar tipos_selecionados da assinatura do usuário
+  // (fonte de verdade: o que o assinante efetivamente contratou)
   const ctx = _getCtx();
-  if (ctx && ctx.segmento === 'assinante') {
+  if (ctx && ctx.segmento === 'assinante' && ctx.uid) {
     try {
-      // Busca o plano do assinante para obter tipos_inclusos
-      const planosSnap = await db.collection('planos')
-        .where('slug', '==', ctx.plano_slug)
-        .limit(1).get();
-      if (!planosSnap.empty) {
-        _drawer.tiposInclusos = planosSnap.docs[0].data().tipos_inclusos || [];
+      let tiposCarregados = false;
+
+      // 1ª tentativa: assinaturaId direto (mais rápido)
+      if (ctx.assinaturaId) {
+        const assSnap = await db.collection('usuarios')
+          .doc(ctx.uid)
+          .collection('assinaturas')
+          .doc(ctx.assinaturaId)
+          .get();
+        if (assSnap.exists) {
+          const d = assSnap.data();
+          _drawer.tiposInclusos = Array.isArray(d.tipos_selecionados)
+            ? d.tipos_selecionados.map(String)
+            : [];
+          tiposCarregados = true;
+          console.log('[drawer] tiposInclusos via assinatura:', _drawer.tiposInclusos);
+        }
+      }
+
+      // 2ª tentativa: busca a assinatura ativa (fallback)
+      if (!tiposCarregados) {
+        const assSnap = await db.collection('usuarios')
+          .doc(ctx.uid)
+          .collection('assinaturas')
+          .where('status', 'in', ['ativa', 'aprovada'])
+          .limit(1)
+          .get();
+        if (!assSnap.empty) {
+          const d = assSnap.docs[0].data();
+          _drawer.tiposInclusos = Array.isArray(d.tipos_selecionados)
+            ? d.tipos_selecionados.map(String)
+            : [];
+          console.log('[drawer] tiposInclusos via assinatura ativa:', _drawer.tiposInclusos);
+        } else {
+          _drawer.tiposInclusos = [];
+        }
       }
     } catch (e) {
+      console.warn('[drawer] Falha ao carregar tipos da assinatura:', e);
       _drawer.tiposInclusos = [];
     }
   }
