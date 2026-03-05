@@ -1755,6 +1755,8 @@ async function carregarLeads(resetar = false) {
               onclick="abrirModalContatoLead('${d.id}')">📞</span>
             <span class="icon-btn" title="Ver histórico de interações"
               onclick="abrirModalHistorico('${d.id}')">📜</span>
+            <span class="icon-btn" title="Prorrogar acesso"
+              onclick="abrirModalProrrogarAcesso('${d.id}', '${(d.nome||'').replace(/'/g,"\\'")}')">⏰</span>
           </td>
         </tr>`;
     }
@@ -4144,7 +4146,172 @@ function generateCheckboxField(fieldName, label = '', checked = false) {
 
   return wrapper;
 }
+// ─── Prorrogar acesso lead ────────────────────────────────────────────────────
+async function abrirModalProrrogarAcesso(leadId, nomeLead) {
+  let modal = document.getElementById("modal-prorrogar-acesso");
+  if (!modal) {
+    modal = document.createElement("div");
+    modal.id = "modal-prorrogar-acesso";
+    modal.style.cssText = `display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);
+      z-index:9999;justify-content:center;align-items:center`;
+    modal.innerHTML = `
+      <div style="background:#fff;padding:24px;border-radius:10px;max-width:580px;
+        width:90%;position:relative;box-shadow:0 4px 30px rgba(0,0,0,.2);max-height:80vh;
+        overflow-y:auto">
+        <button onclick="document.getElementById('modal-prorrogar-acesso').style.display='none'"
+          style="position:absolute;top:10px;right:10px;background:none;border:none;
+          font-size:18px;cursor:pointer">❌</button>
+        <h3>⏰ Prorrogar acesso — <span id="prorrogar-lead-nome"></span></h3>
+        <div style="display:flex;gap:10px;align-items:center;margin:14px 0 10px">
+          <label style="font-size:13px;font-weight:600">Adicionar dias:</label>
+          <select id="prorrogar-dias" style="padding:6px 10px;border-radius:6px;
+            border:1px solid #ccc;font-size:13px">
+            <option value="7">7 dias</option>
+            <option value="15">15 dias</option>
+            <option value="30" selected>30 dias</option>
+            <option value="60">60 dias</option>
+            <option value="0">Personalizado</option>
+          </select>
+          <input type="number" id="prorrogar-dias-custom" min="1" max="365"
+            placeholder="Nº dias" style="display:none;width:80px;padding:6px;
+            border-radius:6px;border:1px solid #ccc;font-size:13px">
+          <label style="font-size:12px;display:flex;align-items:center;gap:4px">
+            <input type="checkbox" id="prorrogar-zerar-acessos" checked>
+            Zerar contagem de acessos
+          </label>
+        </div>
+        <div id="lista-envios-lead" style="margin-top:8px"></div>
+        <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:16px">
+          <button onclick="document.getElementById('modal-prorrogar-acesso').style.display='none'"
+            style="padding:8px 16px;border-radius:6px;border:1px solid #ccc;cursor:pointer">
+            Cancelar
+          </button>
+          <button onclick="confirmarProrrogacao()"
+            style="padding:8px 16px;background:#0891b2;color:#fff;border:none;
+            border-radius:6px;cursor:pointer;font-weight:700">
+            ⏰ Confirmar prorrogação
+          </button>
+        </div>
+      </div>`;
+    document.body.appendChild(modal);
 
+    // Listener para campo personalizado
+    document.getElementById("prorrogar-dias").addEventListener("change", function() {
+      document.getElementById("prorrogar-dias-custom").style.display =
+        this.value === "0" ? "inline-block" : "none";
+    });
+  }
+
+  document.getElementById("prorrogar-lead-nome").textContent = nomeLeads || "";
+  document.getElementById("lista-envios-lead").innerHTML =
+    "<p style='color:#999;font-size:13px'>Carregando envios...</p>";
+  modal.style.display = "flex";
+
+  // Buscar envios do lead
+  const { data: envios, error } = await window.supabase
+    .from("leads_envios")
+    .select("id, newsletter_id, data_envio, expira_em, acessos_totais")
+    .eq("lead_id", Number(leadId))
+    .order("data_envio", { ascending: false });
+
+  if (error || !envios?.length) {
+    document.getElementById("lista-envios-lead").innerHTML =
+      "<p style='color:#999;font-size:13px'>Nenhum envio encontrado para este lead.</p>";
+    return;
+  }
+
+  // Buscar títulos das newsletters
+  const nids = [...new Set(envios.map(e => e.newsletter_id))];
+  const titulosMap = {};
+  await Promise.all(nids.map(async nid => {
+    try {
+      const snap = await db.collection("newsletters").doc(nid).get();
+      titulosMap[nid] = snap.exists
+        ? `Edição ${snap.data().numero || "—"} — ${snap.data().titulo || ""}`
+        : nid;
+    } catch { titulosMap[nid] = nid; }
+  }));
+
+  document.getElementById("lista-envios-lead").innerHTML = `
+    <table style="width:100%;border-collapse:collapse;font-size:12px">
+      <thead>
+        <tr style="background:#f8fafc">
+          <th style="padding:8px;text-align:left;border-bottom:1px solid #e2e8f0">
+            <input type="checkbox" id="chk-todos-envios"
+              onchange="document.querySelectorAll('.chk-envio').forEach(c=>c.checked=this.checked)">
+          </th>
+          <th style="padding:8px;text-align:left;border-bottom:1px solid #e2e8f0">Newsletter</th>
+          <th style="padding:8px;text-align:left;border-bottom:1px solid #e2e8f0">Enviado em</th>
+          <th style="padding:8px;text-align:left;border-bottom:1px solid #e2e8f0">Expira em</th>
+          <th style="padding:8px;text-align:center;border-bottom:1px solid #e2e8f0">Acessos</th>
+          <th style="padding:8px;text-align:left;border-bottom:1px solid #e2e8f0">Situação</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${envios.map(e => {
+          const expira    = e.expira_em ? new Date(e.expira_em) : null;
+          const expirado  = expira && expira < new Date();
+          const expiraFmt = expira ? expira.toLocaleString("pt-BR") : "—";
+          const envioFmt  = e.data_envio ? new Date(e.data_envio).toLocaleDateString("pt-BR") : "—";
+          const situacao  = !expira ? "—"
+            : expirado ? `<span style="color:#e53e3e;font-weight:700">⛔ Expirado</span>`
+            : `<span style="color:#22c55e;font-weight:700">✅ Ativo</span>`;
+          return `
+            <tr style="border-bottom:1px solid #f1f5f9">
+              <td style="padding:8px">
+                <input type="checkbox" class="chk-envio" value="${e.id}" checked>
+              </td>
+              <td style="padding:8px">${titulosMap[e.newsletter_id] || e.newsletter_id}</td>
+              <td style="padding:8px">${envioFmt}</td>
+              <td style="padding:8px">${expiraFmt}</td>
+              <td style="padding:8px;text-align:center">${e.acessos_totais ?? 0}</td>
+              <td style="padding:8px">${situacao}</td>
+            </tr>`;
+        }).join("")}
+      </tbody>
+    </table>`;
+}
+
+async function confirmarProrrogacao() {
+  const selecionados = [...document.querySelectorAll(".chk-envio:checked")]
+    .map(c => Number(c.value));
+
+  if (!selecionados.length)
+    return mostrarMensagem("Selecione pelo menos um envio para prorrogar.");
+
+  const diasSelect = document.getElementById("prorrogar-dias").value;
+  const dias = diasSelect === "0"
+    ? parseInt(document.getElementById("prorrogar-dias-custom").value || "0")
+    : parseInt(diasSelect);
+
+  if (!dias || dias < 1)
+    return mostrarMensagem("Informe um número de dias válido.");
+
+  const zerarAcessos = document.getElementById("prorrogar-zerar-acessos").checked;
+  const novaExpiracao = new Date();
+  novaExpiracao.setDate(novaExpiracao.getDate() + dias);
+
+  const update = { expira_em: novaExpiracao.toISOString() };
+  if (zerarAcessos) update.acessos_totais = 0;
+
+  try {
+    const { error } = await window.supabase
+      .from("leads_envios")
+      .update(update)
+      .in("id", selecionados);
+
+    if (error) throw error;
+
+    mostrarMensagem(
+      `✅ ${selecionados.length} envio(s) prorrogado(s) por ${dias} dias.\n` +
+      `Nova expiração: ${novaExpiracao.toLocaleString("pt-BR")}`
+    );
+    document.getElementById("modal-prorrogar-acesso").style.display = "none";
+
+  } catch (e) {
+    mostrarMensagem("Erro ao prorrogar: " + e.message);
+  }
+}
 /* ======================
    EXPORTAR GLOBAL
    ====================== */
