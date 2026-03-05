@@ -2359,8 +2359,19 @@
     }
 
     // inicializa com usuários visível
-    abrirTab('usuarios');
-    verificarPendenciasLeads();
+      abrirTab('usuarios');
+
+      // Aguarda o supabase estar disponível (module script é assíncrono)
+      function _aguardarSupabaseEVerificar(tentativas = 0) {
+        if (window.supabase) {
+          verificarPendenciasLeads();
+        } else if (tentativas < 20) {
+          setTimeout(() => _aguardarSupabaseEVerificar(tentativas + 1), 150);
+        } else {
+          console.warn('[admin] supabase não disponível para verificar pendências');
+        }
+      }
+      _aguardarSupabaseEVerificar();
   </script>
   <script>
     document.addEventListener("DOMContentLoaded", () => {
