@@ -3087,16 +3087,15 @@ async function carregarUsuariosComFiltro() {
         ${temSolicitacoesPendentes ? '<span style="color:orange" title="Solicitações pendentes">🟠</span>' : ''}
         ${temParcelasAGerar ? '<span style="color:blue" title="Parcelas a gerar">🔵</span>' : ''}
       </td>
-      <td>
+      <td style="white-space:nowrap">
+        <button onclick="abrirDrawerUsuario('${doc.id}')"
+          style="padding:5px 12px;background:#0284c7;color:#fff;border:none;
+          border-radius:6px;cursor:pointer;font-size:12px;font-weight:700;margin-right:4px">
+          👁️ Abrir
+        </button>
         <span class="icon-btn" title="Editar Usuário" onclick="abrirModalEditarUsuario('${doc.id}')">✏️</span>
         <span class="icon-btn" title="Excluir Usuário" onclick="confirmarExclusaoUsuario('${doc.id}','${(d.nome || '').replace(/'/g, "\\'")}')">🗑️</span>
         <span class="icon-btn" title="Logs de Acesso" onclick="abrirSubcolecao('${doc.id}','logs_acesso')">📜</span>
-        <span class="icon-btn" title="Assinaturas" onclick="abrirSubcolecao('${doc.id}','assinaturas')">📑</span>
-        <span class="icon-btn" title="Solicitações" onclick="abrirSubcolecao('${doc.id}','solicitacoes')">📬</span>
-        <span class="icon-btn" title="Pagamentos" onclick="abrirSubcolecao('${doc.id}','pagamentos')">💳</span>
-        <span class="icon-btn" title="Preferências Newsletter" onclick="abrirSubcolecao('${doc.id}','preferencias_newsletter')">📰</span>
-        <span class="icon-btn" title="Visão Geral" onclick="mostrarVisaoGeral('${doc.id}')">👁️</span>
-        <span class="icon-btn" title="Enviar e-mail" onclick="abrirModalEnvioManual('${doc.id}')">📤</span>
       </td>`;
 
     tbody.appendChild(tr);
