@@ -1661,137 +1661,318 @@ function formatarPreferencia(valor) {
 let ultimoDoc = null;
 let ultimaQueryKey = null;
 
-async function carregarLeads(paginaNova = false) {
+let _leadsOffset = 0;
+const _LEADS_LIMIT = 20;
+
+async function carregarLeads(resetar = false) {
   const tabela = document.getElementById("tabela-leads");
-  const resumo = document.getElementById("resumo-leads");
+  const resumo  = document.getElementById("resumo-leads");
+  if (!tabela) return;
 
-  const perfil = document.getElementById("filtro-perfil-lead")?.value?.trim() || "";
-  const preferencia = document.getElementById("filtro-preferencia")?.value?.trim() || "";
-  const status = document.getElementById("filtro-status-lead-consulta")?.value?.trim() || "";
-  const termoBuscaRaw = document.getElementById("busca-leads")?.value || "";
-  const termoBusca = termoBuscaRaw.trim().toLowerCase();
+  if (resetar) _leadsOffset = 0;
 
-  // Monta chave única da consulta com todos os filtros
-  const queryKey = JSON.stringify({
-    perfil,
-    preferencia,
-    status,
-    termoBusca
-  });
+  const perfil      = document.getElementById("filtro-perfil-lead")?.value || "";
+  const preferencia = document.getElementById("filtro-preferencia")?.value || "";
+  const status      = document.getElementById("filtro-status-lead-consulta")?.value || "";
+  const termoBusca  = document.getElementById("busca-leads")?.value?.trim().toLowerCase() || "";
 
-  // Reset de paginação se for nova busca OU se os filtros/termo mudaram
-  if (paginaNova || queryKey !== ultimaQueryKey) {
-    ultimoDoc = null;
-    ultimaQueryKey = queryKey;
-  }
-
-  tabela.innerHTML = "<tr><td colspan='10'>Carregando...</td></tr>";
+  tabela.innerHTML = "<tr><td colspan='11'>Carregando...</td></tr>";
 
   try {
-    let query = db.collection("leads");
+    let query = window.supabase.from("leads").select("*", { count: "exact" });
 
-    // Busca por prefixo em nome_lowercase
-    if (termoBusca) {
-      query = query
-        .orderBy("nome_lowercase")
-        .startAt(termoBusca)
-        .endAt(termoBusca + "\uf8ff");
-    } else if (!perfil && !status && !preferencia) {
-      // Sem filtros → ordena por timestamp
-      query = query.orderBy("timestamp", "desc");
-    }
+    // Filtros
+    if (termoBusca)  query = query.ilike("nome_lowercase", `${termoBusca}%`);
+    if (perfil)      query = query.eq("perfil", perfil);
+    if (preferencia) query = query.eq("preferencia_contato", preferencia);
+    if (status)      query = query.eq("status", status);
 
-    // 🔹 Se houver filtros simples, não força orderBy
-    if (perfil) query = query.where("perfil", "==", perfil);
-    if (preferencia) query = query.where("preferencia_contato", "==", preferencia);
-    if (status) query = query.where("status", "==", status);
+    // Ordenação: mensagens não respondidas primeiro, depois mais recentes
+    query = query
+      .order("mensagem_respondida", { ascending: true, nullsFirst: true })
+      .order("data_criacao", { ascending: false })
+      .range(_leadsOffset, _leadsOffset + _LEADS_LIMIT - 1);
 
-    // status
-    query = query.limit(limitePorPagina);
-    if (ultimoDoc) {
-      query = query.startAfter(ultimoDoc);
-    }
+    const { data: leads, error, count } = await query;
+    if (error) throw error;
 
-    const snap = await query.get();
-
-    if (snap.empty) {
-      tabela.innerHTML = "<tr><td colspan='10'>Nenhum lead encontrado.</td></tr>";
-      resumo.innerHTML = `<span style="cursor:pointer;text-decoration:underline" onclick="carregarLeads(false)">🔄 Ver mais</span>`;
+    if (!leads || leads.length === 0) {
+      tabela.innerHTML = "<tr><td colspan='11'>Nenhum lead encontrado.</td></tr>";
+      resumo.innerHTML = "";
       return;
     }
 
-    // Atualiza o último doc para a próxima página
-    ultimoDoc = snap.docs[snap.docs.length - 1];
-
-    const contadores = {
-      "Novo": 0,
-      "Em contato": 0,
-      "Negociando": 0,
-      "Convertido": 0,
-      "Descartado": 0
-    };
-
+    const contadores = { "Novo": 0, "Em contato": 0, "Negociando": 0, "Convertido": 0, "Descartado": 0 };
     let linhas = "";
 
-    for (const doc of snap.docs) {
-      const d = doc.data();
-      const leadId = doc.id;
-      const data = d.data_criacao?.toDate?.() ? d.data_criacao.toDate().toLocaleString("pt-BR") : "";
-      const interesses = Array.isArray(d.interesses) ? d.interesses.join(", ") : "";
-      const statusAtual = d.status || "Novo";
-      const destaque = statusAtual === "Convertido" ? "lead-convertido" : "";
+    for (const d of leads) {
+      const statusAtual   = d.status || "Novo";
+      const destaque      = statusAtual === "Convertido" ? "lead-convertido" : "";
+      const dataFmt       = d.data_criacao ? new Date(d.data_criacao).toLocaleString("pt-BR") : "";
+      const interesses    = Array.isArray(d.interesses) ? d.interesses.join(", ") : (d.interesses || "");
       contadores[statusAtual] = (contadores[statusAtual] || 0) + 1;
 
-      const iconeHistorico = d.tem_interacoes
-        ? `<span class="icon-btn" title="Ver histórico" onclick="abrirModalHistorico('${leadId}')">📜</span>`
-        : "";
+      // Mensagem — destaque se não respondida
+      const temMensagem = !!d.mensagem;
+      const respondida  = !!d.mensagem_respondida;
+      const celMensagem = temMensagem
+        ? respondida
+          ? `<span style="color:#22c55e;font-size:12px" title="${d.mensagem}">✅ ${d.mensagem.slice(0, 25)}…</span>`
+          : `<span style="color:#e53e3e;font-weight:700;cursor:pointer;font-size:12px"
+               title="${d.mensagem}" onclick="abrirModalResponderMensagem('${d.id}','${(d.mensagem||'').replace(/'/g,"\\'")}')">
+               🔴 ${d.mensagem.slice(0, 25)}${d.mensagem.length > 25 ? '…' : ''}
+             </span>`
+        : "—";
 
-      const podeVincular = statusAtual !== "Convertido" && statusAtual !== "Descartado";
-      const iconeVincular = podeVincular
-        ? `<span class="icon-btn" title="Vincular lead" onclick="abrirModalVincularLead('${leadId}')">👤</span>`
-        : "";
-
-      linhas += ` 
-        <tr class="${destaque}">
+      linhas += `
+        <tr class="${destaque}${!respondida && temMensagem ? ' tr-pendente' : ''}">
           <td>${d.nome || ""}</td>
           <td>${d.email || ""}</td>
           <td>${d.telefone || ""}</td>
           <td>${d.perfil || "-"}</td>
-          <td>${interesses}</td>
-          <td>${data}</td>
+          <td style="font-size:11px">${interesses}</td>
+          <td style="font-size:11px">${dataFmt}</td>
           <td>${formatarPreferencia(d.preferencia_contato)}</td>
+          <td>${celMensagem}</td>
+          <td style="font-size:11px">${d.nome_municipio || ""}${d.cod_uf ? ` / ${d.cod_uf}` : ""}</td>
           <td>
-            ${d.mensagem
-          ? `<span title="${d.mensagem}" style="cursor:help" aria-label="Mensagem completa">📝 ${d.mensagem.slice(0, 30)}${d.mensagem.length > 30 ? "..." : ""}</span>`
-          : "—"}
-          </td>
-          <td>
-            <select onchange="atualizarStatusLead('${leadId}', this.value)">
-              ${["Novo", "Em contato", "Negociando", "Convertido", "Descartado"].map(op => `
-                <option value="${op}" ${op === statusAtual ? "selected" : ""}>${op}</option>
-              `).join("")}
+            <select onchange="atualizarStatusLeadSupabase('${d.id}', this.value)">
+              ${["Novo","Em contato","Negociando","Convertido","Descartado"].map(op =>
+                `<option value="${op}" ${op === statusAtual ? "selected" : ""}>${op}</option>`
+              ).join("")}
             </select>
-            <span class="icon-btn" title="Registrar contato" onclick="abrirModalContatoLead('${leadId}')">📞</span>
-            ${iconeHistorico}
-            ${iconeVincular}
           </td>
-        </tr>
-      `;
+          <td style="white-space:nowrap">
+            ${temMensagem && !respondida
+              ? `<span class="icon-btn" title="Responder mensagem"
+                   onclick="abrirModalResponderMensagem('${d.id}','${(d.mensagem||'').replace(/'/g,"\\'")}')">💬</span>`
+              : ""}
+            <span class="icon-btn" title="Registrar contato"
+              onclick="abrirModalContatoLead('${d.id}')">📞</span>
+          </td>
+        </tr>`;
     }
 
     tabela.innerHTML = linhas;
 
+    const total = count || 0;
+    const mostrando = Math.min(_leadsOffset + _LEADS_LIMIT, total);
     resumo.innerHTML = `
-      <span style="cursor:pointer;color:green">🟢 Convertidos: ${contadores["Convertido"]}</span> |
-      <span style="cursor:pointer;color:orange">🟡 Negociando: ${contadores["Negociando"]}</span> |
-      <span style="cursor:pointer;color:blue">🔵 Em contato: ${contadores["Em contato"]}</span> |
-      <span style="cursor:pointer;color:gray">⚪️ Novos: ${contadores["Novo"]}</span> |
-      <span style="cursor:pointer;color:red">🔴 Descartados: ${contadores["Descartado"]}</span> |
-      <span style="cursor:pointer;text-decoration:underline" onclick="carregarLeads(false)">🔄 Ver mais</span>
+      <span>Mostrando ${mostrando} de ${total} leads</span> &nbsp;|&nbsp;
+      <span style="color:green">🟢 ${contadores["Convertido"]} convertidos</span> |
+      <span style="color:orange">🟡 ${contadores["Negociando"]} negociando</span> |
+      <span style="color:blue">🔵 ${contadores["Em contato"]} em contato</span> |
+      <span style="color:gray">⚪ ${contadores["Novo"]} novos</span>
+      ${mostrando < total
+        ? `&nbsp;|&nbsp;<span style="cursor:pointer;text-decoration:underline;color:#007acc"
+             onclick="_leadsOffset+=${_LEADS_LIMIT};carregarLeads()">▶ Próxima página</span>`
+        : ""}
+      ${_leadsOffset > 0
+        ? `&nbsp;|&nbsp;<span style="cursor:pointer;text-decoration:underline;color:#007acc"
+             onclick="_leadsOffset=Math.max(0,_leadsOffset-${_LEADS_LIMIT});carregarLeads()">◀ Anterior</span>`
+        : ""}
     `;
+
   } catch (err) {
-    tabela.innerHTML = `<tr><td colspan='10'>Erro ao carregar leads.</td></tr>`;
-    console.error("Erro ao carregar leads:", err);
+    tabela.innerHTML = `<tr><td colspan='11'>Erro ao carregar leads: ${err.message}</td></tr>`;
+    console.error("[leads]", err);
+  }
+}
+
+// ─── Atualizar status do lead no Supabase ─────────────────────────────────────
+async function atualizarStatusLeadSupabase(leadId, novoStatus) {
+  const { error } = await window.supabase
+    .from("leads").update({ status: novoStatus }).eq("id", leadId);
+  if (error) mostrarMensagem("Erro ao atualizar status: " + error.message);
+}
+
+// ─── Badge: verificar pendências ─────────────────────────────────────────────
+async function verificarPendenciasLeads() {
+  try {
+    // Mensagens não respondidas
+    const { count: msgAbertas } = await window.supabase
+      .from("leads")
+      .select("*", { count: "exact", head: true })
+      .eq("mensagem_respondida", false)
+      .not("mensagem", "is", null);
+
+    // Feedbacks sem resposta (todos os feedbacks de newsletters)
+    const snap = await db.collection("newsletters")
+      .where("enviada", "==", true).get();
+    let fbAbertas = 0;
+    snap.forEach(doc => {
+      const feedbacks = doc.data().feedbacks || [];
+      fbAbertas += feedbacks.filter(f => !f.respondido).length;
+    });
+
+    const total = (msgAbertas || 0) + fbAbertas;
+    const badge = document.getElementById("badge-leads");
+    const badgeFb = document.getElementById("badge-feedbacks");
+
+    if (badge) {
+      badge.textContent = total;
+      badge.style.display = total > 0 ? "inline" : "none";
+    }
+    if (badgeFb) {
+      badgeFb.textContent = fbAbertas;
+      badgeFb.style.display = fbAbertas > 0 ? "inline" : "none";
+    }
+  } catch (e) { console.warn("[pendências]", e); }
+}
+
+// ─── Responder mensagem do lead ───────────────────────────────────────────────
+function abrirModalResponderMensagem(leadId, mensagem) {
+  document.getElementById("modal-responder-lead-id").value = leadId;
+  document.getElementById("modal-mensagem-original").textContent = mensagem;
+  document.getElementById("modal-resposta-texto").value = "";
+  document.getElementById("modal-responder-mensagem").style.display = "flex";
+}
+
+async function enviarRespostaMensagemLead() {
+  const leadId  = document.getElementById("modal-responder-lead-id").value;
+  const resposta = document.getElementById("modal-resposta-texto").value.trim();
+  if (!resposta) return mostrarMensagem("Digite uma resposta.");
+
+  // Buscar dados do lead para enviar e-mail
+  const { data: lead, error } = await window.supabase
+    .from("leads").select("nome,email").eq("id", leadId).single();
+  if (error || !lead) return mostrarMensagem("Lead não encontrado.");
+
+  try {
+    // Enviar e-mail via API SES
+    await fetch("https://api.radarsiope.com.br/api/sendViaSES", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        nome: lead.nome,
+        email: lead.email,
+        assunto: "Resposta à sua mensagem — Radar SIOPE",
+        mensagemHtml: `<p>Olá ${lead.nome},</p><p>${resposta}</p>
+          <p>Atenciosamente,<br><strong>Equipe Radar SIOPE</strong></p>`
+      })
+    });
+
+    // Marcar como respondida no Supabase
+    await window.supabase.from("leads").update({
+      mensagem_respondida: true,
+      mensagem_resposta: resposta,
+      mensagem_respondida_em: new Date().toISOString()
+    }).eq("id", leadId);
+
+    document.getElementById("modal-responder-mensagem").style.display = "none";
+    mostrarMensagem("✅ Resposta enviada com sucesso!");
+    carregarLeads(true);
+    verificarPendenciasLeads();
+
+  } catch (e) {
+    mostrarMensagem("Erro ao enviar resposta: " + e.message);
+  }
+}
+
+// ─── Feedbacks das newsletters ────────────────────────────────────────────────
+async function carregarFeedbacksNewsletters() {
+  const container = document.getElementById("lista-feedbacks-newsletters");
+  if (!container) return;
+  container.innerHTML = "<p style='color:#999;font-size:13px'>Carregando feedbacks...</p>";
+
+  try {
+    const snap = await db.collection("newsletters")
+      .where("enviada", "==", true)
+      .orderBy("data_publicacao", "desc")
+      .limit(20).get();
+
+    let html = "";
+    let totalAbertos = 0;
+
+    snap.forEach(doc => {
+      const nl = doc.data();
+      const feedbacks = nl.feedbacks || [];
+      if (!feedbacks.length) return;
+
+      const abertos = feedbacks.filter(f => !f.respondido).length;
+      totalAbertos += abertos;
+
+      html += `
+        <div style="border:1px solid #e2e8f0;border-radius:8px;margin-bottom:12px;overflow:hidden">
+          <div style="background:#f8fafc;padding:10px 14px;display:flex;
+            justify-content:space-between;align-items:center;border-bottom:1px solid #e2e8f0">
+            <strong style="font-size:13px">📰 Edição ${nl.numero || "—"} — ${nl.titulo || ""}</strong>
+            ${abertos > 0
+              ? `<span style="background:#fef2f2;color:#e53e3e;border-radius:10px;
+                  padding:2px 8px;font-size:11px;font-weight:700">${abertos} pendente${abertos > 1 ? "s" : ""}</span>`
+              : `<span style="background:#f0fdf4;color:#22c55e;border-radius:10px;
+                  padding:2px 8px;font-size:11px">✅ Todos tratados</span>`}
+          </div>
+          <div style="padding:10px 14px">
+            ${feedbacks.map((f, idx) => `
+              <div style="display:flex;align-items:flex-start;gap:10px;padding:8px 0;
+                border-bottom:1px dashed #e2e8f0;${idx === feedbacks.length-1 ? 'border:none' : ''}">
+                <div style="flex:1">
+                  <div style="font-size:12px;color:#555;line-height:1.5">${f.texto}</div>
+                  <div style="font-size:10px;color:#aaa;margin-top:3px">
+                    ${f.segmento || "—"} · ${f.plano || "—"} ·
+                    ${f.ts ? new Date(f.ts).toLocaleString("pt-BR") : ""}
+                  </div>
+                  ${f.respondido
+                    ? `<div style="font-size:11px;color:#22c55e;margin-top:3px">
+                        ✅ Tratado: ${f.nota_interna || ""}</div>`
+                    : ""}
+                </div>
+                ${!f.respondido
+                  ? `<button onclick="abrirModalResponderFeedback('${doc.id}', ${idx}, \`${(f.texto||'').replace(/`/g,"'")}\`, '${f.segmento||''}', '${f.plano||''}')"
+                      style="padding:5px 10px;background:#f59e0b;color:#fff;border:none;
+                      border-radius:6px;font-size:11px;cursor:pointer;white-space:nowrap">
+                      💬 Tratar
+                    </button>`
+                  : ""}
+              </div>`).join("")}
+          </div>
+        </div>`;
+    });
+
+    container.innerHTML = html || "<p style='color:#999;font-size:13px'>Nenhum feedback registrado ainda.</p>";
+
+    // Atualizar badge
+    const badgeFb = document.getElementById("badge-feedbacks");
+    if (badgeFb) {
+      badgeFb.textContent = totalAbertos;
+      badgeFb.style.display = totalAbertos > 0 ? "inline" : "none";
+    }
+
+  } catch (e) {
+    container.innerHTML = `<p style='color:#e53e3e;font-size:13px'>Erro: ${e.message}</p>`;
+    console.error("[feedbacks]", e);
+  }
+}
+
+function abrirModalResponderFeedback(newsletterId, idx, texto, segmento, plano) {
+  document.getElementById("modal-feedback-newsletter-id").value = newsletterId;
+  document.getElementById("modal-feedback-index").value = idx;
+  document.getElementById("modal-feedback-original").textContent = texto;
+  document.getElementById("modal-feedback-meta").textContent = `${segmento} · ${plano}`;
+  document.getElementById("modal-feedback-resposta").value = "";
+  document.getElementById("modal-responder-feedback").style.display = "flex";
+}
+
+async function salvarRespostaFeedback() {
+  const nid   = document.getElementById("modal-feedback-newsletter-id").value;
+  const idx   = parseInt(document.getElementById("modal-feedback-index").value);
+  const nota  = document.getElementById("modal-feedback-resposta").value.trim();
+  if (!nota) return mostrarMensagem("Digite uma observação.");
+
+  try {
+    const snap = await db.collection("newsletters").doc(nid).get();
+    const feedbacks = snap.data()?.feedbacks || [];
+    feedbacks[idx] = { ...feedbacks[idx], respondido: true, nota_interna: nota,
+      respondido_em: new Date().toISOString() };
+    await db.collection("newsletters").doc(nid).update({ feedbacks });
+
+    document.getElementById("modal-responder-feedback").style.display = "none";
+    mostrarMensagem("✅ Feedback marcado como tratado!");
+    carregarFeedbacksNewsletters();
+    verificarPendenciasLeads();
+  } catch (e) {
+    mostrarMensagem("Erro: " + e.message);
   }
 }
 
