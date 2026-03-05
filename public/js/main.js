@@ -1745,10 +1745,12 @@ async function carregarLeads(resetar = false) {
           <td style="white-space:nowrap">
             ${temMensagem && !respondida
               ? `<span class="icon-btn" title="Responder mensagem"
-                   onclick="abrirModalResponderMensagem('${d.id}','${(d.mensagem||'').replace(/'/g,"\\'")}')">💬</span>`
+                  onclick="abrirModalResponderMensagem('${d.id}','${(d.mensagem||'').replace(/'/g,"\\'")}')">💬</span>`
               : ""}
             <span class="icon-btn" title="Registrar contato"
               onclick="abrirModalContatoLead('${d.id}')">📞</span>
+            <span class="icon-btn" title="Ver histórico de interações"
+              onclick="abrirModalHistorico('${d.id}')">📜</span>
           </td>
         </tr>`;
     }
@@ -2003,95 +2005,97 @@ function fecharModalContatoLead() {
   document.getElementById("modal-contato-lead").style.display = "none";
 }
 
-function abrirModalHistorico(leadId) {
+async function abrirModalHistorico(leadId) {
   const container = document.getElementById("conteudo-historico-lead");
+  if (!container) return;
   container.innerHTML = "<p>🔄 Carregando histórico...</p>";
+  document.getElementById("modal-historico-lead").style.display = "flex";
 
-  db.collection("leads").doc(leadId).collection("interacoes")
-    .orderBy("data", "desc")
-    .get()
-    .then(snapshot => {
-      if (snapshot.empty) {
-        container.innerHTML = "<p>⚠️ Nenhuma interação registrada.</p>";
-        return;
-      }
+  const { data: interacoes, error } = await window.supabase
+    .from("leads_interacoes")
+    .select("*")
+    .eq("lead_id", Number(leadId))
+    .order("data", { ascending: false });
 
-      const itens = snapshot.docs.map(doc => {
-        const d = doc.data();
-        const dataFormatada = d.data?.toDate().toLocaleDateString("pt-BR") || "Data desconhecida";
-        const horaFormatada = d.data?.toDate().toLocaleTimeString("pt-BR", { hour: '2-digit', minute: '2-digit' }) || "";
+  if (error) {
+    container.innerHTML = `<p style="color:red">Erro: ${error.message}</p>`;
+    return;
+  }
 
-        let resultadoHtml = "";
-        let destaqueEmail = false;
+  if (!interacoes || interacoes.length === 0) {
+    container.innerHTML = "<p style='color:#999'>Nenhuma interação registrada.</p>";
+    return;
+  }
 
-        if (d.tipo === "vinculacao") {
-          resultadoHtml = `
-            <p>🔗 Lead vinculado a <strong>${d.usuario_vinculado?.nome || "usuário desconhecido"}</strong></p>
-            <p><small>Feito por: ${d.feito_por || "Desconhecido"}</small></p>
-          `;
-        } else {
-          const resultadoTexto = d.resultado || "Sem detalhes";
-          destaqueEmail = resultadoTexto.toLowerCase().includes("e-mail enviado");
-
-          resultadoHtml = `
-            <em>Resultado:</em><br>
-            <div style="
-              background:${destaqueEmail ? '#e6f7ff' : '#f9f9f9'};
-              padding:8px;
-              border-radius:4px;
-              border-left:4px solid ${destaqueEmail ? '#007acc' : '#ccc'};
-            ">
-              ${resultadoTexto}
-            </div>
-          `;
-        }
-
-        return `
-          <div style="border-bottom:1px solid #ccc; padding:10px 0;">
-            <strong>${dataFormatada} às ${horaFormatada}</strong><br>
-            <em>Tipo:</em> ${d.tipo}<br>
-            <em>Responsável:</em> ${d.usuario_responsavel || d.feito_por || "Desconhecido"}<br>
-            ${resultadoHtml}
-          </div>
-        `;
-      }).join("");
-
-      container.innerHTML = itens;
-      document.getElementById("modal-historico-lead").style.display = "flex";
-    });
+  container.innerHTML = interacoes.map(d => {
+    const dataFmt = d.data
+      ? new Date(d.data).toLocaleString("pt-BR")
+      : "Data desconhecida";
+    const destaque = (d.resultado || "").toLowerCase().includes("e-mail");
+    return `
+      <div style="border-bottom:1px solid #eee;padding:10px 0">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <strong style="font-size:13px">${dataFmt}</strong>
+          <span style="font-size:11px;color:#888">${d.responsavel || "—"}</span>
+        </div>
+        <div style="font-size:12px;color:#666;margin:2px 0">
+          Tipo: <strong>${d.tipo || "—"}</strong>
+        </div>
+        <div style="
+          background:${destaque ? '#e6f7ff' : '#f9f9f9'};
+          border-left:3px solid ${destaque ? '#007acc' : '#ccc'};
+          border-radius:4px;
+          padding:8px;
+          font-size:13px;
+          margin-top:6px;
+          line-height:1.5">
+          ${d.resultado || "Sem detalhes"}
+        </div>
+      </div>`;
+  }).join("");
 }
-
 
 function fecharModalHistorico() {
   document.getElementById("modal-historico-lead").style.display = "none";
 }
 
-function salvarInteracaoLead() {
-  const tipo = dadosLeadAtual.preferencia_contato?.toLowerCase() || "e-mail";
-  const resultado = document.getElementById("resultado-contato-lead").value;
+async function salvarInteracaoLead() {
+  const tipo      = dadosLeadAtual.preferencia_contato?.toLowerCase() || "e-mail";
+  const resultado = document.getElementById("resultado-contato-lead").value.trim();
+  if (!resultado) return mostrarMensagem("Preencha o resultado do contato.");
 
-  if (!resultado.trim()) return mostrarMensagem("Preencha o resultado do contato.");
+  const adminLogado = JSON.parse(localStorage.getItem("usuarioLogado") || "{}");
+  const responsavel = adminLogado.nome || adminLogado.email || "admin";
 
-  db.collection("leads").doc(leadAtual).collection("interacoes").add({
-    tipo,
-    resultado,
-    data: new Date(),
-    usuario_responsavel: "adminId"
-  }).then(() => {
-    // Atualiza status do lead
-    db.collection("leads").doc(leadAtual).update({
-      status: "Em contato"
-    });
+  try {
+    // 1. Salvar interação
+    const { error: errInter } = await window.supabase
+      .from("leads_interacoes")
+      .insert([{
+        lead_id: Number(leadAtual),
+        tipo,
+        resultado,
+        responsavel,
+        data:        new Date().toISOString()
+      }]);
+    if (errInter) throw errInter;
 
-    mostrarMensagem("Interação registrada com sucesso.");
+    // 2. Atualizar status do lead
+    const { error: errStatus } = await window.supabase
+      .from("leads")
+      .update({ status: "Em contato" })
+      .eq("id", leadAtual);
+    if (errStatus) throw errStatus;
+
+    mostrarMensagem("✅ Interação registrada com sucesso.");
     fecharModalContatoLead();
-    carregarLeads();
-  }).catch(err => {
-    console.error("Erro ao salvar interação:", err);
-    mostrarMensagem("Erro ao salvar interação.");
-  });
-}
+    carregarLeads(true);
 
+  } catch (err) {
+    console.error("[interação]", err);
+    mostrarMensagem("Erro ao salvar interação: " + err.message);
+  }
+}
 
 document.getElementById("btn-enviar-email-lead").onclick = () => {
   abrirModalEnvioManualLead(leadAtual, dadosLeadAtual); // abre o modal de envio
