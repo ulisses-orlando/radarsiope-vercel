@@ -1,6 +1,5 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
-
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
@@ -8,7 +7,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=Lora:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
 
   <style>
-    /* ─── TEMAS — mesmo sistema do web app ──────────────────────────── */
+    /* ─── TEMAS ─────────────────────────────────────────────────────── */
     :root {
       --bg:#f1f5f9; --card:#fff; --card2:#f8fafc; --text:#0f172a;
       --accent:#0284c7; --accent2:#6366f1; --muted:#475569;
@@ -51,7 +50,7 @@
       min-height: 100vh;
       -webkit-font-smoothing: antialiased;
       transition: background .3s, color .3s;
-      padding-bottom: 70px;
+      padding-bottom: 80px;
     }
 
     /* ─── HEADER ────────────────────────────────────────────────────── */
@@ -64,144 +63,68 @@
       z-index: 300;
       box-shadow: 0 2px 12px rgba(0,0,0,.3);
     }
-    .header-top {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 10px;
-    }
-    .header-brand {
-      display: flex;
-      align-items: center;
-      gap: 9px;
-    }
-    .header-brand img {
-      height: 34px;
-      filter: brightness(0) invert(1);
-      flex-shrink: 0;
-    }
+    .header-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+    .header-brand { display: flex; align-items: center; gap: 9px; }
+    .header-brand img { height: 34px; filter: brightness(0) invert(1); flex-shrink: 0; }
     .header-brand-text strong {
-      display: block;
-      font-family: var(--font-head);
-      font-size: 13px;
-      font-weight: 800;
-      color: #fff;
-      line-height: 1.2;
+      display: block; font-family: var(--font-head); font-size: 13px;
+      font-weight: 800; color: #fff; line-height: 1.2;
     }
-    .header-brand-text small {
-      display: block;
-      font-size: 10px;
-      color: rgba(255,255,255,.6);
-      line-height: 1.2;
-    }
-    .header-actions {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-    }
+    .header-brand-text small { display: block; font-size: 10px; color: rgba(255,255,255,.6); }
+    .header-actions { display: flex; align-items: center; gap: 6px; }
     #nome-usuario {
-      font-family: var(--font-head);
-      font-size: 11px;
-      color: rgba(255,255,255,.8);
-      text-align: right;
-      max-width: 120px;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
+      font-family: var(--font-head); font-size: 11px; color: rgba(255,255,255,.8);
+      text-align: right; max-width: 130px; overflow: hidden;
+      text-overflow: ellipsis; white-space: nowrap;
     }
     .menu-toggle {
-      display: none;
-      padding: 7px 12px;
-      border-radius: 20px;
-      border: 1.5px solid rgba(255,255,255,.25);
-      background: rgba(255,255,255,.1);
-      color: #fff;
-      cursor: pointer;
-      font-family: var(--font-head);
-      font-size: 11px;
-      font-weight: 700;
-      touch-action: manipulation;
+      display: none; padding: 7px 12px; border-radius: 20px;
+      border: 1.5px solid rgba(255,255,255,.25); background: rgba(255,255,255,.1);
+      color: #fff; cursor: pointer; font-family: var(--font-head);
+      font-size: 11px; font-weight: 700; touch-action: manipulation;
     }
     .btn-logout {
-      padding: 7px 12px;
-      border-radius: 20px;
-      border: 1.5px solid rgba(255,255,255,.25);
-      background: rgba(239,68,68,.18);
-      color: #fff;
-      cursor: pointer;
-      font-family: var(--font-head);
-      font-size: 11px;
-      font-weight: 700;
-      touch-action: manipulation;
+      padding: 7px 12px; border-radius: 20px;
+      border: 1.5px solid rgba(255,255,255,.25); background: rgba(239,68,68,.18);
+      color: #fff; cursor: pointer; font-family: var(--font-head);
+      font-size: 11px; font-weight: 700; touch-action: manipulation;
       transition: background .15s;
     }
     .btn-logout:hover { background: rgba(239,68,68,.38); }
 
     /* ─── LAYOUT ────────────────────────────────────────────────────── */
-    .container {
-      display: flex;
-      min-height: calc(100vh - 66px);
-    }
+    .container { display: flex; min-height: calc(100vh - 66px); }
 
-    /* ─── NAV lateral ───────────────────────────────────────────────── */
+    /* ─── NAV ───────────────────────────────────────────────────────── */
     nav {
-      width: 230px;
-      flex-shrink: 0;
-      background: var(--card);
-      border-right: 1px solid var(--border);
-      padding: 14px 10px;
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
+      width: 230px; flex-shrink: 0; background: var(--card);
+      border-right: 1px solid var(--border); padding: 14px 10px;
+      display: flex; flex-direction: column; gap: 6px;
       transition: background .3s, border-color .3s;
     }
     .brand {
-      font-family: var(--font-head);
-      font-size: 10px;
-      font-weight: 700;
-      color: var(--muted);
-      letter-spacing: 1px;
-      text-transform: uppercase;
-      padding: 0 8px;
-      margin-bottom: 4px;
+      font-family: var(--font-head); font-size: 10px; font-weight: 700;
+      color: var(--muted); letter-spacing: 1px; text-transform: uppercase;
+      padding: 0 8px; margin-bottom: 4px;
     }
     .menu { list-style: none; display: flex; flex-direction: column; gap: 3px; }
     .menu button {
-      display: flex;
-      align-items: center;
-      gap: 9px;
-      width: 100%;
-      text-align: left;
-      padding: 10px 12px;
-      border-radius: 10px;
-      border: none;
-      background: transparent;
-      cursor: pointer;
-      color: var(--text);
-      font-family: var(--font-head);
-      font-size: 13px;
-      font-weight: 600;
-      letter-spacing: .2px;
-      transition: background .15s, color .15s;
-      touch-action: manipulation;
-      -webkit-tap-highlight-color: transparent;
+      display: flex; align-items: center; gap: 9px; width: 100%;
+      text-align: left; padding: 10px 12px; border-radius: 10px;
+      border: none; background: transparent; cursor: pointer;
+      color: var(--text); font-family: var(--font-head); font-size: 13px;
+      font-weight: 600; letter-spacing: .2px;
+      transition: background .15s, color .15s; touch-action: manipulation;
     }
     .menu button:hover { background: rgba(148,163,184,.1); }
-    .menu button[aria-current="true"] {
-      background: rgba(2,132,199,.12);
-      color: var(--accent);
-    }
+    .menu button[aria-current="true"] { background: rgba(2,132,199,.12); color: var(--accent); }
     [data-theme="escuro"] .menu button[aria-current="true"] { background: rgba(56,189,248,.12); }
     [data-theme="exito"]  .menu button[aria-current="true"] { background: rgba(34,197,94,.12); }
     [data-theme="aurora"] .menu button[aria-current="true"] { background: rgba(167,139,250,.12); }
     [data-theme="suave"]  .menu button[aria-current="true"] { background: rgba(224,122,47,.1); }
-
     .nav-footer {
-      margin-top: auto;
-      padding: 0 8px;
-      font-family: var(--font-head);
-      font-size: 10px;
-      color: var(--muted);
+      margin-top: auto; padding: 0 8px;
+      font-family: var(--font-head); font-size: 10px; color: var(--muted);
     }
 
     /* ─── MAIN ──────────────────────────────────────────────────────── */
@@ -209,11 +132,8 @@
 
     /* ─── SECTIONS ──────────────────────────────────────────────────── */
     .section {
-      display: none;
-      background: var(--card);
-      padding: 20px;
-      border-radius: var(--radius);
-      border: 1px solid var(--border);
+      display: none; background: var(--card); padding: 20px;
+      border-radius: var(--radius); border: 1px solid var(--border);
       box-shadow: 0 4px 20px var(--shadow);
       animation: slideUp .3s ease;
     }
@@ -223,290 +143,241 @@
       to   { opacity:1; transform:translateY(0); }
     }
     .section h2 {
-      margin-top: 0;
-      margin-bottom: 16px;
-      color: var(--accent);
-      font-family: var(--font-head);
-      font-size: .95rem;
-      font-weight: 800;
-      letter-spacing: .6px;
-      text-transform: uppercase;
-    }
-    .section h3 {
-      font-family: var(--font-head);
-      font-size: .88rem;
-      font-weight: 700;
-      color: var(--text);
-      margin-bottom: 8px;
+      margin: 0 0 18px; color: var(--accent); font-family: var(--font-head);
+      font-size: .95rem; font-weight: 800; letter-spacing: .6px;
+      text-transform: uppercase; padding-bottom: 10px;
+      border-bottom: 1px solid var(--border);
     }
 
-    /* ─── CARDS ─────────────────────────────────────────────────────── */
-    .card {
-      background: var(--card2);
-      padding: 14px;
-      border-radius: 10px;
+    /* ─── ASSINATURA CARD ───────────────────────────────────────────── */
+    .assinatura-card {
       border: 1px solid var(--border);
-      color: var(--text);
-    }
-
-    /* ─── NEWSLETTER CARDS ──────────────────────────────────────────── */
-    .lista-newsletters {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
-      gap: 12px;
-    }
-    .newsletter-card {
-      display: flex;
-      flex-direction: column;
-      border-radius: 12px;
+      border-left: 4px solid var(--st-cor, var(--accent));
+      border-radius: var(--radius);
+      padding: 16px;
+      margin-bottom: 14px;
       background: var(--card2);
-      border: 1px solid var(--border);
-      overflow: hidden;
-      transition: transform .18s, box-shadow .18s;
     }
-    .newsletter-card:hover { transform: translateY(-2px); box-shadow: 0 6px 20px var(--shadow); }
-    .newsletter-card img.thumb {
-      width: 100%;
-      height: 80px;
-      object-fit: cover;
-      display: block;
+    .assinatura-header {
+      display: flex; justify-content: space-between;
+      align-items: flex-start; gap: 12px; margin-bottom: 10px;
     }
-    .newsletter-card .conteudo { padding: 10px 12px; display: flex; flex-direction: column; gap: 5px; }
-    .newsletter-card .card-title {
-      margin: 0;
-      font-family: var(--font-head);
-      font-size: .85rem;
-      font-weight: 700;
-      color: var(--text);
-      line-height: 1.2;
+    .assinatura-plano {
+      font-family: var(--font-head); font-size: 15px;
+      font-weight: 800; color: var(--text);
     }
-    .meta {
-      display: flex;
-      gap: 6px;
-      align-items: center;
-      font-family: var(--font-head);
-      font-size: .76rem;
-      color: var(--muted);
-      flex-wrap: wrap;
+    .assinatura-ciclo { font-size: 12px; color: var(--muted); margin-top: 3px; }
+    .assinatura-status {
+      font-family: var(--font-head); font-size: 12px;
+      font-weight: 700; white-space: nowrap;
     }
-    .meta .classificacao {
-      background: rgba(2,132,199,.1);
-      color: var(--accent);
-      padding: 2px 7px;
-      border-radius: 20px;
-      font-weight: 700;
+    .assinatura-datas {
+      display: flex; gap: 16px; flex-wrap: wrap;
+      font-size: 12px; color: var(--muted); margin-bottom: 10px;
     }
-    .card-summary {
-      color: var(--muted);
-      font-size: .83rem;
-      line-height: 1.4;
-      display: -webkit-box;
-      -webkit-line-clamp: 2;
-      -webkit-box-orient: vertical;
-      overflow: hidden;
-    }
-    .acoes-card { display: flex; justify-content: flex-end; margin-top: 4px; }
-    .acoes-card .btn-ver {
-      padding: 6px 14px;
-      border-radius: 8px;
-      border: none;
-      background: var(--accent);
-      color: #fff;
-      cursor: pointer;
-      font-family: var(--font-head);
-      font-weight: 700;
-      font-size: .82rem;
-      touch-action: manipulation;
-      transition: opacity .15s;
-    }
-    .acoes-card .btn-ver:hover { opacity: .85; }
+    .assinatura-datas span strong { color: var(--text); }
 
-    /* ─── GRID SOLICITAÇÕES ─────────────────────────────────────────── */
-    .grid-solicitacoes {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-      gap: 12px;
-      margin-top: 12px;
-    }
-
-    /* ─── FILTROS ───────────────────────────────────────────────────── */
-    #filtros-solicitacoes {
-      display: flex;
-      gap: 6px;
-      flex-wrap: wrap;
+    /* Features */
+    .features-lista {
+      display: flex; flex-wrap: wrap; gap: 6px;
       margin-bottom: 12px;
     }
-    #filtros-solicitacoes button {
-      padding: 5px 12px;
-      border-radius: 20px;
-      border: 1px solid var(--border);
-      background: var(--card2);
-      color: var(--text);
-      font-family: var(--font-head);
-      font-size: 11px;
-      font-weight: 700;
-      cursor: pointer;
-      transition: .15s;
-      touch-action: manipulation;
+    .feature-badge {
+      display: inline-flex; align-items: center; gap: 4px;
+      background: rgba(2,132,199,.08); color: var(--accent);
+      border: 1px solid rgba(2,132,199,.2);
+      border-radius: 20px; padding: 3px 10px;
+      font-family: var(--font-head); font-size: 11px; font-weight: 700;
     }
-    #filtros-solicitacoes button:hover,
-    #filtros-solicitacoes button.ativo {
-      background: var(--accent);
-      color: #fff;
-      border-color: transparent;
+    [data-theme="exito"]  .feature-badge { background: rgba(34,197,94,.08); color: var(--accent); border-color: rgba(34,197,94,.2); }
+    [data-theme="aurora"] .feature-badge { background: rgba(167,139,250,.08); color: var(--accent); border-color: rgba(167,139,250,.2); }
+
+    /* Pagamentos dentro da assinatura */
+    .pagamentos-lista {
+      margin-top: 10px; border-top: 1px solid var(--border); padding-top: 10px;
+    }
+    .pagamentos-titulo {
+      font-family: var(--font-head); font-size: 11px; font-weight: 700;
+      color: var(--muted); text-transform: uppercase; letter-spacing: .5px;
+      margin-bottom: 8px;
+    }
+    .pagamento-row {
+      display: flex; justify-content: space-between; align-items: center;
+      gap: 8px; padding: 6px 0;
+      border-bottom: 1px dashed var(--border);
+      font-size: 12px;
+    }
+    .pagamento-row:last-child { border-bottom: none; }
+
+    /* ─── NEWSLETTER CARDS ──────────────────────────────────────────── */
+    .nl-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 12px;
+    }
+    .nl-card {
+      background: var(--card2); border: 1px solid var(--border);
+      border-radius: 12px; padding: 14px; display: flex;
+      flex-direction: column; gap: 10px;
+      transition: transform .18s, box-shadow .18s;
+    }
+    .nl-card:hover { transform: translateY(-2px); box-shadow: 0 6px 20px var(--shadow); }
+    .nl-card-expirado { opacity: .6; }
+    .nl-card-edicao {
+      font-family: var(--font-head); font-size: 10px; font-weight: 700;
+      color: var(--accent); text-transform: uppercase; letter-spacing: .5px;
+    }
+    .nl-card-titulo {
+      font-family: var(--font-head); font-size: 13px; font-weight: 700;
+      color: var(--text); line-height: 1.3;
+    }
+    .nl-card-data { font-size: 11px; color: var(--muted); }
+    .nl-card-footer { margin-top: auto; }
+    .btn-ver-nl {
+      display: inline-block; padding: 7px 14px; border-radius: 8px;
+      background: var(--accent); color: #fff; text-decoration: none;
+      font-family: var(--font-head); font-weight: 700; font-size: 12px;
+      transition: opacity .15s; touch-action: manipulation;
+    }
+    .btn-ver-nl:hover { opacity: .85; }
+    .nl-badge-expirado {
+      font-size: 11px; color: var(--muted);
+      font-family: var(--font-head);
     }
 
-    /* ─── FORMULÁRIOS ───────────────────────────────────────────────── */
+    /* ─── SUPORTE / SOLICITAÇÕES ────────────────────────────────────── */
     .form-row { display: flex; flex-direction: column; gap: 5px; max-width: 640px; margin-bottom: 12px; }
     label {
-      display: block;
-      font-family: var(--font-head);
-      font-weight: 700;
-      font-size: 11px;
-      color: var(--text);
-      letter-spacing: .3px;
+      display: block; font-family: var(--font-head); font-weight: 700;
+      font-size: 11px; color: var(--text); letter-spacing: .3px;
     }
     input, select, textarea {
-      width: 100%;
-      padding: 9px 12px;
-      border-radius: 8px;
-      border: 1px solid var(--border);
-      background: var(--card2);
-      color: var(--text);
-      font-size: .9rem;
-      font-family: var(--font-body);
-      outline: none;
-      transition: border-color .15s;
+      width: 100%; padding: 9px 12px; border-radius: 8px;
+      border: 1px solid var(--border); background: var(--card2);
+      color: var(--text); font-size: .9rem; font-family: var(--font-body);
+      outline: none; transition: border-color .15s;
     }
     input:focus, select:focus, textarea:focus { border-color: var(--accent); }
-    input[readonly] { opacity: .6; cursor: not-allowed; }
     .actions { display: flex; gap: 8px; align-items: center; margin-top: 10px; }
     .btn-primary {
-      padding: 10px 18px;
-      border-radius: 10px;
-      border: none;
-      background: var(--accent);
-      color: #fff;
-      font-family: var(--font-head);
-      font-weight: 700;
-      font-size: 13px;
-      cursor: pointer;
-      touch-action: manipulation;
-      transition: opacity .15s;
+      padding: 10px 18px; border-radius: 10px; border: none;
+      background: var(--accent); color: #fff; font-family: var(--font-head);
+      font-weight: 700; font-size: 13px; cursor: pointer;
+      touch-action: manipulation; transition: opacity .15s;
     }
     .btn-primary:hover { opacity: .85; }
 
+    #filtros-solicitacoes {
+      display: flex; gap: 6px; flex-wrap: wrap; margin: 14px 0 10px;
+    }
+    #filtros-solicitacoes button {
+      padding: 5px 12px; border-radius: 20px; border: 1px solid var(--border);
+      background: var(--card2); color: var(--text); font-family: var(--font-head);
+      font-size: 11px; font-weight: 700; cursor: pointer; transition: .15s;
+    }
+    #filtros-solicitacoes button:hover,
+    #filtros-solicitacoes button.ativo {
+      background: var(--accent); color: #fff; border-color: transparent;
+    }
+
+    .solicitacao-item {
+      border: 1px solid var(--border);
+      border-left: 4px solid var(--st-cor, var(--muted));
+      border-radius: 10px; padding: 12px 14px;
+      margin-bottom: 10px; background: var(--card2);
+    }
+    .solicitacao-header {
+      display: flex; justify-content: space-between;
+      align-items: center; margin-bottom: 6px;
+    }
+    .solicitacao-tipo {
+      font-family: var(--font-head); font-size: 12px;
+      font-weight: 700; color: var(--text); text-transform: capitalize;
+    }
+    .solicitacao-status { font-family: var(--font-head); font-size: 12px; font-weight: 700; }
+    .solicitacao-desc { font-size: 13px; color: var(--text); line-height: 1.5; margin-bottom: 6px; }
+    .solicitacao-resposta {
+      background: var(--card); border-radius: 6px; padding: 8px 10px;
+      font-size: 12px; color: var(--muted); margin: 6px 0;
+      border-left: 3px solid var(--accent);
+    }
+    .solicitacao-footer {
+      display: flex; justify-content: space-between;
+      align-items: center; margin-top: 8px; gap: 8px;
+    }
+    .solicitacao-meta { font-size: 11px; color: var(--muted); }
+    .btn-sm {
+      padding: 4px 10px; border-radius: 6px; border: 1px solid var(--border);
+      background: var(--card); color: var(--text); font-size: 11px;
+      font-family: var(--font-head); font-weight: 700; cursor: pointer;
+      transition: .15s;
+    }
+    .btn-sm:hover { background: var(--accent); color: #fff; border-color: transparent; }
+    .btn-sm-danger:hover { background: #ef4444; }
+    .btn-expandir {
+      margin-top: 6px; padding: 4px 10px; border-radius: 6px;
+      border: 1px solid var(--border); background: transparent;
+      color: var(--accent); font-size: 11px; font-family: var(--font-head);
+      font-weight: 700; cursor: pointer;
+    }
+
+    /* ─── FORMULÁRIOS ───────────────────────────────────────────────── */
+    input[readonly] { opacity: .6; cursor: not-allowed; }
+
+    /* ─── ESTADOS ───────────────────────────────────────────────────── */
+    .loading { color: var(--muted); font-size: 13px; padding: 8px 0; }
+    .erro { color: #ef4444; font-size: 13px; }
+    .empty-state {
+      text-align: center; padding: 40px 20px; color: var(--muted);
+      font-family: var(--font-head); font-size: 13px;
+    }
+
     /* ─── MODAL ─────────────────────────────────────────────────────── */
     .modal-overlay {
-      position: fixed;
-      inset: 0;
-      background: rgba(0,0,0,.6);
-      display: none;
-      align-items: center;
-      justify-content: center;
-      z-index: 1200;
+      position: fixed; inset: 0; background: rgba(0,0,0,.6);
+      display: none; align-items: center; justify-content: center; z-index: 1200;
     }
     .modal-overlay.show { display: flex; }
     .modal-content {
-      width: 100%;
-      max-width: 500px;
-      background: var(--card);
-      color: var(--text);
-      padding: 20px;
-      border-radius: var(--radius);
-      border: 1px solid var(--border);
-      box-shadow: 0 16px 40px var(--shadow);
+      width: 100%; max-width: 500px; background: var(--card);
+      color: var(--text); padding: 20px; border-radius: var(--radius);
+      border: 1px solid var(--border); box-shadow: 0 16px 40px var(--shadow);
     }
-    .modal-content h3 {
-      font-family: var(--font-head);
-      color: var(--text);
-      margin-bottom: 12px;
-    }
-    .modal-content textarea {
-      width: 100%;
-      margin-top: 6px;
-      background: var(--card2);
-      color: var(--text);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 8px 10px;
-    }
-    .modal-btns {
-      margin-top: 10px;
-      display: flex;
-      justify-content: flex-end;
-      gap: 8px;
-    }
+    .modal-content h3 { font-family: var(--font-head); color: var(--text); margin-bottom: 12px; }
+    .modal-btns { margin-top: 10px; display: flex; justify-content: flex-end; gap: 8px; }
     #fechar-edicao {
-      padding: 8px 14px;
-      border-radius: 8px;
-      border: 1px solid var(--border);
-      background: var(--card2);
-      color: var(--text);
-      cursor: pointer;
-      font-family: var(--font-head);
-      font-size: 13px;
+      padding: 8px 14px; border-radius: 8px; border: 1px solid var(--border);
+      background: var(--card2); color: var(--text); cursor: pointer;
+      font-family: var(--font-head); font-size: 13px;
     }
 
-    /* ─── SELETOR DE TEMAS — BARRA FIXA NO RODAPÉ ───────────────────── */
-    /* Idêntico ao verNewsletterComToken — sem display:none em nenhuma viewport */
+    /* ─── TEMA BAR ──────────────────────────────────────────────────── */
     .rs-theme-bar {
-      position: fixed;
-      bottom: 20px;
-      left: 50%;
-      transform: translateX(-50%);
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      background: var(--card);
-      border: 1px solid var(--border);
-      border-radius: 40px;
-      padding: 6px 14px;
-      box-shadow: 0 8px 32px var(--shadow);
-      z-index: 500;
-      transition: background .35s, border-color .35s;
-      white-space: nowrap;
+      position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+      display: flex; align-items: center; gap: 6px; background: var(--card);
+      border: 1px solid var(--border); border-radius: 40px;
+      padding: 6px 14px; box-shadow: 0 8px 32px var(--shadow); z-index: 500;
+      transition: background .35s, border-color .35s; white-space: nowrap;
     }
     .rs-theme-bar label {
-      font-family: var(--font-head);
-      font-size: 9px;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 1px;
-      color: var(--muted);
-      margin-right: 4px;
-      user-select: none;
+      font-family: var(--font-head); font-size: 9px; font-weight: 700;
+      text-transform: uppercase; letter-spacing: 1px; color: var(--muted);
+      margin-right: 4px; user-select: none;
     }
     .rs-theme-dot {
-      width: 22px;
-      height: 22px;
-      border-radius: 50%;
-      border: 2px solid transparent;
-      cursor: pointer;
+      width: 22px; height: 22px; border-radius: 50%;
+      border: 2px solid transparent; cursor: pointer;
       transition: transform .2s, border-color .2s;
-      position: relative;
-      flex-shrink: 0;
-      touch-action: manipulation;
-      -webkit-tap-highlight-color: transparent;
+      position: relative; flex-shrink: 0; touch-action: manipulation;
     }
     .rs-theme-dot:hover  { transform: scale(1.25); }
     .rs-theme-dot.ativo  { border-color: var(--text); transform: scale(1.15); }
-    .rs-theme-dot[data-t="claro"]      { background: linear-gradient(135deg,#f1f5f9,#0284c7); }
-    .rs-theme-dot[data-t="escuro"]     { background: linear-gradient(135deg,#0f172a,#38bdf8); }
-    .rs-theme-dot[data-t="suave"]      { background: linear-gradient(135deg,#fdf6ee,#e07a2f); }
-    .rs-theme-dot[data-t="minimalista"]{ background: linear-gradient(135deg,#f9f9f7,#111); }
-    .rs-theme-dot[data-t="exito"]      { background: linear-gradient(135deg,#021a0f,#22c55e); }
-    .rs-theme-dot[data-t="aurora"]     { background: linear-gradient(135deg,#0d0d1a,#a78bfa); }
-    .rs-theme-dot[data-t="aurora"]::after {
-      content: '';
-      position: absolute;
-      inset: -2px;
-      border-radius: 50%;
-      background: conic-gradient(from 0deg,#a78bfa,#f472b6,#38bdf8,#a78bfa);
-      z-index: -1;
-      filter: blur(2px);
-    }
-    /* Estreito: esconde label mas NUNCA os dots */
+    .rs-theme-dot[data-t="claro"]       { background: linear-gradient(135deg,#f1f5f9,#0284c7); }
+    .rs-theme-dot[data-t="escuro"]      { background: linear-gradient(135deg,#0f172a,#38bdf8); }
+    .rs-theme-dot[data-t="suave"]       { background: linear-gradient(135deg,#fdf6ee,#e07a2f); }
+    .rs-theme-dot[data-t="minimalista"] { background: linear-gradient(135deg,#f9f9f7,#111); }
+    .rs-theme-dot[data-t="exito"]       { background: linear-gradient(135deg,#021a0f,#22c55e); }
+    .rs-theme-dot[data-t="aurora"]      { background: linear-gradient(135deg,#0d0d1a,#a78bfa); }
     @media (max-width: 480px) {
       .rs-theme-bar label { display: none; }
       .rs-theme-bar { padding: 6px 10px; gap: 5px; }
@@ -515,14 +386,9 @@
     /* ─── RESPONSIVE ────────────────────────────────────────────────── */
     @media (max-width: 900px) {
       nav {
-        position: fixed;
-        left: 0; top: 66px; bottom: 0;
-        width: 230px;
-        transform: translateX(-110%);
-        transition: transform .22s;
-        z-index: 1100;
-        box-shadow: 4px 0 20px var(--shadow);
-        overflow-y: auto;
+        position: fixed; left: 0; top: 66px; bottom: 0; width: 230px;
+        transform: translateX(-110%); transition: transform .22s; z-index: 1100;
+        box-shadow: 4px 0 20px var(--shadow); overflow-y: auto;
       }
       nav.open { transform: translateX(0); }
       .menu-toggle { display: inline-flex; }
@@ -530,28 +396,23 @@
       .header-brand-text small { display: none; }
     }
     @media (min-width: 901px) { .menu-toggle { display: none; } }
-
     button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   </style>
 </head>
 
 <body>
-
-  <!-- Script de tema: aplicado antes do primeiro paint, evita flash -->
   <script>
     (function () {
-      const KEY = 'radar-tema';
-      const TEMAS = ['claro','escuro','suave','minimalista','exito','aurora'];
-      const t = TEMAS.includes(localStorage.getItem(KEY)) ? localStorage.getItem(KEY) : 'claro';
-      document.documentElement.setAttribute('data-theme', t);
+      const t = ['claro','escuro','suave','minimalista','exito','aurora'];
+      const v = t.includes(localStorage.getItem('radar-tema')) ? localStorage.getItem('radar-tema') : 'claro';
+      document.documentElement.setAttribute('data-theme', v);
     })();
   </script>
 
   <header>
     <div class="header-top">
       <div class="header-brand">
-        <img src="/icons/icon-192x192.png" alt="Radar SIOPE"
-             onerror="this.style.display='none'">
+        <img src="/icons/icon-192x192.png" alt="Radar SIOPE" onerror="this.style.display='none'">
         <div class="header-brand-text">
           <strong>Radar SIOPE</strong>
           <small>Guia Digital — FUNDEB e SIOPE</small>
@@ -559,8 +420,7 @@
       </div>
       <div class="header-actions">
         <div id="nome-usuario" aria-live="polite">Usuário</div>
-        <button id="menu-toggle" class="menu-toggle"
-                aria-expanded="false" aria-controls="main-nav">☰ Menu</button>
+        <button id="menu-toggle" class="menu-toggle" aria-expanded="false" aria-controls="main-nav">☰ Menu</button>
         <button id="btn-logout" class="btn-logout">⏏ Sair</button>
       </div>
     </div>
@@ -570,69 +430,69 @@
     <nav id="main-nav" aria-label="Navegação principal">
       <div class="brand">Área do Assinante</div>
       <ul class="menu" role="menu">
-        <li role="none"><button role="menuitem" data-target="bloco-assinaturas" aria-current="true">📄 Minhas Assinaturas</button></li>
-        <li role="none"><button role="menuitem" data-target="bloco-pagamentos">💳 Pagamentos</button></li>
-        <li role="none"><button role="menuitem" data-target="bloco-biblioteca">📚 Minhas Newsletters</button></li>
-        <li role="none"><button role="menuitem" data-target="bloco-suporte">💬 Suporte</button></li>
-        <li role="none"><button role="menuitem" data-target="bloco-perfil">⚙️ Perfil</button></li>
+        <li><button data-target="bloco-assinaturas"  aria-current="true">📄 Assinaturas</button></li>
+        <li><button data-target="bloco-biblioteca">📚 Minhas Newsletters</button></li>
+        <li><button data-target="bloco-suporte">💬 Suporte</button></li>
+        <li><button data-target="bloco-perfil">⚙️ Perfil</button></li>
       </ul>
       <div class="nav-footer">Radar SIOPE © 2025</div>
     </nav>
 
     <main>
-      <section id="bloco-assinaturas" class="section active" aria-labelledby="titulo-assinaturas">
-        <h2 id="titulo-assinaturas">📄 Minhas Assinaturas</h2>
-        <div id="minhas-assinaturas" class="card">Carregando...</div>
+
+      <!-- ASSINATURAS + PAGAMENTOS -->
+      <section id="bloco-assinaturas" class="section active">
+        <h2>📄 Minhas Assinaturas</h2>
+        <div id="minhas-assinaturas">Carregando...</div>
       </section>
 
-      <section id="bloco-pagamentos" class="section" aria-labelledby="titulo-pagamentos">
-        <h2 id="titulo-pagamentos">💳 Pagamentos</h2>
-        <div id="meus-pagamentos" class="card">Carregando...</div>
+      <!-- NEWSLETTERS -->
+      <section id="bloco-biblioteca" class="section">
+        <h2>📚 Minhas Newsletters</h2>
+        <div id="biblioteca-tecnica">Carregando...</div>
       </section>
 
-      <section id="bloco-biblioteca" class="section" aria-labelledby="titulo-biblioteca">
-        <h2 id="titulo-biblioteca">📚 Minhas Newsletters</h2>
-        <div id="biblioteca-tecnica" class="card">Carregando...</div>
-      </section>
-
-      <section id="bloco-suporte" class="section" aria-labelledby="titulo-suporte">
-        <h2 id="titulo-suporte">💬 Suporte</h2>
-        <div id="form-suporte">
-          <div class="form-row">
-            <label for="tipo-suporte">Tipo</label>
-            <select id="tipo-suporte" name="tipo-suporte">
-              <option value="treinamento">Treinamento</option>
-              <option value="consultoria">Consultoria</option>
-              <option value="newsletters">Newsletters</option>
-              <option value="sugestao de tema">Sugestão de tema para newsletter</option>
-              <option value="cancelamento">Solicitar cancelamento de assinatura</option>
-              <option value="outros">Outros</option>
-            </select>
-          </div>
-          <div class="form-row">
-            <label for="mensagem-suporte">Descrição</label>
-            <textarea id="mensagem-suporte" name="mensagem-suporte" rows="5"
-              placeholder="Descreva sua solicitação..."></textarea>
-          </div>
-          <div class="actions">
-            <button id="btn-enviar-suporte" class="btn-primary">Enviar solicitação</button>
-            <div id="suporte-feedback" style="color:var(--muted)"></div>
-          </div>
+      <!-- SUPORTE -->
+      <section id="bloco-suporte" class="section">
+        <h2>💬 Suporte</h2>
+        <div class="form-row">
+          <label for="tipo-suporte">Tipo de solicitação</label>
+          <select id="tipo-suporte">
+            <option value="treinamento">Treinamento</option>
+            <option value="consultoria">Consultoria</option>
+            <option value="newsletters">Newsletters</option>
+            <option value="sugestao de tema">Sugestão de tema para newsletter</option>
+            <option value="cancelamento">Solicitar cancelamento de assinatura</option>
+            <option value="outros">Outros</option>
+          </select>
         </div>
-        <h3 style="margin-top:24px">📜 Histórico de solicitações</h3>
+        <div class="form-row">
+          <label for="mensagem-suporte">Descrição</label>
+          <textarea id="mensagem-suporte" rows="5" placeholder="Descreva sua solicitação..."></textarea>
+        </div>
+        <div class="actions">
+          <button id="btn-enviar-suporte" class="btn-primary">Enviar solicitação</button>
+          <div id="suporte-feedback" style="color:var(--muted);font-size:13px"></div>
+        </div>
+
+        <h3 style="margin-top:24px;font-family:var(--font-head);font-size:.88rem;font-weight:700">
+          📜 Histórico de solicitações
+        </h3>
         <div id="filtros-solicitacoes">
-          <button data-filter="todos">Todos</button>
-          <button data-filter="pendente">Pendente</button>
-          <button data-filter="aberta">Aberta</button>
-          <button data-filter="atendida">Atendida</button>
-          <button data-filter="cancelada">Cancelada</button>
+          <button data-filter="todos" class="ativo" onclick="filtrarSolicitacoes('todos')">Todos</button>
+          <button data-filter="pendente"  onclick="filtrarSolicitacoes('pendente')">Pendente</button>
+          <button data-filter="aberta"    onclick="filtrarSolicitacoes('aberta')">Aberta</button>
+          <button data-filter="atendida"  onclick="filtrarSolicitacoes('atendida')">Atendida</button>
+          <button data-filter="cancelada" onclick="filtrarSolicitacoes('cancelada')">Cancelada</button>
         </div>
-        <div id="historico-solicitacoes" class="grid-solicitacoes"></div>
+        <div id="historico-solicitacoes"></div>
       </section>
 
-      <section id="bloco-perfil" class="section" aria-labelledby="titulo-perfil">
-        <h2 id="titulo-perfil">⚙️ Perfil</h2>
-        <div id="perfil-dados" class="card">
+      <!-- PERFIL -->
+      <section id="bloco-perfil" class="section">
+        <h2>⚙️ Perfil</h2>
+        <div class="card" style="background:var(--card2);border:1px solid var(--border);
+          border-radius:var(--radius);padding:16px">
           <form id="perfil-form" autocomplete="off" novalidate>
             <div style="display:flex;flex-direction:column;gap:10px;max-width:640px">
               <div class="form-row">
@@ -644,7 +504,7 @@
                 <input id="perfil-nome" name="nome" type="text" required />
               </div>
               <div class="form-row">
-                <label for="perfil-email">E‑mail</label>
+                <label for="perfil-email">E-mail</label>
                 <input id="perfil-email" name="email" type="email" required />
               </div>
               <div class="form-row">
@@ -679,22 +539,22 @@
               </div>
               <div class="actions">
                 <button id="perfil-salvar" type="button" class="btn-primary">Salvar</button>
-                <div id="perfil-status" style="color:var(--muted)"></div>
+                <div id="perfil-status" style="color:var(--muted);font-size:13px"></div>
               </div>
             </div>
           </form>
         </div>
       </section>
+
     </main>
   </div>
 
   <!-- Modal edição de solicitação -->
-  <div id="modal-editar-solicitacao" class="modal-overlay" role="dialog"
-       aria-modal="true" aria-labelledby="titulo-modal-editar">
-    <div class="modal-content" role="document">
-      <h3 id="titulo-modal-editar">✏️ Editar Solicitação</h3>
+  <div id="modal-editar-solicitacao" class="modal-overlay" role="dialog" aria-modal="true">
+    <div class="modal-content">
+      <h3>✏️ Editar Solicitação</h3>
       <label for="nova-descricao">Nova descrição</label>
-      <textarea id="nova-descricao" rows="4"></textarea>
+      <textarea id="nova-descricao" rows="4" style="margin-top:6px"></textarea>
       <div class="modal-btns">
         <button id="salvar-edicao" class="btn-primary">💾 Salvar</button>
         <button id="fechar-edicao">❌ Cancelar</button>
@@ -702,7 +562,7 @@
     </div>
   </div>
 
-  <!-- ── BARRA DE TEMAS FIXA NO RODAPÉ ─────────────────────────────────── -->
+  <!-- Barra de temas -->
   <div class="rs-theme-bar" role="group" aria-label="Seletor de tema">
     <label>Tema</label>
     <div class="rs-theme-dot" data-t="claro"       title="Claro"       onclick="setPainelTheme('claro')"></div>
@@ -719,43 +579,37 @@
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
   <script src="js/firebase-init.js"></script>
 
-  <!-- Navegação + tema -->
   <script>
     (function () {
       const KEY = 'radar-tema';
       const TEMAS = ['claro','escuro','suave','minimalista','exito','aurora'];
 
-      /* ── Tema ── */
       function aplicarTema(tema) {
         if (!TEMAS.includes(tema)) tema = 'claro';
         document.body.setAttribute('data-theme', tema);
         document.documentElement.setAttribute('data-theme', tema);
-        document.querySelectorAll('.rs-theme-dot').forEach(d => {
-          d.classList.toggle('ativo', d.dataset.t === tema);
-        });
+        document.querySelectorAll('.rs-theme-dot').forEach(d =>
+          d.classList.toggle('ativo', d.dataset.t === tema));
       }
+
       window.setPainelTheme = function (tema) {
-        aplicarTema(tema);
-        localStorage.setItem(KEY, tema);
+        aplicarTema(tema); localStorage.setItem(KEY, tema);
       };
+
       document.addEventListener('DOMContentLoaded', () => {
         aplicarTema(localStorage.getItem(KEY) || 'claro');
       });
 
-      /* ── Navegação de seções ── */
+      /* Navegação */
       const menu = document.querySelectorAll('.menu button[data-target]');
       const sections = document.querySelectorAll('.section');
       const menuToggle = document.getElementById('menu-toggle');
       const nav = document.getElementById('main-nav');
-      const modal = document.getElementById('modal-editar-solicitacao');
-      let lastFocused = null;
 
       function showSection(id, pushState = true) {
         sections.forEach(s => s.classList.toggle('active', s.id === id));
-        menu.forEach(btn => {
-          btn.setAttribute('aria-current', btn.dataset.target === id ? 'true' : 'false');
-        });
-        document.dispatchEvent(new CustomEvent('section:shown', { detail: { id } }));
+        menu.forEach(btn =>
+          btn.setAttribute('aria-current', btn.dataset.target === id ? 'true' : 'false'));
         if (pushState) history.replaceState(null, '', '#' + id);
         if (window.innerWidth <= 900) {
           nav.classList.remove('open');
@@ -770,15 +624,6 @@
         const initial = hash && document.getElementById(hash) ? hash : 'bloco-assinaturas';
         showSection(initial, false);
 
-        try {
-          const dados = JSON.parse(localStorage.getItem('usuarioLogado') || 'null');
-          if (dados) {
-            const nome = dados.nome || dados.email || 'Usuário';
-            const el = document.getElementById('nome-usuario');
-            if (el) el.textContent = nome + (dados.tipo_perfil ? ` (${dados.tipo_perfil})` : '');
-          }
-        } catch (e) { }
-
         /* Logout */
         document.getElementById('btn-logout').addEventListener('click', () => {
           localStorage.removeItem('usuarioLogado');
@@ -791,35 +636,22 @@
         menuToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
       });
 
-      /* ── Modal ── */
-      function openModal() {
-        lastFocused = document.activeElement;
-        modal.classList.add('show');
-        modal.querySelector('textarea')?.focus();
-      }
-      function closeModal() {
-        modal.classList.remove('show');
-        lastFocused?.focus();
-      }
-      document.getElementById('fechar-edicao').addEventListener('click', closeModal);
+      /* Modal */
+      document.getElementById('fechar-edicao').addEventListener('click', () =>
+        document.getElementById('modal-editar-solicitacao').classList.remove('show'));
       document.getElementById('salvar-edicao').addEventListener('click', () => {
-        const newText = document.getElementById('nova-descricao').value;
-        document.dispatchEvent(new CustomEvent('solicitacao:edit:save', { detail: { text: newText } }));
-        closeModal();
+        if (typeof salvarEdicaoSolicitacao === 'function') salvarEdicaoSolicitacao();
       });
       document.addEventListener('keydown', e => {
-        if (e.key === 'Escape' && modal.classList.contains('show')) closeModal();
+        const modal = document.getElementById('modal-editar-solicitacao');
+        if (e.key === 'Escape' && modal.classList.contains('show'))
+          modal.classList.remove('show');
       });
-
-      window.visualizarNewsletter = id =>
-        document.dispatchEvent(new CustomEvent('newsletter:view', { detail: { id } }));
-      window.RadarSiopeUI = { showSection, openModal, closeModal };
     })();
   </script>
 
   <script src="js/functions.js"></script>
   <script src="js/perfil.js"></script>
   <script src="js/painel.js"></script>
-
 </body>
 </html>
