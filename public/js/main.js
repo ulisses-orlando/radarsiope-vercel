@@ -1793,7 +1793,7 @@ async function verificarPendenciasLeads() {
     const { count: msgAbertas } = await window.supabase
       .from("leads")
       .select("*", { count: "exact", head: true })
-      .eq("mensagem_respondida", false)
+      .or("mensagem_respondida.is.null,mensagem_respondida.eq.false")
       .not("mensagem", "is", null);
 
     // Feedbacks sem resposta (todos os feedbacks de newsletters)
@@ -1979,23 +1979,24 @@ async function salvarRespostaFeedback() {
 let leadAtual = null;
 let dadosLeadAtual = null;
 
-function abrirModalContatoLead(leadId) {
+async function abrirModalContatoLead(leadId) {
   leadAtual = leadId;
 
-  db.collection("leads").doc(leadId).get().then(doc => {
-    if (!doc.exists) return mostrarMensagem("Lead não encontrado.");
-    dadosLeadAtual = doc.data();
+  const { data: lead, error } = await window.supabase
+    .from("leads").select("*").eq("id", leadId).single();
 
-    const tipo = dadosLeadAtual.preferencia_contato?.toLowerCase() || "E-mail";
-    document.getElementById("tipo-contato-lead").value = formatarPreferencia(tipo);
-    document.getElementById("resultado-contato-lead").value = "";
-    document.getElementById("acao-email-lead").style.display = (tipo === "e-mail") ? "block" : "none";
-    document.getElementById("email-contato-lead").value = dadosLeadAtual.email || "";
-    document.getElementById("campo-email-lead").style.display = (tipo === "e-mail") ? "block" : "none";
-    document.getElementById("btn-enviar-email-lead").style.display = (tipo === "e-mail") ? "inline-block" : "none";
+  if (error || !lead) return mostrarMensagem("Lead não encontrado.");
+  dadosLeadAtual = lead;
 
-    document.getElementById("modal-contato-lead").style.display = "flex";
-  });
+  const tipo = lead.preferencia_contato?.toLowerCase() || "e-mail";
+  document.getElementById("tipo-contato-lead").value = formatarPreferencia(tipo);
+  document.getElementById("resultado-contato-lead").value = "";
+  document.getElementById("acao-email-lead").style.display = (tipo === "e-mail") ? "block" : "none";
+  document.getElementById("email-contato-lead").value = lead.email || "";
+  document.getElementById("campo-email-lead").style.display = (tipo === "e-mail") ? "block" : "none";
+  document.getElementById("btn-enviar-email-lead").style.display = (tipo === "e-mail") ? "inline-block" : "none";
+
+  document.getElementById("modal-contato-lead").style.display = "flex";
 }
 
 function fecharModalContatoLead() {
