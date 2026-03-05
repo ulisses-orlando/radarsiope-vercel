@@ -35,17 +35,17 @@ function fmtBRL(centavos) {
 
 function fmtStatus(status) {
   const mapa = {
-    ativa:                { cor: '#22c55e', icone: '✅', label: 'Ativa' },
-    ativo:                { cor: '#22c55e', icone: '✅', label: 'Ativa' },
-    pendente_pagamento:   { cor: '#f59e0b', icone: '⏳', label: 'Aguardando pagamento' },
-    pendente:             { cor: '#f59e0b', icone: '⏳', label: 'Pendente' },
-    cancelada:            { cor: '#ef4444', icone: '❌', label: 'Cancelada' },
-    cancelado:            { cor: '#ef4444', icone: '❌', label: 'Cancelada' },
-    pago:                 { cor: '#22c55e', icone: '💰', label: 'Pago' },
-    aprovado:             { cor: '#22c55e', icone: '💰', label: 'Aprovado' },
-    falhou:               { cor: '#ef4444', icone: '❌', label: 'Falhou' },
-    aberta:               { cor: '#3b82f6', icone: '📤', label: 'Aberta' },
-    atendida:             { cor: '#22c55e', icone: '✅', label: 'Atendida' },
+    ativa: { cor: '#22c55e', icone: '✅', label: 'Ativa' },
+    ativo: { cor: '#22c55e', icone: '✅', label: 'Ativa' },
+    pendente_pagamento: { cor: '#f59e0b', icone: '⏳', label: 'Aguardando pagamento' },
+    pendente: { cor: '#f59e0b', icone: '⏳', label: 'Pendente' },
+    cancelada: { cor: '#ef4444', icone: '❌', label: 'Cancelada' },
+    cancelado: { cor: '#ef4444', icone: '❌', label: 'Cancelada' },
+    pago: { cor: '#22c55e', icone: '💰', label: 'Pago' },
+    aprovado: { cor: '#22c55e', icone: '💰', label: 'Aprovado' },
+    falhou: { cor: '#ef4444', icone: '❌', label: 'Falhou' },
+    aberta: { cor: '#3b82f6', icone: '📤', label: 'Aberta' },
+    atendida: { cor: '#22c55e', icone: '✅', label: 'Atendida' },
   };
   return mapa[String(status).toLowerCase()] || { cor: '#94a3b8', icone: '❔', label: status || '—' };
 }
@@ -57,7 +57,7 @@ function montarUrlWebApp(nid, envioId, uid, assinaturaId, token) {
     `env=${envioId || ''}`,
     `uid=${uid || ''}`,
     assinaturaId ? `assinaturaId=${assinaturaId}` : '',
-    token        ? `token=${token}` : '',
+    token ? `token=${token}` : '',
   ].filter(Boolean).join('&');
   const b64 = btoa(qs);
   return `https://app.radarsiope.com.br/verNewsletterComToken.html?d=${encodeURIComponent(b64)}`;
@@ -133,13 +133,13 @@ async function carregarAssinaturas(uid) {
 
       // Features badges
       const featuresLabels = {
-        newsletter_texto:      { label: 'Newsletter',    icone: '📰' },
-        newsletter_audio:      { label: 'Podcast',       icone: '🎧' },
-        newsletter_video:      { label: 'Vídeo',         icone: '🎬' },
-        newsletter_infografico:{ label: 'Infográfico',   icone: '📊' },
-        biblioteca_acesso:     { label: 'Biblioteca',    icone: '📚' },
-        alertas_prioritarios:  { label: 'Alertas',       icone: '🔔' },
-        grupo_whatsapp_vip:    { label: 'WhatsApp VIP',  icone: '💬' },
+        newsletter_texto: { label: 'Newsletter', icone: '📰' },
+        newsletter_audio: { label: 'Podcast', icone: '🎧' },
+        newsletter_video: { label: 'Vídeo', icone: '🎬' },
+        newsletter_infografico: { label: 'Infográfico', icone: '📊' },
+        biblioteca_acesso: { label: 'Biblioteca', icone: '📚' },
+        alertas_prioritarios: { label: 'Alertas', icone: '🔔' },
+        grupo_whatsapp_vip: { label: 'WhatsApp VIP', icone: '💬' },
       };
 
       const featuresHtml = Object.entries(featuresLabels)
@@ -280,8 +280,8 @@ async function carregarBibliotecaNewsletters(uid) {
           </div>
           <div class="nl-card-footer">
             ${expirado
-              ? `<span class="nl-badge-expirado">⏰ Acesso expirado</span>`
-              : `<a href="${url}" class="btn-ver-nl" target="_blank">
+          ? `<span class="nl-badge-expirado">⏰ Acesso expirado</span>`
+          : `<a href="${url}" class="btn-ver-nl" target="_blank">
                    Ler edição →
                  </a>`}
           </div>
@@ -307,9 +307,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
 function enviarSolicitacao() {
   const usuario = JSON.parse(localStorage.getItem('usuarioLogado'));
-  const tipo     = document.getElementById('tipo-suporte').value;
+  const tipo = document.getElementById('tipo-suporte').value;
   const descricao = document.getElementById('mensagem-suporte').value.trim();
-  const feedback  = document.getElementById('suporte-feedback');
+  const feedback = document.getElementById('suporte-feedback');
 
   feedback.innerHTML = '';
   if (!descricao) {
@@ -323,6 +323,12 @@ function enviarSolicitacao() {
     status: 'aberta',
     data_solicitacao: new Date().toISOString(),
   }).then(() => {
+
+    db.collection('admin_contadores').doc('pendencias').set(
+      { solicitacoes: firebase.firestore.FieldValue.increment(1) },
+      { merge: true }
+    );
+
     feedback.innerHTML = `<span style="color:#22c55e">✅ Solicitação enviada com sucesso!</span>`;
     document.getElementById('mensagem-suporte').value = '';
     carregarHistoricoSolicitacoes(usuario.id);
@@ -407,9 +413,9 @@ function carregarHistoricoSolicitacoes(uid) {
               <span class="solicitacao-meta">${fmtData(s.data_solicitacao)}</span>
               <div style="display:flex;gap:6px">
                 ${status === 'pendente'
-                  ? `<button class="btn-sm" onclick="editarSolicitacao('${uid}','${doc.id}','${(s.descricao||'').replace(/'/g,"\\'")}')">✏️ Editar</button>` : ''}
+            ? `<button class="btn-sm" onclick="editarSolicitacao('${uid}','${doc.id}','${(s.descricao || '').replace(/'/g, "\\'")}')">✏️ Editar</button>` : ''}
                 ${status === 'aberta' || status === 'pendente'
-                  ? `<button class="btn-sm btn-sm-danger" onclick="cancelarSolicitacao('${uid}','${doc.id}')">Cancelar</button>` : ''}
+            ? `<button class="btn-sm btn-sm-danger" onclick="cancelarSolicitacao('${uid}','${doc.id}')">Cancelar</button>` : ''}
               </div>
             </div>
           </div>`;
@@ -464,6 +470,12 @@ function cancelarSolicitacao(uid, solicitacaoId) {
     .update({ status: 'cancelada' })
     .then(() => carregarHistoricoSolicitacoes(uid))
     .catch(err => { console.error(err); mostrarMensagem('Erro ao cancelar.'); });
+
+  db.collection('admin_contadores').doc('pendencias').set(
+    { solicitacoes: firebase.firestore.FieldValue.increment(-1) },
+    { merge: true }
+  );
+  
 }
 
 // ─── Expandir mensagem admin ──────────────────────────────────────────────────

@@ -572,32 +572,32 @@ async function abrirModalNewsletter(docId = null, isEdit = false) {
   col1.appendChild(proTempSection);
 
   const tiposSnap = await db.collection("tipo_newsletters").get();
-const tiposDocs = tiposSnap.docs.map(doc => ({ id: doc.id, nome: doc.data().nome })).filter(t => t.nome);
-const tiposArr  = tiposDocs.map(t => t.nome); // só nomes — usado no filtro de templates abaixo
+  const tiposDocs = tiposSnap.docs.map(doc => ({ id: doc.id, nome: doc.data().nome })).filter(t => t.nome);
+  const tiposArr = tiposDocs.map(t => t.nome); // só nomes — usado no filtro de templates abaixo
 
-// Select tipo: value = ID, label = nome, fieldName = 'tipo'
-const tipoWrap = document.createElement('div');
-tipoWrap.className = 'field';
-const tipoLabel = document.createElement('label');
-tipoLabel.innerText = 'Tipo';
-const tipoSelect = document.createElement('select');
-tipoSelect.dataset.fieldName = 'tipo';
-tipoSelect.style.width = '100%';
-tipoSelect.innerHTML = '<option value="">Selecione...</option>';
-tiposDocs.forEach(t => {
-  const opt = document.createElement('option');
-  opt.value = t.id;
-  opt.textContent = t.nome;
-  if (t.id === data.tipo) opt.selected = true; // data.tipo = ID gravado
-  tipoSelect.appendChild(opt);
-});
-tipoWrap.appendChild(tipoLabel);
-tipoWrap.appendChild(tipoSelect);
-col1.appendChild(tipoWrap);
+  // Select tipo: value = ID, label = nome, fieldName = 'tipo'
+  const tipoWrap = document.createElement('div');
+  tipoWrap.className = 'field';
+  const tipoLabel = document.createElement('label');
+  tipoLabel.innerText = 'Tipo';
+  const tipoSelect = document.createElement('select');
+  tipoSelect.dataset.fieldName = 'tipo';
+  tipoSelect.style.width = '100%';
+  tipoSelect.innerHTML = '<option value="">Selecione...</option>';
+  tiposDocs.forEach(t => {
+    const opt = document.createElement('option');
+    opt.value = t.id;
+    opt.textContent = t.nome;
+    if (t.id === data.tipo) opt.selected = true; // data.tipo = ID gravado
+    tipoSelect.appendChild(opt);
+  });
+  tipoWrap.appendChild(tipoLabel);
+  tipoWrap.appendChild(tipoSelect);
+  col1.appendChild(tipoWrap);
 
-// Classificação: passa 'classificacao' como fieldName para salvar no campo correto
-const selectClassificacao = generateDomainSelect('classificacao', ['Básica', 'Premium'], data.classificacao || 'Básica');
-col1.appendChild(selectClassificacao);
+  // Classificação: passa 'classificacao' como fieldName para salvar no campo correto
+  const selectClassificacao = generateDomainSelect('classificacao', ['Básica', 'Premium'], data.classificacao || 'Básica');
+  col1.appendChild(selectClassificacao);
 
   // Campo "Enviada" (somente leitura)
   const enviadaDiv = document.createElement("div");
@@ -970,14 +970,14 @@ col1.appendChild(selectClassificacao);
     payload.blocos = coletarBlocosEdicao();
 
     // ── Validações existentes ─────────────────────────────────────────────
-    const htmlNewsletter      = payload['html_conteudo'] || "";
-    const htmlCompleto        = payload['conteudo_html_completo'] || "";
-    const blocos              = payload.blocos || [];
+    const htmlNewsletter = payload['html_conteudo'] || "";
+    const htmlCompleto = payload['conteudo_html_completo'] || "";
+    const blocos = payload.blocos || [];
 
     if (!validarNewsletter(htmlNewsletter, blocos)) return;
-    if (!validarPlaceholders(htmlNewsletter))       return;
-    if (!validarNewsletter(htmlCompleto, blocos))   return;
-    if (!validarPlaceholders(htmlCompleto))         return;
+    if (!validarPlaceholders(htmlNewsletter)) return;
+    if (!validarNewsletter(htmlCompleto, blocos)) return;
+    if (!validarPlaceholders(htmlCompleto)) return;
 
     // ── Data de publicação ────────────────────────────────────────────────
     const inputData = document.getElementById("data_publicacao");
@@ -1666,15 +1666,15 @@ const _LEADS_LIMIT = 20;
 
 async function carregarLeads(resetar = false) {
   const tabela = document.getElementById("tabela-leads");
-  const resumo  = document.getElementById("resumo-leads");
+  const resumo = document.getElementById("resumo-leads");
   if (!tabela) return;
 
   if (resetar) _leadsOffset = 0;
 
-  const perfil      = document.getElementById("filtro-perfil-lead")?.value || "";
+  const perfil = document.getElementById("filtro-perfil-lead")?.value || "";
   const preferencia = document.getElementById("filtro-preferencia")?.value || "";
-  const status      = document.getElementById("filtro-status-lead-consulta")?.value || "";
-  const termoBusca  = document.getElementById("busca-leads")?.value?.trim().toLowerCase() || "";
+  const status = document.getElementById("filtro-status-lead-consulta")?.value || "";
+  const termoBusca = document.getElementById("busca-leads")?.value?.trim().toLowerCase() || "";
 
   tabela.innerHTML = "<tr><td colspan='11'>Carregando...</td></tr>";
 
@@ -1687,9 +1687,9 @@ async function carregarLeads(resetar = false) {
         `nome_lowercase.ilike.${termoBusca}%,email.ilike.%${termoBusca}%`
       );
     }
-    if (perfil)      query = query.eq("perfil", perfil);
+    if (perfil) query = query.eq("perfil", perfil);
     if (preferencia) query = query.eq("preferencia_contato", preferencia);
-    if (status)      query = query.eq("status", status);
+    if (status) query = query.eq("status", status);
 
     // Ordenação: mensagens não respondidas primeiro, depois mais recentes
     query = query
@@ -1710,20 +1710,20 @@ async function carregarLeads(resetar = false) {
     let linhas = "";
 
     for (const d of leads) {
-      const statusAtual   = d.status || "Novo";
-      const destaque      = statusAtual === "Convertido" ? "lead-convertido" : "";
-      const dataFmt       = d.data_criacao ? new Date(d.data_criacao).toLocaleString("pt-BR") : "";
-      const interesses    = Array.isArray(d.interesses) ? d.interesses.join(", ") : (d.interesses || "");
+      const statusAtual = d.status || "Novo";
+      const destaque = statusAtual === "Convertido" ? "lead-convertido" : "";
+      const dataFmt = d.data_criacao ? new Date(d.data_criacao).toLocaleString("pt-BR") : "";
+      const interesses = Array.isArray(d.interesses) ? d.interesses.join(", ") : (d.interesses || "");
       contadores[statusAtual] = (contadores[statusAtual] || 0) + 1;
 
       // Mensagem — destaque se não respondida
       const temMensagem = !!d.mensagem;
-      const respondida  = !!d.mensagem_respondida;
+      const respondida = !!d.mensagem_respondida;
       const celMensagem = temMensagem
         ? respondida
           ? `<span style="color:#22c55e;font-size:12px" title="${d.mensagem}">✅ ${d.mensagem.slice(0, 25)}…</span>`
           : `<span style="color:#e53e3e;font-weight:700;cursor:pointer;font-size:12px"
-               title="${d.mensagem}" onclick="abrirModalResponderMensagem('${d.id}','${(d.mensagem||'').replace(/'/g,"\\'")}')">
+               title="${d.mensagem}" onclick="abrirModalResponderMensagem('${d.id}','${(d.mensagem || '').replace(/'/g, "\\'")}')">
                🔴 ${d.mensagem.slice(0, 25)}${d.mensagem.length > 25 ? '…' : ''}
              </span>`
         : "—";
@@ -1741,22 +1741,22 @@ async function carregarLeads(resetar = false) {
           <td style="font-size:11px">${d.nome_municipio || ""}${d.cod_uf ? ` / ${d.cod_uf}` : ""}</td>
           <td>
             <select onchange="atualizarStatusLeadSupabase('${d.id}', this.value)">
-              ${["Novo","Em contato","Negociando","Convertido","Descartado"].map(op =>
-                `<option value="${op}" ${op === statusAtual ? "selected" : ""}>${op}</option>`
-              ).join("")}
+              ${["Novo", "Em contato", "Negociando", "Convertido", "Descartado"].map(op =>
+        `<option value="${op}" ${op === statusAtual ? "selected" : ""}>${op}</option>`
+      ).join("")}
             </select>
           </td>
           <td style="white-space:nowrap">
             ${temMensagem && !respondida
-              ? `<span class="icon-btn" title="Responder mensagem"
-                  onclick="abrirModalResponderMensagem('${d.id}','${(d.mensagem||'').replace(/'/g,"\\'")}')">💬</span>`
-              : ""}
+          ? `<span class="icon-btn" title="Responder mensagem"
+                  onclick="abrirModalResponderMensagem('${d.id}','${(d.mensagem || '').replace(/'/g, "\\'")}')">💬</span>`
+          : ""}
             <span class="icon-btn" title="Registrar contato"
               onclick="abrirModalContatoLead('${d.id}')">📞</span>
             <span class="icon-btn" title="Ver histórico de interações"
               onclick="abrirModalHistorico('${d.id}')">📜</span>
             <span class="icon-btn" title="Prorrogar acesso"
-              onclick="abrirModalProrrogarAcesso('${d.id}', '${(d.nome||'').replace(/'/g,"\\'")}')">⏰</span>
+              onclick="abrirModalProrrogarAcesso('${d.id}', '${(d.nome || '').replace(/'/g, "\\'")}')">⏰</span>
           </td>
         </tr>`;
     }
@@ -1837,7 +1837,7 @@ function abrirModalResponderMensagem(leadId, mensagem) {
 }
 
 async function enviarRespostaMensagemLead() {
-  const leadId  = document.getElementById("modal-responder-lead-id").value;
+  const leadId = document.getElementById("modal-responder-lead-id").value;
   const resposta = document.getElementById("modal-resposta-texto").value.trim();
   if (!resposta) return mostrarMensagem("Digite uma resposta.");
 
@@ -1906,15 +1906,15 @@ async function carregarFeedbacksNewsletters() {
             justify-content:space-between;align-items:center;border-bottom:1px solid #e2e8f0">
             <strong style="font-size:13px">📰 Edição ${nl.numero || "—"} — ${nl.titulo || ""}</strong>
             ${abertos > 0
-              ? `<span style="background:#fef2f2;color:#e53e3e;border-radius:10px;
+          ? `<span style="background:#fef2f2;color:#e53e3e;border-radius:10px;
                   padding:2px 8px;font-size:11px;font-weight:700">${abertos} pendente${abertos > 1 ? "s" : ""}</span>`
-              : `<span style="background:#f0fdf4;color:#22c55e;border-radius:10px;
+          : `<span style="background:#f0fdf4;color:#22c55e;border-radius:10px;
                   padding:2px 8px;font-size:11px">✅ Todos tratados</span>`}
           </div>
           <div style="padding:10px 14px">
             ${feedbacks.map((f, idx) => `
               <div style="display:flex;align-items:flex-start;gap:10px;padding:8px 0;
-                border-bottom:1px dashed #e2e8f0;${idx === feedbacks.length-1 ? 'border:none' : ''}">
+                border-bottom:1px dashed #e2e8f0;${idx === feedbacks.length - 1 ? 'border:none' : ''}">
                 <div style="flex:1">
                   <div style="font-size:12px;color:#555;line-height:1.5">${f.texto}</div>
                   <div style="font-size:10px;color:#aaa;margin-top:3px">
@@ -1922,17 +1922,17 @@ async function carregarFeedbacksNewsletters() {
                     ${f.ts ? new Date(f.ts).toLocaleString("pt-BR") : ""}
                   </div>
                   ${f.respondido
-                    ? `<div style="font-size:11px;color:#22c55e;margin-top:3px">
+              ? `<div style="font-size:11px;color:#22c55e;margin-top:3px">
                         ✅ Tratado: ${f.nota_interna || ""}</div>`
-                    : ""}
+              : ""}
                 </div>
                 ${!f.respondido
-                  ? `<button onclick="abrirModalResponderFeedback('${doc.id}', ${idx}, \`${(f.texto||'').replace(/`/g,"'")}\`, '${f.segmento||''}', '${f.plano||''}')"
+              ? `<button onclick="abrirModalResponderFeedback('${doc.id}', ${idx}, \`${(f.texto || '').replace(/`/g, "'")}\`, '${f.segmento || ''}', '${f.plano || ''}')"
                       style="padding:5px 10px;background:#f59e0b;color:#fff;border:none;
                       border-radius:6px;font-size:11px;cursor:pointer;white-space:nowrap">
                       💬 Tratar
                     </button>`
-                  : ""}
+              : ""}
               </div>`).join("")}
           </div>
         </div>`;
@@ -1963,19 +1963,27 @@ function abrirModalResponderFeedback(newsletterId, idx, texto, segmento, plano) 
 }
 
 async function salvarRespostaFeedback() {
-  const nid   = document.getElementById("modal-feedback-newsletter-id").value;
-  const idx   = parseInt(document.getElementById("modal-feedback-index").value);
-  const nota  = document.getElementById("modal-feedback-resposta").value.trim();
+  const nid = document.getElementById("modal-feedback-newsletter-id").value;
+  const idx = parseInt(document.getElementById("modal-feedback-index").value);
+  const nota = document.getElementById("modal-feedback-resposta").value.trim();
   if (!nota) return mostrarMensagem("Digite uma observação.");
 
   try {
     const snap = await db.collection("newsletters").doc(nid).get();
     const feedbacks = snap.data()?.feedbacks || [];
-    feedbacks[idx] = { ...feedbacks[idx], respondido: true, nota_interna: nota,
-      respondido_em: new Date().toISOString() };
+    feedbacks[idx] = {
+      ...feedbacks[idx], respondido: true, nota_interna: nota,
+      respondido_em: new Date().toISOString()
+    };
     await db.collection("newsletters").doc(nid).update({ feedbacks });
 
     document.getElementById("modal-responder-feedback").style.display = "none";
+
+    await db.collection('admin_contadores').doc('pendencias').set(
+      { feedbacks: firebase.firestore.FieldValue.increment(-1) },
+      { merge: true }
+    );
+
     mostrarMensagem("✅ Feedback marcado como tratado!");
     carregarFeedbacksNewsletters();
     verificarPendenciasLeads();
@@ -2066,7 +2074,7 @@ function fecharModalHistorico() {
 }
 
 async function salvarInteracaoLead() {
-  const tipo      = dadosLeadAtual.preferencia_contato?.toLowerCase() || "e-mail";
+  const tipo = dadosLeadAtual.preferencia_contato?.toLowerCase() || "e-mail";
   const resultado = document.getElementById("resultado-contato-lead").value.trim();
   if (!resultado) return mostrarMensagem("Preencha o resultado do contato.");
 
@@ -2082,7 +2090,7 @@ async function salvarInteracaoLead() {
         tipo,
         resultado,
         responsavel,
-        data:        new Date().toISOString()
+        data: new Date().toISOString()
       }]);
     if (errInter) throw errInter;
 
@@ -4195,7 +4203,7 @@ async function abrirModalProrrogarAcesso(leadId, nomeLead) {
     document.body.appendChild(modal);
 
     // Listener para campo personalizado
-    document.getElementById("prorrogar-dias").addEventListener("change", function() {
+    document.getElementById("prorrogar-dias").addEventListener("change", function () {
       document.getElementById("prorrogar-dias-custom").style.display =
         this.value === "0" ? "inline-block" : "none";
     });
@@ -4248,14 +4256,14 @@ async function abrirModalProrrogarAcesso(leadId, nomeLead) {
       </thead>
       <tbody>
         ${envios.map(e => {
-          const expira    = e.expira_em ? new Date(e.expira_em) : null;
-          const expirado  = expira && expira < new Date();
-          const expiraFmt = expira ? expira.toLocaleString("pt-BR") : "—";
-          const envioFmt  = e.data_envio ? new Date(e.data_envio).toLocaleDateString("pt-BR") : "—";
-          const situacao  = !expira ? "—"
-            : expirado ? `<span style="color:#e53e3e;font-weight:700">⛔ Expirado</span>`
-            : `<span style="color:#22c55e;font-weight:700">✅ Ativo</span>`;
-          return `
+    const expira = e.expira_em ? new Date(e.expira_em) : null;
+    const expirado = expira && expira < new Date();
+    const expiraFmt = expira ? expira.toLocaleString("pt-BR") : "—";
+    const envioFmt = e.data_envio ? new Date(e.data_envio).toLocaleDateString("pt-BR") : "—";
+    const situacao = !expira ? "—"
+      : expirado ? `<span style="color:#e53e3e;font-weight:700">⛔ Expirado</span>`
+        : `<span style="color:#22c55e;font-weight:700">✅ Ativo</span>`;
+    return `
             <tr style="border-bottom:1px solid #f1f5f9">
               <td style="padding:8px">
                 <input type="checkbox" class="chk-envio" value="${e.id}" checked>
@@ -4266,7 +4274,7 @@ async function abrirModalProrrogarAcesso(leadId, nomeLead) {
               <td style="padding:8px;text-align:center">${e.acessos_totais ?? 0}</td>
               <td style="padding:8px">${situacao}</td>
             </tr>`;
-        }).join("")}
+  }).join("")}
       </tbody>
     </table>`;
 }

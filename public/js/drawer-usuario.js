@@ -1,10 +1,11 @@
 // ─── drawer-usuario.js ───────────────────────────────────────────────────────
 // Drawer lateral completo para gestão de assinantes no admin
+// Contador centralizado em /admin_contadores/pendencias
 
 // ─── Estado ──────────────────────────────────────────────────────────────────
-let _drawerUid      = null;
-let _drawerDados    = {};
-let _drawerTabAtual = 'resumo';
+let _drawerUid       = null;
+let _drawerDados     = {};
+let _drawerTabAtual  = 'resumo';
 let _drawerAcessoSel = {};
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -39,9 +40,125 @@ function _stBadge(status) {
     border-radius:20px;padding:2px 9px;font-size:11px;font-weight:700;white-space:nowrap">${status||'—'}</span>`;
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// CONTADOR CENTRALIZADO — /admin_contadores/pendencias
+// ─────────────────────────────────────────────────────────────────────────────
+// Campos: solicitacoes | feedbacks | parcelas_vencidas
+//
+// Leitura: sempre 1 documento, independente do número de usuários.
+// Escrita: FieldValue.increment pontual nos eventos relevantes.
+//
+// Quando o doc não existe (primeiro acesso), dispara _recalcularESeedContadores()
+// que varre os dados uma única vez, persiste o resultado e depois só lê o doc.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+const _CONTADOR_REF = () => db.collection('admin_contadores').doc('pendencias');
+
+/**
+ * Incrementa ou decrementa um campo do doc contador.
+ * Uso: _incrementarContador('solicitacoes', -1)
+ */
+async function _incrementarContador(campo, delta = 1) {
+  try {
+    await _CONTADOR_REF().set(
+      { [campo]: firebase.firestore.FieldValue.increment(delta) },
+      { merge: true }
+    );
+  } catch(e) {
+    console.warn('[contador]', campo, delta, e.message);
+  }
+}
+
+/**
+ * Lê o badge a partir do doc contador — 1 leitura sempre.
+ * Se o doc não existir, dispara o seed automático.
+ */
+async function atualizarBadgeUsuarios() {
+  const badge = document.getElementById('badge-usuarios');
+  if (!badge) return;
+  try {
+    const snap = await _CONTADOR_REF().get();
+    if (!snap.exists) {
+      // Primeiro acesso: calcula, persiste e depois atualiza o badge
+      badge.textContent = '…';
+      badge.style.display = 'inline';
+      await _recalcularESeedContadores();
+      return;
+    }
+    const d = snap.data();
+    const sol  = Math.max(0, d.solicitacoes      || 0);
+    const feed = Math.max(0, d.feedbacks         || 0);
+    const pag  = Math.max(0, d.parcelas_vencidas || 0);
+    const total = sol + feed + pag;
+
+    badge.textContent   = total > 99 ? '99+' : total;
+    badge.style.display = total > 0 ? 'inline' : 'none';
+    badge.title = [
+      `📬 Solicitações pendentes/abertas: ${sol}`,
+      `💬 Feedbacks sem resposta: ${feed}`,
+      `💳 Parcelas vencidas: ${pag}`,
+    ].join('\n');
+  } catch(e) {
+    console.warn('[badge-usuarios]', e.message);
+  }
+}
+
+/**
+ * Calcula contadores varrendo os dados reais e persiste no doc.
+ * Chamado automaticamente só quando o doc não existe.
+ * Pode ser chamado manualmente pelo admin via botão "Recalcular".
+ */
+async function _recalcularESeedContadores() {
+  let solicitacoes = 0, feedbacks = 0, parcelas_vencidas = 0;
+  const hoje = new Date();
+  try {
+    const usersSnap = await db.collection('usuarios').limit(500).get();
+    await Promise.all(usersSnap.docs.map(async uDoc => {
+      try {
+        const s = await db.collection('usuarios').doc(uDoc.id)
+          .collection('solicitacoes').where('status','in',['pendente','aberta']).get();
+        solicitacoes += s.size;
+      } catch(e) {}
+      try {
+        const assinSnap = await db.collection('usuarios').doc(uDoc.id)
+          .collection('assinaturas').get();
+        await Promise.all(assinSnap.docs.map(async aDoc => {
+          try {
+            const pagSnap = await db.collection('usuarios').doc(uDoc.id)
+              .collection('assinaturas').doc(aDoc.id)
+              .collection('pagamentos').where('status','==','pendente').get();
+            pagSnap.forEach(pDoc => {
+              const v = pDoc.data().data_vencimento;
+              const vd = v ? (v.toDate ? v.toDate() : new Date(v)) : null;
+              if (vd && vd < hoje) parcelas_vencidas++;
+            });
+          } catch(e) {}
+        }));
+      } catch(e) {}
+    }));
+
+    // Feedbacks de newsletters (coleção raiz, sem collectionGroup)
+    const nlSnap = await db.collection('newsletters')
+      .where('enviada','==',true).limit(100).get();
+    nlSnap.forEach(doc => {
+      const fbs = doc.data().feedbacks || [];
+      feedbacks += fbs.filter(f => !f.respondido && !f.nota_interna).length;
+    });
+
+    await _CONTADOR_REF().set({
+      solicitacoes, feedbacks, parcelas_vencidas,
+      recalculado_em: firebase.firestore.FieldValue.serverTimestamp(),
+    });
+    console.info('[contador] seed:', { solicitacoes, feedbacks, parcelas_vencidas });
+  } catch(e) {
+    console.warn('[contador seed]', e.message);
+  }
+  atualizarBadgeUsuarios();
+}
+
 // ─── Abrir / Fechar ───────────────────────────────────────────────────────────
 async function abrirDrawerUsuario(uid) {
-  _drawerUid = uid;
+  _drawerUid      = uid;
   _drawerTabAtual = 'resumo';
   _drawerAcessoSel = {};
 
@@ -204,7 +321,7 @@ async function _renderPagamentos() {
 
         const rowBg = vencido ? '#fff1f2' : status === 'pago' ? '#f0fdf4' : '';
         const parcela = p.numero_parcela
-          ? `Parc. ${p.numero_parcela}${p.mpInstallments>1 ? `/${p.mpInstallments}` : ''}` : 'Pgto.';
+          ? `Parc. ${p.numero_parcela}${p.mpInstallments>1?`/${p.mpInstallments}`:''}` : 'Pgto.';
 
         linhas += `
           <tr style="background:${rowBg}">
@@ -277,10 +394,10 @@ async function _renderSolicitacoes() {
 
     let pendentes = 0;
     snap.forEach(doc => {
-      const s = doc.data();
+      const s   = doc.data();
       const status = (s.status||'pendente').toLowerCase();
       if (status === 'aberta' || status === 'pendente') pendentes++;
-      const c = _stColor(status);
+      const c       = _stColor(status);
       const isAdmin = s.tipo === 'envio_manual_admin';
 
       const respostaHtml = s.resposta
@@ -317,7 +434,7 @@ async function _renderSolicitacoes() {
             ${_stBadge(s.status)}
           </div>
           <div style="font-size:13px;color:#334155;margin-top:6px;line-height:1.5">
-            ${isAdmin ? (s.assunto ? `<strong>${s.assunto}</strong><br>` : '') : ''}
+            ${isAdmin ? (s.assunto?`<strong>${s.assunto}</strong><br>`:'') : ''}
             ${s.descricao || s.mensagem || '—'}
           </div>
           ${respostaHtml}${acoes}
@@ -328,19 +445,23 @@ async function _renderSolicitacoes() {
     if (pendentes) {
       html = `<div class="drawer-alerta amarelo">🟠 <strong>${pendentes}</strong> solicitação(ões) aguardando atendimento</div>` + html;
     }
-
     body.innerHTML = html;
   } catch(e) {
     body.innerHTML = `<p style="color:#ef4444">Erro: ${e.message}</p>`;
   }
 }
 
+// Responder → decrementa contador
 async function _drawerResponderSolicitacao(uid, solId, novoStatus) {
   const resposta = prompt(`Resposta para o usuário (status → ${novoStatus}):`);
   if (resposta === null) return;
   try {
     await db.collection('usuarios').doc(uid).collection('solicitacoes').doc(solId)
       .update({ status: novoStatus, resposta, data_resposta: new Date() });
+
+    // ▼ decrementa contador central
+    await _incrementarContador('solicitacoes', -1);
+
     mostrarMensagem('Solicitação atualizada!');
     _ativarDrawerTab('solicitacoes');
     atualizarBadgeUsuarios();
@@ -370,7 +491,7 @@ async function _renderEnvios() {
 
       let linhas = '';
       for (const ed of enviosSnap.docs) {
-        const e = ed.data();
+        const e      = ed.data();
         const status = (e.status||'').toLowerCase();
         if (status === 'falhou' || status === 'erro' || status === 'falha') totalFalhos++;
 
@@ -388,13 +509,13 @@ async function _renderEnvios() {
 
         const qs = btoa([
           `nid=${e.newsletter_id||e.id_edicao||''}`,
-          `env=${ed.id}`,`uid=${uid}`,
+          `env=${ed.id}`, `uid=${uid}`,
           `assinaturaId=${assinDoc.id}`,
-          e.token_acesso?`token=${e.token_acesso}`:''
+          e.token_acesso ? `token=${e.token_acesso}` : ''
         ].filter(Boolean).join('&'));
-        const urlVer = `https://app.radarsiope.com.br/verNewsletterComToken.html?d=${encodeURIComponent(qs)}`;
-        const expirou = e.expira_em && new Date() > (
-          e.expira_em?.toDate ? e.expira_em.toDate() : new Date(e.expira_em));
+        const urlVer  = `https://app.radarsiope.com.br/verNewsletterComToken.html?d=${encodeURIComponent(qs)}`;
+        const expirou = e.expira_em && new Date() >
+          (e.expira_em?.toDate ? e.expira_em.toDate() : new Date(e.expira_em));
 
         linhas += `
           <tr>
@@ -436,9 +557,8 @@ async function _renderEnvios() {
         </div>`;
     }
 
-    let alertas = totalFalhos
+    const alertas = totalFalhos
       ? `<div class="drawer-alerta vermelho">❌ <strong>${totalFalhos}</strong> envio(s) com falha</div>` : '';
-
     body.innerHTML = alertas + (html || '<p style="color:#94a3b8;font-size:13px">Nenhum envio registrado.</p>');
   } catch(e) {
     body.innerHTML = `<p style="color:#ef4444">Erro: ${e.message}</p>`;
@@ -491,12 +611,11 @@ async function _renderInteracoes() {
   try {
     const snap = await db.collection('usuarios').doc(uid)
       .collection('interacoes').orderBy('data','desc').limit(50).get();
-
     const hist = document.getElementById('interacoes-historico');
     if (snap.empty) {
-      hist.innerHTML = '<p style="color:#94a3b8;font-size:13px">Nenhuma interação registrada.</p>'; return;
+      hist.innerHTML = '<p style="color:#94a3b8;font-size:13px">Nenhuma interação registrada.</p>';
+      return;
     }
-
     let h = '<div class="drawer-secao"><div class="drawer-secao-titulo">📜 Histórico</div>';
     snap.forEach(doc => {
       const i = doc.data();
@@ -548,7 +667,7 @@ async function _renderAcesso() {
       body.innerHTML = '<p style="color:#94a3b8;font-size:13px">Nenhuma assinatura.</p>'; return;
     }
 
-    let html = '';
+    let html  = '';
     const hoje = new Date();
 
     for (const assinDoc of assinSnap.docs) {
@@ -556,7 +675,6 @@ async function _renderAcesso() {
       const enviosSnap = await db.collection('usuarios').doc(uid)
         .collection('assinaturas').doc(assinDoc.id)
         .collection('envios').orderBy('data_envio','desc').get();
-
       if (enviosSnap.empty) continue;
 
       let itens = '';
@@ -587,8 +705,8 @@ async function _renderAcesso() {
               </div>
             </div>
             ${expirou
-              ? '<span style="background:#fee2e2;color:#ef4444;border-radius:20px;padding:2px 8px;font-size:11px;flex-shrink:0">⛔</span>'
-              : '<span style="background:#dcfce7;color:#22c55e;border-radius:20px;padding:2px 8px;font-size:11px;flex-shrink:0">✅</span>'}
+              ? '<span style="background:#fee2e2;color:#ef4444;border-radius:20px;padding:2px 8px;font-size:11px;flex-shrink:0">⛔ Expirado</span>'
+              : '<span style="background:#dcfce7;color:#22c55e;border-radius:20px;padding:2px 8px;font-size:11px;flex-shrink:0">✅ Ativo</span>'}
           </div>`;
       }
 
@@ -646,17 +764,14 @@ async function _confirmarProrrogacaoUsuario(diasFixo) {
   const dias    = diasFixo || custom;
   const resetar = document.getElementById('resetar-acessos')?.checked;
   const uid     = _drawerUid;
-
   if (!dias || dias < 1) { mostrarMensagem('Informe quantos dias prorrogar.'); return; }
   const selecionados = Object.values(_drawerAcessoSel);
   if (!selecionados.length) { mostrarMensagem('Selecione ao menos um envio.'); return; }
-
   try {
-    const batch = db.batch();
+    const batch  = db.batch();
     const novaExp = new Date();
     novaExp.setDate(novaExp.getDate() + dias);
     const ts = firebase.firestore.Timestamp.fromDate(novaExp);
-
     for (const { assinId, envioId } of selecionados) {
       const ref = db.collection('usuarios').doc(uid)
         .collection('assinaturas').doc(assinId)
@@ -671,31 +786,17 @@ async function _confirmarProrrogacaoUsuario(diasFixo) {
   } catch(e) { mostrarMensagem('Erro: ' + e.message); }
 }
 
-// ─── BADGE NO MENU ────────────────────────────────────────────────────────────
-async function atualizarBadgeUsuarios() {
-  const badge = document.getElementById('badge-usuarios');
-  if (!badge) return;
-  try {
-    const [solSnap, pagSnap, envSnap] = await Promise.all([
-      db.collectionGroup('solicitacoes').where('status','in',['aberta','pendente']).get(),
-      db.collectionGroup('pagamentos').where('status','==','pendente').get(),
-      db.collectionGroup('envios').where('status','in',['falhou','erro','falha']).get(),
-    ]);
-    const total = solSnap.size + pagSnap.size + envSnap.size;
-    badge.textContent = total > 99 ? '99+' : total;
-    badge.style.display = total > 0 ? 'inline' : 'none';
-  } catch(e) { console.warn('[badge-usuarios]', e.message); }
-}
+// ─── Exportações globais ─────────────────────────────────────────────────────
+window.abrirDrawerUsuario           = abrirDrawerUsuario;
+window.fecharDrawerUsuario          = fecharDrawerUsuario;
+window._ativarDrawerTab             = _ativarDrawerTab;
+window._drawerResponderSolicitacao  = _drawerResponderSolicitacao;
+window._salvarInteracaoUsuario      = _salvarInteracaoUsuario;
+window._confirmarProrrogacaoUsuario = _confirmarProrrogacaoUsuario;
+window._toggleAcessoSel             = _toggleAcessoSel;
+window._selecionarTodosAcesso       = _selecionarTodosAcesso;
+window.atualizarBadgeUsuarios       = atualizarBadgeUsuarios;
+window._recalcularESeedContadores   = _recalcularESeedContadores;
+window._incrementarContador         = _incrementarContador;
 
-// Exporta funções para escopo global
-window.abrirDrawerUsuario          = abrirDrawerUsuario;
-window.fecharDrawerUsuario         = fecharDrawerUsuario;
-window._ativarDrawerTab            = _ativarDrawerTab;
-window._drawerResponderSolicitacao = _drawerResponderSolicitacao;
-window._salvarInteracaoUsuario     = _salvarInteracaoUsuario;
-window._confirmarProrrogacaoUsuario= _confirmarProrrogacaoUsuario;
-window._toggleAcessoSel            = _toggleAcessoSel;
-window._selecionarTodosAcesso      = _selecionarTodosAcesso;
-window.atualizarBadgeUsuarios      = atualizarBadgeUsuarios;
-
-document.addEventListener('DOMContentLoaded', () => setTimeout(atualizarBadgeUsuarios, 2500));
+document.addEventListener('DOMContentLoaded', () => setTimeout(atualizarBadgeUsuarios, 1500));

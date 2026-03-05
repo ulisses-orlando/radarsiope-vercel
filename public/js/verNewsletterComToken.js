@@ -159,8 +159,8 @@ function detectarAcesso(destinatario, newsletter, segmento, envio) {
   // versus acesso_pro_horas da newsletter.
   let acessoProTemp = false;
   if (!isAssinante
-      && newsletter.acesso_pro_temporario === true
-      && (newsletter.acesso_pro_horas || 0) > 0) {
+    && newsletter.acesso_pro_temporario === true
+    && (newsletter.acesso_pro_horas || 0) > 0) {
 
     // Tenta obter o timestamp de referência do envio (primeiro acesso ou data de criação)
     const ref = envio?.primeiro_acesso || envio?.expira_em || null;
@@ -324,13 +324,13 @@ async function renderMunicipio(destinatario, acesso) {
 
 function renderMidia(newsletter, acesso) {
   const secao = document.getElementById('secao-midia');
-  const wrap  = document.getElementById('midia-conteudo');
+  const wrap = document.getElementById('midia-conteudo');
   if (!secao || !wrap) return;
 
   // Campos aceitos (admin pode ter gravado com nome levemente diferente)
-  const audioUrl  = newsletter.audio_url      || newsletter.url_podcast      || '';
-  const videoUrl  = newsletter.video_url      || newsletter.url_video        || '';
-  const infoUrl   = newsletter.infografico_url || newsletter.url_infografico  || '';
+  const audioUrl = newsletter.audio_url || newsletter.url_podcast || '';
+  const videoUrl = newsletter.video_url || newsletter.url_video || '';
+  const infoUrl = newsletter.infografico_url || newsletter.url_infografico || '';
 
   if (!audioUrl && !videoUrl && !infoUrl) return; // nada a exibir
 
@@ -522,10 +522,10 @@ function toggleFaq(idx) {
 // Escala de avaliação — 5 níveis de progressão emocional
 const REACTIONS = [
   { emoji: '😞', label: 'Decepcionou', key: 'decepcionou' },
-  { emoji: '😐', label: 'Regular',     key: 'regular'     },
-  { emoji: '🙂', label: 'Bom',         key: 'bom'         },
-  { emoji: '😀', label: 'Muito bom',   key: 'muito_bom'   },
-  { emoji: '🤩', label: 'Excelente',   key: 'excelente'   },
+  { emoji: '😐', label: 'Regular', key: 'regular' },
+  { emoji: '🙂', label: 'Bom', key: 'bom' },
+  { emoji: '😀', label: 'Muito bom', key: 'muito_bom' },
+  { emoji: '🤩', label: 'Excelente', key: 'excelente' },
 ];
 
 async function renderReactions(nid, uid) {
@@ -1021,7 +1021,7 @@ const TEMAS_DISPONIVEIS = ['claro', 'escuro', 'suave', 'minimalista', 'exito', '
 // Carregar tema salvo (ou usar 'claro' como padrão)
 function carregarTema() {
   const temaSalvo = localStorage.getItem('radar-tema');
-  
+
   // Verificar se o tema salvo é válido
   if (temaSalvo && TEMAS_DISPONIVEIS.includes(temaSalvo)) {
     aplicarTema(temaSalvo);
@@ -1037,9 +1037,9 @@ function aplicarTema(tema) {
     console.warn('[Tema] Tema inválido:', tema);
     tema = 'claro';
   }
-  
+
   document.body.setAttribute('data-theme', tema);
-  
+
   // Atualizar botões ativos (se existirem)
   document.querySelectorAll('[data-theme-btn]').forEach(btn => {
     const btnTema = btn.getAttribute('data-theme-btn');
@@ -1049,25 +1049,25 @@ function aplicarTema(tema) {
       btn.classList.remove('ativo');
     }
   });
-  
+
   console.log('[Tema] Aplicado:', tema);
 }
 
 // Trocar tema (chamado pelo onclick dos botões)
 function setTheme(tema) {
   console.log('[Tema] Mudando para:', tema);
-  
+
   if (!TEMAS_DISPONIVEIS.includes(tema)) {
     console.warn('[Tema] Tema inválido:', tema);
     return;
   }
-  
+
   // Aplicar tema
   aplicarTema(tema);
-  
+
   // Salvar no localStorage
   localStorage.setItem('radar-tema', tema);
-  
+
   // Feedback visual (opcional)
   const btn = document.querySelector(`[data-theme-btn="${tema}"]`);
   if (btn) {
@@ -1095,24 +1095,24 @@ if (document.readyState === 'loading') {
 
 // ─── Estado do drawer ────────────────────────────────────────────────────────
 const _drawer = {
-  aberto:       false,
-  nivel:        1,          // 1 = tipos, 2 = edições do tipo
-  tipoAtivo:    null,       // { id, nome, icone }
-  edicaoAtual:  null,       // id da edição sendo lida
-  tipoAtual:    null,       // tipo da edição sendo lida
+  aberto: false,
+  nivel: 1,          // 1 = tipos, 2 = edições do tipo
+  tipoAtivo: null,       // { id, nome, icone }
+  edicaoAtual: null,       // id da edição sendo lida
+  tipoAtual: null,       // tipo da edição sendo lida
   edicoesCache: {},         // { [tipoId]: [array de edições] } — memória de sessão
-  contadores:   [],         // refs dos setInterval dos contadores regressivos
+  contadores: [],         // refs dos setInterval dos contadores regressivos
 };
 
 // ─── Cache de tipos no localStorage (24h) ───────────────────────────────────
-const DRAWER_CACHE_KEY    = 'rs_tipos_cache';
+const DRAWER_CACHE_KEY = 'rs_tipos_cache';
 const DRAWER_CACHE_TS_KEY = 'rs_tipos_cache_ts';
-const DRAWER_CACHE_TTL    = 24 * 60 * 60 * 1000; // 24h em ms
+const DRAWER_CACHE_TTL = 24 * 60 * 60 * 1000; // 24h em ms
 
 async function _getTipos() {
   try {
-    const ts   = parseInt(localStorage.getItem(DRAWER_CACHE_TS_KEY) || '0', 10);
-    const raw  = localStorage.getItem(DRAWER_CACHE_KEY);
+    const ts = parseInt(localStorage.getItem(DRAWER_CACHE_TS_KEY) || '0', 10);
+    const raw = localStorage.getItem(DRAWER_CACHE_KEY);
     if (raw && (Date.now() - ts) < DRAWER_CACHE_TTL) {
       return JSON.parse(raw);
     }
@@ -1123,13 +1123,13 @@ async function _getTipos() {
     .get();
 
   const tipos = snap.docs.map(d => ({
-    id:    d.id,
-    nome:  d.data().nome  || d.id,
+    id: d.id,
+    nome: d.data().nome || d.id,
     icone: d.data().icone || '📰',
   }));
 
   try {
-    localStorage.setItem(DRAWER_CACHE_KEY,    JSON.stringify(tipos));
+    localStorage.setItem(DRAWER_CACHE_KEY, JSON.stringify(tipos));
     localStorage.setItem(DRAWER_CACHE_TS_KEY, String(Date.now()));
   } catch (e) { /* quota excedida — ignora */ }
 
@@ -1159,19 +1159,19 @@ async function iniciarDrawer(newsletter) {
   if (window._radarUser) {
     try {
       sessionStorage.setItem('rs_drawer_ctx', JSON.stringify({
-        uid:          _radarUser.uid,
-        segmento:     _radarUser.segmento,
-        plano_slug:   _radarUser.plano_slug,
-        features:     _radarUser.features,
+        uid: _radarUser.uid,
+        segmento: _radarUser.segmento,
+        plano_slug: _radarUser.plano_slug,
+        features: _radarUser.features,
         assinaturaId: _radarUser.assinaturaId,
-        email:        _radarUser.email,
+        email: _radarUser.email,
       }));
     } catch (e) { /* ignora */ }
   }
 
   // Guardar referência da edição atual
   _drawer.edicaoAtual = newsletter.id;
-  _drawer.tipoAtual   = newsletter.Tipo || newsletter.tipo || null;
+  _drawer.tipoAtual = newsletter.Tipo || newsletter.tipo || null;
 
   // Carregar tipos_selecionados da assinatura do usuário
   // (fonte de verdade: o que o assinante efetivamente contratou)
@@ -1241,7 +1241,7 @@ function _initSwipeFechar() {
   if (!panel) return;
   let startX = 0;
   panel.addEventListener('touchstart', e => { startX = e.touches[0].clientX; }, { passive: true });
-  panel.addEventListener('touchend',   e => {
+  panel.addEventListener('touchend', e => {
     if (e.changedTouches[0].clientX - startX > 60) fecharDrawer();
   }, { passive: true });
 }
@@ -1250,7 +1250,7 @@ function _initSwipeFechar() {
 function abrirDrawer() {
   const ctx = _getCtx();
   const overlay = document.getElementById('rs-drawer-overlay');
-  const panel   = document.getElementById('rs-drawer-panel');
+  const panel = document.getElementById('rs-drawer-panel');
   if (!overlay || !panel) return;
 
   // Edge case: sem identificação
@@ -1272,7 +1272,7 @@ function abrirDrawer() {
 
 function fecharDrawer() {
   document.getElementById('rs-drawer-overlay')?.classList.remove('rs-drawer-show');
-  document.getElementById('rs-drawer-panel')  ?.classList.remove('rs-drawer-show');
+  document.getElementById('rs-drawer-panel')?.classList.remove('rs-drawer-show');
   _drawer.aberto = false;
   document.body.style.overflow = '';
   _limparContadores();
@@ -1337,7 +1337,7 @@ async function _renderNivel1() {
 
 // ─── Nível 2 — lista de edições do tipo ─────────────────────────────────────
 async function abrirTipo(tipoId, tipoNome, tipoIcone) {
-  _drawer.nivel     = 2;
+  _drawer.nivel = 2;
   _drawer.tipoAtivo = { id: tipoId, nome: tipoNome, icone: tipoIcone };
   _setDrawerHeader(`${tipoIcone} ${tipoNome}`, true);
   _limparContadores();
@@ -1349,9 +1349,9 @@ async function abrirTipo(tipoId, tipoNome, tipoIcone) {
       Carregando edições…
     </div>`;
 
-  const ctx         = _getCtx();
+  const ctx = _getCtx();
   const isAssinante = ctx?.segmento === 'assinante';
-  const temAcesso   = !isAssinante || _assinanteTemAcesso(tipoId);
+  const temAcesso = !isAssinante || _assinanteTemAcesso(tipoId);
 
   // Cabeçalho de up-sell para assinante sem acesso ao tipo
   const upSellBanner = (!isAssinante || temAcesso) ? '' : `
@@ -1438,11 +1438,11 @@ async function abrirTipo(tipoId, tipoNome, tipoIcone) {
 
 // ─── Card de edição — assinante ──────────────────────────────────────────────
 function _cardEdicaoAssinante(ed, isAtual, temAcesso) {
-  const num   = ed.numero || ed.edicao || '';
+  const num = ed.numero || ed.edicao || '';
   const titulo = _esc(ed.titulo || `Edição ${num}`);
-  const data   = _fmtData(ed.data_publicacao);
+  const data = _fmtData(ed.data_publicacao);
   const classeAtual = isAtual ? 'rs-drawer-ed-atual' : '';
-  const bloqueado   = !temAcesso;
+  const bloqueado = !temAcesso;
 
   if (bloqueado) {
     return `
@@ -1464,16 +1464,16 @@ function _cardEdicaoAssinante(ed, isAtual, temAcesso) {
         <div class="rs-drawer-ed-data">${data}${num ? ` · Ed. ${num}` : ''}</div>
       </div>
       ${isAtual
-        ? '<span class="rs-drawer-ed-badge-atual">👁 lendo agora</span>'
-        : '<span class="rs-drawer-chevron">›</span>'}
+      ? '<span class="rs-drawer-ed-badge-atual">👁 lendo agora</span>'
+      : '<span class="rs-drawer-chevron">›</span>'}
     </button>`;
 }
 
 // ─── Card de edição — lead ───────────────────────────────────────────────────
 function _cardEdicaoLead(ed, isAtual, envio) {
-  const num    = ed.numero || ed.edicao || '';
+  const num = ed.numero || ed.edicao || '';
   const titulo = _esc(ed.titulo || `Edição ${num}`);
-  const data   = _fmtData(ed.data_publicacao);
+  const data = _fmtData(ed.data_publicacao);
 
   // Sem envio = edição nunca recebida
   if (!envio) {
@@ -1488,8 +1488,8 @@ function _cardEdicaoLead(ed, isAtual, envio) {
       </div>`;
   }
 
-  const expira  = envio.expira_em ? new Date(envio.expira_em) : null;
-  const agora   = new Date();
+  const expira = envio.expira_em ? new Date(envio.expira_em) : null;
+  const agora = new Date();
   const expirou = expira && agora > expira;
   const expira2h = expira && !expirou && (expira - agora) < 2 * 60 * 60 * 1000;
 
@@ -1510,7 +1510,7 @@ function _cardEdicaoLead(ed, isAtual, envio) {
 
   // Acesso ativo (normal ou expirando)
   const classeExpirando = expira2h ? 'rs-drawer-ed-expirando' : '';
-  const badgeExpirando  = expira2h
+  const badgeExpirando = expira2h
     ? '<div class="rs-drawer-ed-status rs-drawer-ed-status-warn">⚠️ Expira em breve</div>'
     : '';
   const contadorHTML = expira
@@ -1528,8 +1528,8 @@ function _cardEdicaoLead(ed, isAtual, envio) {
         ${contadorHTML}
       </div>
       ${isAtual
-        ? '<span class="rs-drawer-ed-badge-atual">👁 lendo agora</span>'
-        : '<span class="rs-drawer-chevron">›</span>'}
+      ? '<span class="rs-drawer-ed-badge-atual">👁 lendo agora</span>'
+      : '<span class="rs-drawer-chevron">›</span>'}
     </button>`;
 }
 
@@ -1538,7 +1538,7 @@ function _mostrarExpirado(edicaoId, titulo, horas) {
   const modal = document.getElementById('rs-drawer-modal-expirado');
   if (!modal) return;
   document.getElementById('rs-modal-exp-titulo').textContent = titulo;
-  document.getElementById('rs-modal-exp-horas').textContent  = horas;
+  document.getElementById('rs-modal-exp-horas').textContent = horas;
   modal.classList.add('rs-drawer-show');
 }
 
@@ -1566,7 +1566,7 @@ function iniciarContador(expiraEm, elementId) {
   const expira = new Date(expiraEm);
 
   function atualizar() {
-    const el   = document.getElementById(elementId);
+    const el = document.getElementById(elementId);
     if (!el) { clearInterval(intervId); return; }
 
     const diff = expira - Date.now();
@@ -1588,13 +1588,13 @@ function iniciarContador(expiraEm, elementId) {
     const s = Math.floor((diff % 60000) / 1000);
 
     if (h > 0) {
-      el.textContent = `Acesso em ${h}h ${String(m).padStart(2,'0')}m`;
+      el.textContent = `Acesso em ${h}h ${String(m).padStart(2, '0')}m`;
       el.style.color = 'var(--verde)';
     } else if (m >= 10) {
-      el.textContent = `Expira em ${m}:${String(s).padStart(2,'0')}`;
+      el.textContent = `Expira em ${m}:${String(s).padStart(2, '0')}`;
       el.style.color = 'var(--amarelo)';
     } else {
-      el.textContent = `⚠ Expira em ${m}:${String(s).padStart(2,'0')}`;
+      el.textContent = `⚠ Expira em ${m}:${String(s).padStart(2, '0')}`;
       el.style.color = 'var(--vermelho)';
       el.style.animation = 'rs-pulso .8s ease infinite';
     }
@@ -1656,15 +1656,15 @@ async function navegarParaEdicao(edicaoId) {
 
     // Reconstruir dados do destinatário a partir do contexto
     const destinatario = {
-      _uid:            ctx.uid,
-      email:           ctx.email        || '',
-      nome:            ctx.nome         || '',
-      plano_slug:      ctx.plano_slug   || '',
-      features:        ctx.features     || {},
-      cod_uf:          ctx.uf           || '',
-      cod_municipio:   ctx.municipio_cod || '',
-      nome_municipio:  ctx.municipio_nome || '',
-      perfil:          ctx.perfil       || '',
+      _uid: ctx.uid,
+      email: ctx.email || '',
+      nome: ctx.nome || '',
+      plano_slug: ctx.plano_slug || '',
+      features: ctx.features || {},
+      cod_uf: ctx.uf || '',
+      cod_municipio: ctx.municipio_cod || '',
+      nome_municipio: ctx.municipio_nome || '',
+      perfil: ctx.perfil || '',
     };
     const segmento = ctx.segmento === 'assinante' ? 'assinantes' : 'leads';
 
@@ -1675,20 +1675,20 @@ async function navegarParaEdicao(edicaoId) {
 
     const acesso = detectarAcesso(destinatario, newsletter, segmento, envioDrawer);
     const dados = {
-      nome:            destinatario.nome,
-      email:           destinatario.email,
-      edicao:          newsletter.numero || newsletter.edicao || '',
-      titulo:          newsletter.titulo || '',
+      nome: destinatario.nome,
+      email: destinatario.email,
+      edicao: newsletter.numero || newsletter.edicao || '',
+      titulo: newsletter.titulo || '',
       data_publicacao: newsletter.data_publicacao || null,
-      cod_uf:          destinatario.cod_uf,
-      nome_municipio:  destinatario.nome_municipio,
-      perfil:          destinatario.perfil,
-      plano:           destinatario.plano_slug,
+      cod_uf: destinatario.cod_uf,
+      nome_municipio: destinatario.nome_municipio,
+      perfil: destinatario.perfil,
+      plano: destinatario.plano_slug,
     };
 
     // Atualizar edição atual no estado do drawer
     _drawer.edicaoAtual = edicaoId;
-    _drawer.tipoAtual   = newsletter.Tipo || newsletter.tipo || null;
+    _drawer.tipoAtual = newsletter.Tipo || newsletter.tipo || null;
 
     // Limpar e re-renderizar
     renderHeader(newsletter, destinatario);
@@ -1731,18 +1731,18 @@ function _mostrarCTAConversao(motivo, horas) {
   const msgs = {
     nao_recebida: {
       titulo: '📬 Conteúdo exclusivo para assinantes',
-      texto:  'Assine para receber esta e todas as próximas edições com acesso permanente.',
-      cta:    'Assinar agora →',
+      texto: 'Assine para receber esta e todas as próximas edições com acesso permanente.',
+      cta: 'Assinar agora →',
     },
     expirando: {
       titulo: '⏳ Seu acesso está expirando',
-      texto:  'Não perca o próximo envio — assine agora e tenha acesso permanente.',
-      cta:    'Assinar e não perder →',
+      texto: 'Não perca o próximo envio — assine agora e tenha acesso permanente.',
+      cta: 'Assinar e não perder →',
     },
     expirada: {
       titulo: `⌛ Conteúdo disponível por ${horas}h após o envio`,
-      texto:  'Este conteúdo ficou disponível por tempo limitado. Assine para ter acesso permanente a todas as edições.',
-      cta:    'Assinar para acesso permanente →',
+      texto: 'Este conteúdo ficou disponível por tempo limitado. Assine para ter acesso permanente a todas as edições.',
+      cta: 'Assinar para acesso permanente →',
     },
   };
 
@@ -1774,7 +1774,7 @@ async function verificarEdicaoMaisRecente(newsletter) {
 
     // Exibir notificação
     const banner = document.getElementById('rs-banner-recente');
-    const link   = document.getElementById('rs-banner-recente-link');
+    const link = document.getElementById('rs-banner-recente-link');
     if (!banner || !link) return;
 
     banner.style.display = 'flex';
@@ -1787,10 +1787,10 @@ async function verificarEdicaoMaisRecente(newsletter) {
 }
 
 // ─── Expor globalmente ───────────────────────────────────────────────────────
-window.abrirDrawer      = abrirDrawer;
-window.fecharDrawer     = fecharDrawer;
-window.abrirTipo        = abrirTipo;
-window.voltarParaTipos  = voltarParaTipos;
+window.abrirDrawer = abrirDrawer;
+window.fecharDrawer = fecharDrawer;
+window.abrirTipo = abrirTipo;
+window.voltarParaTipos = voltarParaTipos;
 window.navegarParaEdicao = navegarParaEdicao;
 window._mostrarExpirado = _mostrarExpirado;
 
@@ -1833,16 +1833,16 @@ async function renderFeedback(nid) {
   document.getElementById('rs-feedback-txt')?.addEventListener('input', function () {
     const len = this.value.length;
     const counter = document.getElementById('rs-feedback-chars');
-    const btn     = document.getElementById('rs-feedback-btn');
+    const btn = document.getElementById('rs-feedback-btn');
     if (counter) counter.textContent = `${len}/500`;
-    if (btn)     btn.disabled = len === 0;
+    if (btn) btn.disabled = len === 0;
   });
 }
 
 async function enviarFeedback(nid) {
   const textarea = document.getElementById('rs-feedback-txt');
-  const btn      = document.getElementById('rs-feedback-btn');
-  const texto    = textarea?.value?.trim();
+  const btn = document.getElementById('rs-feedback-btn');
+  const texto = textarea?.value?.trim();
   if (!texto) return;
 
   if (btn) { btn.disabled = true; btn.textContent = 'Enviando…'; }
@@ -1854,11 +1854,16 @@ async function enviarFeedback(nid) {
       feedbacks: firebase.firestore.FieldValue.arrayUnion({
         texto,
         segmento: ctx?.segmento || 'desconhecido',
-        plano:    ctx?.plano_slug || null,
-        ts:       new Date().toISOString(),
+        plano: ctx?.plano_slug || null,
+        ts: new Date().toISOString(),
       }),
     });
 
+    await db.collection('admin_contadores').doc('pendencias').set(
+      { feedbacks: firebase.firestore.FieldValue.increment(1) },
+      { merge: true }
+    );
+    
     // Marcar como enviado
     localStorage.setItem(`rs_fb_${nid}`, '1');
 
