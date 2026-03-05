@@ -4202,7 +4202,7 @@ async function abrirModalProrrogarAcesso(leadId, nomeLead) {
     });
   }
 
-  document.getElementById("prorrogar-lead-nome").textContent = nomeLeads || "";
+  document.getElementById("prorrogar-lead-nome").textContent = nomeLead || "";
   document.getElementById("lista-envios-lead").innerHTML =
     "<p style='color:#999;font-size:13px'>Carregando envios...</p>";
   modal.style.display = "flex";
