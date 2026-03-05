@@ -1682,7 +1682,11 @@ async function carregarLeads(resetar = false) {
     let query = window.supabase.from("leads").select("*", { count: "exact" });
 
     // Filtros
-    if (termoBusca)  query = query.ilike("nome_lowercase", `${termoBusca}%`);
+    if (termoBusca) {
+      query = query.or(
+        `nome_lowercase.ilike.${termoBusca}%,email.ilike.%${termoBusca}%`
+      );
+    }
     if (perfil)      query = query.eq("perfil", perfil);
     if (preferencia) query = query.eq("preferencia_contato", preferencia);
     if (status)      query = query.eq("status", status);
