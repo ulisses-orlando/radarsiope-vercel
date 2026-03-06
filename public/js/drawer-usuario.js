@@ -1,12 +1,13 @@
 // ─── drawer-usuario.js ───────────────────────────────────────────────────────
-// Drawer lateral completo para gestão de assinantes no admin
-// Contador centralizado em /admin_contadores/pendencias
+// Drawer lateral completo para gestão de assinantes
+// Contador centralizado: /admin_contadores/pendencias
 
 // ─── Estado ──────────────────────────────────────────────────────────────────
-let _drawerUid       = null;
-let _drawerDados     = {};
-let _drawerTabAtual  = 'resumo';
-let _drawerAcessoSel = {};
+let _drawerUid        = null;
+let _drawerDados      = {};
+let _drawerTabAtual   = 'resumo';
+let _drawerAcessoSel  = {};
+let _seedEmAndamento  = false; // guard anti-loop
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 function _fmtData(v) {
@@ -45,18 +46,19 @@ function _stBadge(status) {
 // ─────────────────────────────────────────────────────────────────────────────
 // Campos: solicitacoes | feedbacks | parcelas_vencidas
 //
-// Leitura: sempre 1 documento, independente do número de usuários.
-// Escrita: FieldValue.increment pontual nos eventos relevantes.
+// Leitura: 1 documento, independente do número de usuários.
+// Escrita: FieldValue.increment pontual nos eventos (ver instruções no README).
 //
-// Quando o doc não existe (primeiro acesso), dispara _recalcularESeedContadores()
-// que varre os dados uma única vez, persiste o resultado e depois só lê o doc.
+// Se o doc não existir, cria com zeros e exibe botão "Recalcular" no admin.
+// O recálculo manual varre os dados e persiste — não roda automaticamente
+// para não exigir permissões de leitura cruzada (auth.uid != userId).
 // ═══════════════════════════════════════════════════════════════════════════════
 
 const _CONTADOR_REF = () => db.collection('admin_contadores').doc('pendencias');
 
 /**
- * Incrementa ou decrementa um campo do doc contador.
- * Uso: _incrementarContador('solicitacoes', -1)
+ * Incrementa ou decrementa um campo do contador.
+ * Nunca lança exceção — falhas são silenciosas no badge.
  */
 async function _incrementarContador(campo, delta = 1) {
   try {
@@ -70,22 +72,27 @@ async function _incrementarContador(campo, delta = 1) {
 }
 
 /**
- * Lê o badge a partir do doc contador — 1 leitura sempre.
- * Se o doc não existir, dispara o seed automático.
+ * Lê o badge a partir do doc contador (1 leitura).
+ * Se o doc não existir, inicializa com zeros sem varrer dados.
  */
 async function atualizarBadgeUsuarios() {
   const badge = document.getElementById('badge-usuarios');
   if (!badge) return;
   try {
     const snap = await _CONTADOR_REF().get();
+
     if (!snap.exists) {
-      // Primeiro acesso: calcula, persiste e depois atualiza o badge
-      badge.textContent = '…';
-      badge.style.display = 'inline';
-      await _recalcularESeedContadores();
+      // Inicializa o doc com zeros — NÃO varre dados automaticamente
+      await _CONTADOR_REF().set({
+        solicitacoes: 0, feedbacks: 0, parcelas_vencidas: 0,
+        criado_em: firebase.firestore.FieldValue.serverTimestamp(),
+      });
+      badge.textContent   = '0';
+      badge.style.display = 'none';
       return;
     }
-    const d = snap.data();
+
+    const d    = snap.data();
     const sol  = Math.max(0, d.solicitacoes      || 0);
     const feed = Math.max(0, d.feedbacks         || 0);
     const pag  = Math.max(0, d.parcelas_vencidas || 0);
@@ -99,26 +106,36 @@ async function atualizarBadgeUsuarios() {
       `💳 Parcelas vencidas: ${pag}`,
     ].join('\n');
   } catch(e) {
+    // Permissão negada ou outra falha — não travar o admin
+    badge.style.display = 'none';
     console.warn('[badge-usuarios]', e.message);
   }
 }
 
 /**
- * Calcula contadores varrendo os dados reais e persiste no doc.
- * Chamado automaticamente só quando o doc não existe.
- * Pode ser chamado manualmente pelo admin via botão "Recalcular".
+ * Recálculo manual — varrre os dados e atualiza o doc.
+ * Chamado apenas pelo admin via botão "Recalcular contadores".
+ * Exige que as Firestore Rules permitam leitura admin de /usuarios.
  */
-async function _recalcularESeedContadores() {
+async function recalcularContadores() {
+  if (_seedEmAndamento) return;
+  _seedEmAndamento = true;
+  mostrarMensagem('🔄 Recalculando contadores...');
+
   let solicitacoes = 0, feedbacks = 0, parcelas_vencidas = 0;
   const hoje = new Date();
+
   try {
     const usersSnap = await db.collection('usuarios').limit(500).get();
     await Promise.all(usersSnap.docs.map(async uDoc => {
+      // Solicitações
       try {
         const s = await db.collection('usuarios').doc(uDoc.id)
           .collection('solicitacoes').where('status','in',['pendente','aberta']).get();
         solicitacoes += s.size;
       } catch(e) {}
+
+      // Parcelas vencidas
       try {
         const assinSnap = await db.collection('usuarios').doc(uDoc.id)
           .collection('assinaturas').get();
@@ -137,29 +154,42 @@ async function _recalcularESeedContadores() {
       } catch(e) {}
     }));
 
-    // Feedbacks de newsletters (coleção raiz, sem collectionGroup)
-    const nlSnap = await db.collection('newsletters')
-      .where('enviada','==',true).limit(100).get();
-    nlSnap.forEach(doc => {
-      const fbs = doc.data().feedbacks || [];
-      feedbacks += fbs.filter(f => !f.respondido && !f.nota_interna).length;
-    });
+    // Feedbacks — lê subcoleção /newsletters/{id}/feedbacks
+    try {
+      const nlSnap = await db.collection('newsletters')
+        .where('enviada','==',true).limit(100).get();
+      await Promise.all(nlSnap.docs.map(async doc => {
+        try {
+          const fbSnap = await db.collection('newsletters').doc(doc.id)
+            .collection('feedbacks').where('respondido','==',false).get();
+          feedbacks += fbSnap.size;
+        } catch(e) {
+          // Fallback: array legado
+          const fbs = doc.data().feedbacks || [];
+          feedbacks += fbs.filter(f => !f.respondido).length;
+        }
+      }));
+    } catch(e) {}
 
     await _CONTADOR_REF().set({
       solicitacoes, feedbacks, parcelas_vencidas,
       recalculado_em: firebase.firestore.FieldValue.serverTimestamp(),
     });
-    console.info('[contador] seed:', { solicitacoes, feedbacks, parcelas_vencidas });
+
+    mostrarMensagem(`✅ Contadores atualizados: ${solicitacoes} sol. | ${feedbacks} fb | ${parcelas_vencidas} parc.`);
+    atualizarBadgeUsuarios();
   } catch(e) {
-    console.warn('[contador seed]', e.message);
+    mostrarMensagem('Erro no recálculo: ' + e.message);
+    console.warn('[recalcular]', e);
+  } finally {
+    _seedEmAndamento = false;
   }
-  atualizarBadgeUsuarios();
 }
 
 // ─── Abrir / Fechar ───────────────────────────────────────────────────────────
 async function abrirDrawerUsuario(uid) {
-  _drawerUid      = uid;
-  _drawerTabAtual = 'resumo';
+  _drawerUid       = uid;
+  _drawerTabAtual  = 'resumo';
   _drawerAcessoSel = {};
 
   const overlay = document.getElementById('drawer-usuario-overlay');
@@ -319,7 +349,7 @@ async function _renderPagamentos() {
         if (vencido) totalVencido++;
         else if (status === 'pendente') totalPendente++;
 
-        const rowBg = vencido ? '#fff1f2' : status === 'pago' ? '#f0fdf4' : '';
+        const rowBg  = vencido ? '#fff1f2' : status === 'pago' ? '#f0fdf4' : '';
         const parcela = p.numero_parcela
           ? `Parc. ${p.numero_parcela}${p.mpInstallments>1?`/${p.mpInstallments}`:''}` : 'Pgto.';
 
@@ -394,7 +424,7 @@ async function _renderSolicitacoes() {
 
     let pendentes = 0;
     snap.forEach(doc => {
-      const s   = doc.data();
+      const s      = doc.data();
       const status = (s.status||'pendente').toLowerCase();
       if (status === 'aberta' || status === 'pendente') pendentes++;
       const c       = _stColor(status);
@@ -451,17 +481,15 @@ async function _renderSolicitacoes() {
   }
 }
 
-// Responder → decrementa contador
+// Responder solicitação → decrementa contador
 async function _drawerResponderSolicitacao(uid, solId, novoStatus) {
   const resposta = prompt(`Resposta para o usuário (status → ${novoStatus}):`);
   if (resposta === null) return;
   try {
     await db.collection('usuarios').doc(uid).collection('solicitacoes').doc(solId)
       .update({ status: novoStatus, resposta, data_resposta: new Date() });
-
     // ▼ decrementa contador central
     await _incrementarContador('solicitacoes', -1);
-
     mostrarMensagem('Solicitação atualizada!');
     _ativarDrawerTab('solicitacoes');
     atualizarBadgeUsuarios();
@@ -517,6 +545,15 @@ async function _renderEnvios() {
         const expirou = e.expira_em && new Date() >
           (e.expira_em?.toDate ? e.expira_em.toDate() : new Date(e.expira_em));
 
+        const fbEnviado = e.feedback_enviado === true;
+        const fbLabel   = fbEnviado
+          ? `<span style="font-size:11px;color:#22c55e">✅ Enviado</span>
+             <button onclick="_resetarFeedbackEnvio('${assinDoc.id}','${ed.id}')"
+               style="margin-left:4px;padding:1px 7px;font-size:10px;border:1px solid #e2e8f0;
+               border-radius:4px;background:#fff;cursor:pointer;color:#94a3b8"
+               title="Permitir novo feedback">↺ Resetar</button>`
+          : `<span style="font-size:11px;color:#94a3b8">— não enviado</span>`;
+
         linhas += `
           <tr>
             <td style="padding:5px 6px;font-size:12px;max-width:180px">${tituloNL}</td>
@@ -529,6 +566,7 @@ async function _renderEnvios() {
             </td>
             <td style="padding:5px 6px;font-size:11px;color:#94a3b8">${_fmtData(e.expira_em)}</td>
             <td style="padding:5px 6px;font-size:12px;text-align:center">${e.acessos_totais||0}</td>
+            <td style="padding:5px 6px">${fbLabel}</td>
           </tr>`;
       }
 
@@ -545,6 +583,7 @@ async function _renderEnvios() {
               <th style="text-align:left;padding:4px 6px">Link</th>
               <th style="text-align:left;padding:4px 6px">Expira</th>
               <th style="text-align:center;padding:4px 6px">👁</th>
+              <th style="text-align:left;padding:4px 6px">Feedback</th>
             </tr></thead>
             <tbody>${linhas||'<tr><td colspan="6" style="color:#94a3b8;padding:8px;font-size:12px">Nenhum envio.</td></tr>'}</tbody>
           </table>
@@ -768,7 +807,7 @@ async function _confirmarProrrogacaoUsuario(diasFixo) {
   const selecionados = Object.values(_drawerAcessoSel);
   if (!selecionados.length) { mostrarMensagem('Selecione ao menos um envio.'); return; }
   try {
-    const batch  = db.batch();
+    const batch   = db.batch();
     const novaExp = new Date();
     novaExp.setDate(novaExp.getDate() + dias);
     const ts = firebase.firestore.Timestamp.fromDate(novaExp);
@@ -786,7 +825,21 @@ async function _confirmarProrrogacaoUsuario(diasFixo) {
   } catch(e) { mostrarMensagem('Erro: ' + e.message); }
 }
 
+// ─── Reset de feedback por envio ─────────────────────────────────────────────
+async function _resetarFeedbackEnvio(assinId, envioId) {
+  if (!confirm('Permitir que o assinante envie um novo feedback neste envio?')) return;
+  try {
+    await db.collection('usuarios').doc(_drawerUid)
+      .collection('assinaturas').doc(assinId)
+      .collection('envios').doc(envioId)
+      .update({ feedback_enviado: false });
+    mostrarMensagem('✅ Feedback resetado. O assinante poderá enviar novamente.');
+    _renderEnvios(); // recarrega a aba
+  } catch(e) { mostrarMensagem('Erro: ' + e.message); }
+}
+
 // ─── Exportações globais ─────────────────────────────────────────────────────
+window._resetarFeedbackEnvio        = _resetarFeedbackEnvio;
 window.abrirDrawerUsuario           = abrirDrawerUsuario;
 window.fecharDrawerUsuario          = fecharDrawerUsuario;
 window._ativarDrawerTab             = _ativarDrawerTab;
@@ -796,7 +849,7 @@ window._confirmarProrrogacaoUsuario = _confirmarProrrogacaoUsuario;
 window._toggleAcessoSel             = _toggleAcessoSel;
 window._selecionarTodosAcesso       = _selecionarTodosAcesso;
 window.atualizarBadgeUsuarios       = atualizarBadgeUsuarios;
-window._recalcularESeedContadores   = _recalcularESeedContadores;
+window.recalcularContadores         = recalcularContadores;
 window._incrementarContador         = _incrementarContador;
 
 document.addEventListener('DOMContentLoaded', () => setTimeout(atualizarBadgeUsuarios, 1500));

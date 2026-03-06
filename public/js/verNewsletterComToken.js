@@ -159,8 +159,8 @@ function detectarAcesso(destinatario, newsletter, segmento, envio) {
   // versus acesso_pro_horas da newsletter.
   let acessoProTemp = false;
   if (!isAssinante
-    && newsletter.acesso_pro_temporario === true
-    && (newsletter.acesso_pro_horas || 0) > 0) {
+      && newsletter.acesso_pro_temporario === true
+      && (newsletter.acesso_pro_horas || 0) > 0) {
 
     // Tenta obter o timestamp de referência do envio (primeiro acesso ou data de criação)
     const ref = envio?.primeiro_acesso || envio?.expira_em || null;
@@ -181,7 +181,6 @@ function detectarAcesso(destinatario, newsletter, segmento, envio) {
     acessoProTemp,
     temAudio: isAssinante ? !!features.newsletter_audio
       : (!!newsletter.acesso_audio_leads || acessoProTemp),
-    temVideo: isAssinante ? !!features.newsletter_video : acessoProTemp,
     temInfografico: isAssinante ? !!features.newsletter_infografico : acessoProTemp,
     temAlertas: isAssinante && !!features.alertas_prioritarios,
     blurMunicipio: !isAssinante && !acessoProTemp,
@@ -327,160 +326,64 @@ function renderMidia(newsletter, acesso) {
   const wrap = document.getElementById('midia-conteudo');
   if (!secao || !wrap) return;
 
-  // Campos aceitos (admin pode ter gravado com nome levemente diferente)
-  const audioUrl = newsletter.audio_url || newsletter.url_podcast || '';
-  const videoUrl = newsletter.video_url || newsletter.url_video || '';
-  const infoUrl = newsletter.infografico_url || newsletter.url_infografico || '';
-
-  if (!audioUrl && !videoUrl && !infoUrl) return; // nada a exibir
-
   const itens = [];
 
-  // ── 🎧 PODCAST ──────────────────────────────────────────────────────────────
-  if (audioUrl) {
-    if (acesso.temAudio) {
-      itens.push(`
-        <div class="rs-media-card rs-media-card-aberta">
-          <div class="rs-media-card-header">
-            <span class="rs-media-card-icon">🎧</span>
-            <div class="rs-media-card-info">
-              <div class="rs-media-titulo">Podcast desta edição</div>
-              <div class="rs-media-sub">Produzido com NotebookLM · Ouça enquanto trabalha</div>
-            </div>
-          </div>
-          <div class="rs-media-card-body">
-            <audio controls src="${_esc(audioUrl)}" preload="none"
-                   style="width:100%;border-radius:8px;margin-top:4px"></audio>
-          </div>
-        </div>`);
-    } else {
-      itens.push(`
-        <div class="rs-media-card rs-media-card-lock">
-          <div class="rs-media-card-header">
-            <span class="rs-media-card-icon" style="opacity:.4">🎧</span>
-            <div class="rs-media-card-info">
-              <div class="rs-media-titulo">Podcast desta edição</div>
-              <div class="rs-media-sub">Disponível no plano <strong>Essence</strong> ou superior</div>
-            </div>
-            <a href="/assinatura.html?plano=essence" class="rs-media-btn rs-media-btn-lock">🔒 Ver planos</a>
-          </div>
-        </div>`);
-    }
+  if (newsletter.audio_url) {
+    itens.push(acesso.temAudio ? `
+      <div class="rs-media-item">
+        <div class="rs-media-icon">🎧</div>
+        <div class="rs-media-info">
+          <div class="rs-media-titulo">Podcast desta edição</div>
+          <div class="rs-media-sub">Produzido com NotebookLM · Ouça enquanto trabalha</div>
+          <audio controls src="${_esc(newsletter.audio_url)}" preload="none"
+                 style="width:100%;margin-top:8px;border-radius:8px"></audio>
+        </div>
+      </div>` : `
+      <div class="rs-media-item">
+        <div class="rs-media-icon" style="opacity:.4">🎧</div>
+        <div class="rs-media-info">
+          <div class="rs-media-titulo">Podcast desta edição</div>
+          <div class="rs-media-sub">Disponível no plano Essence ou superior</div>
+        </div>
+        <a href="/assinatura.html?plano=essence" class="rs-media-btn rs-media-btn-lock">🔒 Desbloquear</a>
+      </div>`);
   }
 
-  // ── 🎬 VÍDEO ────────────────────────────────────────────────────────────────
-  if (videoUrl) {
-    if (acesso.temVideo) {
-      const embedUrl = _resolverEmbedVideo(videoUrl);
-      const conteudoVideo = embedUrl
-        ? `<div class="rs-media-video-wrap">
-             <iframe src="${embedUrl}" frameborder="0" allowfullscreen
-               allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-               style="position:absolute;top:0;left:0;width:100%;height:100%;border-radius:8px"></iframe>
-           </div>`
-        : `<a href="${_esc(videoUrl)}" target="_blank" rel="noopener noreferrer"
-              class="rs-media-btn rs-media-btn-primary" style="margin-top:10px;display:inline-block">
-             ▶ Assistir ao vídeo →
-           </a>`;
-      itens.push(`
-        <div class="rs-media-card rs-media-card-aberta">
-          <div class="rs-media-card-header">
-            <span class="rs-media-card-icon">🎬</span>
-            <div class="rs-media-card-info">
-              <div class="rs-media-titulo">Vídeo desta edição</div>
-              <div class="rs-media-sub">Análise completa em vídeo</div>
-            </div>
-          </div>
-          <div class="rs-media-card-body">${conteudoVideo}</div>
-        </div>`);
-    } else {
-      itens.push(`
-        <div class="rs-media-card rs-media-card-lock">
-          <div class="rs-media-card-header">
-            <span class="rs-media-card-icon" style="opacity:.4">🎬</span>
-            <div class="rs-media-card-info">
-              <div class="rs-media-titulo">Vídeo desta edição</div>
-              <div class="rs-media-sub">Disponível no plano <strong>Profissional</strong> ou superior</div>
-            </div>
-            <a href="/assinatura.html?plano=profissional" class="rs-media-btn rs-media-btn-lock">🔒 Ver planos</a>
-          </div>
-        </div>`);
-    }
+  if (newsletter.video_url) {
+    itens.push(`
+      <div class="rs-media-item">
+        <div class="rs-media-icon">📺</div>
+        <div class="rs-media-info">
+          <div class="rs-media-titulo">Vídeo explicativo</div>
+          <div class="rs-media-sub">Análise detalhada em vídeo</div>
+        </div>
+        <a href="${_esc(newsletter.video_url)}" target="_blank" rel="noopener noreferrer"
+           class="rs-media-btn rs-media-btn-primary">Assistir →</a>
+      </div>`);
   }
 
-  // ── 📊 INFOGRÁFICO ───────────────────────────────────────────────────────────
-  if (infoUrl) {
-    if (acesso.temInfografico) {
-      const isImagem = /\.(png|jpg|jpeg|webp|svg|gif)(\?.*)?$/i.test(infoUrl);
-      const conteudoInfo = isImagem
-        ? `<img src="${_esc(infoUrl)}" alt="Infográfico da edição"
-                style="width:100%;border-radius:8px;margin-top:8px;cursor:zoom-in"
-                onclick="abrirInfografico('${_esc(infoUrl)}')">`
-        : `<a href="${_esc(infoUrl)}" target="_blank" rel="noopener noreferrer"
-              class="rs-media-btn rs-media-btn-primary" style="margin-top:10px;display:inline-block">
-             📊 Abrir infográfico →
-           </a>`;
-      itens.push(`
-        <div class="rs-media-card rs-media-card-aberta">
-          <div class="rs-media-card-header">
-            <span class="rs-media-card-icon">📊</span>
-            <div class="rs-media-card-info">
-              <div class="rs-media-titulo">Infográfico desta edição</div>
-              <div class="rs-media-sub">Visualização dos principais indicadores</div>
-            </div>
-            ${isImagem ? `<a href="${_esc(infoUrl)}" target="_blank" rel="noopener noreferrer"
-                class="rs-media-btn rs-media-btn-primary">Ampliar →</a>` : ''}
-          </div>
-          <div class="rs-media-card-body">${conteudoInfo}</div>
-        </div>`);
-    } else {
-      itens.push(`
-        <div class="rs-media-card rs-media-card-lock">
-          <div class="rs-media-card-header">
-            <span class="rs-media-card-icon" style="opacity:.4">📊</span>
-            <div class="rs-media-card-info">
-              <div class="rs-media-titulo">Infográfico desta edição</div>
-              <div class="rs-media-sub">Disponível no plano <strong>Profissional</strong> ou superior</div>
-            </div>
-            <a href="/assinatura.html?plano=profissional" class="rs-media-btn rs-media-btn-lock">🔒 Ver planos</a>
-          </div>
-        </div>`);
-    }
+  if (newsletter.infografico_url) {
+    itens.push(acesso.temInfografico ? `
+      <div class="rs-media-item">
+        <div class="rs-media-icon">📊</div>
+        <div class="rs-media-info">
+          <div class="rs-media-titulo">Infográfico da edição</div>
+          <div class="rs-media-sub">Visualização dos principais indicadores</div>
+        </div>
+        <a href="${_esc(newsletter.infografico_url)}" target="_blank" rel="noopener noreferrer"
+           class="rs-media-btn rs-media-btn-primary">Ver →</a>
+      </div>` : `
+      <div class="rs-media-item">
+        <div class="rs-media-icon" style="opacity:.4">📊</div>
+        <div class="rs-media-info">
+          <div class="rs-media-titulo">Infográfico da edição</div>
+          <div class="rs-media-sub">Disponível no plano Profissional ou superior</div>
+        </div>
+        <a href="/assinatura.html?plano=profissional" class="rs-media-btn rs-media-btn-lock">🔒 Desbloquear</a>
+      </div>`);
   }
 
-  secao.style.display = 'block';
-  wrap.innerHTML = itens.join('');
-}
-
-// ─── Resolver URL de embed para YouTube / Vimeo ───────────────────────────────
-function _resolverEmbedVideo(url) {
-  try {
-    const u = new URL(url);
-
-    // YouTube — formatos: watch?v=, youtu.be/, shorts/
-    const ytMatch =
-      u.hostname.includes('youtube.com') && u.searchParams.get('v') ||
-      u.hostname === 'youtu.be' && u.pathname.slice(1) ||
-      u.hostname.includes('youtube.com') && u.pathname.startsWith('/shorts/') && u.pathname.split('/shorts/')[1]?.split('/')[0];
-    if (ytMatch) return `https://www.youtube.com/embed/${ytMatch}?rel=0`;
-
-    // Vimeo — formato: vimeo.com/ID
-    const vimeoMatch = u.hostname.includes('vimeo.com') && u.pathname.match(/^\/(\d+)/);
-    if (vimeoMatch) return `https://player.vimeo.com/video/${vimeoMatch[1]}`;
-
-  } catch (e) { /* URL inválida */ }
-  return null; // URL não reconhecida — cai para botão de link
-}
-
-// ─── Abrir infográfico em lightbox simples ────────────────────────────────────
-function abrirInfografico(src) {
-  const overlay = document.createElement('div');
-  overlay.style.cssText = `
-    position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:9999;
-    display:flex;align-items:center;justify-content:center;padding:20px;cursor:zoom-out`;
-  overlay.innerHTML = `<img src="${src}" style="max-width:100%;max-height:90vh;border-radius:10px;box-shadow:0 4px 40px rgba(0,0,0,.5)">`;
-  overlay.onclick = () => overlay.remove();
-  document.body.appendChild(overlay);
+  if (itens.length) { secao.style.display = 'block'; wrap.innerHTML = itens.join(''); }
 }
 
 // ─── FAQ ──────────────────────────────────────────────────────────────────────
@@ -522,10 +425,10 @@ function toggleFaq(idx) {
 // Escala de avaliação — 5 níveis de progressão emocional
 const REACTIONS = [
   { emoji: '😞', label: 'Decepcionou', key: 'decepcionou' },
-  { emoji: '😐', label: 'Regular', key: 'regular' },
-  { emoji: '🙂', label: 'Bom', key: 'bom' },
-  { emoji: '😀', label: 'Muito bom', key: 'muito_bom' },
-  { emoji: '🤩', label: 'Excelente', key: 'excelente' },
+  { emoji: '😐', label: 'Regular',     key: 'regular'     },
+  { emoji: '🙂', label: 'Bom',         key: 'bom'         },
+  { emoji: '😀', label: 'Muito bom',   key: 'muito_bom'   },
+  { emoji: '🤩', label: 'Excelente',   key: 'excelente'   },
 ];
 
 async function renderReactions(nid, uid) {
@@ -653,7 +556,7 @@ function renderWatermark(destinatario, newsletter) {
 
 // ─── _radarUser para OneSignal ────────────────────────────────────────────────
 
-function publicarRadarUser(destinatario, segmento, assinaturaId) {
+function publicarRadarUser(destinatario, segmento, assinaturaId, envioId) {
   window._radarUser = {
     uid: destinatario._uid || null,
     email: destinatario.email || '',
@@ -666,6 +569,7 @@ function publicarRadarUser(destinatario, segmento, assinaturaId) {
     municipio_nome: destinatario.nome_municipio || '',
     perfil: destinatario.perfil || '',
     assinaturaId: assinaturaId || null,
+    envioId: envioId || null,
   };
 }
 
@@ -825,19 +729,11 @@ async function VerNewsletterComToken() {
 
     if (assinaturaId) {
       // ✅ Assinante → Firebase
-      const [destinatarioSnap, assinaturaSnap] = await Promise.all([
-        db.collection("usuarios").doc(uid).get(),
-        db.collection("usuarios").doc(uid).collection("assinaturas").doc(assinaturaId).get()
-      ]);
+      const destinatarioSnap = await db.collection("usuarios").doc(uid).get();
 
       if (!destinatarioSnap.exists) { mostrarErro('Destinatário não encontrado.'); return; }
 
-      // features_snapshot da assinatura é a fonte de verdade — ignora features do doc raiz
-      const featuresAtivas = assinaturaSnap.exists
-        ? (assinaturaSnap.data().features_snapshot || {})
-        : {};
-
-      destinatario = { _uid: destinatarioSnap.id, ...destinatarioSnap.data(), features: featuresAtivas };
+      destinatario = { _uid: destinatarioSnap.id, ...destinatarioSnap.data() };
       segmento = "assinantes";
     } else {
       // ✅ Lead → Supabase
@@ -858,7 +754,7 @@ async function VerNewsletterComToken() {
 
     // 9. Side effects não bloqueantes
     registrarClique(env, uid, nid);
-    publicarRadarUser(destinatario, segmento, assinaturaId);
+    publicarRadarUser(destinatario, segmento, assinaturaId, env);
 
     // 10. Dados para placeholders
     const dados = {
@@ -1021,7 +917,7 @@ const TEMAS_DISPONIVEIS = ['claro', 'escuro', 'suave', 'minimalista', 'exito', '
 // Carregar tema salvo (ou usar 'claro' como padrão)
 function carregarTema() {
   const temaSalvo = localStorage.getItem('radar-tema');
-
+  
   // Verificar se o tema salvo é válido
   if (temaSalvo && TEMAS_DISPONIVEIS.includes(temaSalvo)) {
     aplicarTema(temaSalvo);
@@ -1037,9 +933,9 @@ function aplicarTema(tema) {
     console.warn('[Tema] Tema inválido:', tema);
     tema = 'claro';
   }
-
+  
   document.body.setAttribute('data-theme', tema);
-
+  
   // Atualizar botões ativos (se existirem)
   document.querySelectorAll('[data-theme-btn]').forEach(btn => {
     const btnTema = btn.getAttribute('data-theme-btn');
@@ -1049,25 +945,25 @@ function aplicarTema(tema) {
       btn.classList.remove('ativo');
     }
   });
-
+  
   console.log('[Tema] Aplicado:', tema);
 }
 
 // Trocar tema (chamado pelo onclick dos botões)
 function setTheme(tema) {
   console.log('[Tema] Mudando para:', tema);
-
+  
   if (!TEMAS_DISPONIVEIS.includes(tema)) {
     console.warn('[Tema] Tema inválido:', tema);
     return;
   }
-
+  
   // Aplicar tema
   aplicarTema(tema);
-
+  
   // Salvar no localStorage
   localStorage.setItem('radar-tema', tema);
-
+  
   // Feedback visual (opcional)
   const btn = document.querySelector(`[data-theme-btn="${tema}"]`);
   if (btn) {
@@ -1095,24 +991,24 @@ if (document.readyState === 'loading') {
 
 // ─── Estado do drawer ────────────────────────────────────────────────────────
 const _drawer = {
-  aberto: false,
-  nivel: 1,          // 1 = tipos, 2 = edições do tipo
-  tipoAtivo: null,       // { id, nome, icone }
-  edicaoAtual: null,       // id da edição sendo lida
-  tipoAtual: null,       // tipo da edição sendo lida
+  aberto:       false,
+  nivel:        1,          // 1 = tipos, 2 = edições do tipo
+  tipoAtivo:    null,       // { id, nome, icone }
+  edicaoAtual:  null,       // id da edição sendo lida
+  tipoAtual:    null,       // tipo da edição sendo lida
   edicoesCache: {},         // { [tipoId]: [array de edições] } — memória de sessão
-  contadores: [],         // refs dos setInterval dos contadores regressivos
+  contadores:   [],         // refs dos setInterval dos contadores regressivos
 };
 
 // ─── Cache de tipos no localStorage (24h) ───────────────────────────────────
-const DRAWER_CACHE_KEY = 'rs_tipos_cache';
+const DRAWER_CACHE_KEY    = 'rs_tipos_cache';
 const DRAWER_CACHE_TS_KEY = 'rs_tipos_cache_ts';
-const DRAWER_CACHE_TTL = 24 * 60 * 60 * 1000; // 24h em ms
+const DRAWER_CACHE_TTL    = 24 * 60 * 60 * 1000; // 24h em ms
 
 async function _getTipos() {
   try {
-    const ts = parseInt(localStorage.getItem(DRAWER_CACHE_TS_KEY) || '0', 10);
-    const raw = localStorage.getItem(DRAWER_CACHE_KEY);
+    const ts   = parseInt(localStorage.getItem(DRAWER_CACHE_TS_KEY) || '0', 10);
+    const raw  = localStorage.getItem(DRAWER_CACHE_KEY);
     if (raw && (Date.now() - ts) < DRAWER_CACHE_TTL) {
       return JSON.parse(raw);
     }
@@ -1123,13 +1019,13 @@ async function _getTipos() {
     .get();
 
   const tipos = snap.docs.map(d => ({
-    id: d.id,
-    nome: d.data().nome || d.id,
+    id:    d.id,
+    nome:  d.data().nome  || d.id,
     icone: d.data().icone || '📰',
   }));
 
   try {
-    localStorage.setItem(DRAWER_CACHE_KEY, JSON.stringify(tipos));
+    localStorage.setItem(DRAWER_CACHE_KEY,    JSON.stringify(tipos));
     localStorage.setItem(DRAWER_CACHE_TS_KEY, String(Date.now()));
   } catch (e) { /* quota excedida — ignora */ }
 
@@ -1159,19 +1055,19 @@ async function iniciarDrawer(newsletter) {
   if (window._radarUser) {
     try {
       sessionStorage.setItem('rs_drawer_ctx', JSON.stringify({
-        uid: _radarUser.uid,
-        segmento: _radarUser.segmento,
-        plano_slug: _radarUser.plano_slug,
-        features: _radarUser.features,
+        uid:          _radarUser.uid,
+        segmento:     _radarUser.segmento,
+        plano_slug:   _radarUser.plano_slug,
+        features:     _radarUser.features,
         assinaturaId: _radarUser.assinaturaId,
-        email: _radarUser.email,
+        email:        _radarUser.email,
       }));
     } catch (e) { /* ignora */ }
   }
 
   // Guardar referência da edição atual
   _drawer.edicaoAtual = newsletter.id;
-  _drawer.tipoAtual = newsletter.Tipo || newsletter.tipo || null;
+  _drawer.tipoAtual   = newsletter.Tipo || newsletter.tipo || null;
 
   // Carregar tipos_selecionados da assinatura do usuário
   // (fonte de verdade: o que o assinante efetivamente contratou)
@@ -1241,7 +1137,7 @@ function _initSwipeFechar() {
   if (!panel) return;
   let startX = 0;
   panel.addEventListener('touchstart', e => { startX = e.touches[0].clientX; }, { passive: true });
-  panel.addEventListener('touchend', e => {
+  panel.addEventListener('touchend',   e => {
     if (e.changedTouches[0].clientX - startX > 60) fecharDrawer();
   }, { passive: true });
 }
@@ -1250,7 +1146,7 @@ function _initSwipeFechar() {
 function abrirDrawer() {
   const ctx = _getCtx();
   const overlay = document.getElementById('rs-drawer-overlay');
-  const panel = document.getElementById('rs-drawer-panel');
+  const panel   = document.getElementById('rs-drawer-panel');
   if (!overlay || !panel) return;
 
   // Edge case: sem identificação
@@ -1272,7 +1168,7 @@ function abrirDrawer() {
 
 function fecharDrawer() {
   document.getElementById('rs-drawer-overlay')?.classList.remove('rs-drawer-show');
-  document.getElementById('rs-drawer-panel')?.classList.remove('rs-drawer-show');
+  document.getElementById('rs-drawer-panel')  ?.classList.remove('rs-drawer-show');
   _drawer.aberto = false;
   document.body.style.overflow = '';
   _limparContadores();
@@ -1337,7 +1233,7 @@ async function _renderNivel1() {
 
 // ─── Nível 2 — lista de edições do tipo ─────────────────────────────────────
 async function abrirTipo(tipoId, tipoNome, tipoIcone) {
-  _drawer.nivel = 2;
+  _drawer.nivel     = 2;
   _drawer.tipoAtivo = { id: tipoId, nome: tipoNome, icone: tipoIcone };
   _setDrawerHeader(`${tipoIcone} ${tipoNome}`, true);
   _limparContadores();
@@ -1349,9 +1245,9 @@ async function abrirTipo(tipoId, tipoNome, tipoIcone) {
       Carregando edições…
     </div>`;
 
-  const ctx = _getCtx();
+  const ctx         = _getCtx();
   const isAssinante = ctx?.segmento === 'assinante';
-  const temAcesso = !isAssinante || _assinanteTemAcesso(tipoId);
+  const temAcesso   = !isAssinante || _assinanteTemAcesso(tipoId);
 
   // Cabeçalho de up-sell para assinante sem acesso ao tipo
   const upSellBanner = (!isAssinante || temAcesso) ? '' : `
@@ -1408,18 +1304,10 @@ async function abrirTipo(tipoId, tipoNome, tipoIcone) {
     }
   }).join('');
 
-  const rodape = isAssinante ? `
+  const rodape = `
     <div class="rs-drawer-rodape">
       <a href="/painel.html#bloco-biblioteca" style="color:var(--azul);font-size:12px;font-weight:600">
         Ver edições mais antigas → Área do Assinante
-      </a>
-    </div>` : `
-    <div class="rs-drawer-rodape">
-      <span style="font-size:12px;color:var(--rs-muted);display:block;margin-bottom:6px">
-        Quer acesso a todas as edições?
-      </span>
-      <a href="/assinatura.html" style="color:var(--azul);font-size:12px;font-weight:600">
-        Conheça nossos planos e assine →
       </a>
     </div>`;
 
@@ -1438,11 +1326,11 @@ async function abrirTipo(tipoId, tipoNome, tipoIcone) {
 
 // ─── Card de edição — assinante ──────────────────────────────────────────────
 function _cardEdicaoAssinante(ed, isAtual, temAcesso) {
-  const num = ed.numero || ed.edicao || '';
+  const num   = ed.numero || ed.edicao || '';
   const titulo = _esc(ed.titulo || `Edição ${num}`);
-  const data = _fmtData(ed.data_publicacao);
+  const data   = _fmtData(ed.data_publicacao);
   const classeAtual = isAtual ? 'rs-drawer-ed-atual' : '';
-  const bloqueado = !temAcesso;
+  const bloqueado   = !temAcesso;
 
   if (bloqueado) {
     return `
@@ -1464,16 +1352,16 @@ function _cardEdicaoAssinante(ed, isAtual, temAcesso) {
         <div class="rs-drawer-ed-data">${data}${num ? ` · Ed. ${num}` : ''}</div>
       </div>
       ${isAtual
-      ? '<span class="rs-drawer-ed-badge-atual">👁 lendo agora</span>'
-      : '<span class="rs-drawer-chevron">›</span>'}
+        ? '<span class="rs-drawer-ed-badge-atual">👁 lendo agora</span>'
+        : '<span class="rs-drawer-chevron">›</span>'}
     </button>`;
 }
 
 // ─── Card de edição — lead ───────────────────────────────────────────────────
 function _cardEdicaoLead(ed, isAtual, envio) {
-  const num = ed.numero || ed.edicao || '';
+  const num    = ed.numero || ed.edicao || '';
   const titulo = _esc(ed.titulo || `Edição ${num}`);
-  const data = _fmtData(ed.data_publicacao);
+  const data   = _fmtData(ed.data_publicacao);
 
   // Sem envio = edição nunca recebida
   if (!envio) {
@@ -1488,8 +1376,8 @@ function _cardEdicaoLead(ed, isAtual, envio) {
       </div>`;
   }
 
-  const expira = envio.expira_em ? new Date(envio.expira_em) : null;
-  const agora = new Date();
+  const expira  = envio.expira_em ? new Date(envio.expira_em) : null;
+  const agora   = new Date();
   const expirou = expira && agora > expira;
   const expira2h = expira && !expirou && (expira - agora) < 2 * 60 * 60 * 1000;
 
@@ -1510,7 +1398,7 @@ function _cardEdicaoLead(ed, isAtual, envio) {
 
   // Acesso ativo (normal ou expirando)
   const classeExpirando = expira2h ? 'rs-drawer-ed-expirando' : '';
-  const badgeExpirando = expira2h
+  const badgeExpirando  = expira2h
     ? '<div class="rs-drawer-ed-status rs-drawer-ed-status-warn">⚠️ Expira em breve</div>'
     : '';
   const contadorHTML = expira
@@ -1528,8 +1416,8 @@ function _cardEdicaoLead(ed, isAtual, envio) {
         ${contadorHTML}
       </div>
       ${isAtual
-      ? '<span class="rs-drawer-ed-badge-atual">👁 lendo agora</span>'
-      : '<span class="rs-drawer-chevron">›</span>'}
+        ? '<span class="rs-drawer-ed-badge-atual">👁 lendo agora</span>'
+        : '<span class="rs-drawer-chevron">›</span>'}
     </button>`;
 }
 
@@ -1538,7 +1426,7 @@ function _mostrarExpirado(edicaoId, titulo, horas) {
   const modal = document.getElementById('rs-drawer-modal-expirado');
   if (!modal) return;
   document.getElementById('rs-modal-exp-titulo').textContent = titulo;
-  document.getElementById('rs-modal-exp-horas').textContent = horas;
+  document.getElementById('rs-modal-exp-horas').textContent  = horas;
   modal.classList.add('rs-drawer-show');
 }
 
@@ -1566,7 +1454,7 @@ function iniciarContador(expiraEm, elementId) {
   const expira = new Date(expiraEm);
 
   function atualizar() {
-    const el = document.getElementById(elementId);
+    const el   = document.getElementById(elementId);
     if (!el) { clearInterval(intervId); return; }
 
     const diff = expira - Date.now();
@@ -1588,13 +1476,13 @@ function iniciarContador(expiraEm, elementId) {
     const s = Math.floor((diff % 60000) / 1000);
 
     if (h > 0) {
-      el.textContent = `Acesso em ${h}h ${String(m).padStart(2, '0')}m`;
+      el.textContent = `Acesso em ${h}h ${String(m).padStart(2,'0')}m`;
       el.style.color = 'var(--verde)';
     } else if (m >= 10) {
-      el.textContent = `Expira em ${m}:${String(s).padStart(2, '0')}`;
+      el.textContent = `Expira em ${m}:${String(s).padStart(2,'0')}`;
       el.style.color = 'var(--amarelo)';
     } else {
-      el.textContent = `⚠ Expira em ${m}:${String(s).padStart(2, '0')}`;
+      el.textContent = `⚠ Expira em ${m}:${String(s).padStart(2,'0')}`;
       el.style.color = 'var(--vermelho)';
       el.style.animation = 'rs-pulso .8s ease infinite';
     }
@@ -1656,15 +1544,15 @@ async function navegarParaEdicao(edicaoId) {
 
     // Reconstruir dados do destinatário a partir do contexto
     const destinatario = {
-      _uid: ctx.uid,
-      email: ctx.email || '',
-      nome: ctx.nome || '',
-      plano_slug: ctx.plano_slug || '',
-      features: ctx.features || {},
-      cod_uf: ctx.uf || '',
-      cod_municipio: ctx.municipio_cod || '',
-      nome_municipio: ctx.municipio_nome || '',
-      perfil: ctx.perfil || '',
+      _uid:            ctx.uid,
+      email:           ctx.email        || '',
+      nome:            ctx.nome         || '',
+      plano_slug:      ctx.plano_slug   || '',
+      features:        ctx.features     || {},
+      cod_uf:          ctx.uf           || '',
+      cod_municipio:   ctx.municipio_cod || '',
+      nome_municipio:  ctx.municipio_nome || '',
+      perfil:          ctx.perfil       || '',
     };
     const segmento = ctx.segmento === 'assinante' ? 'assinantes' : 'leads';
 
@@ -1675,20 +1563,20 @@ async function navegarParaEdicao(edicaoId) {
 
     const acesso = detectarAcesso(destinatario, newsletter, segmento, envioDrawer);
     const dados = {
-      nome: destinatario.nome,
-      email: destinatario.email,
-      edicao: newsletter.numero || newsletter.edicao || '',
-      titulo: newsletter.titulo || '',
+      nome:            destinatario.nome,
+      email:           destinatario.email,
+      edicao:          newsletter.numero || newsletter.edicao || '',
+      titulo:          newsletter.titulo || '',
       data_publicacao: newsletter.data_publicacao || null,
-      cod_uf: destinatario.cod_uf,
-      nome_municipio: destinatario.nome_municipio,
-      perfil: destinatario.perfil,
-      plano: destinatario.plano_slug,
+      cod_uf:          destinatario.cod_uf,
+      nome_municipio:  destinatario.nome_municipio,
+      perfil:          destinatario.perfil,
+      plano:           destinatario.plano_slug,
     };
 
     // Atualizar edição atual no estado do drawer
     _drawer.edicaoAtual = edicaoId;
-    _drawer.tipoAtual = newsletter.Tipo || newsletter.tipo || null;
+    _drawer.tipoAtual   = newsletter.Tipo || newsletter.tipo || null;
 
     // Limpar e re-renderizar
     renderHeader(newsletter, destinatario);
@@ -1731,18 +1619,18 @@ function _mostrarCTAConversao(motivo, horas) {
   const msgs = {
     nao_recebida: {
       titulo: '📬 Conteúdo exclusivo para assinantes',
-      texto: 'Assine para receber esta e todas as próximas edições com acesso permanente.',
-      cta: 'Assinar agora →',
+      texto:  'Assine para receber esta e todas as próximas edições com acesso permanente.',
+      cta:    'Assinar agora →',
     },
     expirando: {
       titulo: '⏳ Seu acesso está expirando',
-      texto: 'Não perca o próximo envio — assine agora e tenha acesso permanente.',
-      cta: 'Assinar e não perder →',
+      texto:  'Não perca o próximo envio — assine agora e tenha acesso permanente.',
+      cta:    'Assinar e não perder →',
     },
     expirada: {
       titulo: `⌛ Conteúdo disponível por ${horas}h após o envio`,
-      texto: 'Este conteúdo ficou disponível por tempo limitado. Assine para ter acesso permanente a todas as edições.',
-      cta: 'Assinar para acesso permanente →',
+      texto:  'Este conteúdo ficou disponível por tempo limitado. Assine para ter acesso permanente a todas as edições.',
+      cta:    'Assinar para acesso permanente →',
     },
   };
 
@@ -1774,7 +1662,7 @@ async function verificarEdicaoMaisRecente(newsletter) {
 
     // Exibir notificação
     const banner = document.getElementById('rs-banner-recente');
-    const link = document.getElementById('rs-banner-recente-link');
+    const link   = document.getElementById('rs-banner-recente-link');
     if (!banner || !link) return;
 
     banner.style.display = 'flex';
@@ -1787,10 +1675,10 @@ async function verificarEdicaoMaisRecente(newsletter) {
 }
 
 // ─── Expor globalmente ───────────────────────────────────────────────────────
-window.abrirDrawer = abrirDrawer;
-window.fecharDrawer = fecharDrawer;
-window.abrirTipo = abrirTipo;
-window.voltarParaTipos = voltarParaTipos;
+window.abrirDrawer      = abrirDrawer;
+window.fecharDrawer     = fecharDrawer;
+window.abrirTipo        = abrirTipo;
+window.voltarParaTipos  = voltarParaTipos;
 window.navegarParaEdicao = navegarParaEdicao;
 window._mostrarExpirado = _mostrarExpirado;
 
@@ -1802,12 +1690,31 @@ async function renderFeedback(nid) {
   const wrap = document.getElementById('rs-feedback-wrap');
   if (!wrap) return;
 
-  // Verificar se já enviou feedback nesta edição
-  if (localStorage.getItem(`rs_fb_${nid}`)) {
-    wrap.innerHTML = `
-      <div class="rs-feedback-enviado">
-        ✅ Obrigado pelo seu feedback!
-      </div>`;
+  // Verificar se já enviou feedback: checa localStorage E Firestore (permite reset pelo admin)
+  const ctx = _getCtx();
+  const jaEnviouLocal = !!localStorage.getItem(`rs_fb_${nid}`);
+
+  if (jaEnviouLocal && ctx?.uid && ctx?.assinaturaId && ctx?.envioId) {
+    // Confirma no Firestore se o admin não resetou
+    try {
+      const envioSnap = await db.collection('usuarios').doc(ctx.uid)
+        .collection('assinaturas').doc(ctx.assinaturaId)
+        .collection('envios').doc(ctx.envioId).get();
+      if (envioSnap.exists && envioSnap.data().feedback_enviado === false) {
+        // Admin resetou: limpa localStorage e mostra form
+        localStorage.removeItem(`rs_fb_${nid}`);
+      } else if (envioSnap.exists && envioSnap.data().feedback_enviado !== false) {
+        wrap.innerHTML = `<div class=rs-feedback-enviado>✅ Obrigado pelo seu feedback!</div>`;
+        return;
+      }
+    } catch(e) {
+      // Sem acesso ao Firestore: confia no localStorage
+      wrap.innerHTML = `<div class=rs-feedback-enviado>✅ Obrigado pelo seu feedback!</div>`;
+      return;
+    }
+  } else if (jaEnviouLocal) {
+    // Não tem contexto Firestore (lead ou sem ctx): confia no localStorage
+    wrap.innerHTML = `<div class=rs-feedback-enviado>✅ Obrigado pelo seu feedback!</div>`;
     return;
   }
 
@@ -1833,16 +1740,16 @@ async function renderFeedback(nid) {
   document.getElementById('rs-feedback-txt')?.addEventListener('input', function () {
     const len = this.value.length;
     const counter = document.getElementById('rs-feedback-chars');
-    const btn = document.getElementById('rs-feedback-btn');
+    const btn     = document.getElementById('rs-feedback-btn');
     if (counter) counter.textContent = `${len}/500`;
-    if (btn) btn.disabled = len === 0;
+    if (btn)     btn.disabled = len === 0;
   });
 }
 
 async function enviarFeedback(nid) {
   const textarea = document.getElementById('rs-feedback-txt');
-  const btn = document.getElementById('rs-feedback-btn');
-  const texto = textarea?.value?.trim();
+  const btn      = document.getElementById('rs-feedback-btn');
+  const texto    = textarea?.value?.trim();
   if (!texto) return;
 
   if (btn) { btn.disabled = true; btn.textContent = 'Enviando…'; }
@@ -1850,33 +1757,42 @@ async function enviarFeedback(nid) {
   const ctx = _getCtx();
 
   try {
-    await db.collection('newsletters').doc(nid)
-      .collection('feedbacks').add({
-        texto,
-        segmento: ctx?.segmento || 'desconhecido',
-        plano: ctx?.plano_slug || null,
-        usuario_id: ctx?.uid || null,
-        nome: ctx?.nome || null,
-        email: ctx?.email || null,
-        data: firebase.firestore.FieldValue.serverTimestamp(),
-        respondido: false,
-      });
+    // Grava na subcoleção /newsletters/{nid}/feedbacks
+    await db.collection('newsletters').doc(nid).collection('feedbacks').add({
+      texto,
+      segmento:   ctx?.segmento    || 'desconhecido',
+      plano:      ctx?.plano_slug  || null,
+      usuario_id: ctx?.uid         || null,
+      nome:       ctx?.nome        || null,
+      email:      ctx?.email       || null,
+      data:       firebase.firestore.FieldValue.serverTimestamp(),
+      respondido: false,
+    });
 
-    // ▼ incrementa contador admin
+    // Marca no doc do envio (permite controle de reset pelo admin)
+    if (ctx?.uid && ctx?.assinaturaId && ctx?.envioId) {
+      try {
+        await db.collection('usuarios').doc(ctx.uid)
+          .collection('assinaturas').doc(ctx.assinaturaId)
+          .collection('envios').doc(ctx.envioId)
+          .update({ feedback_enviado: true });
+      } catch(_) { /* não bloqueia */ }
+    }
+
+    // Incrementa contador admin
     try {
       await db.collection('admin_contadores').doc('pendencias').set(
         { feedbacks: firebase.firestore.FieldValue.increment(1) },
         { merge: true }
       );
-    } catch (_) { }
+    } catch(_) {}
 
-    // Marcar como enviado
+    // Marcar no localStorage também
     localStorage.setItem(`rs_fb_${nid}`, '1');
 
     // Atualizar UI
     const wrap = document.getElementById('rs-feedback-wrap');
-    if (wrap) wrap.innerHTML = `
-      <div class="rs-feedback-enviado">✅ Obrigado pelo seu feedback!</div>`;
+    if (wrap) wrap.innerHTML = `<div class="rs-feedback-enviado">✅ Obrigado pelo seu feedback!</div>`;
 
   } catch (e) {
     if (btn) { btn.disabled = false; btn.textContent = 'Enviar'; }
