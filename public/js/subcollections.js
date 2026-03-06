@@ -279,6 +279,7 @@ async function duplicarNewsletter(docId) {
   const data = snap.data();
   data.edicao = data.edicao + ' (cópia)';
   data.data_publicacao = firebase.firestore.Timestamp.fromDate(new Date());
+  data.enviada = false;
 
   await db.collection('newsletters').add(data);
   carregarNewsletters();
