@@ -2502,7 +2502,7 @@
       }
     });
 
-    // comparativo preferencias/assinaturas
+// comparativo preferencias/assinaturas
     const ctxComparativo = document.getElementById('grafico-comparativo').getContext('2d');
     window.graficoComparativo = new Chart(ctxComparativo, {
       type: 'bar',
@@ -2521,4 +2521,19 @@
           }
         ]
       },
-      options
+      options: {
+        responsive: true,
+        plugins: {
+          legend: { position: 'bottom' }
+        },
+        scales: {
+          y: { beginAtZero: true }
+        }
+      }
+    });
+
+  </script>
+
+</body>
+
+</html>
