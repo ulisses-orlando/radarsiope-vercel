@@ -2195,11 +2195,7 @@
 
   <!-- ── SEÇÃO: FEEDBACKS ───────────────────────────────────────── -->
   <section id="feedbacks" class="card" style="display:none">
-    <h2 style="margin:0 0 4px">💬 Feedbacks de Newsletters</h2>
-    <p style="color:#64748b;font-size:13px;margin:0 0 16px">
-      Feedbacks textuais enviados pelos assinantes ao ler as newsletters.
-    </p>
-    <!-- preenchido por carregarSecaoFeedbacks() em feedbacks.js -->
+    <!-- preenchido inteiramente por carregarSecaoFeedbacks() em feedbacks.js -->
   </section>
 
   <!-- ── DRAWER: USUÁRIO ────────────────────────────────────────── -->
@@ -2522,6 +2518,7 @@
         }
       }
     });
+
     // comparativo preferencias/assinaturas
     const ctxComparativo = document.getElementById('grafico-comparativo').getContext('2d');
     window.graficoComparativo = new Chart(ctxComparativo, {
