@@ -460,10 +460,12 @@ async function renderReactions(nid, uid) {
   renderFeedback(nid);
 
   window.votar = async (newsletterId, key) => {
-    const fb = document.getElementById('reaction-feedback');
+    const fb       = document.getElementById('reaction-feedback');
     const anterior = localStorage.getItem(`rs_rx_${newsletterId}`);
 
+    // ── Atualização otimista local (só para exibição imediata) ──
     if (anterior === key) {
+      // Desfaz o próprio voto
       counts[key] = Math.max(0, (counts[key] || 1) - 1);
       minha = null;
       localStorage.removeItem(`rs_rx_${newsletterId}`);
@@ -480,10 +482,18 @@ async function renderReactions(nid, uid) {
       setTimeout(() => { if (fb) fb.textContent = ''; }, 2500);
     }
 
-    // Persiste no Firestore (fire & forget)
+    // ── Persiste no Firestore com increment (atômico — nunca sobrescreve outros votos) ──
     try {
       const upd = {};
-      REACTIONS.forEach(r => { upd[`reactions.${r.key}`] = counts[r.key] || 0; });
+      if (anterior === key) {
+        // Desfez o próprio voto: decrementa só este
+        upd[`reactions.${key}`] = firebase.firestore.FieldValue.increment(-1);
+      } else {
+        // Novo voto
+        upd[`reactions.${key}`] = firebase.firestore.FieldValue.increment(1);
+        // Trocou de reação: decrementa a anterior
+        if (anterior) upd[`reactions.${anterior}`] = firebase.firestore.FieldValue.increment(-1);
+      }
       await db.collection('newsletters').doc(newsletterId).update(upd);
     } catch (e) { /* não fatal */ }
   };

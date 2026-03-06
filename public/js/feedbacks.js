@@ -10,10 +10,14 @@ let _fbCarregando   = false;
 
 // ─── Entrypoint ───────────────────────────────────────────────────────────────
 async function carregarSecaoFeedbacks() {
-  const secao = document.getElementById('secao-feedbacks');
-  if (!secao) return;
+  const secao = document.getElementById('feedbacks');
+  if (!secao) { console.error('[feedbacks] section#feedbacks não encontrada no DOM'); return; }
 
   secao.innerHTML = `
+    <h2 style="margin:0 0 4px">💬 Feedbacks de Newsletters</h2>
+    <p style="color:#64748b;font-size:13px;margin:0 0 16px">
+      Feedbacks textuais enviados pelos assinantes ao ler as newsletters.
+    </p>
     <!-- Toolbar -->
     <div style="display:flex;justify-content:space-between;align-items:center;
       flex-wrap:wrap;gap:10px;margin-bottom:16px">
@@ -44,7 +48,7 @@ async function carregarSecaoFeedbacks() {
     <!-- Lista -->
     <div id="fb-lista"></div>
     <div id="fb-status" style="text-align:center;font-size:13px;color:#94a3b8;
-      padding:12px"></div>
+      padding:12px">⏳ Carregando...</div>
     <div style="text-align:center;margin-top:8px">
       <button id="fb-btn-mais" onclick="fbCarregarMais()"
         style="display:none;padding:8px 20px;background:#fff;border:1px solid #e2e8f0;
@@ -122,24 +126,19 @@ async function _fbCarregar(reset = false) {
     let todos = [];
     await Promise.all(nlSnap.docs.map(async nlDoc => {
       try {
-        let q = db.collection('newsletters').doc(nlDoc.id)
-          .collection('feedbacks').orderBy('data', 'desc');
-        if (_fbFiltro === 'pendentes') {
-          q = db.collection('newsletters').doc(nlDoc.id)
-            .collection('feedbacks')
-            .where('respondido', '==', false)
-            .orderBy('data', 'desc');
-        }
-        const fbSnap = await q.limit(30).get();
+        // Busca sem filtro e filtra em memória (evita exigir índice composto no Firestore)
+        const q = db.collection('newsletters').doc(nlDoc.id)
+          .collection('feedbacks').orderBy('data', 'desc').limit(100);
+        const fbSnap = await q.get();
         fbSnap.forEach(fbDoc => {
-          todos.push({
-            id:  fbDoc.id,
-            nid: nlDoc.id,
-            nl:  _fbNewsletters[nlDoc.id],
-            ...fbDoc.data(),
-          });
+          const d = fbDoc.data();
+          // Filtra pendentes em memória (sem índice composto)
+          if (_fbFiltro === 'pendentes' && d.respondido === true) return;
+          todos.push({ id: fbDoc.id, nid: nlDoc.id, nl: _fbNewsletters[nlDoc.id], ...d });
         });
-      } catch(e) { /* pula newsletter sem feedbacks */ }
+      } catch(e) {
+        console.warn('[feedbacks] newsletter', nlDoc.id, e.message);
+      }
     }));
 
     // Ordena por data desc
