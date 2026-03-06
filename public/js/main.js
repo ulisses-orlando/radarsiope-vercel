@@ -1235,18 +1235,53 @@ function adicionarBlocoEdicao(bloco = {}) {
   inputTitulo.dataset.blocoField = "titulo";
   wrapper.appendChild(inputTitulo);
 
-  // Select de acesso
+  // Linha com 3 selects lado a lado: Tipo | Acesso | Destino
+  const rowSelects = document.createElement("div");
+  rowSelects.style.cssText = "display:flex;gap:6px;margin-bottom:5px";
+
+  // Select tipo
+  const selectTipo = document.createElement("select");
+  selectTipo.style.cssText = "flex:1;font-size:12px;padding:3px";
+  selectTipo.dataset.blocoField = "tipo";
+  selectTipo.title = "Tipo do bloco";
+  selectTipo.innerHTML = `
+    <option value="">— Tipo —</option>
+    <option value="chamada">📢 Chamada</option>
+    <option value="destaque">⭐ Destaque</option>
+    <option value="analise">📊 Análise</option>
+    <option value="dados">📋 Dados</option>
+    <option value="cta">🎯 CTA</option>
+  `;
+  selectTipo.value = bloco.tipo || "";
+  rowSelects.appendChild(selectTipo);
+
+  // Select acesso
   const selectAcesso = document.createElement("select");
-  selectAcesso.style.width = "100%";
-  selectAcesso.style.marginBottom = "5px";
+  selectAcesso.style.cssText = "flex:1;font-size:12px;padding:3px";
   selectAcesso.dataset.blocoField = "acesso";
+  selectAcesso.title = "Quem pode ver";
   selectAcesso.innerHTML = `
-    <option value="todos">Todos</option>
-    <option value="leads">Somente leads</option>
-    <option value="assinantes">Somente assinantes</option>
+    <option value="todos">👥 Todos</option>
+    <option value="leads">🔓 Leads</option>
+    <option value="assinantes">🔒 Assinantes</option>
   `;
   selectAcesso.value = bloco.acesso || "todos";
-  wrapper.appendChild(selectAcesso);
+  rowSelects.appendChild(selectAcesso);
+
+  // Select destino
+  const selectDestino = document.createElement("select");
+  selectDestino.style.cssText = "flex:1;font-size:12px;padding:3px";
+  selectDestino.dataset.blocoField = "destino";
+  selectDestino.title = "Onde aparece";
+  selectDestino.innerHTML = `
+    <option value="email+app">📧+📱 E-mail e App</option>
+    <option value="app">📱 Só App</option>
+    <option value="email">📧 Só E-mail</option>
+  `;
+  selectDestino.value = bloco.destino || "email+app";
+  rowSelects.appendChild(selectDestino);
+
+  wrapper.appendChild(rowSelects);
 
   // HTML do bloco
   const taBloco = document.createElement("textarea");
