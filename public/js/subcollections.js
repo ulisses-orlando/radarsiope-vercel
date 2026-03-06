@@ -77,33 +77,15 @@ function generateBooleanSelect(name, value) {
   });
   wrap.appendChild(select); return wrap;
 }
-function generateDomainSelect(name, optionsArray, value, fieldName = null) {
-  const wrap = document.createElement('div'); 
-  wrap.className = 'field';
-
-  const label = document.createElement('label'); 
-  label.innerHTML = `<strong>${name}:</strong>`; // Melhora a aparência
-  wrap.appendChild(label);
-
-  const select = document.createElement('select'); 
-  // Usa o fieldName (banco de dados) se existir, senão usa o name (label)
-  select.dataset.fieldName = fieldName || name; 
-  select.style.width = "100%"; // Garante que preencha o espaço
-
+function generateDomainSelect(name, optionsArray, value) {
+  const wrap = document.createElement('div'); wrap.className = 'field';
+  const label = document.createElement('label'); label.innerText = name; wrap.appendChild(label);
+  const select = document.createElement('select'); select.dataset.fieldName = name;
   optionsArray.forEach(optVal => {
-    const el = document.createElement('option'); 
-    el.value = optVal; 
-    el.text = optVal;
-    
-    // Comparação segura de strings para marcar o selecionado
-    if (value && String(value) === String(optVal)) {
-        el.selected = true;
-    }
-    select.appendChild(el);
+    const el = document.createElement('option'); el.value = optVal; el.text = optVal;
+    if (String(value) === String(optVal)) el.selected = true; select.appendChild(el);
   });
-
-  wrap.appendChild(select); 
-  return wrap;
+  wrap.appendChild(select); return wrap;
 }
 
 function generateDateInput(name, dateVal) {
@@ -179,25 +161,12 @@ async function carregarNewsletters() {
   const classFiltro = document.getElementById('filtro-classificacao')?.value || '';
   const busca = (document.getElementById('filtro-busca')?.value || '').toLowerCase();
 
-  // Carrega mapa ID → nome dos tipos para resolver na coluna
-  const tiposSnap = await db.collection('tipo_newsletters').get();
-  const tiposMap = {};
-  tiposSnap.forEach(doc => { tiposMap[doc.id] = doc.data().nome || doc.id; });
-
   const snap = await db.collection('newsletters').orderBy('data_publicacao', 'desc').get();
 
   snap.forEach(doc => {
     const d = doc.data();
-
-    // Campo tipo contém o ID do tipo (novo padrão)
-    const tipoId   = d.tipo || '';
-    const tipoNome = tiposMap[tipoId] || tipoId || '-';
-
-    // Filtro pelo ID do tipo
-    const tipoMatch = !tipoFiltro || tipoId === tipoFiltro;
-
     if (
-      !tipoMatch ||
+      (tipoFiltro && d.tipo !== tipoFiltro) ||
       (classFiltro && d.classificacao !== classFiltro) ||
       (busca && !((d.titulo || '').toLowerCase().includes(busca) || (d.edicao || '').toLowerCase().includes(busca)))
     ) return;
@@ -215,19 +184,81 @@ async function carregarNewsletters() {
       <td>${dt}</td>
       <td>${d.edicao || ''}</td>
       <td>${d.titulo || ''}</td>
-      <td>${tipoNome}</td>
+      <td>${d.tipo || ''}</td>
       <td>${d.classificacao || 'Básica'}</td>
       <td style="text-align:center;">${enviadaIcon}</td>
       <td>
         <span class="icon-btn" title="Editar" onclick="abrirModalNewsletter('${doc.id}', true)">✏️</span>
         <span class="icon-btn" title="Duplicar" onclick="duplicarNewsletter('${doc.id}')">📄</span>
+        <span class="icon-btn" title="Ver Avaliações" onclick="verReacoesNewsletter('${doc.id}', '${(d.titulo||'').replace(/'/g,"\\'")}')">📊</span>
         <span class="icon-btn" title="Excluir" onclick="confirmarExclusaoNewsletter('${doc.id}', '${(d.titulo || '').replace(/'/g, "\\'")}')">🗑️</span>
       </td>`;
     tbody.appendChild(tr);
   });
 }
 
-async function duplicarNewsletter(docId) {
+async function verReacoesNewsletter(docId, titulo) {
+  const snap = await db.collection('newsletters').doc(docId).get();
+  if (!snap.exists) return;
+
+  const reactions = snap.data().reactions || {};
+
+  const LABELS = [
+    { key: 'decepcionou', emoji: '😞', label: 'Decepcionou', cor: '#ef4444' },
+    { key: 'regular',     emoji: '😐', label: 'Regular',     cor: '#f59e0b' },
+    { key: 'bom',         emoji: '🙂', label: 'Bom',         cor: '#3b82f6' },
+    { key: 'muito_bom',   emoji: '😀', label: 'Muito bom',   cor: '#22c55e' },
+    { key: 'excelente',   emoji: '🤩', label: 'Excelente',   cor: '#8b5cf6' },
+  ];
+
+  const total = LABELS.reduce((s, { key }) => s + (reactions[key] || 0), 0);
+
+  const linhas = LABELS.map(({ key, emoji, label, cor }) => {
+    const count = reactions[key] || 0;
+    const pct   = total > 0 ? Math.round((count / total) * 100) : 0;
+    return `
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
+        <span style="font-size:24px;width:32px;text-align:center">${emoji}</span>
+        <div style="flex:1">
+          <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px">
+            <span style="font-weight:700;color:#334155">${label}</span>
+            <span style="color:#64748b">${count} voto${count !== 1 ? 's' : ''} <span style="color:#94a3b8">· ${pct}%</span></span>
+          </div>
+          <div style="background:#f1f5f9;border-radius:20px;height:10px;overflow:hidden">
+            <div style="width:${pct}%;background:${cor};height:100%;border-radius:20px"></div>
+          </div>
+        </div>
+      </div>`;
+  }).join('');
+
+  // Remove modal anterior se existir
+  document.getElementById('modal-reactions')?.remove();
+
+  const modal = document.createElement('div');
+  modal.id = 'modal-reactions';
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;display:flex;align-items:center;justify-content:center';
+  modal.innerHTML = `
+    <div style="background:#fff;border-radius:12px;padding:28px 24px;
+      max-width:460px;width:94%;box-shadow:0 8px 40px rgba(0,0,0,.2);position:relative">
+      <button onclick="document.getElementById('modal-reactions').remove()"
+        style="position:absolute;top:12px;right:14px;background:none;border:none;
+        font-size:20px;cursor:pointer;color:#94a3b8;line-height:1">✕</button>
+      <h3 style="margin:0 0 4px;font-size:16px;color:#0A3D62">📊 Avaliações</h3>
+      <p style="color:#64748b;font-size:13px;margin:0 0 20px">${titulo}</p>
+      <p style="font-size:13px;color:#64748b;margin:0 0 16px">
+        Total de avaliações: <strong style="color:#334155">${total}</strong>
+      </p>
+      ${total === 0
+        ? '<p style="color:#94a3b8;text-align:center;padding:20px 0">Nenhuma avaliação registrada ainda.</p>'
+        : linhas}
+    </div>`;
+
+  // Fecha ao clicar fora
+  modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
+  document.body.appendChild(modal);
+}
+
+
   const snap = await db.collection('newsletters').doc(docId).get();
   if (!snap.exists) return;
 
@@ -242,6 +273,7 @@ async function duplicarNewsletter(docId) {
 async function preencherFiltroTipoNewsletter(selectElement) {
   if (!selectElement || !(selectElement instanceof HTMLElement)) return;
 
+  // Limpa opções anteriores (exceto a primeira)
   selectElement.innerHTML = '<option value="">Todos os tipos</option>';
 
   try {
@@ -255,7 +287,7 @@ async function preencherFiltroTipoNewsletter(selectElement) {
       const nome = doc.data().nome;
       if (nome) {
         const opt = document.createElement("option");
-        opt.value = doc.id;   // ID — alinhado com campo Tipo nas newsletters
+        opt.value = nome;
         opt.textContent = nome;
         selectElement.appendChild(opt);
       }
