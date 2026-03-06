@@ -134,8 +134,13 @@ async function montarBlocos(newsletter, dados, segmento) {
   let htmlBlocos = '';
 
   blocos.forEach(b => {
+    // Filtro de acesso (existente)
     if (segmento && b.acesso !== 'todos' && b.acesso !== segmento) return;
-    htmlBlocos += b.html || '';
+    // Filtro de destino: blocos marcados como só e-mail não aparecem no app
+    if (b.destino === 'email') return;
+    // Envolve em wrapper com data-tipo para o flipbook paginar por tipo
+    const tipo = b.tipo || 'conteudo';
+    htmlBlocos += `<div class="rs-bloco" data-tipo="${tipo}">${b.html || ''}</div>`;
   });
 
   const htmlFinal = blocos.length === 0
