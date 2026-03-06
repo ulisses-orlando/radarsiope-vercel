@@ -488,6 +488,17 @@
     /* Lead com mensagem pendente */
     tr.tr-pendente { background: #fff5f5; }
     tr.tr-pendente:hover { background: #fee2e2; }
+    /* Lead convertido */
+    tr.lead-convertido { background: #f0fdf4; }
+    tr.lead-convertido:hover { background: #dcfce7; }
+    tr.lead-convertido td:first-child { border-left: 3px solid #22c55e; }
+    /* Lead com interações */
+    tr.lead-com-interacao { background: #fffbeb; }
+    tr.lead-com-interacao:hover { background: #fef3c7; }
+    tr.lead-com-interacao td:first-child { border-left: 3px solid #f59e0b; }
+    /* Convertido + interação: prioriza verde */
+    tr.lead-convertido.lead-com-interacao { background: #f0fdf4; }
+    tr.lead-convertido.lead-com-interacao td:first-child { border-left: 3px solid #22c55e; }
   </style>
 </head>
 
@@ -1836,9 +1847,7 @@
             <th>Data</th>
             <th>Preferência</th>
             <th>Mensagem</th>
-            <th>Município</th>
-            <th>Status</th>
-            <th>Ações</th>
+            <th>Status / Ações</th>
           </tr>
         </thead>
         <tbody id="tabela-leads"></tbody>
