@@ -1658,6 +1658,28 @@ function formatarPreferencia(valor) {
 let ultimoDoc = null;
 let ultimaQueryKey = null;
 
+async function verificarPendenciasLeads() {
+  try {
+    // Mensagens de leads não respondidas
+    const { count: msgAbertas } = await window.supabase
+      .from("leads")
+      .select("*", { count: "exact", head: true })
+      .or("mensagem_respondida.is.null,mensagem_respondida.eq.false")
+      .not("mensagem", "is", null);
+
+    const total = msgAbertas || 0;
+    const badge = document.getElementById("badge-leads");
+    if (badge) {
+      badge.textContent   = total > 99 ? '99+' : total;
+      badge.style.display = total > 0 ? "inline" : "none";
+    }
+
+    // Feedbacks delegados ao feedbacks.js (usa subcoleção, não array antigo)
+    if (typeof atualizarBadgeFeedbacks === 'function') atualizarBadgeFeedbacks();
+
+  } catch (e) { console.warn("[pendências]", e); }
+}
+
 async function carregarLeads(paginaNova = false) {
   const tabela = document.getElementById("tabela-leads");
   const resumo = document.getElementById("resumo-leads");
