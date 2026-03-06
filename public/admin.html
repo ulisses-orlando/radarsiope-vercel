@@ -485,9 +485,15 @@
       font-size: 14px;
       padding-left: 20px;
     }
+
     /* Lead com mensagem pendente */
-    tr.tr-pendente { background: #fff5f5; }
-    tr.tr-pendente:hover { background: #fee2e2; }
+    tr.tr-pendente {
+      background: #fff5f5;
+    }
+
+    tr.tr-pendente:hover {
+      background: #fee2e2;
+    }
   </style>
 </head>
 
@@ -526,6 +532,11 @@
       <span id="badge-usuarios" style="display:none;background:#e53e3e;color:#fff;
         border-radius:10px;padding:1px 7px;font-size:11px;font-weight:700;margin-left:6px">0</span>
     </button>
+    <button onclick="abrirTab('feedbacks')" id="btn-tab-feedbacks">
+      💬 Feedbacks
+      <span id="badge-feedbacks" style="display:none;background:#e53e3e;color:#fff;
+    border-radius:10px;padding:1px 7px;font-size:11px;font-weight:700;margin-left:6px">0</span>
+    </button>
     <button onclick="abrirTab('relatorio-avaliacoes')">🗳️ Relatório de Avaliações</button>
     <button onclick="abrirTab('leads')" id="btn-tab-leads">
       📥 Leads Capturados
@@ -534,7 +545,7 @@
     </button>
     <button onclick="abrirTab('auditoria')">🕵️ Auditoria Leads</button>
     <!-- <button onclick="abrirEnvioNewsletterLeads()">📮 Enviar Newsletters</button> -->
-     <button id="botaoEnvioNewsletterLeads">📮Enviar Newsletter</button>
+    <button id="botaoEnvioNewsletterLeads">📮Enviar Newsletter</button>
 
     <button onclick="abrirModalVerificarLotes(event)">📮 Verificar lotes pendentes - atualizar status</button>
     <button onclick="abrirPainelGestao()">🗞️ Painel</button>
@@ -574,10 +585,10 @@
   <main id="conteudo">
     <!-- Enviar Newsletters para Leads -->
     <section id="secao-envio-newsletters" class="card">
-    <!-- Supabase -->
-    <script type="module" src="/exposeSupabaseAdmin.js"></script>
-    <!-- Scripts específicos do admin -->
-    <script type="module" src="js/EnvioLeads.js"></script>
+      <!-- Supabase -->
+      <script type="module" src="/exposeSupabaseAdmin.js"></script>
+      <!-- Scripts específicos do admin -->
+      <script type="module" src="js/EnvioLeads.js"></script>
 
       <div class="abas-navegacao">
         <button onclick="mostrarAba('secao-newsletters-envio')">📰 Newsletters Disponíveis</button>
@@ -607,6 +618,10 @@
         </div>
       </div>
 
+      <section id="secao-feedbacks" class="card" style="display:none">
+        <h2>💬 Feedbacks de Newsletters</h2>
+        <!-- preenchido por carregarSecaoFeedbacks() -->
+      </section>
 
       <!-- Newsletters disponíveis -->
       <section id="secao-newsletters-envio" style="margin-top:30px">
@@ -895,7 +910,7 @@
           <div style="display: flex; gap: 10px; margin-bottom: 15px;">
             <!-- Botões com visibilidade condicional -->
             <div id="botoes-envio-padrao" style="display: flex; gap: 10px;">
-                <button id="btn-gerar-lotes">📦 Gerar Lotes</button>
+              <button id="btn-gerar-lotes">📦 Gerar Lotes</button>
               <button onclick="abrirLotesGerados()">📂 Ver Lotes Gerados</button>
               <button onclick="mostrarAba('secao-newsletters-envio')">🔙 Voltar para Newsletters disponiveis</button>
             </div>
@@ -1993,7 +2008,8 @@
               <tbody>
                 <tr>
                   <td>João Silva</td>
-                  <td><a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="660c09070926030b070f0a4805090b">[email&#160;protected]</a></td>
+                  <td><a href="/cdn-cgi/l/email-protection" class="__cf_email__"
+                      data-cfemail="660c09070926030b070f0a4805090b">[email&#160;protected]</a></td>
                   <td>11999999999</td>
                   <td>contador</td>
                   <td>WhatsApp</td>
@@ -2019,95 +2035,91 @@
           <button onclick="fecharModalImportacaoLeads()">Fechar</button>
         </div>
       </div>
-      <script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
-        <!-- Modal: Responder mensagem do lead -->
-        <div id="modal-responder-mensagem" style="display:none;position:fixed;inset:0;
+      <script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script>
+      <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+      <!-- Modal: Responder mensagem do lead -->
+      <div id="modal-responder-mensagem" style="display:none;position:fixed;inset:0;
           background:rgba(0,0,0,.5);z-index:9999;justify-content:center;align-items:center">
-          <div style="background:#fff;padding:24px;border-radius:10px;max-width:520px;
+        <div style="background:#fff;padding:24px;border-radius:10px;max-width:520px;
             width:90%;position:relative;box-shadow:0 4px 30px rgba(0,0,0,.2)">
-            <button onclick="document.getElementById('modal-responder-mensagem').style.display='none'"
-              style="position:absolute;top:10px;right:10px;background:none;border:none;
+          <button onclick="document.getElementById('modal-responder-mensagem').style.display='none'" style="position:absolute;top:10px;right:10px;background:none;border:none;
               font-size:18px;cursor:pointer">❌</button>
-            <h3>💬 Responder mensagem do lead</h3>
-            <div style="background:#f5f5f5;border-radius:6px;padding:12px;margin:12px 0;
+          <h3>💬 Responder mensagem do lead</h3>
+          <div style="background:#f5f5f5;border-radius:6px;padding:12px;margin:12px 0;
               font-size:13px;color:#555;border-left:4px solid #007acc">
-              <strong>Mensagem recebida:</strong><br>
-              <span id="modal-mensagem-original"></span>
-            </div>
-            <input type="hidden" id="modal-responder-lead-id">
-            <div class="field">
-              <label>Sua resposta:</label>
-              <textarea id="modal-resposta-texto" rows="5"
-                style="width:100%;border:1px solid #ccc;border-radius:6px;padding:8px;font-size:13px"
-                placeholder="Digite sua resposta para o lead..."></textarea>
-            </div>
-            <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:14px">
-              <button onclick="document.getElementById('modal-responder-mensagem').style.display='none'"
-                style="padding:8px 16px;border-radius:6px;border:1px solid #ccc;cursor:pointer">
-                Cancelar
-              </button>
-              <button onclick="enviarRespostaMensagemLead()"
-                style="padding:8px 16px;background:#007acc;color:#fff;border:none;
+            <strong>Mensagem recebida:</strong><br>
+            <span id="modal-mensagem-original"></span>
+          </div>
+          <input type="hidden" id="modal-responder-lead-id">
+          <div class="field">
+            <label>Sua resposta:</label>
+            <textarea id="modal-resposta-texto" rows="5"
+              style="width:100%;border:1px solid #ccc;border-radius:6px;padding:8px;font-size:13px"
+              placeholder="Digite sua resposta para o lead..."></textarea>
+          </div>
+          <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:14px">
+            <button onclick="document.getElementById('modal-responder-mensagem').style.display='none'"
+              style="padding:8px 16px;border-radius:6px;border:1px solid #ccc;cursor:pointer">
+              Cancelar
+            </button>
+            <button onclick="enviarRespostaMensagemLead()" style="padding:8px 16px;background:#007acc;color:#fff;border:none;
                 border-radius:6px;cursor:pointer;font-weight:700">
-                📧 Enviar resposta por e-mail
-              </button>
-            </div>
+              📧 Enviar resposta por e-mail
+            </button>
           </div>
         </div>
+      </div>
 
-        <!-- Seção: Feedbacks das newsletters -->
-        <div style="margin-top:32px;border-top:2px solid #eee;padding-top:20px">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
-            <h3 style="margin:0">
-              💬 Feedbacks das Newsletters
-              <span id="badge-feedbacks" style="display:none;background:#e53e3e;color:#fff;
+      <!-- Seção: Feedbacks das newsletters -->
+      <div style="margin-top:32px;border-top:2px solid #eee;padding-top:20px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+          <h3 style="margin:0">
+            💬 Feedbacks das Newsletters
+            <span id="badge-feedbacks" style="display:none;background:#e53e3e;color:#fff;
                 border-radius:10px;padding:1px 7px;font-size:11px;font-weight:700;margin-left:6px">0</span>
-            </h3>
-            <button onclick="carregarFeedbacksNewsletters()"
-              style="padding:6px 14px;background:#007acc;color:#fff;border:none;
+          </h3>
+          <button onclick="carregarFeedbacksNewsletters()" style="padding:6px 14px;background:#007acc;color:#fff;border:none;
               border-radius:6px;cursor:pointer;font-size:13px">🔄 Atualizar</button>
-          </div>
-          <div id="lista-feedbacks-newsletters">
-            <p style="color:#999;font-size:13px">Clique em "Leads Capturados" para carregar os feedbacks.</p>
-          </div>
         </div>
+        <div id="lista-feedbacks-newsletters">
+          <p style="color:#999;font-size:13px">Clique em "Leads Capturados" para carregar os feedbacks.</p>
+        </div>
+      </div>
 
-        <!-- Modal: Responder feedback -->
-        <div id="modal-responder-feedback" style="display:none;position:fixed;inset:0;
+      <!-- Modal: Responder feedback -->
+      <div id="modal-responder-feedback" style="display:none;position:fixed;inset:0;
           background:rgba(0,0,0,.5);z-index:9999;justify-content:center;align-items:center">
-          <div style="background:#fff;padding:24px;border-radius:10px;max-width:520px;
+        <div style="background:#fff;padding:24px;border-radius:10px;max-width:520px;
             width:90%;position:relative;box-shadow:0 4px 30px rgba(0,0,0,.2)">
-            <button onclick="document.getElementById('modal-responder-feedback').style.display='none'"
-              style="position:absolute;top:10px;right:10px;background:none;border:none;
+          <button onclick="document.getElementById('modal-responder-feedback').style.display='none'" style="position:absolute;top:10px;right:10px;background:none;border:none;
               font-size:18px;cursor:pointer">❌</button>
-            <h3>💬 Responder feedback</h3>
-            <div style="background:#f5f5f5;border-radius:6px;padding:12px;margin:12px 0;
+          <h3>💬 Responder feedback</h3>
+          <div style="background:#f5f5f5;border-radius:6px;padding:12px;margin:12px 0;
               font-size:13px;color:#555;border-left:4px solid #f59e0b">
-              <strong>Feedback recebido:</strong><br>
-              <span id="modal-feedback-original"></span><br>
-              <small style="color:#888" id="modal-feedback-meta"></small>
-            </div>
-            <input type="hidden" id="modal-feedback-newsletter-id">
-            <input type="hidden" id="modal-feedback-index">
-            <div class="field">
-              <label>Sua resposta interna (nota para o time):</label>
-              <textarea id="modal-feedback-resposta" rows="4"
-                style="width:100%;border:1px solid #ccc;border-radius:6px;padding:8px;font-size:13px"
-                placeholder="Registre uma observação sobre este feedback..."></textarea>
-            </div>
-            <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:14px">
-              <button onclick="document.getElementById('modal-responder-feedback').style.display='none'"
-                style="padding:8px 16px;border-radius:6px;border:1px solid #ccc;cursor:pointer">
-                Cancelar
-              </button>
-              <button onclick="salvarRespostaFeedback()"
-                style="padding:8px 16px;background:#f59e0b;color:#fff;border:none;
+            <strong>Feedback recebido:</strong><br>
+            <span id="modal-feedback-original"></span><br>
+            <small style="color:#888" id="modal-feedback-meta"></small>
+          </div>
+          <input type="hidden" id="modal-feedback-newsletter-id">
+          <input type="hidden" id="modal-feedback-index">
+          <div class="field">
+            <label>Sua resposta interna (nota para o time):</label>
+            <textarea id="modal-feedback-resposta" rows="4"
+              style="width:100%;border:1px solid #ccc;border-radius:6px;padding:8px;font-size:13px"
+              placeholder="Registre uma observação sobre este feedback..."></textarea>
+          </div>
+          <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:14px">
+            <button onclick="document.getElementById('modal-responder-feedback').style.display='none'"
+              style="padding:8px 16px;border-radius:6px;border:1px solid #ccc;cursor:pointer">
+              Cancelar
+            </button>
+            <button onclick="salvarRespostaFeedback()" style="padding:8px 16px;background:#f59e0b;color:#fff;border:none;
                 border-radius:6px;cursor:pointer;font-weight:700">
-                ✅ Marcar como tratado
-              </button>
-            </div>
+              ✅ Marcar como tratado
+            </button>
           </div>
         </div>
+      </div>
 
 
 
@@ -2251,10 +2263,11 @@
   <script src="js/main.js"></script>
   <script src="js/subcollections.js"></script>
   <script src="js/drawer-usuario.js"></script>
+  <script src="js/feedbacks.js"></script>
   <script src="js/site.js"></script>
   <script src="js/functions.js"></script>
   <script src="js/mailer.js"></script>
-  
+
 
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/2.4.0/purify.min.js"></script>
@@ -2344,6 +2357,7 @@
         preencherFiltroTipoNewsletter(document.getElementById("filtro-tipo-news"));
         carregarNewsletters();
       }
+      else if (tabId === 'feedbacks') carregarSecaoFeedbacks();
       else if (tabId === 'template_newsletters') carregarTemplatesNewsletter();
       else if (tabId === 'tipo-newsletters') carregarTipoNewsLetters();
       else if (tabId === 'leads') { carregarLeads(true); carregarFeedbacksNewsletters(); }
@@ -2364,29 +2378,29 @@
     }
 
     // inicializa com usuários visível
-      abrirTab('usuarios');
+    abrirTab('usuarios');
 
-      // Aguarda o supabase estar disponível (module script é assíncrono)
-      function _aguardarSupabaseEVerificar(tentativas = 0) {
-        if (window.supabase) {
-          verificarPendenciasLeads();
-        } else if (tentativas < 20) {
-          setTimeout(() => _aguardarSupabaseEVerificar(tentativas + 1), 150);
-        } else {
-          console.warn('[admin] supabase não disponível para verificar pendências');
-        }
-      }
-      _aguardarSupabaseEVerificar();
-
-      // Badge de usuários (Firebase — dispara direto)
-      if (typeof verificarPendenciasUsuarios === 'function') {
-        verificarPendenciasUsuarios();
+    // Aguarda o supabase estar disponível (module script é assíncrono)
+    function _aguardarSupabaseEVerificar(tentativas = 0) {
+      if (window.supabase) {
+        verificarPendenciasLeads();
+      } else if (tentativas < 20) {
+        setTimeout(() => _aguardarSupabaseEVerificar(tentativas + 1), 150);
       } else {
-        // drawer-usuario.js pode ainda estar carregando
-        setTimeout(() => {
-          if (typeof verificarPendenciasUsuarios === 'function') verificarPendenciasUsuarios();
-        }, 800);
+        console.warn('[admin] supabase não disponível para verificar pendências');
       }
+    }
+    _aguardarSupabaseEVerificar();
+
+    // Badge de usuários (Firebase — dispara direto)
+    if (typeof verificarPendenciasUsuarios === 'function') {
+      verificarPendenciasUsuarios();
+    } else {
+      // drawer-usuario.js pode ainda estar carregando
+      setTimeout(() => {
+        if (typeof verificarPendenciasUsuarios === 'function') verificarPendenciasUsuarios();
+      }, 800);
+    }
   </script>
   <script>
     document.addEventListener("DOMContentLoaded", () => {
