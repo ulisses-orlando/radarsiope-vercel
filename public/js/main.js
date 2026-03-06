@@ -417,9 +417,21 @@ async function abrirModalNewsletter(docId = null, isEdit = false) {
     <label>URL do Podcast (áudio)
       <span style="font-weight:400;color:#888;font-size:11px"> — Essence+</span>
     </label>
-    <input type="url" data-field-name="audio_url"
-      value="${data.audio_url || ''}"
-      placeholder="https://...">
+    <div style="display:flex;gap:6px;align-items:center">
+      <input type="url" data-field-name="audio_url"
+        value="${data.audio_url || ''}"
+        placeholder="https://app.radarsiope.com.br/media/podcasts/edicao-XXX.mp3"
+        style="flex:1">
+      <button type="button" title="Gerar URL padrão"
+        style="padding:6px 10px;border-radius:6px;border:1px solid #ccc;background:#f5f5f5;cursor:pointer;font-size:12px;white-space:nowrap"
+        onclick="(function(){
+          const num = document.querySelector('[data-field-name=numero]')?.value || 'XXX';
+          const n = String(num).padStart(3,'0');
+          const el = this.closest('.field').querySelector('input');
+          el.value = 'https://app.radarsiope.com.br/media/podcasts/edicao-' + n + '.mp3';
+          el.dispatchEvent(new Event('input'));
+        }).call(this)">📎 Gerar</button>
+    </div>
   `;
   col1.appendChild(audioWrap);
 
@@ -428,11 +440,11 @@ async function abrirModalNewsletter(docId = null, isEdit = false) {
   videoWrap.className = 'field';
   videoWrap.innerHTML = `
     <label>URL do Vídeo
-      <span style="font-weight:400;color:#888;font-size:11px"> — todos os planos</span>
+      <span style="font-weight:400;color:#888;font-size:11px"> — Profissional+</span>
     </label>
     <input type="url" data-field-name="video_url"
       value="${data.video_url || ''}"
-      placeholder="https://youtube.com/...">
+      placeholder="https://youtube.com/watch?v=... ou https://youtu.be/...">
   `;
   col1.appendChild(videoWrap);
 
@@ -443,9 +455,21 @@ async function abrirModalNewsletter(docId = null, isEdit = false) {
     <label>URL do Infográfico
       <span style="font-weight:400;color:#888;font-size:11px"> — Profissional+</span>
     </label>
-    <input type="url" data-field-name="infografico_url"
-      value="${data.infografico_url || ''}"
-      placeholder="https://...">
+    <div style="display:flex;gap:6px;align-items:center">
+      <input type="url" data-field-name="infografico_url"
+        value="${data.infografico_url || ''}"
+        placeholder="https://app.radarsiope.com.br/media/infograficos/edicao-XXX.png"
+        style="flex:1">
+      <button type="button" title="Gerar URL padrão"
+        style="padding:6px 10px;border-radius:6px;border:1px solid #ccc;background:#f5f5f5;cursor:pointer;font-size:12px;white-space:nowrap"
+        onclick="(function(){
+          const num = document.querySelector('[data-field-name=numero]')?.value || 'XXX';
+          const n = String(num).padStart(3,'0');
+          const el = this.closest('.field').querySelector('input');
+          el.value = 'https://app.radarsiope.com.br/media/infograficos/edicao-' + n + '.png';
+          el.dispatchEvent(new Event('input'));
+        }).call(this)">📎 Gerar</button>
+    </div>
   `;
   col1.appendChild(infoWrap);
 
@@ -548,9 +572,32 @@ async function abrirModalNewsletter(docId = null, isEdit = false) {
   col1.appendChild(proTempSection);
 
   const tiposSnap = await db.collection("tipo_newsletters").get();
-  const tiposArr = tiposSnap.docs.map(doc => doc.data().nome).filter(Boolean);
-  col1.appendChild(generateDomainSelect("tipo", tiposArr, data.tipo));
-  col1.appendChild(generateDomainSelect('Classificação', ['Básica', 'Premium'], data.classificacao || 'Básica'));
+const tiposDocs = tiposSnap.docs.map(doc => ({ id: doc.id, nome: doc.data().nome })).filter(t => t.nome);
+const tiposArr  = tiposDocs.map(t => t.nome); // só nomes — usado no filtro de templates abaixo
+
+// Select tipo: value = ID, label = nome, fieldName = 'tipo'
+const tipoWrap = document.createElement('div');
+tipoWrap.className = 'field';
+const tipoLabel = document.createElement('label');
+tipoLabel.innerText = 'Tipo';
+const tipoSelect = document.createElement('select');
+tipoSelect.dataset.fieldName = 'tipo';
+tipoSelect.style.width = '100%';
+tipoSelect.innerHTML = '<option value="">Selecione...</option>';
+tiposDocs.forEach(t => {
+  const opt = document.createElement('option');
+  opt.value = t.id;
+  opt.textContent = t.nome;
+  if (t.id === data.tipo) opt.selected = true; // data.tipo = ID gravado
+  tipoSelect.appendChild(opt);
+});
+tipoWrap.appendChild(tipoLabel);
+tipoWrap.appendChild(tipoSelect);
+col1.appendChild(tipoWrap);
+
+// Classificação: passa 'classificacao' como fieldName para salvar no campo correto
+const selectClassificacao = generateDomainSelect('classificacao', ['Básica', 'Premium'], data.classificacao || 'Básica');
+col1.appendChild(selectClassificacao);
 
   // Campo "Enviada" (somente leitura)
   const enviadaDiv = document.createElement("div");
@@ -960,19 +1007,10 @@ async function abrirModalNewsletter(docId = null, isEdit = false) {
     const statusDiv = document.getElementById("status-envio-news");
 
     if (statusDiv) {
-      const enviosSnap = await db.collection("newsletters")
-        .doc(docId)
-        .collection("envios")
-        .orderBy("data_envio", "desc")
-        .limit(1)
-        .get();
-
-      if (enviosSnap.empty) {
+      if (!data || data.enviada !== true) {
         statusDiv.innerHTML = `<span style="color:red;">❌ Ainda não enviada</span>`;
       } else {
-        const envio = enviosSnap.docs[0].data();
-        const dt = envio.data_envio.toDate().toLocaleDateString("pt-BR");
-        statusDiv.innerHTML = `<span style="color:green;">✔️ Enviada em ${dt}</span>`;
+        statusDiv.innerHTML = `<span style="color:green;">✔️ Enviada</span>`;
       }
     }
   }
@@ -1197,53 +1235,18 @@ function adicionarBlocoEdicao(bloco = {}) {
   inputTitulo.dataset.blocoField = "titulo";
   wrapper.appendChild(inputTitulo);
 
-  // Linha com 3 selects lado a lado: tipo | acesso | destino
-  const rowSelects = document.createElement("div");
-  rowSelects.style.cssText = "display:flex;gap:6px;margin-bottom:5px";
-
-  // Select tipo
-  const selectTipo = document.createElement("select");
-  selectTipo.style.cssText = "flex:1;font-size:12px;padding:3px";
-  selectTipo.dataset.blocoField = "tipo";
-  selectTipo.title = "Tipo do bloco";
-  selectTipo.innerHTML = `
-    <option value="">— Tipo —</option>
-    <option value="chamada">📢 Chamada</option>
-    <option value="destaque">⭐ Destaque</option>
-    <option value="analise">📊 Análise</option>
-    <option value="dados">📋 Dados</option>
-    <option value="cta">🎯 CTA</option>
-  `;
-  selectTipo.value = bloco.tipo || "";
-  rowSelects.appendChild(selectTipo);
-
-  // Select acesso
+  // Select de acesso
   const selectAcesso = document.createElement("select");
-  selectAcesso.style.cssText = "flex:1;font-size:12px;padding:3px";
+  selectAcesso.style.width = "100%";
+  selectAcesso.style.marginBottom = "5px";
   selectAcesso.dataset.blocoField = "acesso";
-  selectAcesso.title = "Quem pode ver";
   selectAcesso.innerHTML = `
-    <option value="todos">👥 Todos</option>
-    <option value="leads">🔓 Leads</option>
-    <option value="assinantes">🔒 Assinantes</option>
+    <option value="todos">Todos</option>
+    <option value="leads">Somente leads</option>
+    <option value="assinantes">Somente assinantes</option>
   `;
   selectAcesso.value = bloco.acesso || "todos";
-  rowSelects.appendChild(selectAcesso);
-
-  // Select destino
-  const selectDestino = document.createElement("select");
-  selectDestino.style.cssText = "flex:1;font-size:12px;padding:3px";
-  selectDestino.dataset.blocoField = "destino";
-  selectDestino.title = "Onde aparece";
-  selectDestino.innerHTML = `
-    <option value="email+app">📧+📱 E-mail e App</option>
-    <option value="app">📱 Só App</option>
-    <option value="email">📧 Só E-mail</option>
-  `;
-  selectDestino.value = bloco.destino || "email+app";
-  rowSelects.appendChild(selectDestino);
-
-  wrapper.appendChild(rowSelects);
+  wrapper.appendChild(selectAcesso);
 
   // HTML do bloco
   const taBloco = document.createElement("textarea");
@@ -1658,280 +1661,447 @@ function formatarPreferencia(valor) {
 let ultimoDoc = null;
 let ultimaQueryKey = null;
 
+let _leadsOffset = 0;
+const _LEADS_LIMIT = 20;
+
+async function carregarLeads(resetar = false) {
+  const tabela = document.getElementById("tabela-leads");
+  const resumo  = document.getElementById("resumo-leads");
+  if (!tabela) return;
+
+  if (resetar) _leadsOffset = 0;
+
+  const perfil      = document.getElementById("filtro-perfil-lead")?.value || "";
+  const preferencia = document.getElementById("filtro-preferencia")?.value || "";
+  const status      = document.getElementById("filtro-status-lead-consulta")?.value || "";
+  const termoBusca  = document.getElementById("busca-leads")?.value?.trim().toLowerCase() || "";
+
+  tabela.innerHTML = "<tr><td colspan='11'>Carregando...</td></tr>";
+
+  try {
+    let query = window.supabase.from("leads").select("*", { count: "exact" });
+
+    // Filtros
+    if (termoBusca) {
+      query = query.or(
+        `nome_lowercase.ilike.${termoBusca}%,email.ilike.%${termoBusca}%`
+      );
+    }
+    if (perfil)      query = query.eq("perfil", perfil);
+    if (preferencia) query = query.eq("preferencia_contato", preferencia);
+    if (status)      query = query.eq("status", status);
+
+    // Ordenação: mensagens não respondidas primeiro, depois mais recentes
+    query = query
+      .order("mensagem_respondida", { ascending: true, nullsFirst: true })
+      .order("data_criacao", { ascending: false })
+      .range(_leadsOffset, _leadsOffset + _LEADS_LIMIT - 1);
+
+    const { data: leads, error, count } = await query;
+    if (error) throw error;
+
+    if (!leads || leads.length === 0) {
+      tabela.innerHTML = "<tr><td colspan='11'>Nenhum lead encontrado.</td></tr>";
+      resumo.innerHTML = "";
+      return;
+    }
+
+    const contadores = { "Novo": 0, "Em contato": 0, "Negociando": 0, "Convertido": 0, "Descartado": 0 };
+    let linhas = "";
+
+    for (const d of leads) {
+      const statusAtual   = d.status || "Novo";
+      const destaque      = statusAtual === "Convertido" ? "lead-convertido" : "";
+      const dataFmt       = d.data_criacao ? new Date(d.data_criacao).toLocaleString("pt-BR") : "";
+      const interesses    = Array.isArray(d.interesses) ? d.interesses.join(", ") : (d.interesses || "");
+      contadores[statusAtual] = (contadores[statusAtual] || 0) + 1;
+
+      // Mensagem — destaque se não respondida
+      const temMensagem = !!d.mensagem;
+      const respondida  = !!d.mensagem_respondida;
+      const celMensagem = temMensagem
+        ? respondida
+          ? `<span style="color:#22c55e;font-size:12px" title="${d.mensagem}">✅ ${d.mensagem.slice(0, 25)}…</span>`
+          : `<span style="color:#e53e3e;font-weight:700;cursor:pointer;font-size:12px"
+               title="${d.mensagem}" onclick="abrirModalResponderMensagem('${d.id}','${(d.mensagem||'').replace(/'/g,"\\'")}')">
+               🔴 ${d.mensagem.slice(0, 25)}${d.mensagem.length > 25 ? '…' : ''}
+             </span>`
+        : "—";
+
+      linhas += `
+        <tr class="${destaque}${!respondida && temMensagem ? ' tr-pendente' : ''}">
+          <td>${d.nome || ""}</td>
+          <td>${d.email || ""}</td>
+          <td>${d.telefone || ""}</td>
+          <td>${d.perfil || "-"}</td>
+          <td style="font-size:11px">${interesses}</td>
+          <td style="font-size:11px">${dataFmt}</td>
+          <td>${formatarPreferencia(d.preferencia_contato)}</td>
+          <td>${celMensagem}</td>
+          <td style="font-size:11px">${d.nome_municipio || ""}${d.cod_uf ? ` / ${d.cod_uf}` : ""}</td>
+          <td>
+            <select onchange="atualizarStatusLeadSupabase('${d.id}', this.value)">
+              ${["Novo","Em contato","Negociando","Convertido","Descartado"].map(op =>
+                `<option value="${op}" ${op === statusAtual ? "selected" : ""}>${op}</option>`
+              ).join("")}
+            </select>
+          </td>
+          <td style="white-space:nowrap">
+            ${temMensagem && !respondida
+              ? `<span class="icon-btn" title="Responder mensagem"
+                  onclick="abrirModalResponderMensagem('${d.id}','${(d.mensagem||'').replace(/'/g,"\\'")}')">💬</span>`
+              : ""}
+            <span class="icon-btn" title="Registrar contato"
+              onclick="abrirModalContatoLead('${d.id}')">📞</span>
+            <span class="icon-btn" title="Ver histórico de interações"
+              onclick="abrirModalHistorico('${d.id}')">📜</span>
+            <span class="icon-btn" title="Prorrogar acesso"
+              onclick="abrirModalProrrogarAcesso('${d.id}', '${(d.nome||'').replace(/'/g,"\\'")}')">⏰</span>
+          </td>
+        </tr>`;
+    }
+
+    tabela.innerHTML = linhas;
+
+    const total = count || 0;
+    const mostrando = Math.min(_leadsOffset + _LEADS_LIMIT, total);
+    resumo.innerHTML = `
+      <span>Mostrando ${mostrando} de ${total} leads</span> &nbsp;|&nbsp;
+      <span style="color:green">🟢 ${contadores["Convertido"]} convertidos</span> |
+      <span style="color:orange">🟡 ${contadores["Negociando"]} negociando</span> |
+      <span style="color:blue">🔵 ${contadores["Em contato"]} em contato</span> |
+      <span style="color:gray">⚪ ${contadores["Novo"]} novos</span>
+      ${mostrando < total
+        ? `&nbsp;|&nbsp;<span style="cursor:pointer;text-decoration:underline;color:#007acc"
+             onclick="_leadsOffset+=${_LEADS_LIMIT};carregarLeads()">▶ Próxima página</span>`
+        : ""}
+      ${_leadsOffset > 0
+        ? `&nbsp;|&nbsp;<span style="cursor:pointer;text-decoration:underline;color:#007acc"
+             onclick="_leadsOffset=Math.max(0,_leadsOffset-${_LEADS_LIMIT});carregarLeads()">◀ Anterior</span>`
+        : ""}
+    `;
+
+  } catch (err) {
+    tabela.innerHTML = `<tr><td colspan='11'>Erro ao carregar leads: ${err.message}</td></tr>`;
+    console.error("[leads]", err);
+  }
+}
+
+// ─── Atualizar status do lead no Supabase ─────────────────────────────────────
+async function atualizarStatusLeadSupabase(leadId, novoStatus) {
+  const { error } = await window.supabase
+    .from("leads").update({ status: novoStatus }).eq("id", leadId);
+  if (error) mostrarMensagem("Erro ao atualizar status: " + error.message);
+}
+
+// ─── Badge: verificar pendências ─────────────────────────────────────────────
 async function verificarPendenciasLeads() {
   try {
-    // Mensagens de leads não respondidas
+    // Mensagens não respondidas
     const { count: msgAbertas } = await window.supabase
       .from("leads")
       .select("*", { count: "exact", head: true })
       .or("mensagem_respondida.is.null,mensagem_respondida.eq.false")
       .not("mensagem", "is", null);
 
-    const total = msgAbertas || 0;
+    // Feedbacks sem resposta (todos os feedbacks de newsletters)
+    const snap = await db.collection("newsletters")
+      .where("enviada", "==", true).get();
+    let fbAbertas = 0;
+    snap.forEach(doc => {
+      const feedbacks = doc.data().feedbacks || [];
+      fbAbertas += feedbacks.filter(f => !f.respondido).length;
+    });
+
+    const total = (msgAbertas || 0) + fbAbertas;
     const badge = document.getElementById("badge-leads");
+    const badgeFb = document.getElementById("badge-feedbacks");
+
     if (badge) {
-      badge.textContent   = total > 99 ? '99+' : total;
+      badge.textContent = total;
       badge.style.display = total > 0 ? "inline" : "none";
     }
-
-    // Feedbacks delegados ao feedbacks.js (usa subcoleção, não array antigo)
-    if (typeof atualizarBadgeFeedbacks === 'function') atualizarBadgeFeedbacks();
-
+    if (badgeFb) {
+      badgeFb.textContent = fbAbertas;
+      badgeFb.style.display = fbAbertas > 0 ? "inline" : "none";
+    }
   } catch (e) { console.warn("[pendências]", e); }
 }
 
-async function carregarLeads(paginaNova = false) {
-  const tabela = document.getElementById("tabela-leads");
-  const resumo = document.getElementById("resumo-leads");
+// ─── Responder mensagem do lead ───────────────────────────────────────────────
+function abrirModalResponderMensagem(leadId, mensagem) {
+  document.getElementById("modal-responder-lead-id").value = leadId;
+  document.getElementById("modal-mensagem-original").textContent = mensagem;
+  document.getElementById("modal-resposta-texto").value = "";
+  document.getElementById("modal-responder-mensagem").style.display = "flex";
+}
 
-  const perfil = document.getElementById("filtro-perfil-lead")?.value?.trim() || "";
-  const preferencia = document.getElementById("filtro-preferencia")?.value?.trim() || "";
-  const status = document.getElementById("filtro-status-lead-consulta")?.value?.trim() || "";
-  const termoBuscaRaw = document.getElementById("busca-leads")?.value || "";
-  const termoBusca = termoBuscaRaw.trim().toLowerCase();
+async function enviarRespostaMensagemLead() {
+  const leadId  = document.getElementById("modal-responder-lead-id").value;
+  const resposta = document.getElementById("modal-resposta-texto").value.trim();
+  if (!resposta) return mostrarMensagem("Digite uma resposta.");
 
-  // Monta chave única da consulta com todos os filtros
-  const queryKey = JSON.stringify({
-    perfil,
-    preferencia,
-    status,
-    termoBusca
-  });
-
-  // Reset de paginação se for nova busca OU se os filtros/termo mudaram
-  if (paginaNova || queryKey !== ultimaQueryKey) {
-    ultimoDoc = null;
-    ultimaQueryKey = queryKey;
-  }
-
-  tabela.innerHTML = "<tr><td colspan='10'>Carregando...</td></tr>";
+  // Buscar dados do lead para enviar e-mail
+  const { data: lead, error } = await window.supabase
+    .from("leads").select("nome,email").eq("id", leadId).single();
+  if (error || !lead) return mostrarMensagem("Lead não encontrado.");
 
   try {
-    let query = db.collection("leads");
+    // Enviar e-mail via API SES
+    await fetch("https://api.radarsiope.com.br/api/sendViaSES", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        nome: lead.nome,
+        email: lead.email,
+        assunto: "Resposta à sua mensagem — Radar SIOPE",
+        mensagemHtml: `<p>Olá ${lead.nome},</p><p>${resposta}</p>
+          <p>Atenciosamente,<br><strong>Equipe Radar SIOPE</strong></p>`
+      })
+    });
 
-    // Busca por prefixo em nome_lowercase
-    if (termoBusca) {
-      query = query
-        .orderBy("nome_lowercase")
-        .startAt(termoBusca)
-        .endAt(termoBusca + "\uf8ff");
-    } else if (!perfil && !status && !preferencia) {
-      // Sem filtros → ordena por timestamp
-      query = query.orderBy("timestamp", "desc");
+    // Marcar como respondida no Supabase
+    await window.supabase.from("leads").update({
+      mensagem_respondida: true,
+      mensagem_resposta: resposta,
+      mensagem_respondida_em: new Date().toISOString()
+    }).eq("id", leadId);
+
+    document.getElementById("modal-responder-mensagem").style.display = "none";
+    mostrarMensagem("✅ Resposta enviada com sucesso!");
+    carregarLeads(true);
+    verificarPendenciasLeads();
+
+  } catch (e) {
+    mostrarMensagem("Erro ao enviar resposta: " + e.message);
+  }
+}
+
+// ─── Feedbacks das newsletters ────────────────────────────────────────────────
+async function carregarFeedbacksNewsletters() {
+  const container = document.getElementById("lista-feedbacks-newsletters");
+  if (!container) return;
+  container.innerHTML = "<p style='color:#999;font-size:13px'>Carregando feedbacks...</p>";
+
+  try {
+    const snap = await db.collection("newsletters")
+      .where("enviada", "==", true)
+      .orderBy("data_publicacao", "desc")
+      .limit(20).get();
+
+    let html = "";
+    let totalAbertos = 0;
+
+    snap.forEach(doc => {
+      const nl = doc.data();
+      const feedbacks = nl.feedbacks || [];
+      if (!feedbacks.length) return;
+
+      const abertos = feedbacks.filter(f => !f.respondido).length;
+      totalAbertos += abertos;
+
+      html += `
+        <div style="border:1px solid #e2e8f0;border-radius:8px;margin-bottom:12px;overflow:hidden">
+          <div style="background:#f8fafc;padding:10px 14px;display:flex;
+            justify-content:space-between;align-items:center;border-bottom:1px solid #e2e8f0">
+            <strong style="font-size:13px">📰 Edição ${nl.numero || "—"} — ${nl.titulo || ""}</strong>
+            ${abertos > 0
+              ? `<span style="background:#fef2f2;color:#e53e3e;border-radius:10px;
+                  padding:2px 8px;font-size:11px;font-weight:700">${abertos} pendente${abertos > 1 ? "s" : ""}</span>`
+              : `<span style="background:#f0fdf4;color:#22c55e;border-radius:10px;
+                  padding:2px 8px;font-size:11px">✅ Todos tratados</span>`}
+          </div>
+          <div style="padding:10px 14px">
+            ${feedbacks.map((f, idx) => `
+              <div style="display:flex;align-items:flex-start;gap:10px;padding:8px 0;
+                border-bottom:1px dashed #e2e8f0;${idx === feedbacks.length-1 ? 'border:none' : ''}">
+                <div style="flex:1">
+                  <div style="font-size:12px;color:#555;line-height:1.5">${f.texto}</div>
+                  <div style="font-size:10px;color:#aaa;margin-top:3px">
+                    ${f.segmento || "—"} · ${f.plano || "—"} ·
+                    ${f.ts ? new Date(f.ts).toLocaleString("pt-BR") : ""}
+                  </div>
+                  ${f.respondido
+                    ? `<div style="font-size:11px;color:#22c55e;margin-top:3px">
+                        ✅ Tratado: ${f.nota_interna || ""}</div>`
+                    : ""}
+                </div>
+                ${!f.respondido
+                  ? `<button onclick="abrirModalResponderFeedback('${doc.id}', ${idx}, \`${(f.texto||'').replace(/`/g,"'")}\`, '${f.segmento||''}', '${f.plano||''}')"
+                      style="padding:5px 10px;background:#f59e0b;color:#fff;border:none;
+                      border-radius:6px;font-size:11px;cursor:pointer;white-space:nowrap">
+                      💬 Tratar
+                    </button>`
+                  : ""}
+              </div>`).join("")}
+          </div>
+        </div>`;
+    });
+
+    container.innerHTML = html || "<p style='color:#999;font-size:13px'>Nenhum feedback registrado ainda.</p>";
+
+    // Atualizar badge
+    const badgeFb = document.getElementById("badge-feedbacks");
+    if (badgeFb) {
+      badgeFb.textContent = totalAbertos;
+      badgeFb.style.display = totalAbertos > 0 ? "inline" : "none";
     }
 
-    // 🔹 Se houver filtros simples, não força orderBy
-    if (perfil) query = query.where("perfil", "==", perfil);
-    if (preferencia) query = query.where("preferencia_contato", "==", preferencia);
-    if (status) query = query.where("status", "==", status);
+  } catch (e) {
+    container.innerHTML = `<p style='color:#e53e3e;font-size:13px'>Erro: ${e.message}</p>`;
+    console.error("[feedbacks]", e);
+  }
+}
 
-    // status
-    query = query.limit(limitePorPagina);
-    if (ultimoDoc) {
-      query = query.startAfter(ultimoDoc);
-    }
+function abrirModalResponderFeedback(newsletterId, idx, texto, segmento, plano) {
+  document.getElementById("modal-feedback-newsletter-id").value = newsletterId;
+  document.getElementById("modal-feedback-index").value = idx;
+  document.getElementById("modal-feedback-original").textContent = texto;
+  document.getElementById("modal-feedback-meta").textContent = `${segmento} · ${plano}`;
+  document.getElementById("modal-feedback-resposta").value = "";
+  document.getElementById("modal-responder-feedback").style.display = "flex";
+}
 
-    const snap = await query.get();
+async function salvarRespostaFeedback() {
+  const nid   = document.getElementById("modal-feedback-newsletter-id").value;
+  const idx   = parseInt(document.getElementById("modal-feedback-index").value);
+  const nota  = document.getElementById("modal-feedback-resposta").value.trim();
+  if (!nota) return mostrarMensagem("Digite uma observação.");
 
-    if (snap.empty) {
-      tabela.innerHTML = "<tr><td colspan='10'>Nenhum lead encontrado.</td></tr>";
-      resumo.innerHTML = `<span style="cursor:pointer;text-decoration:underline" onclick="carregarLeads(false)">🔄 Ver mais</span>`;
-      return;
-    }
+  try {
+    const snap = await db.collection("newsletters").doc(nid).get();
+    const feedbacks = snap.data()?.feedbacks || [];
+    feedbacks[idx] = { ...feedbacks[idx], respondido: true, nota_interna: nota,
+      respondido_em: new Date().toISOString() };
+    await db.collection("newsletters").doc(nid).update({ feedbacks });
 
-    // Atualiza o último doc para a próxima página
-    ultimoDoc = snap.docs[snap.docs.length - 1];
-
-    const contadores = {
-      "Novo": 0,
-      "Em contato": 0,
-      "Negociando": 0,
-      "Convertido": 0,
-      "Descartado": 0
-    };
-
-    let linhas = "";
-
-    for (const doc of snap.docs) {
-      const d = doc.data();
-      const leadId = doc.id;
-      const data = d.data_criacao?.toDate?.() ? d.data_criacao.toDate().toLocaleString("pt-BR") : "";
-      const interesses = Array.isArray(d.interesses) ? d.interesses.join(", ") : "";
-      const statusAtual = d.status || "Novo";
-      const classes = [
-        statusAtual === "Convertido" ? "lead-convertido" : "",
-        d.tem_interacoes ? "lead-com-interacao" : ""
-      ].filter(Boolean).join(" ");
-      contadores[statusAtual] = (contadores[statusAtual] || 0) + 1;
-
-      const iconeHistorico = d.tem_interacoes
-        ? `<span class="icon-btn" title="Ver histórico" onclick="abrirModalHistorico('${leadId}')">📜</span>`
-        : "";
-
-      const podeVincular = statusAtual !== "Convertido" && statusAtual !== "Descartado";
-      const iconeVincular = podeVincular
-        ? `<span class="icon-btn" title="Vincular lead" onclick="abrirModalVincularLead('${leadId}')">👤</span>`
-        : "";
-
-      linhas += ` 
-        <tr class="${classes}">
-          <td>${d.nome || ""}</td>
-          <td>${d.email || ""}</td>
-          <td>${d.telefone || ""}</td>
-          <td>${d.perfil || "-"}</td>
-          <td>${interesses}</td>
-          <td>${data}</td>
-          <td>${formatarPreferencia(d.preferencia_contato)}</td>
-          <td>
-            ${d.mensagem
-          ? `<span title="${d.mensagem}" style="cursor:help" aria-label="Mensagem completa">📝 ${d.mensagem.slice(0, 30)}${d.mensagem.length > 30 ? "..." : ""}</span>`
-          : "—"}
-          </td>
-          <td>
-            <select onchange="atualizarStatusLead('${leadId}', this.value)">
-              ${["Novo", "Em contato", "Negociando", "Convertido", "Descartado"].map(op => `
-                <option value="${op}" ${op === statusAtual ? "selected" : ""}>${op}</option>
-              `).join("")}
-            </select>
-            <span class="icon-btn" title="Registrar contato" onclick="abrirModalContatoLead('${leadId}')">📞</span>
-            ${iconeHistorico}
-            ${iconeVincular}
-          </td>
-        </tr>
-      `;
-    }
-
-    tabela.innerHTML = linhas;
-
-    resumo.innerHTML = `
-      <span style="cursor:pointer;color:green">🟢 Convertidos: ${contadores["Convertido"]}</span> |
-      <span style="cursor:pointer;color:orange">🟡 Negociando: ${contadores["Negociando"]}</span> |
-      <span style="cursor:pointer;color:blue">🔵 Em contato: ${contadores["Em contato"]}</span> |
-      <span style="cursor:pointer;color:gray">⚪️ Novos: ${contadores["Novo"]}</span> |
-      <span style="cursor:pointer;color:red">🔴 Descartados: ${contadores["Descartado"]}</span> |
-      <span style="cursor:pointer;text-decoration:underline" onclick="carregarLeads(false)">🔄 Ver mais</span>
-    `;
-  } catch (err) {
-    tabela.innerHTML = `<tr><td colspan='10'>Erro ao carregar leads.</td></tr>`;
-    console.error("Erro ao carregar leads:", err);
+    document.getElementById("modal-responder-feedback").style.display = "none";
+    mostrarMensagem("✅ Feedback marcado como tratado!");
+    carregarFeedbacksNewsletters();
+    verificarPendenciasLeads();
+  } catch (e) {
+    mostrarMensagem("Erro: " + e.message);
   }
 }
 
 let leadAtual = null;
 let dadosLeadAtual = null;
 
-function abrirModalContatoLead(leadId) {
+async function abrirModalContatoLead(leadId) {
   leadAtual = leadId;
 
-  db.collection("leads").doc(leadId).get().then(doc => {
-    if (!doc.exists) return mostrarMensagem("Lead não encontrado.");
-    dadosLeadAtual = doc.data();
+  const { data: lead, error } = await window.supabase
+    .from("leads").select("*").eq("id", leadId).single();
 
-    const tipo = dadosLeadAtual.preferencia_contato?.toLowerCase() || "E-mail";
-    document.getElementById("tipo-contato-lead").value = formatarPreferencia(tipo);
-    document.getElementById("resultado-contato-lead").value = "";
-    document.getElementById("acao-email-lead").style.display = (tipo === "e-mail") ? "block" : "none";
-    document.getElementById("email-contato-lead").value = dadosLeadAtual.email || "";
-    document.getElementById("campo-email-lead").style.display = (tipo === "e-mail") ? "block" : "none";
-    document.getElementById("btn-enviar-email-lead").style.display = (tipo === "e-mail") ? "inline-block" : "none";
+  if (error || !lead) return mostrarMensagem("Lead não encontrado.");
+  dadosLeadAtual = lead;
 
-    document.getElementById("modal-contato-lead").style.display = "flex";
-  });
+  const tipo = lead.preferencia_contato?.toLowerCase() || "e-mail";
+  document.getElementById("tipo-contato-lead").value = formatarPreferencia(tipo);
+  document.getElementById("resultado-contato-lead").value = "";
+  document.getElementById("acao-email-lead").style.display = (tipo === "e-mail") ? "block" : "none";
+  document.getElementById("email-contato-lead").value = lead.email || "";
+  document.getElementById("campo-email-lead").style.display = (tipo === "e-mail") ? "block" : "none";
+  document.getElementById("btn-enviar-email-lead").style.display = (tipo === "e-mail") ? "inline-block" : "none";
+
+  document.getElementById("modal-contato-lead").style.display = "flex";
 }
 
 function fecharModalContatoLead() {
   document.getElementById("modal-contato-lead").style.display = "none";
 }
 
-function abrirModalHistorico(leadId) {
+async function abrirModalHistorico(leadId) {
   const container = document.getElementById("conteudo-historico-lead");
+  if (!container) return;
   container.innerHTML = "<p>🔄 Carregando histórico...</p>";
+  document.getElementById("modal-historico-lead").style.display = "flex";
 
-  db.collection("leads").doc(leadId).collection("interacoes")
-    .orderBy("data", "desc")
-    .get()
-    .then(snapshot => {
-      if (snapshot.empty) {
-        container.innerHTML = "<p>⚠️ Nenhuma interação registrada.</p>";
-        return;
-      }
+  const { data: interacoes, error } = await window.supabase
+    .from("leads_interacoes")
+    .select("*")
+    .eq("lead_id", Number(leadId))
+    .order("data", { ascending: false });
 
-      const itens = snapshot.docs.map(doc => {
-        const d = doc.data();
-        const dataFormatada = d.data?.toDate().toLocaleDateString("pt-BR") || "Data desconhecida";
-        const horaFormatada = d.data?.toDate().toLocaleTimeString("pt-BR", { hour: '2-digit', minute: '2-digit' }) || "";
+  if (error) {
+    container.innerHTML = `<p style="color:red">Erro: ${error.message}</p>`;
+    return;
+  }
 
-        let resultadoHtml = "";
-        let destaqueEmail = false;
+  if (!interacoes || interacoes.length === 0) {
+    container.innerHTML = "<p style='color:#999'>Nenhuma interação registrada.</p>";
+    return;
+  }
 
-        if (d.tipo === "vinculacao") {
-          resultadoHtml = `
-            <p>🔗 Lead vinculado a <strong>${d.usuario_vinculado?.nome || "usuário desconhecido"}</strong></p>
-            <p><small>Feito por: ${d.feito_por || "Desconhecido"}</small></p>
-          `;
-        } else {
-          const resultadoTexto = d.resultado || "Sem detalhes";
-          destaqueEmail = resultadoTexto.toLowerCase().includes("e-mail enviado");
-
-          resultadoHtml = `
-            <em>Resultado:</em><br>
-            <div style="
-              background:${destaqueEmail ? '#e6f7ff' : '#f9f9f9'};
-              padding:8px;
-              border-radius:4px;
-              border-left:4px solid ${destaqueEmail ? '#007acc' : '#ccc'};
-            ">
-              ${resultadoTexto}
-            </div>
-          `;
-        }
-
-        return `
-          <div style="border-bottom:1px solid #ccc; padding:10px 0;">
-            <strong>${dataFormatada} às ${horaFormatada}</strong><br>
-            <em>Tipo:</em> ${d.tipo}<br>
-            <em>Responsável:</em> ${d.usuario_responsavel || d.feito_por || "Desconhecido"}<br>
-            ${resultadoHtml}
-          </div>
-        `;
-      }).join("");
-
-      container.innerHTML = itens;
-      document.getElementById("modal-historico-lead").style.display = "flex";
-    });
+  container.innerHTML = interacoes.map(d => {
+    const dataFmt = d.data
+      ? new Date(d.data).toLocaleString("pt-BR")
+      : "Data desconhecida";
+    const destaque = (d.resultado || "").toLowerCase().includes("e-mail");
+    return `
+      <div style="border-bottom:1px solid #eee;padding:10px 0">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <strong style="font-size:13px">${dataFmt}</strong>
+          <span style="font-size:11px;color:#888">${d.responsavel || "—"}</span>
+        </div>
+        <div style="font-size:12px;color:#666;margin:2px 0">
+          Tipo: <strong>${d.tipo || "—"}</strong>
+        </div>
+        <div style="
+          background:${destaque ? '#e6f7ff' : '#f9f9f9'};
+          border-left:3px solid ${destaque ? '#007acc' : '#ccc'};
+          border-radius:4px;
+          padding:8px;
+          font-size:13px;
+          margin-top:6px;
+          line-height:1.5">
+          ${d.resultado || "Sem detalhes"}
+        </div>
+      </div>`;
+  }).join("");
 }
-
 
 function fecharModalHistorico() {
   document.getElementById("modal-historico-lead").style.display = "none";
 }
 
-function salvarInteracaoLead() {
-  const tipo = dadosLeadAtual.preferencia_contato?.toLowerCase() || "e-mail";
-  const resultado = document.getElementById("resultado-contato-lead").value;
+async function salvarInteracaoLead() {
+  const tipo      = dadosLeadAtual.preferencia_contato?.toLowerCase() || "e-mail";
+  const resultado = document.getElementById("resultado-contato-lead").value.trim();
+  if (!resultado) return mostrarMensagem("Preencha o resultado do contato.");
 
-  if (!resultado.trim()) return mostrarMensagem("Preencha o resultado do contato.");
+  const adminLogado = JSON.parse(localStorage.getItem("usuarioLogado") || "{}");
+  const responsavel = adminLogado.nome || adminLogado.email || "admin";
 
-  db.collection("leads").doc(leadAtual).collection("interacoes").add({
-    tipo,
-    resultado,
-    data: new Date(),
-    usuario_responsavel: "adminId"
-  }).then(() => {
-    // Atualiza status do lead
-    db.collection("leads").doc(leadAtual).update({
-      status: "Em contato"
-    });
+  try {
+    // 1. Salvar interação
+    const { error: errInter } = await window.supabase
+      .from("leads_interacoes")
+      .insert([{
+        lead_id: Number(leadAtual),
+        tipo,
+        resultado,
+        responsavel,
+        data:        new Date().toISOString()
+      }]);
+    if (errInter) throw errInter;
 
-    mostrarMensagem("Interação registrada com sucesso.");
+    // 2. Atualizar status do lead
+    const { error: errStatus } = await window.supabase
+      .from("leads")
+      .update({ status: "Em contato" })
+      .eq("id", leadAtual);
+    if (errStatus) throw errStatus;
+
+    mostrarMensagem("✅ Interação registrada com sucesso.");
     fecharModalContatoLead();
-    carregarLeads();
-  }).catch(err => {
-    console.error("Erro ao salvar interação:", err);
-    mostrarMensagem("Erro ao salvar interação.");
-  });
-}
+    carregarLeads(true);
 
+  } catch (err) {
+    console.error("[interação]", err);
+    mostrarMensagem("Erro ao salvar interação: " + err.message);
+  }
+}
 
 document.getElementById("btn-enviar-email-lead").onclick = () => {
   abrirModalEnvioManualLead(leadAtual, dadosLeadAtual); // abre o modal de envio
@@ -2917,16 +3087,14 @@ async function carregarUsuariosComFiltro() {
         ${temSolicitacoesPendentes ? '<span style="color:orange" title="Solicitações pendentes">🟠</span>' : ''}
         ${temParcelasAGerar ? '<span style="color:blue" title="Parcelas a gerar">🔵</span>' : ''}
       </td>
-      <td>
-        <span class="icon-btn" title="Editar Usuário" onclick="abrirModalEditarUsuario('${doc.id}')">✏️</span>
+      <td style="white-space:nowrap">
+        <button onclick="abrirDrawerUsuario('${doc.id}')"
+          style="padding:5px 12px;background:#0284c7;color:#fff;border:none;
+          border-radius:6px;cursor:pointer;font-size:12px;font-weight:700;margin-right:4px">
+          👁️ Abrir
+        </button>
         <span class="icon-btn" title="Excluir Usuário" onclick="confirmarExclusaoUsuario('${doc.id}','${(d.nome || '').replace(/'/g, "\\'")}')">🗑️</span>
         <span class="icon-btn" title="Logs de Acesso" onclick="abrirSubcolecao('${doc.id}','logs_acesso')">📜</span>
-        <span class="icon-btn" title="Assinaturas" onclick="abrirSubcolecao('${doc.id}','assinaturas')">📑</span>
-        <span class="icon-btn" title="Solicitações" onclick="abrirSubcolecao('${doc.id}','solicitacoes')">📬</span>
-        <span class="icon-btn" title="Pagamentos" onclick="abrirSubcolecao('${doc.id}','pagamentos')">💳</span>
-        <span class="icon-btn" title="Preferências Newsletter" onclick="abrirSubcolecao('${doc.id}','preferencias_newsletter')">📰</span>
-        <span class="icon-btn" title="Visão Geral" onclick="mostrarVisaoGeral('${doc.id}')">👁️</span>
-        <span class="icon-btn" title="Enviar e-mail" onclick="abrirModalEnvioManual('${doc.id}')">📤</span>
       </td>`;
 
     tbody.appendChild(tr);
@@ -3976,7 +4144,172 @@ function generateCheckboxField(fieldName, label = '', checked = false) {
 
   return wrapper;
 }
+// ─── Prorrogar acesso lead ────────────────────────────────────────────────────
+async function abrirModalProrrogarAcesso(leadId, nomeLead) {
+  let modal = document.getElementById("modal-prorrogar-acesso");
+  if (!modal) {
+    modal = document.createElement("div");
+    modal.id = "modal-prorrogar-acesso";
+    modal.style.cssText = `display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);
+      z-index:9999;justify-content:center;align-items:center`;
+    modal.innerHTML = `
+      <div style="background:#fff;padding:24px;border-radius:10px;max-width:580px;
+        width:90%;position:relative;box-shadow:0 4px 30px rgba(0,0,0,.2);max-height:80vh;
+        overflow-y:auto">
+        <button onclick="document.getElementById('modal-prorrogar-acesso').style.display='none'"
+          style="position:absolute;top:10px;right:10px;background:none;border:none;
+          font-size:18px;cursor:pointer">❌</button>
+        <h3>⏰ Prorrogar acesso — <span id="prorrogar-lead-nome"></span></h3>
+        <div style="display:flex;gap:10px;align-items:center;margin:14px 0 10px">
+          <label style="font-size:13px;font-weight:600">Adicionar dias:</label>
+          <select id="prorrogar-dias" style="padding:6px 10px;border-radius:6px;
+            border:1px solid #ccc;font-size:13px">
+            <option value="7">7 dias</option>
+            <option value="15">15 dias</option>
+            <option value="30" selected>30 dias</option>
+            <option value="60">60 dias</option>
+            <option value="0">Personalizado</option>
+          </select>
+          <input type="number" id="prorrogar-dias-custom" min="1" max="365"
+            placeholder="Nº dias" style="display:none;width:80px;padding:6px;
+            border-radius:6px;border:1px solid #ccc;font-size:13px">
+          <label style="font-size:12px;display:flex;align-items:center;gap:4px">
+            <input type="checkbox" id="prorrogar-zerar-acessos" checked>
+            Zerar contagem de acessos
+          </label>
+        </div>
+        <div id="lista-envios-lead" style="margin-top:8px"></div>
+        <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:16px">
+          <button onclick="document.getElementById('modal-prorrogar-acesso').style.display='none'"
+            style="padding:8px 16px;border-radius:6px;border:1px solid #ccc;cursor:pointer">
+            Cancelar
+          </button>
+          <button onclick="confirmarProrrogacao()"
+            style="padding:8px 16px;background:#0891b2;color:#fff;border:none;
+            border-radius:6px;cursor:pointer;font-weight:700">
+            ⏰ Confirmar prorrogação
+          </button>
+        </div>
+      </div>`;
+    document.body.appendChild(modal);
 
+    // Listener para campo personalizado
+    document.getElementById("prorrogar-dias").addEventListener("change", function() {
+      document.getElementById("prorrogar-dias-custom").style.display =
+        this.value === "0" ? "inline-block" : "none";
+    });
+  }
+
+  document.getElementById("prorrogar-lead-nome").textContent = nomeLead || "";
+  document.getElementById("lista-envios-lead").innerHTML =
+    "<p style='color:#999;font-size:13px'>Carregando envios...</p>";
+  modal.style.display = "flex";
+
+  // Buscar envios do lead
+  const { data: envios, error } = await window.supabase
+    .from("leads_envios")
+    .select("id, newsletter_id, data_envio, expira_em, acessos_totais")
+    .eq("lead_id", Number(leadId))
+    .order("data_envio", { ascending: false });
+
+  if (error || !envios?.length) {
+    document.getElementById("lista-envios-lead").innerHTML =
+      "<p style='color:#999;font-size:13px'>Nenhum envio encontrado para este lead.</p>";
+    return;
+  }
+
+  // Buscar títulos das newsletters
+  const nids = [...new Set(envios.map(e => e.newsletter_id))];
+  const titulosMap = {};
+  await Promise.all(nids.map(async nid => {
+    try {
+      const snap = await db.collection("newsletters").doc(nid).get();
+      titulosMap[nid] = snap.exists
+        ? `Edição ${snap.data().numero || "—"} — ${snap.data().titulo || ""}`
+        : nid;
+    } catch { titulosMap[nid] = nid; }
+  }));
+
+  document.getElementById("lista-envios-lead").innerHTML = `
+    <table style="width:100%;border-collapse:collapse;font-size:12px">
+      <thead>
+        <tr style="background:#f8fafc">
+          <th style="padding:8px;text-align:left;border-bottom:1px solid #e2e8f0">
+            <input type="checkbox" id="chk-todos-envios"
+              onchange="document.querySelectorAll('.chk-envio').forEach(c=>c.checked=this.checked)">
+          </th>
+          <th style="padding:8px;text-align:left;border-bottom:1px solid #e2e8f0">Newsletter</th>
+          <th style="padding:8px;text-align:left;border-bottom:1px solid #e2e8f0">Enviado em</th>
+          <th style="padding:8px;text-align:left;border-bottom:1px solid #e2e8f0">Expira em</th>
+          <th style="padding:8px;text-align:center;border-bottom:1px solid #e2e8f0">Acessos</th>
+          <th style="padding:8px;text-align:left;border-bottom:1px solid #e2e8f0">Situação</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${envios.map(e => {
+          const expira    = e.expira_em ? new Date(e.expira_em) : null;
+          const expirado  = expira && expira < new Date();
+          const expiraFmt = expira ? expira.toLocaleString("pt-BR") : "—";
+          const envioFmt  = e.data_envio ? new Date(e.data_envio).toLocaleDateString("pt-BR") : "—";
+          const situacao  = !expira ? "—"
+            : expirado ? `<span style="color:#e53e3e;font-weight:700">⛔ Expirado</span>`
+            : `<span style="color:#22c55e;font-weight:700">✅ Ativo</span>`;
+          return `
+            <tr style="border-bottom:1px solid #f1f5f9">
+              <td style="padding:8px">
+                <input type="checkbox" class="chk-envio" value="${e.id}" checked>
+              </td>
+              <td style="padding:8px">${titulosMap[e.newsletter_id] || e.newsletter_id}</td>
+              <td style="padding:8px">${envioFmt}</td>
+              <td style="padding:8px">${expiraFmt}</td>
+              <td style="padding:8px;text-align:center">${e.acessos_totais ?? 0}</td>
+              <td style="padding:8px">${situacao}</td>
+            </tr>`;
+        }).join("")}
+      </tbody>
+    </table>`;
+}
+
+async function confirmarProrrogacao() {
+  const selecionados = [...document.querySelectorAll(".chk-envio:checked")]
+    .map(c => Number(c.value));
+
+  if (!selecionados.length)
+    return mostrarMensagem("Selecione pelo menos um envio para prorrogar.");
+
+  const diasSelect = document.getElementById("prorrogar-dias").value;
+  const dias = diasSelect === "0"
+    ? parseInt(document.getElementById("prorrogar-dias-custom").value || "0")
+    : parseInt(diasSelect);
+
+  if (!dias || dias < 1)
+    return mostrarMensagem("Informe um número de dias válido.");
+
+  const zerarAcessos = document.getElementById("prorrogar-zerar-acessos").checked;
+  const novaExpiracao = new Date();
+  novaExpiracao.setDate(novaExpiracao.getDate() + dias);
+
+  const update = { expira_em: novaExpiracao.toISOString() };
+  if (zerarAcessos) update.acessos_totais = 0;
+
+  try {
+    const { error } = await window.supabase
+      .from("leads_envios")
+      .update(update)
+      .in("id", selecionados);
+
+    if (error) throw error;
+
+    mostrarMensagem(
+      `✅ ${selecionados.length} envio(s) prorrogado(s) por ${dias} dias.\n` +
+      `Nova expiração: ${novaExpiracao.toLocaleString("pt-BR")}`
+    );
+    document.getElementById("modal-prorrogar-acesso").style.display = "none";
+
+  } catch (e) {
+    mostrarMensagem("Erro ao prorrogar: " + e.message);
+  }
+}
 /* ======================
    EXPORTAR GLOBAL
    ====================== */
