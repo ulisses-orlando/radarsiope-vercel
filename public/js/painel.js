@@ -323,12 +323,6 @@ function enviarSolicitacao() {
     status: 'aberta',
     data_solicitacao: new Date().toISOString(),
   }).then(() => {
-
-    db.collection('admin_contadores').doc('pendencias').set(
-      { solicitacoes: firebase.firestore.FieldValue.increment(1) },
-      { merge: true }
-    );
-
     feedback.innerHTML = `<span style="color:#22c55e">✅ Solicitação enviada com sucesso!</span>`;
     document.getElementById('mensagem-suporte').value = '';
     carregarHistoricoSolicitacoes(usuario.id);
@@ -336,6 +330,11 @@ function enviarSolicitacao() {
     console.error('[suporte]', err);
     feedback.innerHTML = `<span style="color:#ef4444">❌ Erro ao enviar. Tente novamente.</span>`;
   });
+
+  db.collection('admin_contadores').doc('pendencias').set(
+    { solicitacoes: firebase.firestore.FieldValue.increment(1) },
+    { merge: true }
+  );
 }
 
 // ─── Histórico de Solicitações ────────────────────────────────────────────────
@@ -475,7 +474,7 @@ function cancelarSolicitacao(uid, solicitacaoId) {
     { solicitacoes: firebase.firestore.FieldValue.increment(-1) },
     { merge: true }
   );
-  
+
 }
 
 // ─── Expandir mensagem admin ──────────────────────────────────────────────────
