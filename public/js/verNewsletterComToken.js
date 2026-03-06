@@ -435,13 +435,16 @@ async function renderReactions(nid, uid) {
   const wrap = document.getElementById('reactions-wrap');
   if (!wrap) return;
 
+  // Chave inclui uid para isolar votos por usuário no mesmo navegador
+  const _lsKey = () => `rs_rx_${nid}_${uid || 'anon'}`;
+
   let counts = {};
   let minha = null;
 
   try {
     const snap = await db.collection('newsletters').doc(nid).get();
     counts = snap.data()?.reactions || {};
-    minha = localStorage.getItem(`rs_rx_${nid}`);
+    minha = localStorage.getItem(_lsKey());
   } catch (e) { /* não fatal */ }
 
   function pintar() {
@@ -449,7 +452,7 @@ async function renderReactions(nid, uid) {
       <button class="rs-reaction-btn ${minha === r.key ? 'ativo' : ''}"
               onclick="votar('${_esc(nid)}','${r.key}')">
         <span>${r.emoji}</span>
-        <span class="rs-reaction-count">${counts[r.key] || 0}</span>
+        <span class="rs-reaction-count">${minha === r.key ? 1 : 0}</span>
         <span class="rs-reaction-label">${_esc(r.label)}</span>
       </button>`).join('');
   }
@@ -461,19 +464,19 @@ async function renderReactions(nid, uid) {
 
   window.votar = async (newsletterId, key) => {
     const fb       = document.getElementById('reaction-feedback');
-    const anterior = localStorage.getItem(`rs_rx_${newsletterId}`);
+    const anterior = localStorage.getItem(`rs_rx_${newsletterId}_${uid || 'anon'}`);
 
     // ── Atualização otimista local (só para exibição imediata) ──
     if (anterior === key) {
       // Desfaz o próprio voto
       counts[key] = Math.max(0, (counts[key] || 1) - 1);
       minha = null;
-      localStorage.removeItem(`rs_rx_${newsletterId}`);
+      localStorage.removeItem(`rs_rx_${newsletterId}_${uid || 'anon'}`);
     } else {
       if (anterior) counts[anterior] = Math.max(0, (counts[anterior] || 1) - 1);
       counts[key] = (counts[key] || 0) + 1;
       minha = key;
-      localStorage.setItem(`rs_rx_${newsletterId}`, key);
+      localStorage.setItem(`rs_rx_${newsletterId}_${uid || 'anon'}`, key);
     }
 
     pintar();
