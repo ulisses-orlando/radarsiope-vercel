@@ -415,8 +415,33 @@ function _fbAtualizarBadge(n) {
   badge.style.display = n > 0 ? 'inline' : 'none';
 }
 
+/**
+ * Conta feedbacks pendentes e atualiza o badge — sem renderizar a seção.
+ * Chamado na inicialização do admin junto com os outros badges.
+ */
+async function atualizarBadgeFeedbacks() {
+  try {
+    const nlSnap = await db.collection('newsletters')
+      .where('enviada', '==', true).limit(50).get();
+
+    let pendentes = 0;
+    await Promise.all(nlSnap.docs.map(async nlDoc => {
+      try {
+        const fbSnap = await db.collection('newsletters').doc(nlDoc.id)
+          .collection('feedbacks').where('respondido', '==', false).get();
+        pendentes += fbSnap.size;
+      } catch(e) { /* newsletter sem feedbacks */ }
+    }));
+
+    _fbAtualizarBadge(pendentes);
+  } catch(e) {
+    console.warn('[badge-feedbacks]', e.message);
+  }
+}
+
 // ─── Exportações globais ─────────────────────────────────────────────────────
-window.carregarSecaoFeedbacks = carregarSecaoFeedbacks;
+window.carregarSecaoFeedbacks  = carregarSecaoFeedbacks;
+window.atualizarBadgeFeedbacks = atualizarBadgeFeedbacks;
 window.fbSetFiltro            = fbSetFiltro;
 window.fbCarregarMais         = fbCarregarMais;
 window.fbMarcarTratado        = fbMarcarTratado;
