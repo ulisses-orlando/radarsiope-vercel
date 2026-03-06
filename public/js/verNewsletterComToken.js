@@ -1850,20 +1850,26 @@ async function enviarFeedback(nid) {
   const ctx = _getCtx();
 
   try {
-    await db.collection('newsletters').doc(nid).update({
-      feedbacks: firebase.firestore.FieldValue.arrayUnion({
+    await db.collection('newsletters').doc(nid)
+      .collection('feedbacks').add({
         texto,
         segmento: ctx?.segmento || 'desconhecido',
         plano: ctx?.plano_slug || null,
-        ts: new Date().toISOString(),
-      }),
-    });
+        usuario_id: ctx?.uid || null,
+        nome: ctx?.nome || null,
+        email: ctx?.email || null,
+        data: firebase.firestore.FieldValue.serverTimestamp(),
+        respondido: false,
+      });
 
-    await db.collection('admin_contadores').doc('pendencias').set(
-      { feedbacks: firebase.firestore.FieldValue.increment(1) },
-      { merge: true }
-    );
-    
+    // ▼ incrementa contador admin
+    try {
+      await db.collection('admin_contadores').doc('pendencias').set(
+        { feedbacks: firebase.firestore.FieldValue.increment(1) },
+        { merge: true }
+      );
+    } catch (_) { }
+
     // Marcar como enviado
     localStorage.setItem(`rs_fb_${nid}`, '1');
 
