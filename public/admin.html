@@ -2418,6 +2418,7 @@
       // Badge usuários — aguarda drawer-usuario.js carregar
       setTimeout(() => {
         if (typeof atualizarBadgeUsuarios === 'function') atualizarBadgeUsuarios();
+        if (typeof atualizarBadgeFeedbacks === 'function') atualizarBadgeFeedbacks();
       }, 1000);
   </script>
   <script>
