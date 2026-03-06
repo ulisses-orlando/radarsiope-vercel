@@ -1758,7 +1758,10 @@ async function carregarLeads(paginaNova = false) {
       const data = d.data_criacao?.toDate?.() ? d.data_criacao.toDate().toLocaleString("pt-BR") : "";
       const interesses = Array.isArray(d.interesses) ? d.interesses.join(", ") : "";
       const statusAtual = d.status || "Novo";
-      const destaque = statusAtual === "Convertido" ? "lead-convertido" : "";
+      const classes = [
+        statusAtual === "Convertido" ? "lead-convertido" : "",
+        d.tem_interacoes ? "lead-com-interacao" : ""
+      ].filter(Boolean).join(" ");
       contadores[statusAtual] = (contadores[statusAtual] || 0) + 1;
 
       const iconeHistorico = d.tem_interacoes
@@ -1771,7 +1774,7 @@ async function carregarLeads(paginaNova = false) {
         : "";
 
       linhas += ` 
-        <tr class="${destaque}">
+        <tr class="${classes}">
           <td>${d.nome || ""}</td>
           <td>${d.email || ""}</td>
           <td>${d.telefone || ""}</td>
