@@ -259,6 +259,7 @@ async function verReacoesNewsletter(docId, titulo) {
 }
 
 
+async function duplicarNewsletter(docId) {
   const snap = await db.collection('newsletters').doc(docId).get();
   if (!snap.exists) return;
 
