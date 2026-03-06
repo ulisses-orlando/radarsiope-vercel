@@ -2406,7 +2406,7 @@
       // Aguarda o supabase estar disponível (module script é assíncrono)
       function _aguardarSupabaseEVerificar(tentativas = 0) {
         if (window.supabase) {
-          verificarPendenciasLeads();
+          if (typeof verificarPendenciasLeads === 'function') verificarPendenciasLeads();
         } else if (tentativas < 20) {
           setTimeout(() => _aguardarSupabaseEVerificar(tentativas + 1), 150);
         } else {
@@ -2418,7 +2418,6 @@
       // Badge usuários — aguarda drawer-usuario.js carregar
       setTimeout(() => {
         if (typeof atualizarBadgeUsuarios === 'function') atualizarBadgeUsuarios();
-        if (typeof atualizarBadgeFeedbacks === 'function') atualizarBadgeFeedbacks();
       }, 1000);
   </script>
   <script>
