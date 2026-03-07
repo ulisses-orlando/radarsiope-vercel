@@ -435,21 +435,21 @@ async function renderReactions(nid, uid) {
   const wrap = document.getElementById('reactions-wrap');
   if (!wrap) return;
 
-  let counts = {};
   let minha = null;
 
   try {
-    const snap = await db.collection('newsletters').doc(nid).get();
-    counts = snap.data()?.reactions || {};
-    minha = localStorage.getItem(`rs_rx_${nid}`);
+    await db.collection('newsletters').doc(nid).get(); // mantém listener ativo
+    // Chave inclui uid para isolar voto por usuário no mesmo browser
+    minha = localStorage.getItem(`rs_rx_${nid}_${uid || 'anon'}`);
   } catch (e) { /* não fatal */ }
 
   function pintar() {
+    // Exibe 1 na reação do usuário e 0 nas demais — não expõe totais globais
     wrap.innerHTML = REACTIONS.map(r => `
       <button class="rs-reaction-btn ${minha === r.key ? 'ativo' : ''}"
-              onclick="votar('${_esc(nid)}','${r.key}')">
+              onclick="votar('${_esc(nid)}','${_esc(uid || '')}','${r.key}')">
         <span>${r.emoji}</span>
-        <span class="rs-reaction-count">${counts[r.key] || 0}</span>
+        <span class="rs-reaction-count">${minha === r.key ? 1 : 0}</span>
         <span class="rs-reaction-label">${_esc(r.label)}</span>
       </button>`).join('');
   }
@@ -459,19 +459,18 @@ async function renderReactions(nid, uid) {
   // Renderizar campo de feedback abaixo das reações
   renderFeedback(nid);
 
-  window.votar = async (newsletterId, key) => {
+  window.votar = async (newsletterId, userId, key) => {
     const fb = document.getElementById('reaction-feedback');
-    const anterior = localStorage.getItem(`rs_rx_${newsletterId}`);
+    const lsKey = `rs_rx_${newsletterId}_${userId || 'anon'}`;
+    const anterior = localStorage.getItem(lsKey);
 
+    // Atualiza estado local
     if (anterior === key) {
-      counts[key] = Math.max(0, (counts[key] || 1) - 1);
       minha = null;
-      localStorage.removeItem(`rs_rx_${newsletterId}`);
+      localStorage.removeItem(lsKey);
     } else {
-      if (anterior) counts[anterior] = Math.max(0, (counts[anterior] || 1) - 1);
-      counts[key] = (counts[key] || 0) + 1;
       minha = key;
-      localStorage.setItem(`rs_rx_${newsletterId}`, key);
+      localStorage.setItem(lsKey, key);
     }
 
     pintar();
@@ -480,10 +479,18 @@ async function renderReactions(nid, uid) {
       setTimeout(() => { if (fb) fb.textContent = ''; }, 2500);
     }
 
-    // Persiste no Firestore (fire & forget)
+    // Persiste no Firestore com increment atômico (evita race condition)
     try {
       const upd = {};
-      REACTIONS.forEach(r => { upd[`reactions.${r.key}`] = counts[r.key] || 0; });
+      if (anterior === key) {
+        // Desvoto
+        upd[`reactions.${key}`] = firebase.firestore.FieldValue.increment(-1);
+      } else {
+        // Voto novo
+        upd[`reactions.${key}`] = firebase.firestore.FieldValue.increment(1);
+        // Remove voto anterior se existia
+        if (anterior) upd[`reactions.${anterior}`] = firebase.firestore.FieldValue.increment(-1);
+      }
       await db.collection('newsletters').doc(newsletterId).update(upd);
     } catch (e) { /* não fatal */ }
   };
