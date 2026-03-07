@@ -134,13 +134,8 @@ async function montarBlocos(newsletter, dados, segmento) {
   let htmlBlocos = '';
 
   blocos.forEach(b => {
-    // Filtro de acesso (existente)
     if (segmento && b.acesso !== 'todos' && b.acesso !== segmento) return;
-    // Filtro de destino: blocos marcados como só e-mail não aparecem no app
-    if (b.destino === 'email') return;
-    // Envolve em wrapper com data-tipo para o flipbook paginar por tipo
-    const tipo = b.tipo || 'conteudo';
-    htmlBlocos += `<div class="rs-bloco" data-tipo="${tipo}">${b.html || ''}</div>`;
+    htmlBlocos += b.html || '';
   });
 
   const htmlFinal = blocos.length === 0
@@ -440,16 +435,13 @@ async function renderReactions(nid, uid) {
   const wrap = document.getElementById('reactions-wrap');
   if (!wrap) return;
 
-  // Chave inclui uid para isolar votos por usuário no mesmo navegador
-  const _lsKey = () => `rs_rx_${nid}_${uid || 'anon'}`;
-
   let counts = {};
   let minha = null;
 
   try {
     const snap = await db.collection('newsletters').doc(nid).get();
     counts = snap.data()?.reactions || {};
-    minha = localStorage.getItem(_lsKey());
+    minha = localStorage.getItem(`rs_rx_${nid}`);
   } catch (e) { /* não fatal */ }
 
   function pintar() {
@@ -457,7 +449,7 @@ async function renderReactions(nid, uid) {
       <button class="rs-reaction-btn ${minha === r.key ? 'ativo' : ''}"
               onclick="votar('${_esc(nid)}','${r.key}')">
         <span>${r.emoji}</span>
-        <span class="rs-reaction-count">${minha === r.key ? 1 : 0}</span>
+        <span class="rs-reaction-count">${counts[r.key] || 0}</span>
         <span class="rs-reaction-label">${_esc(r.label)}</span>
       </button>`).join('');
   }
@@ -468,20 +460,18 @@ async function renderReactions(nid, uid) {
   renderFeedback(nid);
 
   window.votar = async (newsletterId, key) => {
-    const fb       = document.getElementById('reaction-feedback');
-    const anterior = localStorage.getItem(`rs_rx_${newsletterId}_${uid || 'anon'}`);
+    const fb = document.getElementById('reaction-feedback');
+    const anterior = localStorage.getItem(`rs_rx_${newsletterId}`);
 
-    // ── Atualização otimista local (só para exibição imediata) ──
     if (anterior === key) {
-      // Desfaz o próprio voto
       counts[key] = Math.max(0, (counts[key] || 1) - 1);
       minha = null;
-      localStorage.removeItem(`rs_rx_${newsletterId}_${uid || 'anon'}`);
+      localStorage.removeItem(`rs_rx_${newsletterId}`);
     } else {
       if (anterior) counts[anterior] = Math.max(0, (counts[anterior] || 1) - 1);
       counts[key] = (counts[key] || 0) + 1;
       minha = key;
-      localStorage.setItem(`rs_rx_${newsletterId}_${uid || 'anon'}`, key);
+      localStorage.setItem(`rs_rx_${newsletterId}`, key);
     }
 
     pintar();
@@ -490,18 +480,10 @@ async function renderReactions(nid, uid) {
       setTimeout(() => { if (fb) fb.textContent = ''; }, 2500);
     }
 
-    // ── Persiste no Firestore com increment (atômico — nunca sobrescreve outros votos) ──
+    // Persiste no Firestore (fire & forget)
     try {
       const upd = {};
-      if (anterior === key) {
-        // Desfez o próprio voto: decrementa só este
-        upd[`reactions.${key}`] = firebase.firestore.FieldValue.increment(-1);
-      } else {
-        // Novo voto
-        upd[`reactions.${key}`] = firebase.firestore.FieldValue.increment(1);
-        // Trocou de reação: decrementa a anterior
-        if (anterior) upd[`reactions.${anterior}`] = firebase.firestore.FieldValue.increment(-1);
-      }
+      REACTIONS.forEach(r => { upd[`reactions.${r.key}`] = counts[r.key] || 0; });
       await db.collection('newsletters').doc(newsletterId).update(upd);
     } catch (e) { /* não fatal */ }
   };
@@ -574,7 +556,7 @@ function renderWatermark(destinatario, newsletter) {
 
 // ─── _radarUser para OneSignal ────────────────────────────────────────────────
 
-function publicarRadarUser(destinatario, segmento, assinaturaId, envioId) {
+function publicarRadarUser(destinatario, segmento, assinaturaId) {
   window._radarUser = {
     uid: destinatario._uid || null,
     email: destinatario.email || '',
@@ -587,7 +569,6 @@ function publicarRadarUser(destinatario, segmento, assinaturaId, envioId) {
     municipio_nome: destinatario.nome_municipio || '',
     perfil: destinatario.perfil || '',
     assinaturaId: assinaturaId || null,
-    envioId: envioId || null,
   };
 }
 
@@ -752,6 +733,21 @@ async function VerNewsletterComToken() {
       if (!destinatarioSnap.exists) { mostrarErro('Destinatário não encontrado.'); return; }
 
       destinatario = { _uid: destinatarioSnap.id, ...destinatarioSnap.data() };
+
+      // Lê features_snapshot da assinatura (fonte de verdade das permissões)
+      try {
+        const assinaturaSnap = await db.collection('usuarios').doc(uid)
+          .collection('assinaturas').doc(assinaturaId).get();
+        if (assinaturaSnap.exists) {
+          const assinaturaData = assinaturaSnap.data();
+          // features_snapshot tem precedência sobre qualquer features do usuário
+          destinatario.features       = assinaturaData.features_snapshot || assinaturaData.features || destinatario.features || {};
+          destinatario.plano_slug     = assinaturaData.plano_slug        || destinatario.plano_slug || null;
+        }
+      } catch (e) {
+        console.warn('[acesso] Não foi possível ler features_snapshot da assinatura:', e);
+      }
+
       segmento = "assinantes";
     } else {
       // ✅ Lead → Supabase
@@ -772,7 +768,7 @@ async function VerNewsletterComToken() {
 
     // 9. Side effects não bloqueantes
     registrarClique(env, uid, nid);
-    publicarRadarUser(destinatario, segmento, assinaturaId, env);
+    publicarRadarUser(destinatario, segmento, assinaturaId);
 
     // 10. Dados para placeholders
     const dados = {
@@ -1708,31 +1704,12 @@ async function renderFeedback(nid) {
   const wrap = document.getElementById('rs-feedback-wrap');
   if (!wrap) return;
 
-  // Verificar se já enviou feedback: checa localStorage E Firestore (permite reset pelo admin)
-  const ctx = _getCtx();
-  const jaEnviouLocal = !!localStorage.getItem(`rs_fb_${nid}`);
-
-  if (jaEnviouLocal && ctx?.uid && ctx?.assinaturaId && ctx?.envioId) {
-    // Confirma no Firestore se o admin não resetou
-    try {
-      const envioSnap = await db.collection('usuarios').doc(ctx.uid)
-        .collection('assinaturas').doc(ctx.assinaturaId)
-        .collection('envios').doc(ctx.envioId).get();
-      if (envioSnap.exists && envioSnap.data().feedback_enviado === false) {
-        // Admin resetou: limpa localStorage e mostra form
-        localStorage.removeItem(`rs_fb_${nid}`);
-      } else if (envioSnap.exists && envioSnap.data().feedback_enviado !== false) {
-        wrap.innerHTML = `<div class=rs-feedback-enviado>✅ Obrigado pelo seu feedback!</div>`;
-        return;
-      }
-    } catch(e) {
-      // Sem acesso ao Firestore: confia no localStorage
-      wrap.innerHTML = `<div class=rs-feedback-enviado>✅ Obrigado pelo seu feedback!</div>`;
-      return;
-    }
-  } else if (jaEnviouLocal) {
-    // Não tem contexto Firestore (lead ou sem ctx): confia no localStorage
-    wrap.innerHTML = `<div class=rs-feedback-enviado>✅ Obrigado pelo seu feedback!</div>`;
+  // Verificar se já enviou feedback nesta edição
+  if (localStorage.getItem(`rs_fb_${nid}`)) {
+    wrap.innerHTML = `
+      <div class="rs-feedback-enviado">
+        ✅ Obrigado pelo seu feedback!
+      </div>`;
     return;
   }
 
@@ -1775,42 +1752,22 @@ async function enviarFeedback(nid) {
   const ctx = _getCtx();
 
   try {
-    // Grava na subcoleção /newsletters/{nid}/feedbacks
-    await db.collection('newsletters').doc(nid).collection('feedbacks').add({
-      texto,
-      segmento:   ctx?.segmento    || 'desconhecido',
-      plano:      ctx?.plano_slug  || null,
-      usuario_id: ctx?.uid         || null,
-      nome:       ctx?.nome        || null,
-      email:      ctx?.email       || null,
-      data:       firebase.firestore.FieldValue.serverTimestamp(),
-      respondido: false,
+    await db.collection('newsletters').doc(nid).update({
+      feedbacks: firebase.firestore.FieldValue.arrayUnion({
+        texto,
+        segmento: ctx?.segmento || 'desconhecido',
+        plano:    ctx?.plano_slug || null,
+        ts:       new Date().toISOString(),
+      }),
     });
 
-    // Marca no doc do envio (permite controle de reset pelo admin)
-    if (ctx?.uid && ctx?.assinaturaId && ctx?.envioId) {
-      try {
-        await db.collection('usuarios').doc(ctx.uid)
-          .collection('assinaturas').doc(ctx.assinaturaId)
-          .collection('envios').doc(ctx.envioId)
-          .update({ feedback_enviado: true });
-      } catch(_) { /* não bloqueia */ }
-    }
-
-    // Incrementa contador admin
-    try {
-      await db.collection('admin_contadores').doc('pendencias').set(
-        { feedbacks: firebase.firestore.FieldValue.increment(1) },
-        { merge: true }
-      );
-    } catch(_) {}
-
-    // Marcar no localStorage também
+    // Marcar como enviado
     localStorage.setItem(`rs_fb_${nid}`, '1');
 
     // Atualizar UI
     const wrap = document.getElementById('rs-feedback-wrap');
-    if (wrap) wrap.innerHTML = `<div class="rs-feedback-enviado">✅ Obrigado pelo seu feedback!</div>`;
+    if (wrap) wrap.innerHTML = `
+      <div class="rs-feedback-enviado">✅ Obrigado pelo seu feedback!</div>`;
 
   } catch (e) {
     if (btn) { btn.disabled = false; btn.textContent = 'Enviar'; }
