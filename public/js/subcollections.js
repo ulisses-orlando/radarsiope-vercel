@@ -985,6 +985,7 @@ async function abrirModalEnvioNewsletterManual(usuarioId, assinaturaId) {
 
   title.innerText = "📧 Enviar newsletter manual";
   body.innerHTML = "";
+  openModal("modal-edit-overlay");
 
   // 🔹 Buscar dados do usuário
   const usuarioSnap = await db.collection("usuarios").doc(usuarioId).get();
