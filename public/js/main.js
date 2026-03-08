@@ -272,9 +272,9 @@ async function abrirModalNewsletter(docId = null, isEdit = false) {
   const col1 = document.createElement('div'); // Campos iniciais
   const col2 = document.createElement('div'); // Editor HTML + templates + preview
   const col3 = document.createElement('div'); // Blocos
-  col1.style.marginTop = '350px';
+/*   col1.style.marginTop = '350px';
   col2.style.marginTop = '350px';
-  col3.style.marginTop = '350px';
+  col3.style.marginTop = '350px'; */
   grid.appendChild(col1);
   grid.appendChild(col2);
   grid.appendChild(col3);
