@@ -246,11 +246,11 @@ function confirmarExclusaoUsuario(id, nome) {
    MODAL NEWSLETTERS
    ====================== */
 async function abrirModalNewsletter(docId = null, isEdit = false) {
-  const title = document.getElementById('modal-edit-title');
+  const title = document.getElementById('modal-newsletter-title');
   title.innerText = isEdit ? 'Editar Newsletter' : 'Nova Newsletter';
-  document.getElementById("modal-edit-save").style.display = "inline-block";
+  document.getElementById("modal-newsletter-save").style.display = "inline-block";
 
-  const body = document.getElementById('modal-edit-body');
+  const body = document.getElementById('modal-newsletter-body');
   body.innerHTML = '';
 
   // -----------------------------
@@ -934,7 +934,7 @@ async function abrirModalNewsletter(docId = null, isEdit = false) {
   // -----------------------------
   // BOTÃO SALVAR
   // -----------------------------
-  document.getElementById('modal-edit-save').onclick = async () => {
+  document.getElementById('modal-newsletter-save').onclick = async () => {
     const payload = {};
 
     body.querySelectorAll('[data-field-name]').forEach(el => {
@@ -1003,14 +1003,14 @@ async function abrirModalNewsletter(docId = null, isEdit = false) {
       await ref.add(payload);
     }
 
-    closeModal('modal-edit-overlay');
+    closeModal('modal-newsletter-overlay');
     carregarNewsletters();
   };
 
   // -----------------------------
   // ABRE O MODAL
   // -----------------------------
-  openModal('modal-edit-overlay');
+  openModal('modal-newsletter-overlay');
 
   // -----------------------------
   // CARREGA STATUS DE ENVIO
