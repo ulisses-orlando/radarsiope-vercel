@@ -270,6 +270,19 @@ async function _renderResumo() {
           border:1px solid #0284c740;border-radius:20px;padding:2px 8px;
           font-size:11px;font-weight:700">${v}</span>`).join('');
 
+      const assinId = doc.id;
+      const featChecks = Object.entries(featLabels).map(([k, v]) => {
+        const ativo = !!(a.features_snapshot||{})[k];
+        return `
+          <label style="display:flex;align-items:center;gap:6px;font-size:12px;
+            cursor:pointer;padding:4px 6px;border-radius:6px;
+            background:${ativo?'#e0f2fe':'#f1f5f9'};border:1px solid ${ativo?'#0284c740':'#e2e8f0'}">
+            <input type="checkbox" data-feat="${k}" ${ativo?'checked':''}
+              style="width:14px;height:14px;cursor:pointer">
+            ${v}
+          </label>`;
+      }).join('');
+
       assinHtml += `
         <div style="border-left:4px solid ${c};border-radius:8px;background:#f8fafc;
           padding:10px 12px;margin-bottom:10px">
@@ -287,6 +300,28 @@ async function _renderResumo() {
             &nbsp;&nbsp;🔄 Renovação: <strong>${_fmtData(a.data_proxima_renovacao)}</strong>
           </div>
           ${feats ? `<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:8px">${feats}</div>` : ''}
+          <div style="margin-top:8px">
+            <button onclick="
+              const p = this.nextElementSibling;
+              const aberto = p.style.display !== 'none';
+              p.style.display = aberto ? 'none' : 'block';
+              this.textContent = aberto ? '⚙️ Editar features' : '▲ Fechar';
+            " style="font-size:11px;padding:3px 10px;border-radius:6px;border:1px solid #cbd5e1;
+              background:#fff;cursor:pointer;color:#0A3D62;font-weight:600">
+              ⚙️ Editar features
+            </button>
+            <div style="display:none;margin-top:8px" id="feat-panel-${assinId}">
+              <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px">
+                ${featChecks}
+              </div>
+              <button onclick="_salvarFeatures('${uid}','${assinId}',this)"
+                style="font-size:12px;padding:4px 14px;border-radius:6px;border:none;
+                  background:#0A3D62;color:#fff;cursor:pointer;font-weight:600">
+                💾 Salvar features
+              </button>
+              <span id="feat-status-${assinId}" style="font-size:11px;color:#64748b;margin-left:8px"></span>
+            </div>
+          </div>
         </div>`;
     }
 
@@ -315,6 +350,38 @@ async function _renderResumo() {
       </div>`;
   } catch(e) {
     body.innerHTML = `<p style="color:#ef4444">Erro: ${e.message}</p>`;
+  }
+}
+
+// ─── SALVAR FEATURES DE ASSINATURA ───────────────────────────────────────────
+async function _salvarFeatures(uid, assinId, btn) {
+  const panel = document.getElementById(`feat-panel-${assinId}`);
+  const status = document.getElementById(`feat-status-${assinId}`);
+  const checkboxes = panel.querySelectorAll('input[type=checkbox]');
+
+  const novasFeatures = {};
+  checkboxes.forEach(cb => { novasFeatures[cb.dataset.feat] = cb.checked; });
+
+  btn.disabled = true;
+  btn.textContent = '⏳ Salvando...';
+  status.textContent = '';
+
+  try {
+    await db.collection('usuarios').doc(uid)
+      .collection('assinaturas').doc(assinId)
+      .update({ features_snapshot: novasFeatures });
+
+    status.textContent = '✅ Salvo!';
+    status.style.color = '#16a34a';
+
+    // Atualiza badges visuais no card
+    setTimeout(() => { status.textContent = ''; }, 3000);
+  } catch(e) {
+    status.textContent = '❌ Erro: ' + e.message;
+    status.style.color = '#dc2626';
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '💾 Salvar features';
   }
 }
 
