@@ -1777,10 +1777,10 @@ async function enviarFeedback(nid) {
       .collection('feedbacks').add({
         texto,
         segmento: ctx?.segmento || 'desconhecido',
-        plano: ctx?.plano_slug || null,
+        plano: ctx?.plano_slug || ctx?.plano || null,
         data: firebase.firestore.Timestamp.now(),
         respondido: false,
-        uid: ctx?.uid || null,
+        usuario_id: ctx?._uid || ctx?.uid || null,
         nome: ctx?.nome || null,
       });
 
