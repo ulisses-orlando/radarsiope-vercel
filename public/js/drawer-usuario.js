@@ -587,12 +587,6 @@ async function _renderEnvios() {
             </tr></thead>
             <tbody>${linhas||'<tr><td colspan="6" style="color:#94a3b8;padding:8px;font-size:12px">Nenhum envio.</td></tr>'}</tbody>
           </table>
-          <div style="margin-top:8px">
-            <button class="btn-drawer-sm"
-              onclick="abrirModalEnvioNewsletterManual('${uid}','${assinDoc.id}')">
-              📧 Enviar newsletter manual
-            </button>
-          </div>
         </div>`;
     }
 
