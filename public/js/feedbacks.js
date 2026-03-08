@@ -3,10 +3,10 @@
 // Estrutura: /newsletters/{nid}/feedbacks/{fbId}
 
 // ─── Estado ───────────────────────────────────────────────────────────────────
-let _fbFiltro       = 'pendentes'; // 'pendentes' | 'todos'
-let _fbNewsletters  = {};          // cache nid → { titulo, edicao }
-let _fbCursor       = null;        // último doc para paginação
-let _fbCarregando   = false;
+let _fbFiltro = 'pendentes'; // 'pendentes' | 'todos' | 'notas'
+let _fbNewsletters = {};          // cache nid → { titulo, edicao }
+let _fbCursor = null;        // último doc para paginação
+let _fbCarregando = false;
 
 // ─── Entrypoint ───────────────────────────────────────────────────────────────
 async function carregarSecaoFeedbacks() {
@@ -29,6 +29,10 @@ async function carregarSecaoFeedbacks() {
         <button id="fb-btn-todos" onclick="fbSetFiltro('todos')"
           class="fb-filtro-btn">
           📋 Todos
+        </button>
+        <button id="fb-btn-notas" onclick="fbSetFiltro('notas')"
+          class="fb-filtro-btn">
+          📝 Notas internas
         </button>
       </div>
       <div style="display:flex;gap:8px">
@@ -84,7 +88,7 @@ async function carregarSecaoFeedbacks() {
     document.head.appendChild(style);
   }
 
-  _fbCursor   = null;
+  _fbCursor = null;
   await _fbCarregar(true);
 }
 
@@ -92,6 +96,7 @@ function fbSetFiltro(filtro) {
   _fbFiltro = filtro;
   document.getElementById('fb-btn-pendentes')?.classList.toggle('ativo', filtro === 'pendentes');
   document.getElementById('fb-btn-todos')?.classList.toggle('ativo', filtro === 'todos');
+  document.getElementById('fb-btn-notas')?.classList.toggle('ativo', filtro === 'notas');
   _fbCursor = null;
   _fbCarregar(true);
 }
@@ -101,8 +106,8 @@ async function _fbCarregar(reset = false) {
   if (_fbCarregando) return;
   _fbCarregando = true;
 
-  const lista   = document.getElementById('fb-lista');
-  const status  = document.getElementById('fb-status');
+  const lista = document.getElementById('fb-lista');
+  const status = document.getElementById('fb-status');
   const btnMais = document.getElementById('fb-btn-mais');
   if (reset && lista) lista.innerHTML = '';
   if (status) status.textContent = '⏳ Carregando...';
@@ -134,9 +139,10 @@ async function _fbCarregar(reset = false) {
           const d = fbDoc.data();
           // Filtra pendentes em memória (sem índice composto)
           if (_fbFiltro === 'pendentes' && d.respondido === true) return;
+          if (_fbFiltro === 'notas' && !d.nota_interna) return;
           todos.push({ id: fbDoc.id, nid: nlDoc.id, nl: _fbNewsletters[nlDoc.id], ...d });
         });
-      } catch(e) {
+      } catch (e) {
         console.warn('[feedbacks] newsletter', nlDoc.id, e.message);
       }
     }));
@@ -166,7 +172,7 @@ async function _fbCarregar(reset = false) {
     const pendentes = todos.filter(f => !f.respondido).length;
     _fbAtualizarBadge(pendentes);
 
-  } catch(e) {
+  } catch (e) {
     if (status) status.textContent = `Erro: ${e.message}`;
     console.error('[feedbacks]', e);
   }
@@ -185,7 +191,7 @@ function _fbRenderCard(fb) {
   const respondido = fb.respondido === true;
   const data = fb.data
     ? (fb.data.toDate ? fb.data.toDate() : new Date(fb.data))
-      .toLocaleString('pt-BR', { day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' })
+      .toLocaleString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
     : '—';
 
   const nlLabel = fb.nl
@@ -196,16 +202,21 @@ function _fbRenderCard(fb) {
     ? `<div style="background:#f0fdf4;border-left:3px solid #22c55e;border-radius:4px;
         padding:8px 10px;margin-top:8px;font-size:12px;color:#166534">
         💬 <strong>Resposta:</strong> ${fb.resposta_admin}
-        <span style="font-size:11px;color:#94a3b8;margin-left:8px">${
-          fb.data_resposta
-            ? (fb.data_resposta.toDate ? fb.data_resposta.toDate() : new Date(fb.data_resposta))
-                .toLocaleDateString('pt-BR')
-            : ''
-        }</span>
+        <span style="font-size:11px;color:#94a3b8;margin-left:8px">${fb.data_resposta
+      ? (fb.data_resposta.toDate ? fb.data_resposta.toDate() : new Date(fb.data_resposta))
+        .toLocaleDateString('pt-BR')
+      : ''
+    }</span>
       </div>` : '';
 
-  const notaHtml = fb.nota_interna
-    ? `<div class="fb-nota-area">🔒 Nota interna: ${fb.nota_interna}</div>` : '';
+const notaHtml = fb.nota_interna
+  ? `<div class="fb-nota-area" style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
+      <span>🔒 Nota interna: ${fb.nota_interna}</span>
+      <button onclick="fbExcluirNota('${fb.nid}','${fb.id}')"
+        title="Excluir nota"
+        style="background:none;border:none;cursor:pointer;color:#ef4444;font-size:13px;
+          flex-shrink:0;padding:0;line-height:1">✕</button>
+    </div>` : '';
 
   const acoesHtml = !respondido ? `
     <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px">
@@ -295,7 +306,7 @@ async function fbMarcarTratado(nid, fbId) {
     }
     mostrarMensagem('✅ Feedback marcado como tratado.');
     atualizarBadgeUsuarios?.();
-  } catch(e) { mostrarMensagem('Erro: ' + e.message); }
+  } catch (e) { mostrarMensagem('Erro: ' + e.message); }
 }
 
 async function fbResponder(nid, fbId) {
@@ -339,7 +350,7 @@ async function fbResponder(nid, fbId) {
       const card = document.getElementById(`fb-card-${fbId}`);
       if (card) card.classList.replace('pendente', 'respondido');
       atualizarBadgeUsuarios?.();
-    } catch(e) { mostrarMensagem('Erro: ' + e.message); }
+    } catch (e) { mostrarMensagem('Erro: ' + e.message); }
   }
 }
 
@@ -363,6 +374,23 @@ async function fbAdicionarNota(nid, fbId) {
         card.appendChild(div);
       }
     }
+  } catch (e) { mostrarMensagem('Erro: ' + e.message); }
+}
+
+async function fbExcluirNota(nid, fbId) {
+  if (!confirm('Excluir esta nota interna?')) return;
+  try {
+    await db.collection('newsletters').doc(nid)
+      .collection('feedbacks').doc(fbId)
+      .update({ nota_interna: firebase.firestore.FieldValue.delete() });
+    mostrarMensagem('🗑️ Nota excluída.');
+    const card = document.getElementById(`fb-card-${fbId}`);
+    if (card) {
+      const notaEl = card.querySelector('.fb-nota-area');
+      if (notaEl) notaEl.remove();
+    }
+    // Se estiver no filtro de notas, remove o card inteiro
+    if (_fbFiltro === 'notas' && card) card.remove();
   } catch(e) { mostrarMensagem('Erro: ' + e.message); }
 }
 
@@ -396,22 +424,22 @@ async function fbExportarCSV() {
       });
     }));
 
-    const csv  = rows.map(r => r.join(';')).join('\n');
+    const csv = rows.map(r => r.join(';')).join('\n');
     const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
-    const url  = URL.createObjectURL(blob);
-    const a    = document.createElement('a');
-    a.href     = url;
-    a.download = `feedbacks_${new Date().toISOString().slice(0,10)}.csv`;
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `feedbacks_${new Date().toISOString().slice(0, 10)}.csv`;
     a.click();
     URL.revokeObjectURL(url);
-  } catch(e) { mostrarMensagem('Erro ao exportar: ' + e.message); }
+  } catch (e) { mostrarMensagem('Erro ao exportar: ' + e.message); }
 }
 
 // ─── Badge ────────────────────────────────────────────────────────────────────
 function _fbAtualizarBadge(n) {
   const badge = document.getElementById('badge-feedbacks');
   if (!badge) return;
-  badge.textContent   = n > 99 ? '99+' : n;
+  badge.textContent = n > 99 ? '99+' : n;
   badge.style.display = n > 0 ? 'inline' : 'none';
 }
 
@@ -430,21 +458,21 @@ async function atualizarBadgeFeedbacks() {
         const fbSnap = await db.collection('newsletters').doc(nlDoc.id)
           .collection('feedbacks').where('respondido', '==', false).get();
         pendentes += fbSnap.size;
-      } catch(e) { /* newsletter sem feedbacks */ }
+      } catch (e) { /* newsletter sem feedbacks */ }
     }));
 
     _fbAtualizarBadge(pendentes);
-  } catch(e) {
+  } catch (e) {
     console.warn('[badge-feedbacks]', e.message);
   }
 }
 
 // ─── Exportações globais ─────────────────────────────────────────────────────
-window.carregarSecaoFeedbacks  = carregarSecaoFeedbacks;
+window.carregarSecaoFeedbacks = carregarSecaoFeedbacks;
 window.atualizarBadgeFeedbacks = atualizarBadgeFeedbacks;
-window.fbSetFiltro            = fbSetFiltro;
-window.fbCarregarMais         = fbCarregarMais;
-window.fbMarcarTratado        = fbMarcarTratado;
-window.fbResponder            = fbResponder;
-window.fbAdicionarNota        = fbAdicionarNota;
-window.fbExportarCSV          = fbExportarCSV;
+window.fbSetFiltro = fbSetFiltro;
+window.fbCarregarMais = fbCarregarMais;
+window.fbMarcarTratado = fbMarcarTratado;
+window.fbResponder = fbResponder;
+window.fbAdicionarNota = fbAdicionarNota;
+window.fbExportarCSV = fbExportarCSV;
