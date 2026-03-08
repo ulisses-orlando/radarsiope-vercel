@@ -2,7 +2,7 @@
   "name": "Radar SIOPE",
   "short_name": "Radar SIOPE",
   "description": "Inteligência fiscal educacional personalizada por município. SIOPE, FUNDEB e Salário-Educação na sua mão.",
-  "start_url": "/verNewsletterComToken.html",
+  "start_url": "/app.html",
   "scope": "/",
   "display": "standalone",
   "orientation": "portrait-primary",
@@ -36,7 +36,7 @@
       "name": "Última Edição",
       "short_name": "Edição",
       "description": "Acessar a edição mais recente do Radar SIOPE",
-      "url": "/verNewsletterComToken.html",
+      "url": "/app.html",
       "icons": [{ "src": "/icons/icon-192x192.png", "sizes": "192x192" }]
     },
     {

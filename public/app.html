@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Radar SIOPE</title>
+  <link rel="manifest" href="/manifest.json">
+  <meta name="theme-color" content="#0A3D62">
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      background: #0A3D62;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .card {
+      background: #fff;
+      border-radius: 16px;
+      padding: 36px 28px;
+      max-width: 360px;
+      width: 90%;
+      text-align: center;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+    }
+
+    .logo {
+      font-size: 32px;
+      margin-bottom: 8px;
+    }
+
+    .titulo {
+      font-size: 20px;
+      font-weight: 800;
+      color: #0A3D62;
+      margin-bottom: 4px;
+    }
+
+    .subtitulo {
+      font-size: 13px;
+      color: #64748b;
+      margin-bottom: 24px;
+    }
+
+    .spinner {
+      width: 36px;
+      height: 36px;
+      border: 3px solid #e2e8f0;
+      border-top-color: #0284c7;
+      border-radius: 50%;
+      animation: spin .8s linear infinite;
+      margin: 0 auto 16px;
+    }
+
+    @keyframes spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+    .msg {
+      font-size: 13px;
+      color: #64748b;
+      line-height: 1.6;
+    }
+
+    .msg strong {
+      color: #0A3D62;
+    }
+
+    .btn {
+      display: inline-block;
+      margin-top: 20px;
+      padding: 12px 28px;
+      background: #0A3D62;
+      color: #fff;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 700;
+      text-decoration: none;
+    }
+
+    .btn-outline {
+      background: transparent;
+      border: 2px solid #0A3D62;
+      color: #0A3D62;
+      margin-top: 10px;
+      display: inline-block;
+      padding: 10px 24px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      text-decoration: none;
+    }
+
+    #estado-erro {
+      display: none;
+    }
+
+    #estado-loading {
+      display: block;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="card">
+    <img src="/icons/icon-192x192-transparent.png" class="rs-logo" alt="Radar SIOPE" onerror="this.style.display='none'"
+      style="width:80px;height:80px;object-fit:contain;margin-bottom:12px">
+    <div class="titulo">Radar SIOPE</div>
+    <div class="subtitulo">Guia digital - Fundeb e Siope</div>
+
+    <!-- Loading -->
+    <div id="estado-loading">
+      <div class="spinner"></div>
+      <div class="msg" id="msg-loading">Buscando sua edição mais recente…</div>
+    </div>
+
+    <!-- Erro / Expirado / Sem sessão -->
+    <div id="estado-erro">
+      <div class="msg" id="msg-erro"></div>
+      <div id="acoes-erro"></div>
+    </div>
+  </div>
+
+  <!-- Firebase -->
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
+  <script src="/js/firebaseInit.js"></script>
+
+  <!-- Supabase -->
+  <script src="/js/supabase-browser.js"></script>
+
+  <script>
+    (async function () {
+      const LS_KEY = 'rs_pwa_session';
+
+      function mostrarErro(msg, acoes = '') {
+        document.getElementById('estado-loading').style.display = 'none';
+        document.getElementById('estado-erro').style.display = 'block';
+        document.getElementById('msg-erro').innerHTML = msg;
+        document.getElementById('acoes-erro').innerHTML = acoes;
+      }
+
+      function atualizarMsg(txt) {
+        const el = document.getElementById('msg-loading');
+        if (el) el.textContent = txt;
+      }
+
+      // ── 1. Verificar se veio com parâmetros na URL (link do e-mail) ───────────
+      const params = new URLSearchParams(window.location.search);
+      const temParams = params.get('uid') && params.get('env') && params.get('token');
+
+      if (temParams) {
+        // Só redireciona para o verNewsletterComToken com os mesmos params
+        window.location.replace('/verNewsletterComToken.html' + window.location.search);
+        return;
+      }
+
+      // ── 2. Sem parâmetros → ler sessão salva ─────────────────────────────────
+      let sessao = null;
+      try {
+        const raw = localStorage.getItem(LS_KEY);
+        sessao = raw ? JSON.parse(raw) : null;
+      } catch (e) { sessao = null; }
+
+      if (!sessao || !sessao.uid) {
+        mostrarErro(
+          '<strong>Nenhuma sessão encontrada.</strong><br>Acesse pelo link enviado por e-mail ou faça login.',
+          '<a href="/login.html" class="btn">🔑 Fazer login</a>'
+        );
+        return;
+      }
+
+      const { uid, assinaturaId, segmento } = sessao;
+
+      try {
+        let envio = null;
+        let nid = null;
+        let env = null;
+        let token = null;
+
+        if (segmento === 'assinante' && assinaturaId) {
+          // ── Assinante → Firestore ─────────────────────────────────────────────
+          atualizarMsg('Buscando sua edição mais recente…');
+          const snap = await window.db
+            .collection('usuarios').doc(uid)
+            .collection('assinaturas').doc(assinaturaId)
+            .collection('envios')
+            .orderBy('data_envio', 'desc')
+            .limit(1)
+            .get();
+
+          if (snap.empty) {
+            mostrarErro(
+              '<strong>Nenhuma edição disponível ainda.</strong><br>Você receberá por e-mail assim que uma edição for publicada.',
+              '<a href="/login.html" class="btn-outline">Área do assinante</a>'
+            );
+            return;
+          }
+
+          const doc = snap.docs[0];
+          envio = doc.data();
+          env = doc.id;
+          nid = envio.newsletter_id || envio.nid;
+          token = envio.token_acesso;
+
+        } else {
+          // ── Lead → Supabase ───────────────────────────────────────────────────
+          atualizarMsg('Buscando sua edição mais recente…');
+          const { data, error } = await window.supabase
+            .from('leads_envios')
+            .select('*')
+            .eq('lead_id', uid)
+            .order('data_envio', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+          if (error || !data) {
+            mostrarErro(
+              '<strong>Nenhuma edição disponível.</strong><br>Acesse pelo link enviado por e-mail.',
+              '<a href="/login.html" class="btn-outline">Fazer login</a>'
+            );
+            return;
+          }
+
+          envio = data;
+          env = String(data.id);
+          nid = data.newsletter_id || data.nid;
+          token = data.token_acesso;
+        }
+
+        // ── 3. Verificar expiração ────────────────────────────────────────────
+        const expiraEm = envio.expira_em
+          ? (envio.expira_em.toDate ? envio.expira_em.toDate() : new Date(envio.expira_em))
+          : null;
+
+        if (expiraEm && new Date() > expiraEm) {
+          mostrarErro(
+            '<strong>Seu acesso a esta edição expirou.</strong><br>Acesse pelo último link recebido por e-mail ou entre na sua área.',
+            `<a href="/login.html" class="btn">Acessar minha área</a>`
+          );
+          return;
+        }
+
+        // ── 4. Montar URL e redirecionar ──────────────────────────────────────
+        const destParams = new URLSearchParams({
+          uid,
+          env,
+          nid,
+          token,
+          ...(segmento === 'assinante' && assinaturaId ? { assinaturaId } : {})
+        });
+
+        window.location.replace('/verNewsletterComToken.html?' + destParams.toString());
+
+      } catch (e) {
+        console.error('[app.html]', e);
+        mostrarErro(
+          '<strong>Erro ao carregar.</strong><br>' + (e.message || 'Tente novamente.'),
+          '<a href="/login.html" class="btn-outline">Fazer login</a>'
+        );
+      }
+    })();
+  </script>
+</body>
+
+</html>
