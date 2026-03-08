@@ -764,6 +764,18 @@ async function VerNewsletterComToken() {
           // features_snapshot tem precedência sobre qualquer features do usuário
           destinatario.features = assinaturaData.features_snapshot || assinaturaData.features || destinatario.features || {};
           destinatario.plano_slug = assinaturaData.plano_slug || destinatario.plano_slug || null;
+
+          // Fallback: busca pelo planId se plano_slug não estiver na assinatura
+          if (!destinatario.plano_slug && assinaturaData.planId) {
+            try {
+              const planoSnap = await db.collection('planos').doc(assinaturaData.planId).get();
+              if (planoSnap.exists) {
+                destinatario.plano_slug = planoSnap.data().slug || planoSnap.data().nome || assinaturaData.planId;
+              }
+            } catch (e) {
+              console.warn('[acesso] Não foi possível ler plano:', e);
+            }
+          }
         }
       } catch (e) {
         console.warn('[acesso] Não foi possível ler features_snapshot da assinatura:', e);
