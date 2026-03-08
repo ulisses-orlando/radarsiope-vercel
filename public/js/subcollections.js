@@ -549,12 +549,12 @@ async function abrirSubcolecao(usuarioId, subcolecao) {
       abrirEnvios.onclick = () => abrirSubEnvios(usuarioId, doc.id);
       tdA.appendChild(abrirEnvios);
 
-      const enviarManual = document.createElement("span");
+/*       const enviarManual = document.createElement("span");
       enviarManual.className = "icon-btn";
       enviarManual.innerText = "📧";
       enviarManual.title = "Enviar newsletter manualmente";
       enviarManual.onclick = () => abrirModalEnvioNewsletterManual(usuarioId, doc.id);
-      tdA.appendChild(enviarManual);
+      tdA.appendChild(enviarManual); */
     }
 
     if (subcolecao === "solicitacoes") {
