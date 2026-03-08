@@ -1773,14 +1773,16 @@ async function enviarFeedback(nid) {
   const ctx = _getCtx();
 
   try {
-    await db.collection('newsletters').doc(nid).update({
-      feedbacks: firebase.firestore.FieldValue.arrayUnion({
+    await db.collection('newsletters').doc(nid)
+      .collection('feedbacks').add({
         texto,
         segmento: ctx?.segmento || 'desconhecido',
         plano: ctx?.plano_slug || null,
-        ts: new Date().toISOString(),
-      }),
-    });
+        data: firebase.firestore.Timestamp.now(),
+        respondido: false,
+        uid: ctx?.uid || null,
+        nome: ctx?.nome || null,
+      });
 
     // Marcar como enviado
     localStorage.setItem(`rs_fb_${nid}`, '1');
