@@ -1779,6 +1779,7 @@ async function enviarFeedback(nid) {
         segmento: ctx?.segmento || 'desconhecido',
         plano: ctx?.plano_slug || ctx?.plano || null,
         data: firebase.firestore.Timestamp.now(),
+        email: ctx?.email || null,
         respondido: false,
         usuario_id: ctx?._uid || ctx?.uid || null,
         nome: ctx?.nome || null,
