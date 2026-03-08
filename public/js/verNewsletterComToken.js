@@ -591,6 +591,15 @@ function publicarRadarUser(destinatario, segmento, assinaturaId) {
     perfil: destinatario.perfil || '',
     assinaturaId: assinaturaId || null,
   };
+
+  // Salva sessão para o PWA (app.html usa ao abrir sem parâmetros)
+  try {
+    localStorage.setItem('rs_pwa_session', JSON.stringify({
+      uid: destinatario._uid || null,
+      assinaturaId: assinaturaId || null,
+      segmento: segmento === 'assinantes' ? 'assinante' : 'lead',
+    }));
+  } catch (e) { /* ignora se localStorage bloqueado */ }
 }
 
 // ─── Buscar newsletter pelo número (URL limpa) ────────────────────────────────
