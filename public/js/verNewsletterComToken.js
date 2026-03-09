@@ -104,11 +104,17 @@ function trocarModo(modo) {
     completo?.classList.remove('visivel');
     btnR?.classList.add('ativo');
     btnC?.classList.remove('ativo');
+    // Desativa flipbook se estiver ativo
+    window._flipbook?.desativarFlipbook();
   } else {
     completo?.classList.add('visivel');
     rapido?.classList.remove('visivel');
     btnC?.classList.add('ativo');
     btnR?.classList.remove('ativo');
+    // Ativa flipbook no mobile (aguarda a section ficar visível)
+    if (window._flipbook && window.innerWidth <= 768) {
+      setTimeout(() => window._flipbook.construirFlipbook(), 50);
+    }
   }
   sessionStorage.setItem('rs_modo_leitura', modo);
 }

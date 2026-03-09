@@ -378,11 +378,7 @@
     if (trilho) trilho.style.transform = `translateX(-${idx * 100}%)`;
 
     atualizarNav();
-    const wrapper = document.getElementById('fb-wrapper');
-    if (wrapper) {
-      const topo = wrapper.getBoundingClientRect().top + window.scrollY - 10;
-      window.scrollTo({ top: topo, behavior: 'smooth' });
-    }
+    
     setTimeout(() => { animando = false; }, ANIM_MS + 50);
   }
 
@@ -440,39 +436,7 @@
     paginas = [];
   }
 
-  // ── Init ─────────────────────────────────────────────────────────────────────
-  function init() {
-
-    if (!isMobile()) {
-      return;
-    }
-
-    aguardarApp(() => {
-
-      const mc = document.getElementById('conteudo-newsletter');
-
-      if (mc && mc.children.length === 0) {
-        let tentativas = 0;
-        const t = setInterval(() => {
-          if (mc.children.length > 0 || ++tentativas > 30) {
-            clearInterval(t);
-            construirFlipbook();
-          }
-        }, 100);
-      } else {
-        construirFlipbook();
-      }
-    });
-  }
-
-  // Inicia quando DOM estiver pronto
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', init);
-  } else {
-    init();
-  }
-
-  // Expõe para debug/testes
-  window._flipbook = { irPara, desativarFlipbook };
+  // Expõe para uso externo (acionado pelo trocarModo)
+  window._flipbook = { construirFlipbook, desativarFlipbook, irPara };
 
 })();
