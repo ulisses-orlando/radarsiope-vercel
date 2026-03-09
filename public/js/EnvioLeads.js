@@ -4,6 +4,9 @@ window.tipoDestinatarioSelecionado = tipoDestinatarioSelecionado; // para acesso
 let leadsFiltraveis = [];
 window.leadsFiltraveis = leadsFiltraveis; // para acesso global
 
+let envioSelecionadoId = null;
+window.envioSelecionadoId = envioSelecionadoId;
+
 // Adicione isto no topo ou antes da função de listagem
 async function obterMapaNomesTipos() {
     const mapa = {};
