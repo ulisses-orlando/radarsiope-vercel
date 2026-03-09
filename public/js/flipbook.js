@@ -266,11 +266,9 @@
   // ── Constrói o DOM do flipbook ────────────────────────────────────────────────
   function construirFlipbook() {
     const mc = document.getElementById('conteudo-newsletter');
-    console.log('[FLIPBOOK] filhos do conteudo-newsletter:', mc?.children.length);
 
     paginas = montarPaginas();
-    console.log('[FLIPBOOK] paginas geradas:', paginas.length);
-    
+
     if (paginas.length < 2) return; // não vale paginar com 1 página
 
     injetarCSS();
@@ -352,12 +350,19 @@
 
     // Hint de swipe na 1ª visita
     if (!sessionStorage.getItem('fb_hint_visto')) {
-      sessionStorage.setItem('fb_hint_visto', '1');
-      const hint = document.createElement('div');
-      hint.id = 'fb-swipe-hint';
-      hint.textContent = '← Deslize para navegar →';
-      document.body.appendChild(hint);
-      setTimeout(() => hint.remove(), 3000);
+      const wrapper = document.getElementById('fb-wrapper');
+      const obs = new IntersectionObserver(entries => {
+        if (entries[0].isIntersecting) {
+          obs.disconnect();
+          sessionStorage.setItem('fb_hint_visto', '1');
+          const hint = document.createElement('div');
+          hint.id = 'fb-swipe-hint';
+          hint.textContent = '← Deslize para navegar →';
+          document.body.appendChild(hint);
+          setTimeout(() => hint.remove(), 3000);
+        }
+      }, { threshold: 0.5 });
+      obs.observe(wrapper);
     }
   }
 
@@ -373,7 +378,11 @@
     if (trilho) trilho.style.transform = `translateX(-${idx * 100}%)`;
 
     atualizarNav();
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    const wrapper = document.getElementById('fb-wrapper');
+    if (wrapper) {
+      const topo = wrapper.getBoundingClientRect().top + window.scrollY - 10;
+      window.scrollTo({ top: topo, behavior: 'smooth' });
+    }
     setTimeout(() => { animando = false; }, ANIM_MS + 50);
   }
 
@@ -433,12 +442,16 @@
 
   // ── Init ─────────────────────────────────────────────────────────────────────
   function init() {
-    if (!isMobile()) return; // desktop: scroll normal
+
+    if (!isMobile()) {
+      return;
+    }
 
     aguardarApp(() => {
+
       const mc = document.getElementById('conteudo-newsletter');
+
       if (mc && mc.children.length === 0) {
-        // Polling leve até ter conteúdo (máx 3s)
         let tentativas = 0;
         const t = setInterval(() => {
           if (mc.children.length > 0 || ++tentativas > 30) {

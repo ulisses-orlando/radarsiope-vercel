@@ -191,7 +191,7 @@ function detectarAcesso(destinatario, newsletter, segmento, envio) {
     temAlertas: isAssinante && !!features.alertas_prioritarios,
     blurMunicipio: !isAssinante && !acessoProTemp,
     truncarTexto: !isAssinante && !acessoProTemp,
-    modoPadrao: isAssinante ? 'completo' : 'rapido',
+    modoPadrao: isAssinante && window.innerWidth > 768 ? 'completo' : 'rapido',
   };
 }
 
@@ -865,8 +865,6 @@ async function VerNewsletterComToken() {
 // ══════════════════════════════════════════════════════════════════════════
 
 async function verHistoricoCompleto() {
-  console.log('[verNL] verHistoricoCompleto chamado, dados:', dadosMunicipioAtual);
-
   if (!dadosMunicipioAtual || !dadosMunicipioAtual.cod_municipio) {
     alert('Município não identificado');
     console.warn('[verNL] Dados do município:', dadosMunicipioAtual);
@@ -900,12 +898,9 @@ async function verHistoricoCompleto() {
     }
 
     // Buscar histórico
-    console.log('[verNL] Buscando histórico para:', dadosMunicipioAtual.cod_municipio);
     const dados = await window.SupabaseMunicipio.getHistoricoCompleto(
       dadosMunicipioAtual.cod_municipio
     );
-
-    console.log('[verNL] Histórico carregado:', dados?.length || 0, 'registros');
 
     // Renderizar
     window.SupabaseMunicipio.renderHistoricoCompleto(
@@ -931,7 +926,6 @@ async function verHistoricoCompleto() {
 }
 
 function voltarResumo() {
-  console.log('[verNL] voltarResumo chamado');
   const resumo = document.getElementById('municipio-resumo');
   const historico = document.getElementById('municipio-historico');
 
@@ -944,7 +938,6 @@ function initHistoricoButton() {
   const btn = document.getElementById('btn-ver-historico');
   if (btn) {
     btn.addEventListener('click', verHistoricoCompleto);
-    console.log('[verNL] Listener do botão histórico registrado');
   }
 }
 
@@ -1002,12 +995,10 @@ function aplicarTema(tema) {
     }
   });
 
-  console.log('[Tema] Aplicado:', tema);
 }
 
 // Trocar tema (chamado pelo onclick dos botões)
 function setTheme(tema) {
-  console.log('[Tema] Mudando para:', tema);
 
   if (!TEMAS_DISPONIVEIS.includes(tema)) {
     console.warn('[Tema] Tema inválido:', tema);
@@ -1145,7 +1136,6 @@ async function iniciarDrawer(newsletter) {
             ? d.tipos_selecionados.map(String)
             : [];
           tiposCarregados = true;
-          console.log('[drawer] tiposInclusos via assinatura:', _drawer.tiposInclusos);
         }
       }
 
@@ -1162,7 +1152,6 @@ async function iniciarDrawer(newsletter) {
           _drawer.tiposInclusos = Array.isArray(d.tipos_selecionados)
             ? d.tipos_selecionados.map(String)
             : [];
-          console.log('[drawer] tiposInclusos via assinatura ativa:', _drawer.tiposInclusos);
         } else {
           _drawer.tiposInclusos = [];
         }
@@ -1327,7 +1316,6 @@ async function abrirTipo(tipoId, tipoNome, tipoIcone) {
       edicoes = snap.docs.map(d => ({ id: d.id, ...d.data() }));
       _drawer.edicoesCache[tipoId] = edicoes;
     } catch (e) {
-      console.log('Newsletters do tipo', tipoId, 'não carregadas:', e);
       body.innerHTML = `${upSellBanner}
         <div style="padding:24px;text-align:center;color:var(--rs-muted);font-size:13px">
           Não foi possível carregar as edições.</div>`;
