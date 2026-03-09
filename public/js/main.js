@@ -1162,12 +1162,15 @@ function validarHtmlEmail(html, blocos = [], tipo = 'email') {
     // 4. Conteúdo fora da tabela principal
     // -----------------------------
     if (idxTableClose !== -1) {
-      const afterTable = htmlLower.substring(idxTableClose + 8).trim();
+      const afterTable = htmlLower
+        .substring(idxTableClose + 8)
+        .replace(/<\/body>/g, '')   // ignora </body>
+        .replace(/<\/html>/g, '')   // ignora </html>
+        .trim();
       if (afterTable.length > 0) {
         erros.push("Há conteúdo fora da tabela principal. Todo o HTML deve estar dentro de <table>...</table>.");
       }
     }
-
     // -----------------------------
     // 5. Pixel dentro da tabela e existência
     // -----------------------------
