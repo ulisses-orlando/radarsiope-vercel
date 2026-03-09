@@ -289,6 +289,7 @@ async function abrirModalNewsletter(docId = null, isEdit = false) {
   dateLabel.innerText = 'Data de Publicação';
   const dateInput = document.createElement('input');
   dateInput.type = 'date';
+  dateInput.id = 'data_publicacao';
   dateInput.style.width = '100%';
   dateInput.dataset.fieldName = 'data_publicacao';
   dateInput.value = data.data_publicacao ? data.data_publicacao.toDate().toISOString().split('T')[0] : '';
