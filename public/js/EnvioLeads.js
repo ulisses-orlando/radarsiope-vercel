@@ -1630,10 +1630,10 @@ function montarHtmlNewsletterParaEnvio(newsletter, dados, segmento = null) {
     // ✅ HTML base da edição
     let htmlBase = newsletter.html_conteudo || "";
     const blocos = newsletter.blocos || [];
-    
-console.log('[DEBUG] newsletter.blocos:', JSON.stringify(newsletter.blocos));
-console.log('[DEBUG] blocos.length:', blocos.length);
-console.log('[DEBUG] htmlBase contém {{blocos}}:', newsletter.html_conteudo?.includes('{{blocos}}'));
+
+    console.log('[DEBUG] newsletter.blocos:', JSON.stringify(newsletter.blocos));
+    console.log('[DEBUG] blocos.length:', blocos.length);
+    console.log('[DEBUG] htmlBase contém {{blocos}}:', newsletter.html_conteudo?.includes('{{blocos}}'));
 
     let htmlBlocos = "";
 
@@ -1659,6 +1659,10 @@ console.log('[DEBUG] htmlBase contém {{blocos}}:', newsletter.html_conteudo?.in
         // ✅ Com blocos → insere no {{blocos}} ou no final
         if (htmlBase.includes("{{blocos}}")) {
             htmlFinal = htmlBase.replace("{{blocos}}", htmlBlocos || "");
+            // DEBUG — remover depois
+            console.log('[DEBUG] htmlBlocos.length:', htmlBlocos.length);
+            console.log('[DEBUG] htmlFinal ainda tem {{blocos}}?', htmlFinal.includes('{{blocos}}'));
+            console.log('[DEBUG] primeiros 200 chars:', htmlFinal.substring(0, 200));
         } else {
             htmlFinal = htmlBase + "\n" + htmlBlocos;
         }
