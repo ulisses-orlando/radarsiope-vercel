@@ -1654,11 +1654,11 @@ function montarHtmlNewsletterParaEnvio(newsletter, dados, segmento = null) {
 
     if (blocos.length === 0) {
         // ✅ Sem blocos → usa apenas o HTML base
-        htmlFinal = htmlBase.replace('{{blocos}}', '');
+        htmlFinal = htmlBase.replace(/\{\{blocos\}\}/g, '');
     } else {
         // ✅ Com blocos → insere no {{blocos}} ou no final
         if (htmlBase.includes("{{blocos}}")) {
-            htmlFinal = htmlBase.replace("{{blocos}}", htmlBlocos || "");
+            htmlFinal = htmlBase.replace(/\{\{blocos\}\}/g, htmlBlocos || "");
             // DEBUG — remover depois
             console.log('[DEBUG] htmlBlocos.length:', htmlBlocos.length);
             console.log('[DEBUG] htmlFinal ainda tem {{blocos}}?', htmlFinal.includes('{{blocos}}'));
@@ -1670,6 +1670,8 @@ function montarHtmlNewsletterParaEnvio(newsletter, dados, segmento = null) {
 
     // ✅ Aplica placeholders reais do destinatário
     htmlFinal = aplicarPlaceholders(htmlFinal, dados);
+        console.log('[DEBUG] pós-placeholders ainda tem {{blocos}}?', htmlFinal.includes('{{blocos}}'));
+
     return htmlFinal;
 }
 window.montarHtmlNewsletterParaEnvio = montarHtmlNewsletterParaEnvio; // para acesso global
