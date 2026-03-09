@@ -986,9 +986,9 @@ async function abrirModalNewsletter(docId = null, isEdit = false) {
     const htmlCompleto = payload['conteudo_html_completo'] || "";
     const blocos = payload.blocos || [];
 
-    if (!validarNewsletter(htmlNewsletter, blocos)) return;
+    if (!validarNewsletter(htmlNewsletter, blocos, 'email')) return;
     if (!validarPlaceholders(htmlNewsletter)) return;
-    if (!validarNewsletter(htmlCompleto, blocos)) return;
+    if (!validarNewsletter(htmlCompleto, blocos, 'app')) return;
     if (!validarPlaceholders(htmlCompleto)) return;
 
     // ── Data de publicação ────────────────────────────────────────────────
@@ -1110,7 +1110,7 @@ function montarHtmlNewsletterPreview(modo, segmento = null, bordas = false) {
 }
 
 function validarNewsletter(html, blocos) {
-  const erros = validarHtmlEmail(html, blocos);
+  const erros = validarHtmlEmail(html, blocos, tipo);
 
   if (erros.length > 0) {
     mostrarMensagem("⚠️ Problemas encontrados no HTML:\n\n" + erros.map(e => "• " + e).join("\n"));
@@ -1120,8 +1120,7 @@ function validarNewsletter(html, blocos) {
   return true;
 }
 
-
-function validarHtmlEmail(html, blocos = []) {
+function validarHtmlEmail(html, blocos = [], tipo = 'email') {
   const erros = [];
 
   const htmlLower = html.toLowerCase().trim();
@@ -1136,35 +1135,44 @@ function validarHtmlEmail(html, blocos = []) {
 
   // -----------------------------
   // 2. Verifica se há blocos mas não há {{blocos}}
+  //    (vale para e-mail e app)
   // -----------------------------
   if (blocos.length > 0 && !html.includes("{{blocos}}")) {
     erros.push("Existem blocos cadastrados, mas o HTML não contém o marcador {{blocos}}.");
   }
 
   // -----------------------------
-  // 3. Verifica tabela principal
+  // Regras exclusivas do e-mail (html_conteudo)
+  // O conteudo_html_completo (app) usa divs normais —
+  // não precisa de <table>, link de token nem descadastro
   // -----------------------------
-  const idxTableOpen = htmlLower.indexOf("<table");
-  const idxTableClose = htmlLower.lastIndexOf("</table>");
+  if (tipo === 'email') {
 
-  if (idxTableOpen === -1 || idxTableClose === -1) {
-    erros.push("O HTML precisa conter uma tabela principal (<table>...</table>).");
-  }
+    // -----------------------------
+    // 3. Verifica tabela principal
+    // -----------------------------
+    const idxTableOpen = htmlLower.indexOf("<table");
+    const idxTableClose = htmlLower.lastIndexOf("</table>");
 
-  // -----------------------------
-  // 4. Conteúdo fora da tabela principal
-  // -----------------------------
-  if (idxTableClose !== -1) {
-    const afterTable = htmlLower.substring(idxTableClose + 8).trim();
-    if (afterTable.length > 0) {
-      erros.push("Há conteúdo fora da tabela principal. Todo o HTML deve estar dentro de <table>...</table>.");
+    if (idxTableOpen === -1 || idxTableClose === -1) {
+      erros.push("O HTML precisa conter uma tabela principal (<table>...</table>).");
     }
-  }
 
-  // -----------------------------
-  // 5. Pixel dentro da tabela e existência
-  // -----------------------------
-  /*   if (!html.includes("api.radarsiope.com.br/api/pixel")) {
+    // -----------------------------
+    // 4. Conteúdo fora da tabela principal
+    // -----------------------------
+    if (idxTableClose !== -1) {
+      const afterTable = htmlLower.substring(idxTableClose + 8).trim();
+      if (afterTable.length > 0) {
+        erros.push("Há conteúdo fora da tabela principal. Todo o HTML deve estar dentro de <table>...</table>.");
+      }
+    }
+
+    // -----------------------------
+    // 5. Pixel dentro da tabela e existência
+    // -----------------------------
+    /*
+    if (!html.includes("api.radarsiope.com.br/api/pixel")) {
       erros.push("O HTML não contém o pixel de rastreamento.");
     } else if (idxTableClose !== -1) {
       const pixelPos = html.indexOf("api.radarsiope.com.br/api/pixel");
@@ -1172,55 +1180,62 @@ function validarHtmlEmail(html, blocos = []) {
         erros.push("O pixel de rastreamento está fora da tabela principal.");
       }
     }
-   */
-  // -----------------------------
-  // 6. Link de click dentro da tabela e existência
-  // -----------------------------
-  if (!html.includes("https://www.radarsiope.com.br/verNewsletterComToken.html")) {
-    erros.push("O HTML não contém o link de rastreamento de clique/token.");
-  } else if (idxTableClose !== -1) {
-    const clickPos = html.indexOf("https://www.radarsiope.com.br/verNewsletterComToken.html");
-    if (clickPos > idxTableClose) {
-      erros.push("O link de rastreamento de clique/token está fora da tabela principal.");
-    }
-  }
+    */
 
-  // -----------------------------
-  // 7. Descadastramento dentro da tabela e existência
-  // -----------------------------
-  if (!html.includes("descadastramento")) {
-    erros.push("O HTML não contém o link de descadastramento.");
-  } else if (idxTableClose !== -1) {
-    const descPos = html.indexOf("descadastramento");
-    if (descPos > idxTableClose) {
-      erros.push("O link de descadastramento está fora da tabela principal.");
+    // -----------------------------
+    // 6. Link de clique/token dentro da tabela
+    // -----------------------------
+    if (!html.includes("verNewsletterComToken.html")) {
+      erros.push("O HTML não contém o link de rastreamento de clique/token.");
+    } else if (htmlLower.lastIndexOf("</table>") !== -1) {
+      const idxTableCloseFinal = htmlLower.lastIndexOf("</table>");
+      const clickPos = html.indexOf("verNewsletterComToken.html");
+      if (clickPos > idxTableCloseFinal) {
+        erros.push("O link de rastreamento de clique/token está fora da tabela principal.");
+      }
     }
-  }
 
-  // -----------------------------
-  // 8. Placeholder de token
-  // -----------------------------
-  /*   if (!html.includes("{{token}}")) {
+    // -----------------------------
+    // 7. Descadastramento dentro da tabela
+    // -----------------------------
+    if (!html.includes("descadastramento")) {
+      erros.push("O HTML não contém o link de descadastramento.");
+    } else if (htmlLower.lastIndexOf("</table>") !== -1) {
+      const idxTableCloseFinal = htmlLower.lastIndexOf("</table>");
+      const descPos = html.indexOf("descadastramento");
+      if (descPos > idxTableCloseFinal) {
+        erros.push("O link de descadastramento está fora da tabela principal.");
+      }
+    }
+
+    // -----------------------------
+    // 8. Placeholder de token
+    // -----------------------------
+    /*
+    if (!html.includes("{{token}}")) {
       erros.push("O HTML não contém o placeholder {{token}}.");
-    } */
+    }
+    */
 
-  // -----------------------------
-  // 9. Verifica tags <tr> mal fechadas
-  // -----------------------------
-  const qtdTrAbertas = (htmlLower.match(/<tr/g) || []).length;
-  const qtdTrFechadas = (htmlLower.match(/<\/tr>/g) || []).length;
-  if (qtdTrAbertas !== qtdTrFechadas) {
-    erros.push(`Quantidade de <tr> abertas (${qtdTrAbertas}) e fechadas (${qtdTrFechadas}) não confere.`);
-  }
+    // -----------------------------
+    // 9. Verifica tags <tr> mal fechadas
+    // -----------------------------
+    const qtdTrAbertas = (htmlLower.match(/<tr/g) || []).length;
+    const qtdTrFechadas = (htmlLower.match(/<\/tr>/g) || []).length;
+    if (qtdTrAbertas !== qtdTrFechadas) {
+      erros.push(`Quantidade de <tr> abertas (${qtdTrAbertas}) e fechadas (${qtdTrFechadas}) não confere.`);
+    }
 
-  // -----------------------------
-  // 10. Verifica tags <td> mal fechadas
-  // -----------------------------
-  const qtdTdAbertas = (htmlLower.match(/<td/g) || []).length;
-  const qtdTdFechadas = (htmlLower.match(/<\/td>/g) || []).length;
-  if (qtdTdAbertas !== qtdTdFechadas) {
-    erros.push(`Quantidade de <td> abertas (${qtdTdAbertas}) e fechadas (${qtdTdFechadas}) não confere.`);
-  }
+    // -----------------------------
+    // 10. Verifica tags <td> mal fechadas
+    // -----------------------------
+    const qtdTdAbertas = (htmlLower.match(/<td/g) || []).length;
+    const qtdTdFechadas = (htmlLower.match(/<\/td>/g) || []).length;
+    if (qtdTdAbertas !== qtdTdFechadas) {
+      erros.push(`Quantidade de <td> abertas (${qtdTdAbertas}) e fechadas (${qtdTdFechadas}) não confere.`);
+    }
+
+  } // fim if (tipo === 'email')
 
   return erros;
 }
