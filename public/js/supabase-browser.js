@@ -29,7 +29,6 @@
 
     // ✅ Se window.supabase?.from já existe, significa que foi criado com sucesso
     if (window.supabase && typeof window.supabase.from === 'function') {
-      console.log('[supabase-browser] ✅ window.supabase já disponível (reutilizando).');
       initialized = true;
       return;
     }
@@ -61,8 +60,6 @@
       window.supabase = client;
       initialized = true;
 
-      console.log('[supabase-browser] ✅ Cliente Supabase inicializado (anon, público).');
-      console.log('[supabase-browser] ✅ window.supabase.from está pronto para usar.');
     } catch (err) {
       console.error('[supabase-browser] ❌ Erro ao criar cliente:', err.message);
     }

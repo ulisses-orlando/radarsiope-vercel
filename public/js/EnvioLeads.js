@@ -21,22 +21,6 @@ async function listarLeadsComPreferencias() {
     const corpo = document.querySelector("#tabela-leads-envio tbody");
     corpo.innerHTML = "<tr><td colspan='6'>Carregando leads...</td></tr>";
 
-    /*     try {
-        const { data, error } = await window.supabase
-            .from("leads")
-            .select("*")
-            .limit(1); // pega só 1 registro para testar
-    
-        if (error) {
-            console.error("❌ Erro ao conectar no Supabase:", error);
-        } else {
-                console.log("✅ Conexão OK. Exemplo de dado retornado:", data);
-        }
-        } catch (err) {
-        console.error("❌ Falha geral ao tentar conectar:", err);
-        }   */
-
-
     const { data: leads, error } = await window.supabase
         .from("leads")
         .select("*");
@@ -1631,10 +1615,6 @@ function montarHtmlNewsletterParaEnvio(newsletter, dados, segmento = null) {
     let htmlBase = newsletter.html_conteudo || "";
     const blocos = newsletter.blocos || [];
 
-    console.log('[DEBUG] newsletter.blocos:', JSON.stringify(newsletter.blocos));
-    console.log('[DEBUG] blocos.length:', blocos.length);
-    console.log('[DEBUG] htmlBase contém {{blocos}}:', newsletter.html_conteudo?.includes('{{blocos}}'));
-
     let htmlBlocos = "";
 
     // ✅ Monta blocos filtrados por segmento
@@ -1659,10 +1639,6 @@ function montarHtmlNewsletterParaEnvio(newsletter, dados, segmento = null) {
         // ✅ Com blocos → insere no {{blocos}} ou no final
         if (htmlBase.includes("{{blocos}}")) {
             htmlFinal = htmlBase.replace(/\{\{blocos\}\}/g, htmlBlocos || "");
-            // DEBUG — remover depois
-            console.log('[DEBUG] htmlBlocos.length:', htmlBlocos.length);
-            console.log('[DEBUG] htmlFinal ainda tem {{blocos}}?', htmlFinal.includes('{{blocos}}'));
-            console.log('[DEBUG] primeiros 200 chars:', htmlFinal.substring(0, 200));
         } else {
             htmlFinal = htmlBase + "\n" + htmlBlocos;
         }
@@ -1670,7 +1646,6 @@ function montarHtmlNewsletterParaEnvio(newsletter, dados, segmento = null) {
 
     // ✅ Aplica placeholders reais do destinatário
     htmlFinal = aplicarPlaceholders(htmlFinal, dados);
-        console.log('[DEBUG] pós-placeholders ainda tem {{blocos}}?', htmlFinal.includes('{{blocos}}'));
 
     return htmlFinal;
 }

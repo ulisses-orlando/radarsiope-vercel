@@ -49,7 +49,6 @@ async function registrarServiceWorker() {
   if (!('serviceWorker' in navigator)) return;
   try {
     const reg = await navigator.serviceWorker.register('/sw.js', { scope: '/' });
-    console.log('[PWA] Service Worker registrado:', reg.scope);
 
     // Verifica atualizações
     reg.addEventListener('updatefound', () => {
@@ -104,7 +103,6 @@ async function _inicializarOneSignal() {
 
       // Solicitar permissão ao browser (já temos consentimento LGPD)
       const permission = await OneSignal.Notifications.requestPermission();
-      console.log('[OneSignal] Permissão:', permission);
 
       if (permission) {
         await _aplicarTagsSegmentacao();
@@ -153,7 +151,6 @@ async function _aplicarTagsSegmentacao() {
 
   try {
     await OneSignal.User.addTags(tags);
-    console.log('[OneSignal] Tags aplicadas:', tags);
   } catch (err) {
     console.warn('[OneSignal] Erro ao aplicar tags:', err);
   }
@@ -187,11 +184,9 @@ async function _salvarPlayerId() {
     if (user.segmento === 'assinante' && user.assinaturaId) {
       await db.collection('usuarios').doc(user.uid).update(payload);
     } else {
-      console.log('[OneSignal] Player ID do lead (salvar no Supabase via API):', playerId);
       await _salvarPlayerIdLead(user.uid, playerId);
     }
 
-    console.log('[OneSignal] Player ID salvo:', playerId);
   } catch (err) {
     console.warn('[OneSignal] Erro ao salvar Player ID:', err);
   }
@@ -323,11 +318,9 @@ let _deferredInstallPrompt = null;
 window.addEventListener('beforeinstallprompt', e => {
   e.preventDefault();
   _deferredInstallPrompt = e;
-  console.log('[PWA] beforeinstallprompt capturado');
 });
 
 window.addEventListener('appinstalled', () => {
-  console.log('[PWA] App instalado com sucesso!');
   localStorage.setItem('rs_pwa_installed', '1');
   _fecharBannerInstalacao();
 });
@@ -446,7 +439,6 @@ function mostrarBannerInstalacao() {
     document.getElementById('rs-install-btn')?.addEventListener('click', async () => {
       _deferredInstallPrompt.prompt();
       const { outcome } = await _deferredInstallPrompt.userChoice;
-      console.log('[PWA] Escolha do usuário:', outcome);
       _deferredInstallPrompt = null;
       _fecharBannerInstalacao();
     });

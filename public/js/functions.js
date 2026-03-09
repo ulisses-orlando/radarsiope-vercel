@@ -468,10 +468,6 @@ async function enviarMensagem(usuario, canal, assunto, mensagemHtml) {
 
 async function dispararMensagemAutomatica(momento, dados, tipo) {
   try {
-
-
-    console.log("🔎 Dados recebidos em dispararMensagemAutomatica:", dados);
-
     // 1. Buscar template ativo e automático
     const snapshot = await db.collection("respostas_automaticas")
       .where("momento_envio", "==", momento)
@@ -480,7 +476,6 @@ async function dispararMensagemAutomatica(momento, dados, tipo) {
       .get();
 
     if (snapshot.empty) {
-      console.log(`Nenhum template encontrado para ${momento}`);
       return;
     }
 
@@ -513,14 +508,12 @@ async function dispararMensagemAutomatica(momento, dados, tipo) {
           enviado_em: new Date().toISOString(), 
           lead_id: dados.id
         }; 
-        console.log("Gravando log de envio automático no Supabase:", log);
         const { error: errorLog } = await window.supabase 
           .from("log_envio_automatico") 
           .insert([log]); 
         if (errorLog) { 
           console.error("❌ Erro ao gravar log no Supabase:", errorLog); 
         }
-        console.log("✅ Log gravado no Supabase com sucesso.");
       } else {
         // log dentro de usuarios/{userId}/assinaturas/{assinaturaId}/log_envio_automatico
         const assinRef = db.collection("usuarios").doc(dados.userId)

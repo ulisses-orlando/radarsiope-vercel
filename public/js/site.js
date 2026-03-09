@@ -500,7 +500,6 @@ async function seedRespostasAutomaticas() {
     batchDelete.delete(doc.ref);
   });
   await batchDelete.commit();
-  console.log(`Excluídos ${snapshot.size} registros antigos de tipo "Momento envio".`);
 
   // 2. Inserir os novos registros revisados
   const mensagens = [
@@ -795,13 +794,11 @@ async function seedRespostasAutomaticas() {
   });
 
   await batch.commit();
-  console.log(`Seed concluído. ${mensagens.length} mensagens adicionadas.`);
 }
 
 
 async function popularDatas() {
   const snapshot = await db.collection("lotes_gerais").get();
-  console.log(`Encontrados ${snapshot.size} documentos.`);
 
   const updates = snapshot.docs.map(async doc => {
     const lote = doc.data();
@@ -824,11 +821,9 @@ async function popularDatas() {
       data_envio: dataEnvio
     });
 
-    console.log(`✅ Atualizado lote ${doc.id}`);
   });
 
   await Promise.all(updates);
-  console.log("🎯 Todos os documentos foram atualizados com datas aleatórias.");
 }
 
 window.migrarSenhasAntigas = async function () {
