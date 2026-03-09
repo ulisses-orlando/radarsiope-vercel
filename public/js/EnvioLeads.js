@@ -18,57 +18,57 @@ async function obterMapaNomesTipos() {
 }
 
 async function listarLeadsComPreferencias() {
-  const corpo = document.querySelector("#tabela-leads-envio tbody");
-  corpo.innerHTML = "<tr><td colspan='6'>Carregando leads...</td></tr>";
+    const corpo = document.querySelector("#tabela-leads-envio tbody");
+    corpo.innerHTML = "<tr><td colspan='6'>Carregando leads...</td></tr>";
 
-/*     try {
-    const { data, error } = await window.supabase
+    /*     try {
+        const { data, error } = await window.supabase
+            .from("leads")
+            .select("*")
+            .limit(1); // pega só 1 registro para testar
+    
+        if (error) {
+            console.error("❌ Erro ao conectar no Supabase:", error);
+        } else {
+                console.log("✅ Conexão OK. Exemplo de dado retornado:", data);
+        }
+        } catch (err) {
+        console.error("❌ Falha geral ao tentar conectar:", err);
+        }   */
+
+
+    const { data: leads, error } = await window.supabase
         .from("leads")
-        .select("*")
-        .limit(1); // pega só 1 registro para testar
+        .select("*");
 
     if (error) {
-        console.error("❌ Erro ao conectar no Supabase:", error);
-    } else {
-            console.log("✅ Conexão OK. Exemplo de dado retornado:", data);
+        console.error("Erro ao buscar leads:", error);
+        corpo.innerHTML = "<tr><td colspan='6'>Erro ao carregar leads.</td></tr>";
+        return;
     }
-    } catch (err) {
-    console.error("❌ Falha geral ao tentar conectar:", err);
-    }   */
 
+    let linhas = "";
+    leadsFiltraveis = [];
 
-  const { data: leads, error } = await window.supabase
-    .from("leads")
-    .select("*");
+    for (const lead of leads) {
+        const leadId = lead.id;
 
-  if (error) {
-    console.error("Erro ao buscar leads:", error);
-    corpo.innerHTML = "<tr><td colspan='6'>Erro ao carregar leads.</td></tr>";
-    return;
-  }
+        if (!["Novo", "Em contato"].includes(lead.status)) continue;
 
-  let linhas = "";
-  leadsFiltraveis = [];
+        const interesses = Array.isArray(lead.interesses)
+            ? lead.interesses.join(", ")
+            : "-";
 
-  for (const lead of leads) {
-    const leadId = lead.id;
+        leadsFiltraveis.push({
+            id: leadId,
+            nome: lead.nome || "",
+            email: lead.email || "",
+            perfil: lead.perfil || "",
+            interesses: Array.isArray(lead.interesses) ? lead.interesses : [],
+            status: lead.status || ""
+        });
 
-    if (!["Novo", "Em contato"].includes(lead.status)) continue;
-
-    const interesses = Array.isArray(lead.interesses)
-      ? lead.interesses.join(", ")
-      : "-";
-
-    leadsFiltraveis.push({
-      id: leadId,
-      nome: lead.nome || "",
-      email: lead.email || "",
-      perfil: lead.perfil || "",
-      interesses: Array.isArray(lead.interesses) ? lead.interesses : [],
-      status: lead.status || ""
-    });
-
-    linhas += `
+        linhas += `
       <tr data-lead-id="${leadId}">
         <td><input type="checkbox" class="chk-lead-envio" checked /></td>
         <td>${lead.nome || ""}</td>
@@ -78,10 +78,10 @@ async function listarLeadsComPreferencias() {
         <td>${lead.status || ""}</td>
       </tr>
     `;
-  }
+    }
 
-  corpo.innerHTML =
-    linhas || "<tr><td colspan='6'>Nenhum lead disponível.</td></tr>";
+    corpo.innerHTML =
+        linhas || "<tr><td colspan='6'>Nenhum lead disponível.</td></tr>";
 }
 
 
@@ -176,8 +176,8 @@ async function mostrarDadosNewsletterSelecionada() {
 
     // 1. Carrega o mapa de nomes (ID -> Nome)
     // Se já tiver esta variável global de outra função, pode reutilizar
-    const mapaNomesTipos = await obterMapaNomesTipos(); 
-    
+    const mapaNomesTipos = await obterMapaNomesTipos();
+
     // 2. Busca o nome usando o ID que está em .tipo
     const nomeTipo = mapaNomesTipos[newsletterSelecionada.tipo] || newsletterSelecionada.tipo || "-";
 
@@ -1009,7 +1009,7 @@ async function gerarPreviaEnvioUsuarios() {
             if (docAssinatura.exists) {
                 const ids = docAssinatura.data().tipos_selecionados || [];
                 u.interessesIds = ids; // Guardamos os IDs para a comparação técnica
-                
+
                 // Converte os IDs em nomes usando o mapa
                 const nomes = ids.map(id => mapaNomesTipos[id] || id).join(", ");
                 interessesMap[`${u.usuarioId}|${u.assinaturaId}`] = nomes || "Nenhum";
@@ -1433,13 +1433,13 @@ async function enviarLoteIndividual(newsletterId, envioDocId, loteId) {
         const loteSnap = await loteRef.get();
         if (!loteSnap.exists) { mostrarMensagem("❌ Lote não encontrado."); return; }
 
-        const lote      = loteSnap.data();
+        const lote = loteSnap.data();
         const numeroLote = lote.numero_lote || loteId;
 
         const newsletterSnap = await db.collection("newsletters").doc(newsletterId).get();
-        const newsletter     = newsletterSnap.exists ? newsletterSnap.data() : {};
-        const titulo         = newsletter.titulo || "Sem título";
-        const edicao         = newsletter.edicao || newsletterId;
+        const newsletter = newsletterSnap.exists ? newsletterSnap.data() : {};
+        const titulo = newsletter.titulo || "Sem título";
+        const edicao = newsletter.edicao || newsletterId;
 
         const jaEnviado = lote.enviados && lote.enviados >= lote.quantidade;
         const confirmar = confirm(
@@ -1453,24 +1453,24 @@ async function enviarLoteIndividual(newsletterId, envioDocId, loteId) {
         let enviados = 0;
 
         for (const dest of destinatarios) {
-            const tipo        = dest.tipo || (dest.assinaturaId ? "usuarios" : "leads");
-            const emailDest   = (dest.email || "").trim();
-            const idDest      = dest.id || "-";
+            const tipo = dest.tipo || (dest.assinaturaId ? "usuarios" : "leads");
+            const emailDest = (dest.email || "").trim();
+            const idDest = dest.id || "-";
             const identificador = emailDest || `ID:${idDest}`;
-            const segmento    = tipo === "leads" ? "leads" : "assinantes";
+            const segmento = tipo === "leads" ? "leads" : "assinantes";
 
             const htmlMontado = montarHtmlNewsletterParaEnvio(newsletter, {
-                nome:            dest.nome,
-                email:           emailDest,
-                edicao:          newsletter.edicao,
-                tipo:            newsletter.tipo,
-                titulo:          newsletter.titulo,
+                nome: dest.nome,
+                email: emailDest,
+                edicao: newsletter.edicao,
+                tipo: newsletter.tipo,
+                titulo: newsletter.titulo,
                 data_publicacao: newsletter.data_publicacao,
                 newsletterId
             }, segmento);
 
             try {
-                const token    = gerarTokenAcesso();
+                const token = gerarTokenAcesso();
                 const expiraEm = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
 
                 let registroEnvioId; // ID do registro criado (Supabase ou Firestore)
@@ -1480,12 +1480,12 @@ async function enviarLoteIndividual(newsletterId, envioDocId, loteId) {
                     const { data, error } = await window.supabase
                         .from("leads_envios")
                         .insert({
-                            lead_id:       idDest,
+                            lead_id: idDest,
                             newsletter_id: newsletterId,
-                            data_envio:    new Date().toISOString(),
-                            status:        "enviado",
-                            token_acesso:  token,
-                            expira_em:     expiraEm.toISOString()
+                            data_envio: new Date().toISOString(),
+                            status: "enviado",
+                            token_acesso: token,
+                            expira_em: expiraEm.toISOString()
                         })
                         .select("id")
                         .single();
@@ -1500,14 +1500,14 @@ async function enviarLoteIndividual(newsletterId, envioDocId, loteId) {
                         .collection("assinaturas").doc(dest.assinaturaId)
                         .collection("envios")
                         .add({
-                            newsletter_id:  newsletterId,
-                            data_envio:     firebase.firestore.Timestamp.now(),
-                            status:         "enviado",
+                            newsletter_id: newsletterId,
+                            data_envio: firebase.firestore.Timestamp.now(),
+                            status: "enviado",
                             destinatarioId: idDest,
-                            assinaturaId:   dest.assinaturaId,
-                            token_acesso:   token,
-                            expira_em:      firebase.firestore.Timestamp.fromDate(expiraEm),
-                            ultimo_acesso:  null,
+                            assinaturaId: dest.assinaturaId,
+                            token_acesso: token,
+                            expira_em: firebase.firestore.Timestamp.fromDate(expiraEm),
+                            ultimo_acesso: null,
                             acessos_totais: 0
                         });
                     registroEnvioId = envioRef.id;
@@ -1526,16 +1526,16 @@ async function enviarLoteIndividual(newsletterId, envioDocId, loteId) {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({
-                        nome:         dest.nome,
-                        email:        emailDest,
+                        nome: dest.nome,
+                        email: emailDest,
                         mensagemHtml: htmlFinal,
-                        assunto:      newsletter.titulo || "Newsletter Radar SIOPE"
+                        assunto: newsletter.titulo || "Newsletter Radar SIOPE"
                     })
                 });
 
                 const text = await response.text();
                 let result;
-                try   { result = JSON.parse(text); }
+                try { result = JSON.parse(text); }
                 catch { throw new Error("Resposta inválida do backend: " + text); }
 
                 if (!response.ok || !result.ok) throw new Error(result.error || "Falha no SES");
@@ -1549,20 +1549,20 @@ async function enviarLoteIndividual(newsletterId, envioDocId, loteId) {
                     const { error } = await window.supabase
                         .from("leads_envios")
                         .insert({
-                            lead_id:       idDest,
+                            lead_id: idDest,
                             newsletter_id: newsletterId,
-                            data_envio:    new Date().toISOString(),
-                            status:        "erro",
-                            token_acesso:  null,
-                            expira_em:     null
+                            data_envio: new Date().toISOString(),
+                            status: "erro",
+                            token_acesso: null,
+                            expira_em: null
                         });
                     // fallback no Firestore se Supabase falhar
                     if (error) {
                         await db.collection("leads").doc(idDest).collection("envios").add({
                             newsletter_id: newsletterId,
-                            data_envio:    firebase.firestore.Timestamp.now(),
-                            status:        "erro",
-                            erro:          err.message
+                            data_envio: firebase.firestore.Timestamp.now(),
+                            status: "erro",
+                            erro: err.message
                         });
                     }
                 } else {
@@ -1570,9 +1570,9 @@ async function enviarLoteIndividual(newsletterId, envioDocId, loteId) {
                         .collection("assinaturas").doc(dest.assinaturaId)
                         .collection("envios").add({
                             newsletter_id: newsletterId,
-                            data_envio:    firebase.firestore.Timestamp.now(),
-                            status:        "erro",
-                            erro:          err.message
+                            data_envio: firebase.firestore.Timestamp.now(),
+                            status: "erro",
+                            erro: err.message
                         });
                 }
                 continue;
@@ -1581,39 +1581,39 @@ async function enviarLoteIndividual(newsletterId, envioDocId, loteId) {
 
         // Atualiza metadados do lote
         const usuarioLogado = JSON.parse(localStorage.getItem("usuarioLogado"));
-        const feitoPor      = usuarioLogado?.nome || usuarioLogado?.email || "Desconhecido";
+        const feitoPor = usuarioLogado?.nome || usuarioLogado?.email || "Desconhecido";
 
         await loteRef.collection("envios_log").add({
             data_envio: firebase.firestore.Timestamp.now(),
             quantidade: destinatarios.length,
             enviados,
-            origem:     "manual",
-            operador:   feitoPor,
-            status:     enviados === destinatarios.length ? "completo" : "parcial"
+            origem: "manual",
+            operador: feitoPor,
+            status: enviados === destinatarios.length ? "completo" : "parcial"
         });
 
         await loteRef.update({
             enviados,
-            status:     enviados === destinatarios.length ? "completo" : "parcial",
+            status: enviados === destinatarios.length ? "completo" : "parcial",
             data_envio: firebase.firestore.Timestamp.now()
         });
 
         // ✅ usa envioDocId (parâmetro da função) — corrige o bug "envioId is not defined"
         const loteGeralSnap = await db.collection("lotes_gerais")
-            .where("loteId",  "==", loteId)
+            .where("loteId", "==", loteId)
             .where("envioId", "==", envioDocId)
             .limit(1).get();
 
         if (!loteGeralSnap.empty) {
             await loteGeralSnap.docs[0].ref.update({
                 enviados,
-                status:     enviados === destinatarios.length ? "completo" : "parcial",
+                status: enviados === destinatarios.length ? "completo" : "parcial",
                 data_envio: firebase.firestore.Timestamp.now()
             });
         }
 
         await db.collection("newsletters").doc(newsletterId).update({
-            enviada:         true,
+            enviada: true,
             data_publicacao: firebase.firestore.Timestamp.now()
         });
 
@@ -1630,6 +1630,10 @@ function montarHtmlNewsletterParaEnvio(newsletter, dados, segmento = null) {
     // ✅ HTML base da edição
     let htmlBase = newsletter.html_conteudo || "";
     const blocos = newsletter.blocos || [];
+    
+console.log('[DEBUG] newsletter.blocos:', JSON.stringify(newsletter.blocos));
+console.log('[DEBUG] blocos.length:', blocos.length);
+console.log('[DEBUG] htmlBase contém {{blocos}}:', newsletter.html_conteudo?.includes('{{blocos}}'));
 
     let htmlBlocos = "";
 
@@ -1639,6 +1643,9 @@ function montarHtmlNewsletterParaEnvio(newsletter, dados, segmento = null) {
             // Filtra por segmento (lead/assinante)
             if (segmento && b.acesso !== "todos" && b.acesso !== segmento) return;
 
+            // Filtra por destino: blocos "só app" não vão para o e-mail
+            if (b.destino === "app") return;
+
             htmlBlocos += b.html || "";
         });
     }
@@ -1647,11 +1654,11 @@ function montarHtmlNewsletterParaEnvio(newsletter, dados, segmento = null) {
 
     if (blocos.length === 0) {
         // ✅ Sem blocos → usa apenas o HTML base
-        htmlFinal = htmlBase;
+        htmlFinal = htmlBase.replace('{{blocos}}', '');
     } else {
         // ✅ Com blocos → insere no {{blocos}} ou no final
         if (htmlBase.includes("{{blocos}}")) {
-            htmlFinal = htmlBase.replace("{{blocos}}", htmlBlocos);
+            htmlFinal = htmlBase.replace("{{blocos}}", htmlBlocos || "");
         } else {
             htmlFinal = htmlBase + "\n" + htmlBlocos;
         }
@@ -1671,11 +1678,11 @@ function aplicarRastreamento(htmlBase, envioId, destinatarioId, newsletterId, as
     // 2) Monta parâmetros e gera link ofuscado (Base64)
     const parts = [
         `nid=${newsletterId || ''}`,
-        `env=${envioId    || ''}`,
+        `env=${envioId || ''}`,
         `uid=${destinatarioId || ''}`
     ];
     if (assinaturaId) parts.push(`assinaturaId=${assinaturaId}`);
-    if (token)        parts.push(`token=${token}`);
+    if (token) parts.push(`token=${token}`);
     const qs = parts.join('&');
 
     let b64;
@@ -1688,7 +1695,7 @@ function aplicarRastreamento(htmlBase, envioId, destinatarioId, newsletterId, as
     }
 
     // ✅ Domínio corrigido: app.radarsiope.com.br (web app), não api.radarsiope.com.br (backend)
-    const encodedD     = encodeURIComponent(b64);
+    const encodedD = encodeURIComponent(b64);
     const hrefOfuscado = `https://app.radarsiope.com.br/verNewsletterComToken.html?d=${encodedD}`;
 
     // 3) Substitui o link de visualização pelo link ofuscado
@@ -1699,16 +1706,16 @@ function aplicarRastreamento(htmlBase, envioId, destinatarioId, newsletterId, as
 
     // 4) Reescreve demais links pelo redirecionador de clique (rastreamento)
     html = html.replace(/href="([^"]+)"/g, (m, href) => {
-        const u     = String(href).trim();
+        const u = String(href).trim();
         const lower = u.toLowerCase();
 
         // Preserva links especiais sem rastreamento
         if (
-            lower.startsWith('mailto:')      ||
-            lower.startsWith('tel:')         ||
-            lower.startsWith('javascript:')  ||
-            lower.startsWith('#')            ||
-            /descadastramento\.html/i.test(u)  ||
+            lower.startsWith('mailto:') ||
+            lower.startsWith('tel:') ||
+            lower.startsWith('javascript:') ||
+            lower.startsWith('#') ||
+            /descadastramento\.html/i.test(u) ||
             /vernewslettercomtoken\.html/i.test(u) ||
             /\/api\/click/i.test(u)
         ) {
@@ -2277,18 +2284,18 @@ async function enviarLoteEmMassa(newsletterId, envioId, loteId, tipo) {
         const loteSnap = await loteRef.get();
         if (!loteSnap.exists) { mostrarMensagem("❌ Lote não encontrado."); return; }
 
-        const lote           = loteSnap.data();
+        const lote = loteSnap.data();
         const newsletterSnap = await db.collection("newsletters").doc(newsletterId).get();
-        const newsletter     = newsletterSnap.data();
-        const destinatarios  = lote.destinatarios || [];
-        const payloadEmails  = [];
+        const newsletter = newsletterSnap.data();
+        const destinatarios = lote.destinatarios || [];
+        const payloadEmails = [];
 
         for (const dest of destinatarios) {
-            const tipoLocal    = dest.tipo || (dest.assinaturaId ? "usuarios" : "leads");
-            const idDest       = dest.id;
+            const tipoLocal = dest.tipo || (dest.assinaturaId ? "usuarios" : "leads");
+            const idDest = dest.id;
             const assinaturaId = dest.assinaturaId || null;
-            const token        = gerarTokenAcesso();
-            const expiraEm     = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+            const token = gerarTokenAcesso();
+            const expiraEm = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
 
             let registroEnvioId;
 
@@ -2297,12 +2304,12 @@ async function enviarLoteEmMassa(newsletterId, envioId, loteId, tipo) {
                     const { data, error } = await window.supabase
                         .from("leads_envios")
                         .insert({
-                            lead_id:       idDest,
+                            lead_id: idDest,
                             newsletter_id: newsletterId,
-                            data_envio:    new Date().toISOString(),
-                            status:        "enviado",
-                            token_acesso:  token,
-                            expira_em:     expiraEm.toISOString()
+                            data_envio: new Date().toISOString(),
+                            status: "enviado",
+                            token_acesso: token,
+                            expira_em: expiraEm.toISOString()
                         })
                         .select("id")
                         .single();
@@ -2316,14 +2323,14 @@ async function enviarLoteEmMassa(newsletterId, envioId, loteId, tipo) {
                         .collection("assinaturas").doc(dest.assinaturaId)
                         .collection("envios")
                         .add({
-                            newsletter_id:  newsletterId,
-                            data_envio:     firebase.firestore.Timestamp.now(),
-                            status:         "enviado",
+                            newsletter_id: newsletterId,
+                            data_envio: firebase.firestore.Timestamp.now(),
+                            status: "enviado",
                             destinatarioId: idDest,
-                            assinaturaId:   dest.assinaturaId,
-                            token_acesso:   token,
-                            expira_em:      firebase.firestore.Timestamp.fromDate(expiraEm),
-                            ultimo_acesso:  null,
+                            assinaturaId: dest.assinaturaId,
+                            token_acesso: token,
+                            expira_em: firebase.firestore.Timestamp.fromDate(expiraEm),
+                            ultimo_acesso: null,
                             acessos_totais: 0
                         });
                     registroEnvioId = envioRef.id;
@@ -2333,13 +2340,13 @@ async function enviarLoteEmMassa(newsletterId, envioId, loteId, tipo) {
                 continue; // pula este destinatário sem abortar o lote
             }
 
-            const segmento    = tipoLocal === "leads" ? "leads" : "assinantes";
+            const segmento = tipoLocal === "leads" ? "leads" : "assinantes";
             const htmlMontado = montarHtmlNewsletterParaEnvio(newsletter, {
-                nome:            dest.nome,
-                email:           dest.email,
-                edicao:          newsletter.edicao,
-                tipo:            newsletter.tipo,
-                titulo:          newsletter.titulo,
+                nome: dest.nome,
+                email: dest.email,
+                edicao: newsletter.edicao,
+                tipo: newsletter.tipo,
+                titulo: newsletter.titulo,
                 data_publicacao: newsletter.data_publicacao,
                 newsletterId
             }, segmento);
@@ -2349,13 +2356,13 @@ async function enviarLoteEmMassa(newsletterId, envioId, loteId, tipo) {
             );
 
             payloadEmails.push({
-                nome:           dest.nome,
-                email:          dest.email,
-                mensagemHtml:   htmlFinal,
-                assunto:        newsletter.titulo || "Newsletter Radar SIOPE",
-                envioId:        registroEnvioId,
+                nome: dest.nome,
+                email: dest.email,
+                mensagemHtml: htmlFinal,
+                assunto: newsletter.titulo || "Newsletter Radar SIOPE",
+                envioId: registroEnvioId,
                 destinatarioId: idDest,
-                tipo:           tipoLocal,
+                tipo: tipoLocal,
                 assinaturaId
             });
         }
@@ -2376,40 +2383,40 @@ async function enviarLoteEmMassa(newsletterId, envioId, loteId, tipo) {
         if (!response.ok) throw new Error(result.error || `Erro backend: ${response.status}`);
 
         // Atualiza metadados
-        const enviados      = payloadEmails.length;
+        const enviados = payloadEmails.length;
         const usuarioLogado = JSON.parse(localStorage.getItem("usuarioLogado"));
-        const feitoPor      = usuarioLogado?.nome || usuarioLogado?.email || "Desconhecido";
+        const feitoPor = usuarioLogado?.nome || usuarioLogado?.email || "Desconhecido";
 
         await loteRef.collection("envios_log").add({
             data_envio: firebase.firestore.Timestamp.now(),
             quantidade: destinatarios.length,
             enviados,
-            origem:     "manual",
-            operador:   feitoPor,
-            status:     enviados === destinatarios.length ? "completo" : "parcial"
+            origem: "manual",
+            operador: feitoPor,
+            status: enviados === destinatarios.length ? "completo" : "parcial"
         });
 
         await loteRef.update({
             enviados,
-            status:     enviados === destinatarios.length ? "completo" : "parcial",
+            status: enviados === destinatarios.length ? "completo" : "parcial",
             data_envio: firebase.firestore.Timestamp.now()
         });
 
         const loteGeralSnap = await db.collection("lotes_gerais")
-            .where("loteId",  "==", loteId)
+            .where("loteId", "==", loteId)
             .where("envioId", "==", envioId)
             .limit(1).get();
 
         if (!loteGeralSnap.empty) {
             await loteGeralSnap.docs[0].ref.update({
                 enviados,
-                status:     enviados === destinatarios.length ? "completo" : "parcial",
+                status: enviados === destinatarios.length ? "completo" : "parcial",
                 data_envio: firebase.firestore.Timestamp.now()
             });
         }
 
         await db.collection("newsletters").doc(newsletterId).update({
-            enviada:         true,
+            enviada: true,
             data_publicacao: firebase.firestore.Timestamp.now()
         });
 
@@ -2503,113 +2510,113 @@ window.dadosCampanha = dadosCampanha; // para acesso global se necessário
 
 // função que abre o modal e prepara os dados
 function abrirModalConfirmacao(newsletter, filtros, totalSelecionados) {
-  dadosCampanha = { newsletterId: newsletter.id, filtros };
+    dadosCampanha = { newsletterId: newsletter.id, filtros };
 
-  const tipo = filtros.tipo === "leads" ? "Leads" : "Usuários";
-  const titulo = newsletter.titulo;
-  const edicao = newsletter.edicao || newsletter.id;
+    const tipo = filtros.tipo === "leads" ? "Leads" : "Usuários";
+    const titulo = newsletter.titulo;
+    const edicao = newsletter.edicao || newsletter.id;
 
-  const info = `📰 Newsletter: ${titulo} (${edicao})\n` +
-               `👥 Tipo: ${tipo}\n` +
-               `📬 Destinatários selecionados: ${totalSelecionados}`;
+    const info = `📰 Newsletter: ${titulo} (${edicao})\n` +
+        `👥 Tipo: ${tipo}\n` +
+        `📬 Destinatários selecionados: ${totalSelecionados}`;
 
-  const infoEl = document.getElementById("info-campanha");
-  if (infoEl) infoEl.innerText = info;
+    const infoEl = document.getElementById("info-campanha");
+    if (infoEl) infoEl.innerText = info;
 
-  const modal = document.getElementById("modal-confirmacao");
-  if (modal) modal.style.display = "flex";
+    const modal = document.getElementById("modal-confirmacao");
+    if (modal) modal.style.display = "flex";
 }
 
 // função que fecha modal
 function fecharModal() {
-  const modal = document.getElementById("modal-confirmacao");
-  if (modal) modal.style.display = "none";
-  dadosCampanha = null;
+    const modal = document.getElementById("modal-confirmacao");
+    if (modal) modal.style.display = "none";
+    dadosCampanha = null;
 }
 
 // função que fecha modal de erros
 function fecharModalErrosEncontrados() {
-  const alertModal = document.getElementById("alert-modal");
-  if (alertModal) alertModal.style.display = "none";
-  dadosCampanha = null;
+    const alertModal = document.getElementById("alert-modal");
+    if (alertModal) alertModal.style.display = "none";
+    dadosCampanha = null;
 }
 
 // prosseguir com a geração chamando confirmarPrevia (já exposta no window)
 async function prosseguirGeracao() {
-  const modal = document.getElementById("modal-confirmacao");
-  if (modal) modal.style.display = "none";
+    const modal = document.getElementById("modal-confirmacao");
+    if (modal) modal.style.display = "none";
 
-  if (dadosCampanha && typeof window.confirmarPrevia === "function") {
-    try {
-      await window.confirmarPrevia(dadosCampanha.newsletterId, dadosCampanha.filtros);
-    } finally {
-      dadosCampanha = null;
+    if (dadosCampanha && typeof window.confirmarPrevia === "function") {
+        try {
+            await window.confirmarPrevia(dadosCampanha.newsletterId, dadosCampanha.filtros);
+        } finally {
+            dadosCampanha = null;
+        }
+    } else {
+        console.warn("confirmarPrevia não disponível ou dadosCampanha vazio");
     }
-  } else {
-    console.warn("confirmarPrevia não disponível ou dadosCampanha vazio");
-  }
 }
 
 // função que será ligada ao botão Gerar Lotes
 function onClickGerarLotes() {
-  const newsletter = window.newsletterSelecionada;
-  if (!newsletter) {
-    return window.mostrarMensagem?.("Nenhuma newsletter selecionada.");
-  }
+    const newsletter = window.newsletterSelecionada;
+    if (!newsletter) {
+        return window.mostrarMensagem?.("Nenhuma newsletter selecionada.");
+    }
 
-  const filtros = typeof window.coletarFiltros === "function"
-    ? window.coletarFiltros()
-    : null;
+    const filtros = typeof window.coletarFiltros === "function"
+        ? window.coletarFiltros()
+        : null;
 
-  if (!filtros) {
-    return window.mostrarMensagem?.("Erro ao coletar filtros.");
-  }
+    if (!filtros) {
+        return window.mostrarMensagem?.("Erro ao coletar filtros.");
+    }
 
-  const linhasSelecionadas = Array.from(document.querySelectorAll(".chk-envio-final:checked"));
-  const totalSelecionados = linhasSelecionadas.length;
+    const linhasSelecionadas = Array.from(document.querySelectorAll(".chk-envio-final:checked"));
+    const totalSelecionados = linhasSelecionadas.length;
 
-  if (totalSelecionados === 0) {
-    return window.mostrarMensagem?.("Nenhum destinatário selecionado para envio.");
-  }
+    if (totalSelecionados === 0) {
+        return window.mostrarMensagem?.("Nenhum destinatário selecionado para envio.");
+    }
 
-  abrirModalConfirmacao(newsletter, filtros, totalSelecionados);
+    abrirModalConfirmacao(newsletter, filtros, totalSelecionados);
 }
 
 // inicializador que registra listeners quando o DOM estiver pronto
 function initGeracaoLotes() {
-  // botão principal
-  const btn = document.getElementById("btn-gerar-lotes");
-  if (btn) {
-    btn.removeEventListener("click", onClickGerarLotes); // segurança
-    btn.addEventListener("click", onClickGerarLotes);
-  } else {
-    console.warn("btn-gerar-lotes não encontrado no DOM");
-  }
+    // botão principal
+    const btn = document.getElementById("btn-gerar-lotes");
+    if (btn) {
+        btn.removeEventListener("click", onClickGerarLotes); // segurança
+        btn.addEventListener("click", onClickGerarLotes);
+    } else {
+        console.warn("btn-gerar-lotes não encontrado no DOM");
+    }
 
-  // botão fechar modal (se for um botão com onclick="fecharModal()" no HTML,
-  // aqui ligamos ao mesmo comportamento sem depender do inline)
-  const btnFechar = document.querySelector("#modal-confirmacao button[onclick='fecharModal()']");
-  if (btnFechar) {
-    btnFechar.removeEventListener("click", fecharModal);
-    btnFechar.addEventListener("click", fecharModal);
-  }
+    // botão fechar modal (se for um botão com onclick="fecharModal()" no HTML,
+    // aqui ligamos ao mesmo comportamento sem depender do inline)
+    const btnFechar = document.querySelector("#modal-confirmacao button[onclick='fecharModal()']");
+    if (btnFechar) {
+        btnFechar.removeEventListener("click", fecharModal);
+        btnFechar.addEventListener("click", fecharModal);
+    }
 
-  // botão prosseguir (ex.: #btn-prosseguir-geracao)
-  const btnProsseguir = document.getElementById("btn-prosseguir-geracao");
-  if (btnProsseguir) {
-    btnProsseguir.removeEventListener("click", prosseguirGeracao);
-    btnProsseguir.addEventListener("click", prosseguirGeracao);
-  }
+    // botão prosseguir (ex.: #btn-prosseguir-geracao)
+    const btnProsseguir = document.getElementById("btn-prosseguir-geracao");
+    if (btnProsseguir) {
+        btnProsseguir.removeEventListener("click", prosseguirGeracao);
+        btnProsseguir.addEventListener("click", prosseguirGeracao);
+    }
 
-  // expor funções no window caso HTML use onclick inline em outros pontos
-  window.fecharModal = fecharModal;
-  window.fecharModalErrosEncontrados = fecharModalErrosEncontrados;
-  window.prosseguirGeracao = prosseguirGeracao;
+    // expor funções no window caso HTML use onclick inline em outros pontos
+    window.fecharModal = fecharModal;
+    window.fecharModalErrosEncontrados = fecharModalErrosEncontrados;
+    window.prosseguirGeracao = prosseguirGeracao;
 }
 
 // registra init no DOMContentLoaded para garantir que elementos existam
 if (document.readyState === "loading") {
-  document.addEventListener("DOMContentLoaded", initGeracaoLotes);
+    document.addEventListener("DOMContentLoaded", initGeracaoLotes);
 } else {
-  initGeracaoLotes();
+    initGeracaoLotes();
 }
