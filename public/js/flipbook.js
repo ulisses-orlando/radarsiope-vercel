@@ -9,16 +9,16 @@
   'use strict';
 
   // ── Configuração ─────────────────────────────────────────────────────────────
-  const MOBILE_MAX        = 768;   // px — acima disso = desktop (scroll normal)
+  const MOBILE_MAX = 768;   // px — acima disso = desktop (scroll normal)
   const BLOCOS_POR_PAGINA = 3;     // filhos do #conteudo-newsletter por página (fallback)
-  const SWIPE_MIN         = 45;    // px mínimos para considerar swipe
-  const ANIM_MS           = 320;   // duração da transição em ms
+  const SWIPE_MIN = 45;    // px mínimos para considerar swipe
+  const ANIM_MS = 320;   // duração da transição em ms
 
   // ── Estado ───────────────────────────────────────────────────────────────────
-  let paginas     = [];
+  let paginas = [];
   let paginaAtual = 0;
-  let animando    = false;
-  let modoAtivo   = false;
+  let animando = false;
+  let modoAtivo = false;
 
   // ── Detecta mobile ───────────────────────────────────────────────────────────
   function isMobile() {
@@ -53,16 +53,16 @@
     if (!conteudo || conteudo.children.length === 0) return [];
 
     const resultado = [];
-    const filhos    = Array.from(conteudo.children);
+    const filhos = Array.from(conteudo.children);
 
     // Agrupamento: por data-tipo (injetado pelo JS) ou por contagem
     const temTipo = filhos.some(f => f.dataset && f.dataset.tipo);
-    let grupos    = [];
+    let grupos = [];
 
     if (temTipo) {
       // Cada tipo diferente → nova página; mesmo tipo consecutivo → mesma página
       let grupoAtual = [];
-      let tipoAtual  = null;
+      let tipoAtual = null;
       filhos.forEach(filho => {
         const t = filho.dataset?.tipo || 'sem-tipo';
         if (t !== tipoAtual && grupoAtual.length > 0) {
@@ -81,7 +81,7 @@
     }
 
     grupos.forEach((grupo, idx) => {
-      const pagina    = document.createElement('div');
+      const pagina = document.createElement('div');
       pagina.className = 'fb-pagina';
       const tipoLabel = grupo[0]?.dataset?.tipo || 'conteudo';
       pagina.setAttribute('data-pagina-tipo', tipoLabel);
@@ -110,7 +110,7 @@
   function injetarCSS() {
     if (document.getElementById('fb-styles')) return;
     const style = document.createElement('style');
-    style.id    = 'fb-styles';
+    style.id = 'fb-styles';
     style.textContent = `
       /* ── Wrapper do flipbook ── */
       #fb-wrapper {
@@ -265,26 +265,31 @@
 
   // ── Constrói o DOM do flipbook ────────────────────────────────────────────────
   function construirFlipbook() {
+    const mc = document.getElementById('conteudo-newsletter');
+    console.log('[FLIPBOOK] filhos do conteudo-newsletter:', mc?.children.length);
+
     paginas = montarPaginas();
+    console.log('[FLIPBOOK] paginas geradas:', paginas.length);
+    
     if (paginas.length < 2) return; // não vale paginar com 1 página
 
     injetarCSS();
 
     // Wrapper + trilho
     const wrapper = document.createElement('div');
-    wrapper.id    = 'fb-wrapper';
+    wrapper.id = 'fb-wrapper';
 
-    const trilho  = document.createElement('div');
-    trilho.id     = 'fb-trilho';
+    const trilho = document.createElement('div');
+    trilho.id = 'fb-trilho';
 
     paginas.forEach(p => trilho.appendChild(p));
     wrapper.appendChild(trilho);
 
     // CTA e watermark vão para a última página
-    const cta       = document.getElementById('rs-cta-wrap');
+    const cta = document.getElementById('rs-cta-wrap');
     const watermark = document.getElementById('rs-watermark');
-    const ultima    = paginas[paginas.length - 1];
-    if (cta)       ultima.appendChild(cta);
+    const ultima = paginas[paginas.length - 1];
+    if (cta) ultima.appendChild(cta);
     if (watermark) ultima.appendChild(watermark);
 
     // Insere no lugar de #modo-completo (que agora está oculto)
@@ -298,7 +303,7 @@
 
     // Barra de navegação
     const nav = document.createElement('div');
-    nav.id    = 'fb-nav';
+    nav.id = 'fb-nav';
     nav.innerHTML = `
       <button id="fb-btn-prev" aria-label="Página anterior">‹</button>
       <div id="fb-progress-wrap">
@@ -339,7 +344,7 @@
     document.addEventListener('keydown', e => {
       if (!modoAtivo) return;
       if (e.key === 'ArrowRight' || e.key === 'ArrowDown') irPara(paginaAtual + 1);
-      if (e.key === 'ArrowLeft'  || e.key === 'ArrowUp')   irPara(paginaAtual - 1);
+      if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') irPara(paginaAtual - 1);
     });
 
     modoAtivo = true;
@@ -349,7 +354,7 @@
     if (!sessionStorage.getItem('fb_hint_visto')) {
       sessionStorage.setItem('fb_hint_visto', '1');
       const hint = document.createElement('div');
-      hint.id          = 'fb-swipe-hint';
+      hint.id = 'fb-swipe-hint';
       hint.textContent = '← Deslize para navegar →';
       document.body.appendChild(hint);
       setTimeout(() => hint.remove(), 3000);
@@ -361,7 +366,7 @@
     if (animando) return;
     if (idx < 0 || idx >= paginas.length) return;
 
-    animando    = true;
+    animando = true;
     paginaAtual = idx;
 
     const trilho = document.getElementById('fb-trilho');
@@ -374,17 +379,17 @@
 
   // ── Atualizar barra de navegação ──────────────────────────────────────────────
   function atualizarNav() {
-    const total   = paginas.length;
-    const label   = document.getElementById('fb-label');
-    const bar     = document.getElementById('fb-progress-bar');
+    const total = paginas.length;
+    const label = document.getElementById('fb-label');
+    const bar = document.getElementById('fb-progress-bar');
     const btnPrev = document.getElementById('fb-btn-prev');
     const btnNext = document.getElementById('fb-btn-next');
-    const dots    = document.querySelectorAll('.fb-dot');
+    const dots = document.querySelectorAll('.fb-dot');
 
-    if (label)   label.textContent = `Página ${paginaAtual + 1} de ${total}`;
-    if (bar)     bar.style.width   = `${((paginaAtual + 1) / total) * 100}%`;
-    if (btnPrev) btnPrev.disabled  = paginaAtual === 0;
-    if (btnNext) btnNext.disabled  = paginaAtual === total - 1;
+    if (label) label.textContent = `Página ${paginaAtual + 1} de ${total}`;
+    if (bar) bar.style.width = `${((paginaAtual + 1) / total) * 100}%`;
+    if (btnPrev) btnPrev.disabled = paginaAtual === 0;
+    if (btnNext) btnNext.disabled = paginaAtual === total - 1;
 
     dots.forEach((d, i) => d.classList.toggle('ativo', i === paginaAtual));
 
@@ -396,9 +401,9 @@
     if (!modoAtivo) return;
     modoAtivo = false;
 
-    const wrapper       = document.getElementById('fb-wrapper');
-    const nav           = document.getElementById('fb-nav');
-    const mc            = document.getElementById('conteudo-newsletter');
+    const wrapper = document.getElementById('fb-wrapper');
+    const nav = document.getElementById('fb-nav');
+    const mc = document.getElementById('conteudo-newsletter');
     const secaoCompleto = document.getElementById('modo-completo');
 
     // Devolve os blocos ao #conteudo-newsletter
@@ -410,14 +415,14 @@
     }
 
     // Restaura CTA e watermark ao lugar original (após #rs-app)
-    const app       = document.getElementById('rs-app');
-    const cta       = document.getElementById('rs-cta-wrap');
+    const app = document.getElementById('rs-app');
+    const cta = document.getElementById('rs-cta-wrap');
     const watermark = document.getElementById('rs-watermark');
-    if (app && cta)       app.appendChild(cta);
+    if (app && cta) app.appendChild(cta);
     if (app && watermark) app.appendChild(watermark);
 
     if (wrapper) wrapper.remove();
-    if (nav)     nav.remove();
+    if (nav) nav.remove();
 
     // Restaura a section original
     if (secaoCompleto) secaoCompleto.style.display = '';
