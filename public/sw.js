@@ -30,7 +30,6 @@ const CACHE_STATIC = [
 
 // ─── Install: pré-carrega cache estático ─────────────────────────────────────
 self.addEventListener('install', event => {
-  console.log('[SW] Instalando v1...');
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then(cache => cache.addAll(CACHE_STATIC.filter(url => !url.startsWith('http') || url.includes('googleapis'))))
@@ -40,7 +39,6 @@ self.addEventListener('install', event => {
 
 // ─── Activate: limpa caches antigos ──────────────────────────────────────────
 self.addEventListener('activate', event => {
-  console.log('[SW] Ativando...');
   event.waitUntil(
     caches.keys().then(keys =>
       Promise.all(
