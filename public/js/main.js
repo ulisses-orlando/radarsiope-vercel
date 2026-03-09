@@ -1109,7 +1109,7 @@ function montarHtmlNewsletterPreview(modo, segmento = null, bordas = false) {
   return htmlBase + "\n" + htmlBlocos;
 }
 
-function validarNewsletter(html, blocos) {
+function validarNewsletter(html, blocos, tipo = 'email') {
   const erros = validarHtmlEmail(html, blocos, tipo);
 
   if (erros.length > 0) {
