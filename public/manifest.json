@@ -43,7 +43,7 @@
       "name": "Minha Área",
       "short_name": "Minha Área",
       "description": "Acessar a Área do Assinante",
-      "url": "/painel.html",
+      "url": "/login.html",
       "icons": [{ "src": "/icons/icon-192x192.png", "sizes": "192x192" }]
     }
   ],
