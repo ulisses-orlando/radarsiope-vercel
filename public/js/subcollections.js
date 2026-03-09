@@ -172,7 +172,7 @@ async function carregarNewsletters() {
     const d = doc.data();
 
     // Campo tipo contém o ID do tipo (novo padrão)
-    const tipoId = d.tipo || '';
+    const tipoId   = d.tipo || '';
     const tipoNome = tiposMap[tipoId] || tipoId || '-';
 
     // Filtro pelo ID do tipo
@@ -203,7 +203,7 @@ async function carregarNewsletters() {
       <td>
         <span class="icon-btn" title="Editar" onclick="abrirModalNewsletter('${doc.id}', true)">✏️</span>
         <span class="icon-btn" title="Duplicar" onclick="duplicarNewsletter('${doc.id}')">📄</span>
-        <span class="icon-btn" title="Ver Avaliações" onclick="verReacoesNewsletter('${doc.id}', '${(d.titulo || '').replace(/'/g, "\\'")}')">📊</span>
+        <span class="icon-btn" title="Ver Avaliações" onclick="verReacoesNewsletter('${doc.id}', '${(d.titulo||'').replace(/'/g,"\\'")}')">📊</span>
         <span class="icon-btn" title="Excluir" onclick="confirmarExclusaoNewsletter('${doc.id}', '${(d.titulo || '').replace(/'/g, "\\'")}')">🗑️</span>
       </td>`;
     tbody.appendChild(tr);
@@ -218,17 +218,17 @@ async function verReacoesNewsletter(docId, titulo) {
 
   const LABELS = [
     { key: 'decepcionou', emoji: '😞', label: 'Decepcionou', cor: '#ef4444' },
-    { key: 'regular', emoji: '😐', label: 'Regular', cor: '#f59e0b' },
-    { key: 'bom', emoji: '🙂', label: 'Bom', cor: '#3b82f6' },
-    { key: 'muito_bom', emoji: '😀', label: 'Muito bom', cor: '#22c55e' },
-    { key: 'excelente', emoji: '🤩', label: 'Excelente', cor: '#8b5cf6' },
+    { key: 'regular',     emoji: '😐', label: 'Regular',     cor: '#f59e0b' },
+    { key: 'bom',         emoji: '🙂', label: 'Bom',         cor: '#3b82f6' },
+    { key: 'muito_bom',   emoji: '😀', label: 'Muito bom',   cor: '#22c55e' },
+    { key: 'excelente',   emoji: '🤩', label: 'Excelente',   cor: '#8b5cf6' },
   ];
 
   const total = LABELS.reduce((s, { key }) => s + (reactions[key] || 0), 0);
 
   const linhas = LABELS.map(({ key, emoji, label, cor }) => {
     const count = reactions[key] || 0;
-    const pct = total > 0 ? Math.round((count / total) * 100) : 0;
+    const pct   = total > 0 ? Math.round((count / total) * 100) : 0;
     return `
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
         <span style="font-size:24px;width:32px;text-align:center">${emoji}</span>
@@ -262,8 +262,8 @@ async function verReacoesNewsletter(docId, titulo) {
         Total de avaliações: <strong style="color:#334155">${total}</strong>
       </p>
       ${total === 0
-      ? '<p style="color:#94a3b8;text-align:center;padding:20px 0">Nenhuma avaliação registrada ainda.</p>'
-      : linhas}
+        ? '<p style="color:#94a3b8;text-align:center;padding:20px 0">Nenhuma avaliação registrada ainda.</p>'
+        : linhas}
     </div>`;
 
   // Fecha ao clicar fora
@@ -272,7 +272,10 @@ async function verReacoesNewsletter(docId, titulo) {
 }
 
 
-async function duplicarNewsletter(docId) {
+async function duplicarNewsletter(docId) { 
+  const snap = await db.collection('newsletters').doc(docId).get();
+  if (!snap.exists) return;
+
   const original = snap.data();
   const data = {
     ...original,
