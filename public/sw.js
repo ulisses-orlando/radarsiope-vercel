@@ -14,10 +14,10 @@
 importScripts('https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.sw.js');
 
 // ─── Configuração do Cache ────────────────────────────────────────────────────
-const CACHE_NAME   = 'radar-siope-v1';
+const CACHE_NAME   = 'radar-siope-v2';
 const CACHE_STATIC = [
   '/',
-  '/verNewsletterComToken.html',
+  '/app.html',
   '/painel.html',
   '/login.html',
   '/css/style.css',
