@@ -22,9 +22,9 @@
 const ONESIGNAL_APP_ID = '040469b1-fa2a-499f-9911-aa417b0cd4bd';
 
 // Chave no localStorage para controle de consentimento LGPD
-const LS_CONSENT_KEY     = 'rs_push_consent';     // 'granted' | 'denied' | null
-const LS_INSTALL_SHOWN   = 'rs_install_shown';
-const LS_INSTALL_DELAY   = 'rs_install_delay';
+const LS_CONSENT_KEY   = 'rs_push_consent';     // 'granted' | 'denied' | null
+const LS_INSTALL_SHOWN = 'rs_install_shown';
+const LS_INSTALL_DELAY = 'rs_install_delay';
 
 // ─── Estado do usuário (preenchido pelo verNewsletterComToken.js) ────────────
 // window._radarUser = {
@@ -134,19 +134,19 @@ async function _aplicarTagsSegmentacao() {
 
   const tags = {
     // Segmento principal
-    segmento:       user.segmento       || 'lead',       // lead | assinante
-    plano:          user.plano_slug     || 'none',        // basico | essence | profissional | premium | supreme
-    perfil:         user.perfil         || '',            // prefeito | secretario | tecnico | etc
-    
+    segmento:       user.segmento       || 'lead',
+    plano:          user.plano_slug     || 'none',
+    perfil:         user.perfil         || '',
+
     // Localização (para alertas do município)
-    uf:             user.uf             || '',            // AM | SP | BA etc
-    municipio_cod:  user.municipio_cod  || '',            // código IBGE
+    uf:             user.uf             || '',
+    municipio_cod:  user.municipio_cod  || '',
     municipio_nome: user.municipio_nome || '',
-    
+
     // Features de alerta (derivadas do plano)
-    alerta_municipio: _temAlertaMunicipio(user) ? '1' : '0',
+    alerta_municipio:   _temAlertaMunicipio(user) ? '1' : '0',
     alerta_nova_edicao: '1',  // todos recebem aviso de nova edição
-    
+
     // Controle
     app_version: '1.0',
   };
@@ -184,12 +184,9 @@ async function _salvarPlayerId() {
       push_plataforma:     _detectarPlataforma(),
     };
 
-    // Salva no documento correto dependendo do segmento
     if (user.segmento === 'assinante' && user.assinaturaId) {
       await db.collection('usuarios').doc(user.uid).update(payload);
     } else {
-      // Para leads, tenta no Firestore (se tiver uid do lead lá)
-      // ou apenas loga — leads estão no Supabase
       console.log('[OneSignal] Player ID do lead (salvar no Supabase via API):', playerId);
       await _salvarPlayerIdLead(user.uid, playerId);
     }
@@ -201,7 +198,6 @@ async function _salvarPlayerId() {
 }
 
 async function _salvarPlayerIdLead(leadId, playerId) {
-  // Lead está no Supabase — salva via API backend
   try {
     await fetch('/api/leads/push-token', {
       method: 'POST',
@@ -216,15 +212,13 @@ async function _salvarPlayerIdLead(leadId, playerId) {
 function _detectarPlataforma() {
   const ua = navigator.userAgent;
   if (/iPhone|iPad|iPod/.test(ua)) return 'ios';
-  if (/Android/.test(ua)) return 'android';
-  if (/Windows/.test(ua)) return 'windows';
-  if (/Mac/.test(ua)) return 'mac';
+  if (/Android/.test(ua))          return 'android';
+  if (/Windows/.test(ua))          return 'windows';
+  if (/Mac/.test(ua))              return 'mac';
   return 'desktop';
 }
 
 // ─── Banner de consentimento LGPD ─────────────────────────────────────────────
-// Aparece ANTES do prompt nativo do browser.
-// Se o usuário aceitar, aí sim dispara o prompt do sistema.
 function mostrarBannerConsentimentoPush() {
   if (document.getElementById('rs-push-banner')) return;
 
@@ -324,7 +318,7 @@ function _registrarConsentimentoFirestore(aceito) {
 }
 
 // ─── Banner de instalação PWA ─────────────────────────────────────────────────
-let _deferredInstallPrompt = null; // guarda o evento beforeinstallprompt (Android)
+let _deferredInstallPrompt = null;
 
 window.addEventListener('beforeinstallprompt', e => {
   e.preventDefault();
@@ -335,18 +329,31 @@ window.addEventListener('beforeinstallprompt', e => {
 window.addEventListener('appinstalled', () => {
   console.log('[PWA] App instalado com sucesso!');
   localStorage.setItem('rs_pwa_installed', '1');
-  document.getElementById('rs-install-banner')?.remove();
+  _fecharBannerInstalacao();
 });
 
+// ── Helper: empurra a theme bar para cima / restaura ─────────────────────────
+function _ajustarThemeBar(alturaOffset) {
+  const themeBar = document.querySelector('.rs-theme-bar');
+  if (!themeBar) return;
+  if (alturaOffset > 0) {
+    themeBar.style.bottom = (alturaOffset + 12) + 'px';
+  } else {
+    themeBar.style.bottom = ''; // restaura o valor do CSS
+  }
+}
+
+function _fecharBannerInstalacao() {
+  const banner = document.getElementById('rs-install-banner');
+  if (banner) banner.remove();
+  _ajustarThemeBar(0); // restaura theme bar
+}
+
 function agendarBannerInstalacao() {
-  // Não mostra se já instalou
   if (localStorage.getItem('rs_pwa_installed')) return;
-  // Não mostra se já está rodando como PWA instalado
   if (window.matchMedia('(display-mode: standalone)').matches) return;
-  // Não mostra se já foi exibido nesta sessão
   if (sessionStorage.getItem('rs_install_shown_session')) return;
 
-  // Aguarda 45 segundos antes de mostrar (usuário precisa ter engajado)
   const delay = localStorage.getItem(LS_INSTALL_DELAY) ? 15000 : 45000;
   localStorage.setItem(LS_INSTALL_DELAY, '1');
 
@@ -357,12 +364,12 @@ function mostrarBannerInstalacao() {
   if (document.getElementById('rs-install-banner')) return;
   sessionStorage.setItem('rs_install_shown_session', '1');
 
-  const isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent);
+  const isIOS     = /iPhone|iPad|iPod/.test(navigator.userAgent);
   const isAndroid = /Android/.test(navigator.userAgent);
-  if (!isIOS && !isAndroid && !_deferredInstallPrompt) return; // desktop sem prompt = não mostra
+  if (!isIOS && !isAndroid && !_deferredInstallPrompt) return;
 
-  const banner = document.createElement('div');
-  banner.id    = 'rs-install-banner';
+  const banner  = document.createElement('div');
+  banner.id     = 'rs-install-banner';
   banner.style.cssText = `
     position: fixed; bottom: 0; left: 0; right: 0;
     background: #fff; border-top: 3px solid #0A3D62;
@@ -372,6 +379,7 @@ function mostrarBannerInstalacao() {
   `;
 
   const conteudoAndroid = `
+    <style>@keyframes rsSlideUp2 { from { transform:translateY(100%); } to { transform:translateY(0); } }</style>
     <div style="display:flex; align-items:center; gap:14px">
       <img src="/icons/icon-192x192.png" width="48" height="48" style="border-radius:12px; flex-shrink:0">
       <div style="flex:1">
@@ -380,10 +388,16 @@ function mostrarBannerInstalacao() {
           Adicione à tela inicial para acesso rápido e alertas.
         </p>
       </div>
-      <button id="rs-install-btn"
-        style="background:#0A3D62; color:#fff; border:none; border-radius:8px; padding:10px 16px; font-weight:600; cursor:pointer; white-space:nowrap; font-size:13px">
-        Instalar
-      </button>
+      <div style="display:flex; flex-direction:column; gap:6px; flex-shrink:0">
+        <button id="rs-install-btn"
+          style="background:#0A3D62; color:#fff; border:none; border-radius:8px; padding:10px 16px; font-weight:600; cursor:pointer; white-space:nowrap; font-size:13px">
+          Instalar
+        </button>
+        <button id="rs-install-fechar"
+          style="background:none; border:1px solid #e2e8f0; border-radius:8px; padding:6px 12px; font-size:12px; color:#94a3b8; cursor:pointer; white-space:nowrap">
+          Agora não
+        </button>
+      </div>
     </div>
   `;
 
@@ -424,6 +438,9 @@ function mostrarBannerInstalacao() {
   banner.innerHTML = isIOS ? conteudoIOS : conteudoAndroid;
   document.body.appendChild(banner);
 
+  // CORREÇÃO: empurra a theme bar para cima para não ser sobreposta pelo banner
+  requestAnimationFrame(() => _ajustarThemeBar(banner.offsetHeight));
+
   // Handlers
   if (!isIOS && _deferredInstallPrompt) {
     document.getElementById('rs-install-btn')?.addEventListener('click', async () => {
@@ -431,14 +448,14 @@ function mostrarBannerInstalacao() {
       const { outcome } = await _deferredInstallPrompt.userChoice;
       console.log('[PWA] Escolha do usuário:', outcome);
       _deferredInstallPrompt = null;
-      banner.remove();
+      _fecharBannerInstalacao();
     });
   }
 
-  document.getElementById('rs-install-fechar')?.addEventListener('click', () => banner.remove());
+  document.getElementById('rs-install-fechar')?.addEventListener('click', _fecharBannerInstalacao);
 
   // Auto-fecha após 20 segundos no iOS
-  if (isIOS) setTimeout(() => banner?.remove(), 20000);
+  if (isIOS) setTimeout(_fecharBannerInstalacao, 20000);
 }
 
 // ─── Banner de atualização disponível ────────────────────────────────────────
@@ -460,10 +477,7 @@ function mostrarBannerAtualizacao() {
 }
 
 // ─── Funções públicas para o backend disparar pushs ──────────────────────────
-// Chamadas via painel admin ou automações do Firestore/Python
-
 window.RadarPush = {
-  // Atualiza tags quando o usuário fizer upgrade de plano
   async atualizarTagsPlano(novoSlug) {
     if (typeof OneSignal === 'undefined') return;
     try {
@@ -476,13 +490,11 @@ window.RadarPush = {
     } catch (e) { console.warn('[RadarPush] Erro ao atualizar tags:', e); }
   },
 
-  // Força re-exibição do banner de consentimento
   solicitarConsentimento() {
     localStorage.removeItem(LS_CONSENT_KEY);
     mostrarBannerConsentimentoPush();
   },
 
-  // Verifica se está inscrito
   async estaInscrito() {
     if (typeof OneSignal === 'undefined') return false;
     try { return await OneSignal.User.PushSubscription.optedIn; }
@@ -491,7 +503,6 @@ window.RadarPush = {
 };
 
 // ─── Auto-init ────────────────────────────────────────────────────────────────
-// Aguarda DOM e _radarUser estarem prontos
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', () => setTimeout(initRadarPWA, 2000));
 } else {

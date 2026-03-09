@@ -9,16 +9,16 @@
   'use strict';
 
   // ── Configuração ─────────────────────────────────────────────────────────────
-  const MOBILE_MAX   = 768;         // px — acima disso = desktop (scroll normal)
-  const BLOCOS_POR_PAGINA = 3;      // filhos do #conteudo-newsletter por página
-  const SWIPE_MIN    = 45;          // px mínimos para considerar swipe
-  const ANIM_MS      = 320;         // duração da transição em ms
+  const MOBILE_MAX        = 768;   // px — acima disso = desktop (scroll normal)
+  const BLOCOS_POR_PAGINA = 3;     // filhos do #conteudo-newsletter por página (fallback)
+  const SWIPE_MIN         = 45;    // px mínimos para considerar swipe
+  const ANIM_MS           = 320;   // duração da transição em ms
 
   // ── Estado ───────────────────────────────────────────────────────────────────
-  let paginas      = [];   // array de elementos DOM (um por página)
-  let paginaAtual  = 0;
-  let animando     = false;
-  let modoAtivo    = false;
+  let paginas     = [];
+  let paginaAtual = 0;
+  let animando    = false;
+  let modoAtivo   = false;
 
   // ── Detecta mobile ───────────────────────────────────────────────────────────
   function isMobile() {
@@ -26,97 +26,82 @@
       /Android|iPhone|iPad|iPod|webOS|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
   }
 
-  // ── Aguarda #rs-app ficar visível (mostrarApp seta display:block) ────────────
+  // ── Aguarda #rs-app ficar visível (mostrarApp seta display:block) ─────────────
   function aguardarApp(cb) {
     const app = document.getElementById('rs-app');
     if (!app) return;
 
-    // Já visível
     if (app.style.display === 'block') { setTimeout(cb, 400); return; }
 
     const obs = new MutationObserver(() => {
       if (app.style.display === 'block') {
         obs.disconnect();
-        setTimeout(cb, 400); // aguarda fade-in completar
+        setTimeout(cb, 400);
       }
     });
     obs.observe(app, { attributes: true, attributeFilter: ['style'] });
   }
 
   // ── Coleta e monta as páginas ─────────────────────────────────────────────────
+  // CORREÇÃO: pagina APENAS o conteúdo de #modo-completo (os rs-blocos).
+  // As demais sections (#modo-rapido, municipio, reactions etc.) ficam no scroll normal.
   function montarPaginas() {
-    const app = document.getElementById('rs-app');
-    if (!app) return [];
+    const secaoCompleto = document.getElementById('modo-completo');
+    if (!secaoCompleto) return [];
+
+    const conteudo = document.getElementById('conteudo-newsletter');
+    if (!conteudo || conteudo.children.length === 0) return [];
 
     const resultado = [];
+    const filhos    = Array.from(conteudo.children);
 
-    // Seleciona sections visíveis
-    const sections = Array.from(app.querySelectorAll(':scope > section.rs-section'))
-      .filter(s => s.style.display !== 'none' && !s.hidden);
+    // Agrupamento: por data-tipo (injetado pelo JS) ou por contagem
+    const temTipo = filhos.some(f => f.dataset && f.dataset.tipo);
+    let grupos    = [];
 
-    sections.forEach(secao => {
-      const conteudo = secao.querySelector('#conteudo-newsletter');
-
-      if (conteudo && conteudo.children.length > 0) {
-        // ── Modo completo: tenta quebrar por tipo de bloco ──────────────────
-        const filhos = Array.from(conteudo.children);
-
-        // Se os blocos têm data-tipo (injetado pelo JS), agrupa por tipo
-        // Senão, agrupa por contagem (BLOCOS_POR_PAGINA)
-        const temTipo = filhos.some(f => f.dataset && f.dataset.tipo);
-
-        let grupos = [];
-        if (temTipo) {
-          // Agrupa: cada tipo diferente = nova página; mesmo tipo consecutivo = mesma página
-          let grupoAtual = [];
-          let tipoAtual  = null;
-          filhos.forEach(filho => {
-            const t = filho.dataset?.tipo || 'sem-tipo';
-            if (t !== tipoAtual && grupoAtual.length > 0) {
-              grupos.push(grupoAtual);
-              grupoAtual = [];
-            }
-            tipoAtual = t;
-            grupoAtual.push(filho);
-          });
-          if (grupoAtual.length > 0) grupos.push(grupoAtual);
-        } else {
-          // Fallback: agrupa por quantidade
-          for (let i = 0; i < filhos.length; i += BLOCOS_POR_PAGINA) {
-            grupos.push(filhos.slice(i, i + BLOCOS_POR_PAGINA));
-          }
+    if (temTipo) {
+      // Cada tipo diferente → nova página; mesmo tipo consecutivo → mesma página
+      let grupoAtual = [];
+      let tipoAtual  = null;
+      filhos.forEach(filho => {
+        const t = filho.dataset?.tipo || 'sem-tipo';
+        if (t !== tipoAtual && grupoAtual.length > 0) {
+          grupos.push(grupoAtual);
+          grupoAtual = [];
         }
-
-        grupos.forEach((grupo, idx) => {
-          const pagina = document.createElement('div');
-          pagina.className = 'fb-pagina';
-          const tipoLabel = grupo[0]?.dataset?.tipo || 'conteudo';
-          pagina.setAttribute('data-pagina-tipo', tipoLabel);
-
-          if (idx === 0) {
-            const header = secao.querySelector('.rs-section-header');
-            if (header) pagina.appendChild(header.cloneNode(true));
-          }
-
-          const wrap = document.createElement('div');
-          wrap.className = 'rs-section-body rs-protegido fb-conteudo-wrap';
-          grupo.forEach(filho => wrap.appendChild(filho));
-          pagina.appendChild(wrap);
-
-          resultado.push(pagina);
-        });
-
-        secao.style.display = 'none';
-
-      } else {
-        // Sections normais: cada uma = uma página
-        const pagina = document.createElement('div');
-        pagina.className = 'fb-pagina';
-        pagina.setAttribute('data-pagina-tipo', secao.id || 'secao');
-        pagina.appendChild(secao);
-        resultado.push(pagina);
+        tipoAtual = t;
+        grupoAtual.push(filho);
+      });
+      if (grupoAtual.length > 0) grupos.push(grupoAtual);
+    } else {
+      // Fallback: agrupa por quantidade
+      for (let i = 0; i < filhos.length; i += BLOCOS_POR_PAGINA) {
+        grupos.push(filhos.slice(i, i + BLOCOS_POR_PAGINA));
       }
+    }
+
+    grupos.forEach((grupo, idx) => {
+      const pagina    = document.createElement('div');
+      pagina.className = 'fb-pagina';
+      const tipoLabel = grupo[0]?.dataset?.tipo || 'conteudo';
+      pagina.setAttribute('data-pagina-tipo', tipoLabel);
+
+      // Clona o header da section apenas na primeira página
+      if (idx === 0) {
+        const header = secaoCompleto.querySelector('.rs-section-header');
+        if (header) pagina.appendChild(header.cloneNode(true));
+      }
+
+      const wrap = document.createElement('div');
+      wrap.className = 'rs-section-body rs-protegido fb-conteudo-wrap';
+      grupo.forEach(filho => wrap.appendChild(filho));
+      pagina.appendChild(wrap);
+
+      resultado.push(pagina);
     });
+
+    // Esconde a section original (substituída pelo flipbook wrapper)
+    secaoCompleto.style.display = 'none';
 
     return resultado;
   }
@@ -125,7 +110,7 @@
   function injetarCSS() {
     if (document.getElementById('fb-styles')) return;
     const style = document.createElement('style');
-    style.id = 'fb-styles';
+    style.id    = 'fb-styles';
     style.textContent = `
       /* ── Wrapper do flipbook ── */
       #fb-wrapper {
@@ -146,7 +131,7 @@
       .fb-pagina {
         min-width: 100%;
         box-sizing: border-box;
-        padding-bottom: 80px; /* espaço para barra de nav */
+        padding-bottom: 80px;
       }
 
       /* ── Barra de navegação fixa na base ── */
@@ -239,9 +224,6 @@
       #fb-dots {
         display: flex;
         gap: 4px;
-        justify-content: center;
-        flex-wrap: wrap;
-        max-width: 140px;
       }
       .fb-dot {
         width: 6px;
@@ -249,7 +231,6 @@
         border-radius: 50%;
         background: #cbd5e1;
         transition: background .2s, transform .2s;
-        flex-shrink: 0;
       }
       .fb-dot.ativo {
         background: #0A3D62;
@@ -284,33 +265,20 @@
 
   // ── Constrói o DOM do flipbook ────────────────────────────────────────────────
   function construirFlipbook() {
-    const app = document.getElementById('rs-app');
-    if (!app) return;
-
     paginas = montarPaginas();
-    if (paginas.length < 2) return; // não vale paginar
+    if (paginas.length < 2) return; // não vale paginar com 1 página
 
     injetarCSS();
 
     // Wrapper + trilho
     const wrapper = document.createElement('div');
-    wrapper.id = 'fb-wrapper';
+    wrapper.id    = 'fb-wrapper';
 
-    const trilho = document.createElement('div');
-    trilho.id = 'fb-trilho';
+    const trilho  = document.createElement('div');
+    trilho.id     = 'fb-trilho';
 
     paginas.forEach(p => trilho.appendChild(p));
     wrapper.appendChild(trilho);
-
-    // Insere após o header (mantém header e banner fora do flipbook)
-    const header  = app.querySelector('header.rs-header');
-    const banner  = app.querySelector('#rs-banner-recente');
-    const ancora  = banner || header;
-    if (ancora && ancora.nextSibling) {
-      app.insertBefore(wrapper, ancora.nextSibling);
-    } else {
-      app.appendChild(wrapper);
-    }
 
     // CTA e watermark vão para a última página
     const cta       = document.getElementById('rs-cta-wrap');
@@ -319,18 +287,27 @@
     if (cta)       ultima.appendChild(cta);
     if (watermark) ultima.appendChild(watermark);
 
+    // Insere no lugar de #modo-completo (que agora está oculto)
+    const secaoCompleto = document.getElementById('modo-completo');
+    if (secaoCompleto && secaoCompleto.parentNode) {
+      secaoCompleto.parentNode.insertBefore(wrapper, secaoCompleto);
+    } else {
+      const app = document.getElementById('rs-app');
+      app?.appendChild(wrapper);
+    }
+
     // Barra de navegação
     const nav = document.createElement('div');
-    nav.id = 'fb-nav';
+    nav.id    = 'fb-nav';
     nav.innerHTML = `
       <button id="fb-btn-prev" aria-label="Página anterior">‹</button>
       <div id="fb-progress-wrap">
         <span id="fb-label">Página 1 de ${paginas.length}</span>
         <div id="fb-progress-track">
-          <div id="fb-progress-bar" style="width:${100/paginas.length}%"></div>
+          <div id="fb-progress-bar" style="width:${100 / paginas.length}%"></div>
         </div>
         <div id="fb-dots">
-          ${paginas.map((_, i) => `<span class="fb-dot${i===0?' ativo':''}"></span>`).join('')}
+          ${paginas.map((_, i) => `<span class="fb-dot${i === 0 ? ' ativo' : ''}"></span>`).join('')}
         </div>
       </div>
       <button id="fb-btn-scroll" title="Alternar modo">↕ Scroll</button>
@@ -361,8 +338,8 @@
     // Teclado (desktop)
     document.addEventListener('keydown', e => {
       if (!modoAtivo) return;
-      if (e.key === 'ArrowRight' || e.key === 'ArrowDown')  irPara(paginaAtual + 1);
-      if (e.key === 'ArrowLeft'  || e.key === 'ArrowUp')    irPara(paginaAtual - 1);
+      if (e.key === 'ArrowRight' || e.key === 'ArrowDown') irPara(paginaAtual + 1);
+      if (e.key === 'ArrowLeft'  || e.key === 'ArrowUp')   irPara(paginaAtual - 1);
     });
 
     modoAtivo = true;
@@ -372,7 +349,7 @@
     if (!sessionStorage.getItem('fb_hint_visto')) {
       sessionStorage.setItem('fb_hint_visto', '1');
       const hint = document.createElement('div');
-      hint.id = 'fb-swipe-hint';
+      hint.id          = 'fb-swipe-hint';
       hint.textContent = '← Deslize para navegar →';
       document.body.appendChild(hint);
       setTimeout(() => hint.remove(), 3000);
@@ -384,17 +361,14 @@
     if (animando) return;
     if (idx < 0 || idx >= paginas.length) return;
 
-    animando = true;
+    animando    = true;
     paginaAtual = idx;
 
     const trilho = document.getElementById('fb-trilho');
     if (trilho) trilho.style.transform = `translateX(-${idx * 100}%)`;
 
     atualizarNav();
-
-    // Scroll ao topo da página atual
     window.scrollTo({ top: 0, behavior: 'smooth' });
-
     setTimeout(() => { animando = false; }, ANIM_MS + 50);
   }
 
@@ -407,56 +381,49 @@
     const btnNext = document.getElementById('fb-btn-next');
     const dots    = document.querySelectorAll('.fb-dot');
 
-    if (label)   label.textContent   = `Página ${paginaAtual + 1} de ${total}`;
-    if (bar)     bar.style.width     = `${((paginaAtual + 1) / total) * 100}%`;
-    if (btnPrev) btnPrev.disabled    = paginaAtual === 0;
-    if (btnNext) btnNext.disabled    = paginaAtual === total - 1;
+    if (label)   label.textContent = `Página ${paginaAtual + 1} de ${total}`;
+    if (bar)     bar.style.width   = `${((paginaAtual + 1) / total) * 100}%`;
+    if (btnPrev) btnPrev.disabled  = paginaAtual === 0;
+    if (btnNext) btnNext.disabled  = paginaAtual === total - 1;
 
     dots.forEach((d, i) => d.classList.toggle('ativo', i === paginaAtual));
 
-    // Troca ícone do botão next na última página
     if (btnNext) btnNext.textContent = paginaAtual === total - 1 ? '✓' : '›';
   }
 
-  // ── Desativar flipbook (modo scroll) ─────────────────────────────────────────
+  // ── Desativar flipbook (volta ao modo scroll) ─────────────────────────────────
   function desativarFlipbook() {
     if (!modoAtivo) return;
     modoAtivo = false;
 
-    // Remove wrapper e nav
-    const wrapper = document.getElementById('fb-wrapper');
-    const nav     = document.getElementById('fb-nav');
-    const app     = document.getElementById('rs-app');
+    const wrapper       = document.getElementById('fb-wrapper');
+    const nav           = document.getElementById('fb-nav');
+    const mc            = document.getElementById('conteudo-newsletter');
+    const secaoCompleto = document.getElementById('modo-completo');
 
-    if (wrapper && app) {
-      // Devolve as páginas ao app em ordem
+    // Devolve os blocos ao #conteudo-newsletter
+    if (mc) {
       paginas.forEach(p => {
-        // Devolve a section que está dentro da página
-        const section = p.querySelector('section.rs-section');
-        if (section) {
-          section.style.display = '';
-          app.appendChild(section);
-        } else {
-          // Conteúdo quebrado: devolve os filhos ao modo-completo
-          const wrap = p.querySelector('.fb-conteudo-wrap');
-          const mc   = document.getElementById('conteudo-newsletter');
-          if (wrap && mc) {
-            Array.from(wrap.children).forEach(f => mc.appendChild(f));
-          }
-        }
+        const wrap = p.querySelector('.fb-conteudo-wrap');
+        if (wrap) Array.from(wrap.children).forEach(f => mc.appendChild(f));
       });
-      wrapper.remove();
     }
 
-    if (nav) nav.remove();
+    // Restaura CTA e watermark ao lugar original (após #rs-app)
+    const app       = document.getElementById('rs-app');
+    const cta       = document.getElementById('rs-cta-wrap');
+    const watermark = document.getElementById('rs-watermark');
+    if (app && cta)       app.appendChild(cta);
+    if (app && watermark) app.appendChild(watermark);
 
-    // Remove CSS
+    if (wrapper) wrapper.remove();
+    if (nav)     nav.remove();
+
+    // Restaura a section original
+    if (secaoCompleto) secaoCompleto.style.display = '';
+
     document.getElementById('fb-styles')?.remove();
-
-    // Restaura sections escondidas
-    document.querySelectorAll('#rs-app section.rs-section').forEach(s => {
-      s.style.display = '';
-    });
+    paginas = [];
   }
 
   // ── Init ─────────────────────────────────────────────────────────────────────
@@ -464,7 +431,6 @@
     if (!isMobile()) return; // desktop: scroll normal
 
     aguardarApp(() => {
-      // Aguarda também o conteudo-newsletter ser preenchido
       const mc = document.getElementById('conteudo-newsletter');
       if (mc && mc.children.length === 0) {
         // Polling leve até ter conteúdo (máx 3s)
