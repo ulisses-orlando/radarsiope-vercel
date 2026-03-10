@@ -565,7 +565,7 @@ function renderCTA(acesso, newsletter) {
   wrap.innerHTML = `
     <div class="rs-cta rs-cta-lead">
       <h3>📡 Leve o Radar SIOPE para o seu município</h3>
-      <p>Dados fiscais em tempo real, alertas de prazo, podcast semanal e
+      <p>Dados em tempo real, alertas de prazo, podcast semanal e
          infográficos — tudo sobre educação pública do seu município.</p>
       <a href="/assinatura.html" class="rs-cta-btn">Ver planos e assinar →</a>
     </div>`;

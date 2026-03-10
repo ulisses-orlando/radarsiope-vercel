@@ -392,7 +392,7 @@ function _htmlBlurOverlay() {
       background:rgba(255,255,255,0.6);border-radius:12px;
       backdrop-filter:blur(2px);padding:20px;text-align:center">
       <span style="font-size:13px;font-weight:700;color:#0A3D62;line-height:1.5">
-        🔒 Assine para ver os dados fiscais do seu município
+        🔒 Assine para ver os dados do seu município
       </span>
       <a href="/assinatura.html"
         style="display:inline-block;padding:9px 20px;background:#0A3D62;color:#fff;
