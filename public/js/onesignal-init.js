@@ -4,14 +4,15 @@
    - Inicializar o OneSignal SDK
    - Gerenciar opt-in com LGPD (banner próprio antes do prompt do browser)
    - Aplicar tags de segmentação (plano, UF, município, perfil)
-   - Salvar o Player ID no Firestore (lead ou assinante)
+   - Salvar o Player ID no Firestore (assinante) ou Supabase via API (lead)
+   - Registrar consentimento LGPD no Firestore (assinante) ou Supabase via API (lead)
    - Exibir banner de instalação PWA com instrução para iOS
-   
+
    Dependências:
    - OneSignal SDK carregado via <script> no HTML
    - window.db (Firestore) inicializado
    - window._radarUser (definido após autenticação/token)
-   
+
    CONFIGURAÇÃO:
    App ID configurado. REST API Key → Vercel Environment Variables.
    ========================================================================== */
@@ -21,26 +22,13 @@
 // ─── Configuração ─────────────────────────────────────────────────────────────
 const ONESIGNAL_APP_ID = '040469b1-fa2a-499f-9911-aa417b0cd4bd';
 
-// Chave no localStorage para controle de consentimento LGPD
-const LS_CONSENT_KEY   = 'rs_push_consent';     // 'granted' | 'denied' | null
-const LS_INSTALL_SHOWN = 'rs_install_shown';
+const LS_CONSENT_KEY   = 'rs_push_consent';   // 'granted' | 'denied' | null
 const LS_INSTALL_DELAY = 'rs_install_delay';
-
-// ─── Estado do usuário (preenchido pelo verNewsletterComToken.js) ────────────
-// window._radarUser = {
-//   uid, email, nome, segmento ('lead'|'assinante'),
-//   plano_slug, uf, municipio_cod, municipio_nome, perfil, assinaturaId
-// }
 
 // ─── Init principal ──────────────────────────────────────────────────────────
 async function initRadarPWA() {
-  // 1. Registrar o Service Worker
   await registrarServiceWorker();
-
-  // 2. Mostrar banner de instalação PWA (com delay)
   agendarBannerInstalacao();
-
-  // 3. Inicializar OneSignal
   await initOneSignal();
 }
 
@@ -49,8 +37,6 @@ async function registrarServiceWorker() {
   if (!('serviceWorker' in navigator)) return;
   try {
     const reg = await navigator.serviceWorker.register('/sw.js', { scope: '/' });
-
-    // Verifica atualizações
     reg.addEventListener('updatefound', () => {
       const newWorker = reg.installing;
       newWorker?.addEventListener('statechange', () => {
@@ -73,16 +59,13 @@ async function initOneSignal() {
 
   const consentimento = localStorage.getItem(LS_CONSENT_KEY);
 
-  // Se já negou, não inicializa
   if (consentimento === 'denied') return;
 
-  // Se ainda não decidiu → mostra banner LGPD próprio antes do prompt do browser
   if (!consentimento) {
     mostrarBannerConsentimentoPush();
     return;
   }
 
-  // consentimento === 'granted' → inicializa OneSignal
   await _inicializarOneSignal();
 }
 
@@ -90,31 +73,24 @@ async function _inicializarOneSignal() {
   const oneSignalFn = async () => {
     try {
       await OneSignal.init({
-        appId:                      ONESIGNAL_APP_ID,
-        serviceWorkerPath:          '/sw.js',
-        serviceWorkerParam:         { scope: '/' },
-        // Não mostrar o prompt automático do OneSignal — controlamos manualmente
-        promptOptions: {
-          slidedown: { prompts: [] }
-        },
-        notifyButton: { enable: false },
-        allowLocalhostAsSecureOrigin: true, // desenvolvimento local
+        appId:              ONESIGNAL_APP_ID,
+        serviceWorkerPath:  '/sw.js',
+        serviceWorkerParam: { scope: '/' },
+        promptOptions: { slidedown: { prompts: [] } },
+        notifyButton:  { enable: false },
+        allowLocalhostAsSecureOrigin: true,
       });
 
-      // Solicitar permissão ao browser (já temos consentimento LGPD)
       const permission = await OneSignal.Notifications.requestPermission();
-
       if (permission) {
         await _aplicarTagsSegmentacao();
         await _salvarPlayerId();
       }
-
     } catch (err) {
       console.warn('[OneSignal] Erro na inicialização:', err);
     }
   };
 
-  // SDK v16 usa OneSignalDeferred array
   if (typeof OneSignalDeferred !== 'undefined') {
     window.OneSignalDeferred = window.OneSignalDeferred || [];
     window.OneSignalDeferred.push(oneSignalFn);
@@ -124,29 +100,20 @@ async function _inicializarOneSignal() {
 }
 
 // ─── Tags de segmentação ──────────────────────────────────────────────────────
-// As tags permitem enviar pushs segmentados no painel OneSignal.
-// Ex: enviar alerta só para assinantes Profissional+ do AM.
 async function _aplicarTagsSegmentacao() {
   const user = window._radarUser;
   if (!user) return;
 
   const tags = {
-    // Segmento principal
-    segmento:       user.segmento       || 'lead',
-    plano:          user.plano_slug     || 'none',
-    perfil:         user.perfil         || '',
-
-    // Localização (para alertas do município)
-    uf:             user.uf             || '',
-    municipio_cod:  user.municipio_cod  || '',
-    municipio_nome: user.municipio_nome || '',
-
-    // Features de alerta (derivadas do plano)
+    segmento:           user.segmento       || 'lead',
+    plano:              user.plano_slug     || 'none',
+    perfil:             user.perfil         || '',
+    uf:                 user.uf             || '',
+    municipio_cod:      user.municipio_cod  || '',
+    municipio_nome:     user.municipio_nome || '',
     alerta_municipio:   _temAlertaMunicipio(user) ? '1' : '0',
-    alerta_nova_edicao: '1',  // todos recebem aviso de nova edição
-
-    // Controle
-    app_version: '1.0',
+    alerta_nova_edicao: '1',
+    app_version:        '1.0',
   };
 
   try {
@@ -156,13 +123,11 @@ async function _aplicarTagsSegmentacao() {
   }
 }
 
-// Verifica se o plano do usuário tem direito a alertas do município
 function _temAlertaMunicipio(user) {
-  const planosComAlerta = ['profissional', 'premium', 'supreme'];
-  return planosComAlerta.includes(user?.plano_slug);
+  return ['profissional', 'premium', 'supreme'].includes(user?.plano_slug);
 }
 
-// ─── Salvar Player ID no Firestore ────────────────────────────────────────────
+// ─── Salvar Player ID ─────────────────────────────────────────────────────────
 async function _salvarPlayerId() {
   try {
     const playerId = await OneSignal.User.PushSubscription.id;
@@ -171,36 +136,63 @@ async function _salvarPlayerId() {
     const user = window._radarUser;
     if (!user?.uid) return;
 
-    const db = window.db;
-    if (!db) return;
-
-    const payload = {
-      onesignal_player_id: playerId,
-      push_opt_in:         true,
-      push_opt_in_em:      firebase.firestore.FieldValue.serverTimestamp(),
-      push_plataforma:     _detectarPlataforma(),
-    };
-
     if (user.segmento === 'assinante' && user.assinaturaId) {
-      await db.collection('usuarios').doc(user.uid).update(payload);
+      // Assinante → Firestore
+      const db = window.db;
+      if (!db) return;
+      await db.collection('usuarios').doc(user.uid).update({
+        onesignal_player_id: playerId,
+        push_opt_in:         true,
+        push_opt_in_em:      firebase.firestore.FieldValue.serverTimestamp(),
+        push_plataforma:     _detectarPlataforma(),
+      });
     } else {
-      await _salvarPlayerIdLead(user.uid, playerId);
+      // Lead → Supabase via API
+      await fetch('/api/leads/push-token', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({
+          leadId:     user.uid,
+          playerId,
+          plataforma: _detectarPlataforma(),
+        }),
+      });
     }
-
   } catch (err) {
     console.warn('[OneSignal] Erro ao salvar Player ID:', err);
   }
 }
 
-async function _salvarPlayerIdLead(leadId, playerId) {
-  try {
-    await fetch('/api/leads/push-token', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ leadId, playerId, plataforma: _detectarPlataforma() })
-    });
-  } catch (err) {
-    console.warn('[OneSignal] Erro ao salvar token do lead:', err);
+// ─── Registrar consentimento ──────────────────────────────────────────────────
+async function _registrarConsentimento(aceito) {
+  const user = window._radarUser;
+  if (!user?.uid) return;
+
+  if (user.segmento === 'assinante') {
+    // Assinante → Firestore
+    const db = window.db;
+    if (!db) return;
+    try {
+      await db.collection('usuarios').doc(user.uid).update({
+        push_consentimento:    aceito,
+        push_consentimento_em: firebase.firestore.FieldValue.serverTimestamp(),
+      });
+    } catch (e) { /* não crítico */ }
+
+  } else {
+    // Lead → Supabase via API
+    try {
+      await fetch('/api/leads/push-consent', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({
+          leadId:    user.uid,
+          aceito,
+          plataforma: _detectarPlataforma(),
+          // timestamp gerado no servidor para consistência
+        }),
+      });
+    } catch (e) { /* não crítico */ }
   }
 }
 
@@ -229,8 +221,11 @@ function mostrarBannerConsentimentoPush() {
 
   banner.innerHTML = `
     <style>
-      @keyframes rsSlideUp { from { opacity:0; transform: translateX(-50%) translateY(20px); } to { opacity:1; transform: translateX(-50%) translateY(0); } }
-      #rs-push-banner button { border: none; border-radius: 8px; padding: 9px 18px; font-size: 13px; font-weight: 600; cursor: pointer; }
+      @keyframes rsSlideUp {
+        from { opacity:0; transform: translateX(-50%) translateY(20px); }
+        to   { opacity:1; transform: translateX(-50%) translateY(0); }
+      }
+      #rs-push-banner button { border:none; border-radius:8px; padding:9px 18px; font-size:13px; font-weight:600; cursor:pointer; }
     </style>
     <div style="display:flex; align-items:flex-start; gap:12px">
       <span style="font-size:26px; flex-shrink:0">🔔</span>
@@ -242,18 +237,9 @@ function mostrarBannerConsentimentoPush() {
           <span id="rs-push-plano-note" style="display:none; color:#86efac"></span>
         </p>
         <div style="display:flex; gap:8px; flex-wrap:wrap">
-          <button id="rs-push-aceitar"
-            style="background:#16a34a; color:#fff; flex:1">
-            ✅ Ativar alertas
-          </button>
-          <button id="rs-push-agora-nao"
-            style="background:rgba(255,255,255,0.12); color:#fff; flex:1">
-            Agora não
-          </button>
-          <button id="rs-push-nunca"
-            style="background:transparent; color:#94a3b8; font-size:11px; padding:4px 8px; flex:0 0 auto">
-            Não mostrar mais
-          </button>
+          <button id="rs-push-aceitar"    style="background:#16a34a; color:#fff; flex:1">✅ Ativar alertas</button>
+          <button id="rs-push-agora-nao"  style="background:rgba(255,255,255,0.12); color:#fff; flex:1">Agora não</button>
+          <button id="rs-push-nunca"      style="background:transparent; color:#94a3b8; font-size:11px; padding:4px 8px; flex:0 0 auto">Não mostrar mais</button>
         </div>
         <p style="margin:10px 0 0; font-size:11px; color:#64748b; line-height:1.4">
           🔒 Você pode cancelar a qualquer momento nas configurações do app.<br>
@@ -265,9 +251,9 @@ function mostrarBannerConsentimentoPush() {
 
   document.body.appendChild(banner);
 
-  // Personaliza a nota pelo plano
+  // FIX 1: ID corrigido — era 'rs-push-note-plano', agora bate com o HTML 'rs-push-plano-note'
   const user = window._radarUser;
-  const note = document.getElementById('rs-push-note-plano');
+  const note = document.getElementById('rs-push-plano-note');
   if (user && note) {
     if (_temAlertaMunicipio(user)) {
       note.style.display = 'inline';
@@ -278,38 +264,23 @@ function mostrarBannerConsentimentoPush() {
     }
   }
 
-  // Handlers
   document.getElementById('rs-push-aceitar').onclick = async () => {
     localStorage.setItem(LS_CONSENT_KEY, 'granted');
     banner.remove();
+    await _registrarConsentimento(true);  // FIX 3: registra para leads também
     await _inicializarOneSignal();
-    _registrarConsentimentoFirestore(true);
   };
 
   document.getElementById('rs-push-agora-nao').onclick = () => {
     banner.remove();
-    // Não salva nada — aparecerá na próxima sessão
+    // Não salva — reaparece na próxima sessão
   };
 
-  document.getElementById('rs-push-nunca').onclick = () => {
+  document.getElementById('rs-push-nunca').onclick = async () => {
     localStorage.setItem(LS_CONSENT_KEY, 'denied');
     banner.remove();
-    _registrarConsentimentoFirestore(false);
+    await _registrarConsentimento(false); // FIX 3: registra negativa para leads também
   };
-}
-
-function _registrarConsentimentoFirestore(aceito) {
-  const user = window._radarUser;
-  if (!user?.uid || !window.db) return;
-  try {
-    if (user.segmento === 'assinante') {
-      window.db.collection('usuarios').doc(user.uid).update({
-        push_consentimento:    aceito,
-        push_consentimento_em: firebase.firestore.FieldValue.serverTimestamp(),
-      });
-    }
-    // Para leads → via API /api/leads/push-consent (implementar no backend)
-  } catch (e) { /* não crítico */ }
 }
 
 // ─── Banner de instalação PWA ─────────────────────────────────────────────────
@@ -325,21 +296,15 @@ window.addEventListener('appinstalled', () => {
   _fecharBannerInstalacao();
 });
 
-// ── Helper: empurra a theme bar para cima / restaura ─────────────────────────
 function _ajustarThemeBar(alturaOffset) {
   const themeBar = document.querySelector('.rs-theme-bar');
   if (!themeBar) return;
-  if (alturaOffset > 0) {
-    themeBar.style.bottom = (alturaOffset + 12) + 'px';
-  } else {
-    themeBar.style.bottom = ''; // restaura o valor do CSS
-  }
+  themeBar.style.bottom = alturaOffset > 0 ? (alturaOffset + 12) + 'px' : '';
 }
 
 function _fecharBannerInstalacao() {
-  const banner = document.getElementById('rs-install-banner');
-  if (banner) banner.remove();
-  _ajustarThemeBar(0); // restaura theme bar
+  document.getElementById('rs-install-banner')?.remove();
+  _ajustarThemeBar(0);
 }
 
 function agendarBannerInstalacao() {
@@ -349,7 +314,6 @@ function agendarBannerInstalacao() {
 
   const delay = localStorage.getItem(LS_INSTALL_DELAY) ? 15000 : 45000;
   localStorage.setItem(LS_INSTALL_DELAY, '1');
-
   setTimeout(() => mostrarBannerInstalacao(), delay);
 }
 
@@ -361,8 +325,8 @@ function mostrarBannerInstalacao() {
   const isAndroid = /Android/.test(navigator.userAgent);
   if (!isIOS && !isAndroid && !_deferredInstallPrompt) return;
 
-  const banner  = document.createElement('div');
-  banner.id     = 'rs-install-banner';
+  const banner = document.createElement('div');
+  banner.id    = 'rs-install-banner';
   banner.style.cssText = `
     position: fixed; bottom: 0; left: 0; right: 0;
     background: #fff; border-top: 3px solid #0A3D62;
@@ -377,9 +341,7 @@ function mostrarBannerInstalacao() {
       <img src="/icons/icon-192x192.png" width="48" height="48" style="border-radius:12px; flex-shrink:0">
       <div style="flex:1">
         <strong style="color:#0A3D62; font-size:15px">Instalar Radar SIOPE</strong>
-        <p style="margin:4px 0 0; font-size:13px; color:#555">
-          Adicione à tela inicial para acesso rápido e alertas.
-        </p>
+        <p style="margin:4px 0 0; font-size:13px; color:#555">Adicione à tela inicial para acesso rápido e alertas.</p>
       </div>
       <div style="display:flex; flex-direction:column; gap:6px; flex-shrink:0">
         <button id="rs-install-btn"
@@ -391,8 +353,7 @@ function mostrarBannerInstalacao() {
           Agora não
         </button>
       </div>
-    </div>
-  `;
+    </div>`;
 
   const conteudoIOS = `
     <style>@keyframes rsSlideUp2 { from { transform:translateY(100%); } to { transform:translateY(0); } }</style>
@@ -425,28 +386,22 @@ function mostrarBannerInstalacao() {
             ? '<br>Você está usando outro navegador — copie a URL e abra no Safari.' : ''}
         </div>
       </div>
-    </div>
-  `;
+    </div>`;
 
   banner.innerHTML = isIOS ? conteudoIOS : conteudoAndroid;
   document.body.appendChild(banner);
-
-  // CORREÇÃO: empurra a theme bar para cima para não ser sobreposta pelo banner
   requestAnimationFrame(() => _ajustarThemeBar(banner.offsetHeight));
 
-  // Handlers
   if (!isIOS && _deferredInstallPrompt) {
     document.getElementById('rs-install-btn')?.addEventListener('click', async () => {
       _deferredInstallPrompt.prompt();
-      const { outcome } = await _deferredInstallPrompt.userChoice;
+      await _deferredInstallPrompt.userChoice;
       _deferredInstallPrompt = null;
       _fecharBannerInstalacao();
     });
   }
 
   document.getElementById('rs-install-fechar')?.addEventListener('click', _fecharBannerInstalacao);
-
-  // Auto-fecha após 20 segundos no iOS
   if (isIOS) setTimeout(_fecharBannerInstalacao, 20000);
 }
 
@@ -463,12 +418,11 @@ function mostrarBannerAtualizacao() {
     <button onclick="window.location.reload()"
       style="background:#16a34a; color:#fff; border:none; border-radius:6px; padding:6px 14px; cursor:pointer; font-weight:600">
       Atualizar
-    </button>
-  `;
+    </button>`;
   document.body.prepend(banner);
 }
 
-// ─── Funções públicas para o backend disparar pushs ──────────────────────────
+// ─── API pública ──────────────────────────────────────────────────────────────
 window.RadarPush = {
   async atualizarTagsPlano(novoSlug) {
     if (typeof OneSignal === 'undefined') return;
@@ -491,12 +445,34 @@ window.RadarPush = {
     if (typeof OneSignal === 'undefined') return false;
     try { return await OneSignal.User.PushSubscription.optedIn; }
     catch { return false; }
-  }
+  },
 };
 
 // ─── Auto-init ────────────────────────────────────────────────────────────────
+// FIX 2: aguarda _radarUser estar disponível em vez de setTimeout fixo.
+// verNewsletterComToken.js deve disparar o evento 'radarUserReady' após definir window._radarUser.
+// Fallback: se o evento não chegar em 5s, tenta mesmo assim (compatibilidade).
+function _aguardarRadarUser(cb) {
+  if (window._radarUser) { cb(); return; }
+
+  let disparou = false;
+
+  window.addEventListener('radarUserReady', () => {
+    if (disparou) return;
+    disparou = true;
+    cb();
+  }, { once: true });
+
+  // Fallback: 5 segundos
+  setTimeout(() => {
+    if (disparou) return;
+    disparou = true;
+    cb();
+  }, 5000);
+}
+
 if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', () => setTimeout(initRadarPWA, 2000));
+  document.addEventListener('DOMContentLoaded', () => _aguardarRadarUser(initRadarPWA));
 } else {
-  setTimeout(initRadarPWA, 2000);
+  _aguardarRadarUser(initRadarPWA);
 }

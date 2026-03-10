@@ -587,25 +587,26 @@ function renderWatermark(destinatario, newsletter) {
 
 function publicarRadarUser(destinatario, segmento, assinaturaId) {
   window._radarUser = {
-    uid: destinatario._uid || null,
-    email: destinatario.email || '',
-    nome: destinatario.nome || '',
-    segmento: segmento === 'assinantes' ? 'assinante' : 'lead',
-    plano_slug: destinatario.plano_slug || null,
-    features: destinatario.features || {},
-    uf: destinatario.cod_uf || '',
+    uid:           destinatario._uid || null,
+    email:         destinatario.email || '',
+    nome:          destinatario.nome || '',
+    segmento:      segmento === 'assinantes' ? 'assinante' : 'lead',
+    plano_slug:    destinatario.plano_slug || null,
+    features:      destinatario.features || {},
+    uf:            destinatario.cod_uf || '',
     municipio_cod: destinatario.cod_municipio || '',
-    municipio_nome: destinatario.nome_municipio || '',
-    perfil: destinatario.perfil || '',
-    assinaturaId: assinaturaId || null,
+    municipio_nome:destinatario.nome_municipio || '',
+    perfil:        destinatario.perfil || '',
+    assinaturaId:  assinaturaId || null,
   };
+  window.dispatchEvent(new Event('radarUserReady')); // ← aqui, indentado junto
 
   // Salva sessão para o PWA (app.html usa ao abrir sem parâmetros)
   try {
     localStorage.setItem('rs_pwa_session', JSON.stringify({
-      uid: destinatario._uid || null,
+      uid:         destinatario._uid || null,
       assinaturaId: assinaturaId || null,
-      segmento: segmento === 'assinantes' ? 'assinante' : 'lead',
+      segmento:    segmento === 'assinantes' ? 'assinante' : 'lead',
     }));
   } catch (e) { /* ignora se localStorage bloqueado */ }
 }
