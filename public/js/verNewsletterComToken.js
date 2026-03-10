@@ -559,6 +559,8 @@ function renderCTA(acesso, newsletter) {
       </div>`; return;
   }
 
+  if (acesso.isAssinante) { wrap.innerHTML = ''; return; }
+
   // Lead padrão
   wrap.innerHTML = `
     <div class="rs-cta rs-cta-lead">
