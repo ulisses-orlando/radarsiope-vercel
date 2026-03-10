@@ -7,16 +7,16 @@
   'use strict';
 
   // ── Configuração ─────────────────────────────────────────────────────────────
-  const MOBILE_MAX        = 768;  // px — acima disso = desktop (scroll normal)
+  const MOBILE_MAX = 768;  // px — acima disso = desktop (scroll normal)
   const BLOCOS_POR_PAGINA = 3;    // fallback quando não há data-tipo
-  const SWIPE_MIN         = 45;   // px mínimos para considerar swipe
-  const ANIM_MS           = 320;  // duração da transição em ms
+  const SWIPE_MIN = 45;   // px mínimos para considerar swipe
+  const ANIM_MS = 320;  // duração da transição em ms
 
   // ── Estado ───────────────────────────────────────────────────────────────────
-  let paginas     = [];
+  let paginas = [];
   let paginaAtual = 0;
-  let animando    = false;
-  let modoAtivo   = false;
+  let animando = false;
+  let modoAtivo = false;
 
   // ── Detecta mobile ───────────────────────────────────────────────────────────
   function isMobile() {
@@ -33,10 +33,10 @@
     if (!conteudo || conteudo.children.length === 0) return [];
 
     const resultado = [];
-    const filhos    = Array.from(conteudo.children);
+    const filhos = Array.from(conteudo.querySelectorAll('.rs-bloco'));
 
-    const temTipo = filhos.some(f => f.dataset && f.dataset.tipo);
-    let grupos    = [];
+    const temTipo = filhos.length > 0 && filhos.every(f => f.dataset?.tipo);
+    let grupos = [];
 
     if (temTipo) {
       let grupoAtual = [], tipoAtual = null;
@@ -229,8 +229,8 @@
     let touchStartX = 0, touchStartY = 0, bloqueandoScroll = false;
 
     wrapper.addEventListener('touchstart', e => {
-      touchStartX     = e.touches[0].clientX;
-      touchStartY     = e.touches[0].clientY;
+      touchStartX = e.touches[0].clientX;
+      touchStartY = e.touches[0].clientY;
       bloqueandoScroll = false;
     }, { passive: true });
 
@@ -257,10 +257,10 @@
     document.addEventListener('keydown', e => {
       if (!modoAtivo) return;
       if (e.key === 'ArrowRight' || e.key === 'ArrowDown') irPara(paginaAtual + 1);
-      if (e.key === 'ArrowLeft'  || e.key === 'ArrowUp')   irPara(paginaAtual - 1);
+      if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') irPara(paginaAtual - 1);
     });
 
-    modoAtivo   = true;
+    modoAtivo = true;
     paginaAtual = 0;
     atualizarNav();
 
@@ -271,7 +271,7 @@
           obs.disconnect();
           sessionStorage.setItem('fb_hint_visto', '1');
           const hint = document.createElement('div');
-          hint.id          = 'fb-swipe-hint';
+          hint.id = 'fb-swipe-hint';
           hint.textContent = '← Deslize para navegar →';
           document.body.appendChild(hint);
           setTimeout(() => hint.remove(), 3000);
@@ -286,7 +286,7 @@
     if (animando) return;
     if (idx < 0 || idx >= paginas.length) return;
 
-    animando    = true;
+    animando = true;
     paginaAtual = idx;
 
     const trilho = document.getElementById('fb-trilho');
@@ -298,17 +298,17 @@
 
   // ── Atualizar barra de navegação ──────────────────────────────────────────────
   function atualizarNav() {
-    const total   = paginas.length;
-    const label   = document.getElementById('fb-label');
-    const bar     = document.getElementById('fb-progress-bar');
+    const total = paginas.length;
+    const label = document.getElementById('fb-label');
+    const bar = document.getElementById('fb-progress-bar');
     const btnPrev = document.getElementById('fb-btn-prev');
     const btnNext = document.getElementById('fb-btn-next');
-    const dots    = document.querySelectorAll('.fb-dot');
+    const dots = document.querySelectorAll('.fb-dot');
 
-    if (label)   label.textContent = `Página ${paginaAtual + 1} de ${total}`;
-    if (bar)     bar.style.width   = `${((paginaAtual + 1) / total) * 100}%`;
-    if (btnPrev) btnPrev.disabled  = paginaAtual === 0;
-    if (btnNext) btnNext.disabled  = paginaAtual === total - 1;
+    if (label) label.textContent = `Página ${paginaAtual + 1} de ${total}`;
+    if (bar) bar.style.width = `${((paginaAtual + 1) / total) * 100}%`;
+    if (btnPrev) btnPrev.disabled = paginaAtual === 0;
+    if (btnNext) btnNext.disabled = paginaAtual === total - 1;
     dots.forEach((d, i) => d.classList.toggle('ativo', i === paginaAtual));
     if (btnNext) btnNext.textContent = paginaAtual === total - 1 ? '✓' : '›';
   }
@@ -318,9 +318,9 @@
     if (!modoAtivo) return;
     modoAtivo = false;
 
-    const wrapper       = document.getElementById('fb-wrapper');
-    const nav           = document.getElementById('fb-nav');
-    const mc            = document.getElementById('conteudo-newsletter');
+    const wrapper = document.getElementById('fb-wrapper');
+    const nav = document.getElementById('fb-nav');
+    const mc = document.getElementById('conteudo-newsletter');
     const secaoCompleto = document.getElementById('modo-completo');
 
     if (mc) {
@@ -331,12 +331,12 @@
     }
 
     if (wrapper) wrapper.remove();
-    if (nav)     nav.remove();
+    if (nav) nav.remove();
 
     if (secaoCompleto) secaoCompleto.style.display = '';
 
     document.getElementById('fb-styles')?.remove();
-    paginas     = [];
+    paginas = [];
     paginaAtual = 0;
   }
 
