@@ -215,6 +215,12 @@ async function _handleConsent({ leadId, aceito, plataforma }, res) {
 // Dispara push segmentado via OneSignal e registra histórico no Firestore.
 // Requer header x-admin-token.
 // Body extra: { tipo, parametros, habilitado }
+//
+// Campos especiais em `parametros` (enviados pelo painel admin, removidos antes
+// de passar ao template para não poluir a interpolação):
+//   _publico      : 'leads' | 'assinantes' | 'todos'  → adiciona filtro segmento
+//   _feature      : 'com'   | 'sem'        | 'todos'  → controla alerta_municipio
+//   _url_override : string                             → substitui a URL do template
 async function _handleAlerta(req, { tipo, parametros = {}, habilitado = true }, res) {
   // Autenticação — só admin/Python pode disparar alertas
   const token = req.headers['x-admin-token'];
@@ -227,6 +233,9 @@ async function _handleAlerta(req, { tipo, parametros = {}, habilitado = true }, 
   if (!habilitado) {
     return res.status(200).json({ ok: true, skipped: true, reason: 'Alerta desabilitado pelo requisitante.' });
   }
+
+  // ── Extrai campos de controle do painel (não são variáveis de template) ──────
+  const { _publico, _feature, _url_override, ...params } = parametros;
 
   // Template base
   let template = { ...TEMPLATES[tipo] };
@@ -247,13 +256,42 @@ async function _handleAlerta(req, { tipo, parametros = {}, habilitado = true }, 
     }
   } catch (e) { console.warn('[push/alerta] config Firestore:', e); }
 
-  // Interpola variáveis {chave} nos templates
-  const titulo  = _sub(template.titulo, parametros);
-  const corpo   = _sub(template.corpo,  parametros);
-  const url     = _sub(template.url,    parametros);
-  const filtros = template.filtros.map(f => ({ ...f, value: _sub(f.value, parametros) }));
+  // ── Interpola variáveis {chave} nos templates (usa params limpos) ────────────
+  const titulo = _sub(template.titulo, params);
+  const corpo  = _sub(template.corpo,  params);
+  const url    = _url_override?.trim() || _sub(template.url, params);
 
-  // Payload OneSignal
+  // ── Monta filtros base do template ───────────────────────────────────────────
+  const filtros = template.filtros.map(f => ({ ...f, value: _sub(f.value, params) }));
+
+  // ── Filtro de público (_publico) ─────────────────────────────────────────────
+  // Só adiciona se o template não já fixou segmento (ex: nova_edicao_acesso_pro)
+  const temSegmento = filtros.some(f => f.field === 'segmento');
+  if (!temSegmento && _publico && _publico !== 'todos') {
+    const val = _publico === 'assinantes' ? 'assinante' : 'lead';
+    filtros.push({ field: 'segmento', relation: '=', value: val });
+  }
+
+  // ── Filtro de feature de alerta (_feature) ───────────────────────────────────
+  // 'com'  → alerta_municipio=1 (alertas operacionais — já têm o recurso)
+  // 'sem'  → alerta_municipio=0 + segmento=assinante (upsell estratégico)
+  // 'todos'→ sem filtro adicional
+  if (_feature && _feature !== 'todos') {
+    // Remove o filtro alerta_municipio do template se existir (evita conflito)
+    const idx = filtros.findIndex(f => f.field === 'alerta_municipio');
+    if (idx !== -1) filtros.splice(idx, 1);
+
+    const val = _feature === 'com' ? '1' : '0';
+    filtros.push({ field: 'alerta_municipio', relation: '=', value: val });
+
+    // Upsell: garante que só assinantes recebem (leads não têm feature)
+    if (_feature === 'sem') {
+      const temSeg = filtros.some(f => f.field === 'segmento');
+      if (!temSeg) filtros.push({ field: 'segmento', relation: '=', value: 'assinante' });
+    }
+  }
+
+  // ── Payload OneSignal ─────────────────────────────────────────────────────────
   const payload = {
     app_id:          ONESIGNAL_APP_ID,
     headings:        { pt: titulo, en: titulo },
@@ -264,10 +302,10 @@ async function _handleAlerta(req, { tipo, parametros = {}, habilitado = true }, 
     filters:         filtros,
     priority:        tipo.includes('prazo') || tipo.includes('nao_enviado') ? 10 : 6,
     ttl:             86400,
-    data:            { tipo, parametros, url },
+    data:            { tipo, parametros: params, url },
   };
 
-  // Dispara
+  // ── Dispara ───────────────────────────────────────────────────────────────────
   let result;
   try {
     const resp = await fetch(ONESIGNAL_URL, {
@@ -285,14 +323,17 @@ async function _handleAlerta(req, { tipo, parametros = {}, habilitado = true }, 
     return res.status(500).json({ ok: false, error: 'Erro ao disparar notificação.' });
   }
 
-  // Histórico no Firestore
+  // ── Histórico no Firestore ────────────────────────────────────────────────────
   try {
     await db.collection('alertas_disparados').add({
       tipo,
       titulo,
       corpo,
-      parametros,
+      parametros:        params,
       filtros,
+      publico:           _publico   || 'todos',
+      feature:           _feature   || 'todos',
+      url_override:      _url_override || null,
       onesignal_id:      result.id,
       destinatarios_est: result.recipients || 0,
       disparado_em:      admin.firestore.FieldValue.serverTimestamp(),
@@ -304,6 +345,7 @@ async function _handleAlerta(req, { tipo, parametros = {}, habilitado = true }, 
     ok:            true,
     tipo,
     titulo,
+    filtros,
     destinatarios: result.recipients || 0,
     onesignal_id:  result.id,
   });
