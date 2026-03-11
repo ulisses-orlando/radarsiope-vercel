@@ -8,16 +8,14 @@
 
 'use strict';
 
-// ─── Importa SDK do OneSignal para Service Worker ────────────────────────────
-// O OneSignal injeta seu próprio SW via importScripts quando detecta o arquivo.
-// Mantemos o nome "sw.js" na raiz e configuramos o OneSignal para usar este arquivo.
-importScripts('https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.sw.js');
-
 // ─── Configuração do Cache ────────────────────────────────────────────────────
-const CACHE_NAME   = 'radar-siope-v2';
+// Nota: o OneSignalSDK é importado via OneSignalSDKWorker.js (na raiz),
+// que chama importScripts deste arquivo. Não importar o SDK aqui para evitar
+// duplo registro.
+const CACHE_NAME   = 'radar-siope-v1';
 const CACHE_STATIC = [
   '/',
-  '/app.html',
+  '/verNewsletterComToken.html',
   '/painel.html',
   '/login.html',
   '/css/style.css',
@@ -30,6 +28,7 @@ const CACHE_STATIC = [
 
 // ─── Install: pré-carrega cache estático ─────────────────────────────────────
 self.addEventListener('install', event => {
+  console.log('[SW] Instalando v1...');
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then(cache => cache.addAll(CACHE_STATIC.filter(url => !url.startsWith('http') || url.includes('googleapis'))))
@@ -39,6 +38,7 @@ self.addEventListener('install', event => {
 
 // ─── Activate: limpa caches antigos ──────────────────────────────────────────
 self.addEventListener('activate', event => {
+  console.log('[SW] Ativando...');
   event.waitUntil(
     caches.keys().then(keys =>
       Promise.all(
