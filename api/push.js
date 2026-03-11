@@ -191,18 +191,20 @@ async function _handleBuscarMunicipios(req, { publico }, res) {
 
   try {
     if (publico === 'assinantes') {
-      // Firestore: usuarios com push ativo e municipio preenchido
+      // Firestore: usuarios com push ativo
+      // Campos confirmados: cod_municipio, nome_municipio, cod_uf
       const snap = await db.collection('usuarios')
         .where('push_opt_in', '==', true)
         .get();
 
       const mapa = new Map();
       snap.docs.forEach(doc => {
-        const d = doc.data();
-        const cod  = d.municipio_cod  || d.cod_municipio  || '';
-        const nome = d.municipio_nome || d.nome_municipio || '';
+        const d   = doc.data();
+        const cod  = d.cod_municipio || '';
+        const nome = d.nome_municipio || cod;
+        const uf   = d.cod_uf || '';
         if (cod && !mapa.has(cod)) {
-          mapa.set(cod, { cod, nome: nome || cod });
+          mapa.set(cod, { cod, nome, uf });
         }
       });
 
@@ -212,22 +214,24 @@ async function _handleBuscarMunicipios(req, { publico }, res) {
       return res.status(200).json({ ok: true, municipios });
 
     } else {
-      // Supabase: leads com push ativo e municipio preenchido
+      // Leads: busca municípios únicos com push ativo
+      // Campos confirmados: cod_municipio, nome_municipio, cod_uf
       const supabase = await getSupabase();
       const { data, error } = await supabase
         .from('leads')
-        .select('municipio_cod, municipio_nome, cod_municipio, nome_municipio')
+        .select('cod_municipio, nome_municipio, cod_uf')
         .eq('push_opt_in', true)
-        .not('municipio_cod', 'is', null);
+        .not('cod_municipio', 'is', null);
 
       if (error) throw error;
 
       const mapa = new Map();
       (data || []).forEach(row => {
-        const cod  = row.municipio_cod  || row.cod_municipio  || '';
-        const nome = row.municipio_nome || row.nome_municipio || '';
+        const cod  = row.cod_municipio || '';
+        const nome = row.nome_municipio || cod;
+        const uf   = row.cod_uf || '';
         if (cod && !mapa.has(cod)) {
-          mapa.set(cod, { cod, nome: nome || cod });
+          mapa.set(cod, { cod, nome, uf });
         }
       });
 
