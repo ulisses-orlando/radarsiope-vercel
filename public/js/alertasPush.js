@@ -313,7 +313,17 @@ async function _bindEventos() {
       headers: { 'Content-Type': 'application/json' },
       body:    JSON.stringify({ acao: 'admin-token', email }),
     });
-    const data = await resp.json();
+
+    // Lê como texto primeiro — evita crash se a API retornar HTML de erro
+    const text = await resp.text();
+    let data;
+    try {
+      data = JSON.parse(text);
+    } catch {
+      // API retornou HTML (crash no servidor) — exibe trecho para debug
+      const preview = text.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 120);
+      throw new Error(`Resposta inválida da API: ${preview}`);
+    }
 
     if (data.ok && data.token) {
       _pushAdminToken = data.token;
