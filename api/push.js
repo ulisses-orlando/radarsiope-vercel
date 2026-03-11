@@ -47,7 +47,7 @@ if (!admin.apps.length) {
     credential: admin.credential.cert({
       projectId:   process.env.FIREBASE_PROJECT_ID,
       clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-      privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\\\n/g, '\n')
+      privateKey:  process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n'),
     }),
   });
 }
@@ -164,11 +164,82 @@ export default async function handler(req, res) {
   if (!acao) return res.status(400).json({ ok: false, error: 'Campo "acao" obrigatório.' });
 
   switch (acao) {
-    case 'token':        return _handleToken(dados, res);
-    case 'consent':      return _handleConsent(dados, res);
-    case 'admin-token':  return _handleAdminToken(dados, res);
-    case 'alerta':       return _handleAlerta(req, dados, res);
-    default:             return res.status(400).json({ ok: false, error: `Ação desconhecida: ${acao}` });
+    case 'token':             return _handleToken(dados, res);
+    case 'consent':           return _handleConsent(dados, res);
+    case 'admin-token':       return _handleAdminToken(dados, res);
+    case 'buscar-municipios': return _handleBuscarMunicipios(req, dados, res);
+    case 'alerta':            return _handleAlerta(req, dados, res);
+    default:                  return res.status(400).json({ ok: false, error: `Ação desconhecida: ${acao}` });
+  }
+}
+
+// ─── AÇÃO: buscar-municipios ──────────────────────────────────────────────────
+// Retorna lista de municípios únicos de users com push ativo.
+// Assinantes → Firestore (usuarios com push_opt_in=true)
+// Leads      → Supabase  (leads com push_opt_in=true)
+// Requer header x-admin-token.
+// Body extra: { publico: 'assinantes' | 'leads' }
+async function _handleBuscarMunicipios(req, { publico }, res) {
+  const token = req.headers['x-admin-token'];
+  if (!token || token !== process.env.ADMIN_API_TOKEN) {
+    return res.status(401).json({ ok: false, error: 'Não autorizado.' });
+  }
+
+  if (!publico || !['assinantes', 'leads'].includes(publico)) {
+    return res.status(400).json({ ok: false, error: 'publico deve ser "assinantes" ou "leads".' });
+  }
+
+  try {
+    if (publico === 'assinantes') {
+      // Firestore: usuarios com push ativo e municipio preenchido
+      const snap = await db.collection('usuarios')
+        .where('push_opt_in', '==', true)
+        .get();
+
+      const mapa = new Map();
+      snap.docs.forEach(doc => {
+        const d = doc.data();
+        const cod  = d.municipio_cod  || d.cod_municipio  || '';
+        const nome = d.municipio_nome || d.nome_municipio || '';
+        if (cod && !mapa.has(cod)) {
+          mapa.set(cod, { cod, nome: nome || cod });
+        }
+      });
+
+      const municipios = Array.from(mapa.values())
+        .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
+
+      return res.status(200).json({ ok: true, municipios });
+
+    } else {
+      // Supabase: leads com push ativo e municipio preenchido
+      const supabase = await getSupabase();
+      const { data, error } = await supabase
+        .from('leads')
+        .select('municipio_cod, municipio_nome, cod_municipio, nome_municipio')
+        .eq('push_opt_in', true)
+        .not('municipio_cod', 'is', null);
+
+      if (error) throw error;
+
+      const mapa = new Map();
+      (data || []).forEach(row => {
+        const cod  = row.municipio_cod  || row.cod_municipio  || '';
+        const nome = row.municipio_nome || row.nome_municipio || '';
+        if (cod && !mapa.has(cod)) {
+          mapa.set(cod, { cod, nome: nome || cod });
+        }
+      });
+
+      const municipios = Array.from(mapa.values())
+        .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
+
+      return res.status(200).json({ ok: true, municipios });
+    }
+
+  } catch (err) {
+    console.error('[push/buscar-municipios]:', err);
+    return res.status(500).json({ ok: false, error: 'Erro ao buscar municípios.' });
   }
 }
 
@@ -274,9 +345,10 @@ async function _handleConsent({ leadId, aceito, plataforma }, res) {
 //
 // Campos especiais em `parametros` (enviados pelo painel admin, removidos antes
 // de passar ao template para não poluir a interpolação):
-//   _publico      : 'leads' | 'assinantes' | 'todos'  → adiciona filtro segmento
-//   _feature      : 'com'   | 'sem'        | 'todos'  → controla alerta_municipio
-//   _url_override : string                             → substitui a URL do template
+//   _publico      : 'leads' | 'assinantes' | 'todos'     → adiciona filtro segmento
+//   _feature      : 'com'   | 'sem'        | 'todos'     → controla alerta_municipio
+//   _url_override : string                               → substitui a URL do template
+//   _municipios   : [{ cod, nome }, ...]                 → múltiplos municípios com OR
 async function _handleAlerta(req, { tipo, parametros = {}, habilitado = true }, res) {
   // Autenticação — só admin/Python pode disparar alertas
   const token = req.headers['x-admin-token'];
@@ -291,7 +363,8 @@ async function _handleAlerta(req, { tipo, parametros = {}, habilitado = true }, 
   }
 
   // ── Extrai campos de controle do painel (não são variáveis de template) ──────
-  const { _publico, _feature, _url_override, ...params } = parametros;
+  // _municipios: array de { cod, nome } para alertas de município com múltipla seleção
+  const { _publico, _feature, _url_override, _municipios, ...params } = parametros;
 
   // Template base
   let template = { ...TEMPLATES[tipo] };
@@ -317,34 +390,50 @@ async function _handleAlerta(req, { tipo, parametros = {}, habilitado = true }, 
   const corpo  = _sub(template.corpo,  params);
   const url    = _url_override?.trim() || _sub(template.url, params);
 
-  // ── Monta filtros base do template ───────────────────────────────────────────
-  const filtros = template.filtros.map(f => ({ ...f, value: _sub(f.value, params) }));
+  // ── Monta filtros base do template (sem municipio_cod — tratado abaixo) ────────
+  const filtrosBase = template.filtros
+    .filter(f => f.field !== 'municipio_cod')   // removido — tratado via _municipios
+    .map(f => ({ ...f, value: _sub(f.value, params) }));
 
   // ── Filtro de público (_publico) ─────────────────────────────────────────────
-  // Só adiciona se o template não já fixou segmento (ex: nova_edicao_acesso_pro)
-  const temSegmento = filtros.some(f => f.field === 'segmento');
+  const temSegmento = filtrosBase.some(f => f.field === 'segmento');
   if (!temSegmento && _publico && _publico !== 'todos') {
     const val = _publico === 'assinantes' ? 'assinante' : 'lead';
-    filtros.push({ field: 'segmento', relation: '=', value: val });
+    filtrosBase.push({ field: 'segmento', relation: '=', value: val });
   }
 
   // ── Filtro de feature de alerta (_feature) ───────────────────────────────────
-  // 'com'  → alerta_municipio=1 (alertas operacionais — já têm o recurso)
-  // 'sem'  → alerta_municipio=0 + segmento=assinante (upsell estratégico)
-  // 'todos'→ sem filtro adicional
   if (_feature && _feature !== 'todos') {
-    // Remove o filtro alerta_municipio do template se existir (evita conflito)
-    const idx = filtros.findIndex(f => f.field === 'alerta_municipio');
-    if (idx !== -1) filtros.splice(idx, 1);
-
+    const idx = filtrosBase.findIndex(f => f.field === 'alerta_municipio');
+    if (idx !== -1) filtrosBase.splice(idx, 1);
     const val = _feature === 'com' ? '1' : '0';
-    filtros.push({ field: 'alerta_municipio', relation: '=', value: val });
-
-    // Upsell: garante que só assinantes recebem (leads não têm feature)
+    filtrosBase.push({ field: 'alerta_municipio', relation: '=', value: val });
     if (_feature === 'sem') {
-      const temSeg = filtros.some(f => f.field === 'segmento');
-      if (!temSeg) filtros.push({ field: 'segmento', relation: '=', value: 'assinante' });
+      const temSeg = filtrosBase.some(f => f.field === 'segmento');
+      if (!temSeg) filtrosBase.push({ field: 'segmento', relation: '=', value: 'assinante' });
     }
+  }
+
+  // ── Múltiplos municípios → grupos com OR no OneSignal ────────────────────────
+  // OneSignal avalia: (filtrosBase AND cod=A) OR (filtrosBase AND cod=B) OR ...
+  // Para 1 município ou nenhum: usa filtrosBase direto (sem OR)
+  let filtros;
+  const muns = Array.isArray(_municipios) && _municipios.length > 0 ? _municipios : null;
+
+  if (!muns) {
+    // Sem seleção de município — usa o params.municipio_cod do template se existir
+    filtros = filtrosBase;
+  } else if (muns.length === 1) {
+    // Município único — adiciona direto, sem OR
+    filtros = [...filtrosBase, { field: 'municipio_cod', relation: '=', value: String(muns[0].cod) }];
+  } else {
+    // Múltiplos municípios — expande em grupos (filtrosBase AND cod=X) OR (filtrosBase AND cod=Y)
+    filtros = [];
+    muns.forEach((mun, i) => {
+      if (i > 0) filtros.push({ operator: 'OR' });
+      filtrosBase.forEach(f => filtros.push({ ...f }));
+      filtros.push({ field: 'municipio_cod', relation: '=', value: String(mun.cod) });
+    });
   }
 
   // ── Payload OneSignal ─────────────────────────────────────────────────────────
@@ -387,9 +476,10 @@ async function _handleAlerta(req, { tipo, parametros = {}, habilitado = true }, 
       corpo,
       parametros:        params,
       filtros,
-      publico:           _publico   || 'todos',
-      feature:           _feature   || 'todos',
+      publico:           _publico    || 'todos',
+      feature:           _feature    || 'todos',
       url_override:      _url_override || null,
+      municipios:        _municipios  || null,
       onesignal_id:      result.id,
       destinatarios_est: result.recipients || 0,
       disparado_em:      admin.firestore.FieldValue.serverTimestamp(),
