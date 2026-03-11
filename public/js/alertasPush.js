@@ -171,17 +171,9 @@ function _renderHTML() {
 
   <h2>🔔 Enviar Alertas Push</h2>
 
-  <!-- Token admin -->
-  <div class="push-card">
-    <h3>🔐 Autenticação</h3>
-    <div class="push-token-field">
-      <div class="push-field" style="flex:1">
-        <label>x-admin-token</label>
-        <input type="password" id="push-admin-token" placeholder="Token de autenticação da API">
-      </div>
-      <button onclick="_pushSalvarToken()">Salvar sessão</button>
-    </div>
-    <div id="push-token-status" style="font-size:12px;margin-top:6px;color:#64748b"></div>
+  <!-- Status de autenticação (preenchido automaticamente) -->
+  <div id="push-auth-status" style="padding:10px 14px;border-radius:8px;font-size:13px;margin-bottom:16px;background:#f0fdf4;color:#166534;border:1px solid #bbf7d0">
+    ⏳ Verificando autenticação...
   </div>
 
   <!-- Composição -->
@@ -285,24 +277,66 @@ function _renderHTML() {
 
 // ─── Eventos e lógica ─────────────────────────────────────────────────────────
 
-function _bindEventos() {
-  // Recupera token salvo na sessão
-  const saved = sessionStorage.getItem('_pushAdminToken');
-  if (saved) {
-    _pushAdminToken = saved;
-    const el = document.getElementById('push-admin-token');
-    if (el) el.value = saved;
-    document.getElementById('push-token-status').textContent = '✅ Token carregado da sessão.';
+async function _bindEventos() {
+  const statusEl = document.getElementById('push-auth-status');
+
+  // 1. Tenta reusar token já obtido nesta sessão
+  const cached = sessionStorage.getItem('_pushAdminToken');
+  if (cached) {
+    _pushAdminToken = cached;
+    if (statusEl) {
+      statusEl.style.background = '#f0fdf4';
+      statusEl.style.color      = '#166534';
+      statusEl.style.border     = '1px solid #bbf7d0';
+      statusEl.textContent      = '✅ Admin autenticado.';
+    }
+    return;
+  }
+
+  // 2. Busca automaticamente usando o email do admin logado
+  const usuarioLogado = JSON.parse(localStorage.getItem('usuarioLogado') || '{}');
+  const email = usuarioLogado?.email;
+
+  if (!email) {
+    if (statusEl) {
+      statusEl.style.background = '#fef2f2';
+      statusEl.style.color      = '#991b1b';
+      statusEl.style.border     = '1px solid #fecaca';
+      statusEl.textContent      = '❌ Sessão expirada. Faça login novamente.';
+    }
+    return;
+  }
+
+  try {
+    const resp = await fetch('/api/push', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ acao: 'admin-token', email }),
+    });
+    const data = await resp.json();
+
+    if (data.ok && data.token) {
+      _pushAdminToken = data.token;
+      sessionStorage.setItem('_pushAdminToken', data.token);
+      if (statusEl) {
+        statusEl.style.background = '#f0fdf4';
+        statusEl.style.color      = '#166534';
+        statusEl.style.border     = '1px solid #bbf7d0';
+        statusEl.textContent      = `✅ Admin autenticado como ${email}.`;
+      }
+    } else {
+      throw new Error(data.error || 'Não autorizado');
+    }
+  } catch (err) {
+    if (statusEl) {
+      statusEl.style.background = '#fef2f2';
+      statusEl.style.color      = '#991b1b';
+      statusEl.style.border     = '1px solid #fecaca';
+      statusEl.textContent      = `❌ Falha na autenticação: ${err.message}`;
+    }
+    console.error('[alertasPush] auth:', err);
   }
 }
-
-window._pushSalvarToken = function () {
-  const val = document.getElementById('push-admin-token')?.value?.trim();
-  if (!val) return;
-  _pushAdminToken = val;
-  sessionStorage.setItem('_pushAdminToken', val);
-  document.getElementById('push-token-status').textContent = '✅ Token salvo para esta sessão.';
-};
 
 window._pushOnTipoChange = function () {
   const tipo = document.getElementById('push-tipo')?.value;
