@@ -408,7 +408,7 @@ async function _bindEventos() {
   }
 }
 
-window._pushOnTipoChange = function () {
+window._pushOnTipoChange = async function () {
   const tipo = document.getElementById('push-tipo')?.value;
   const tpl  = PUSH_TEMPLATES[tipo];
 
