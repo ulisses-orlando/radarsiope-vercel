@@ -560,7 +560,7 @@
     <button onclick="abrirTab('auditoria')">🕵️ Auditoria Leads</button>
     <!-- <button onclick="abrirEnvioNewsletterLeads()">📮 Enviar Newsletters</button> -->
     <button id="botaoEnvioNewsletterLeads">📮Enviar Newsletter</button>
-
+    <button onclick="abrirTab('alertas-push')">🔔 Enviar Alertas Push</button>
     <button onclick="abrirModalVerificarLotes(event)">📮 Verificar lotes pendentes - atualizar status</button>
     <button onclick="abrirPainelGestao()">🗞️ Painel</button>
 
@@ -2177,6 +2177,11 @@
       </div>
     </section>
 
+    <!-- ── SEÇÃO: ALERTAS PUSH ──────────────────────────────────── -->
+    <section id="alertas-push" class="card" style="display:none">
+      <!-- preenchido inteiramente por carregarSecaoAlertasPush() em alertas_push.js -->    
+    </section>
+
     <!-- ── SEÇÃO: FEEDBACKS ───────────────────────────────────────── -->
     <section id="feedbacks" class="card" style="display:none">
       <!-- preenchido inteiramente por carregarSecaoFeedbacks() em feedbacks.js -->
@@ -2387,6 +2392,7 @@
   <script src="js/subcollections.js"></script>
   <script src="js/drawer-usuario.js"></script>
   <script src="js/feedbacks.js"></script>
+  <script src="js/alertasPush.js"></script>
   <script src="js/site.js"></script>
   <script src="js/functions.js"></script>
   <script src="js/mailer.js"></script>
@@ -2487,6 +2493,7 @@
       else if (tabId === 'auditoria') carregarInteracoesAuditoria();
       else if (tabId === 'respostas_automaticas') carregarrespostas_automaticas();
       else if (tabId === 'aba-temas') carregarTemas_noticias();
+      else if (tabId === 'alertas-push') iniciarPainelAlertasPush();
       else if (tabId === 'relatorio-por-tipo') {
         await montarComboTiposNewsletter();
         gerarRelatorioPreferencias();
