@@ -74,7 +74,8 @@ async function _inicializarOneSignal() {
     try {
       await OneSignal.init({
         appId:              ONESIGNAL_APP_ID,
-        serviceWorkerPath:  '/sw.js',
+        // OneSignal v16 usa OneSignalSDKWorker.js na raiz por padrão.
+        // Não especificar serviceWorkerPath evita conflito de registro.
         serviceWorkerParam: { scope: '/' },
         promptOptions: { slidedown: { prompts: [] } },
         notifyButton:  { enable: false },
