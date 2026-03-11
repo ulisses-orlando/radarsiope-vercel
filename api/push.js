@@ -24,6 +24,9 @@
    - ALLOWED_ORIGIN
    ========================================================================== */
 
+// Runtime Node obrigatório — firebase-admin não é compatível com Edge runtime
+export const config = { runtime: 'nodejs' };
+
 import admin from 'firebase-admin';
 
 // ─── Supabase (lazy — só instanciado nas ações token/consent) ─────────────────
