@@ -12,8 +12,9 @@ const PUSH_TEMPLATES = {
     corpo:      'A edição #{edicao} já está disponível. {titulo}',
     url:        '/verNewsletterComToken.html',
     parametros: ['edicao', 'titulo'],
-    publico:    'todos',     // leads | assinantes | todos
+    publico:    'todos',
     bloqueaPublico: false,
+    filtros:    [{ field: 'alerta_nova_edicao', relation: '=', value: '1' }],
   },
   nova_edicao_acesso_pro: {
     label:      '🔓 Acesso especial para leads',
@@ -22,7 +23,11 @@ const PUSH_TEMPLATES = {
     url:        '/verNewsletterComToken.html',
     parametros: ['edicao', 'horas'],
     publico:    'leads',
-    bloqueaPublico: true,   // não permite trocar público
+    bloqueaPublico: true,
+    filtros:    [
+      { field: 'segmento',           relation: '=', value: 'lead' },
+      { field: 'alerta_nova_edicao', relation: '=', value: '1'   },
+    ],
   },
   siope_prazo_proximo: {
     label:      '⏰ Prazo SIOPE se aproximando',
@@ -32,6 +37,11 @@ const PUSH_TEMPLATES = {
     parametros: ['municipio', 'uf', 'municipio_cod', 'dias', 'data_prazo'],
     publico:    'assinantes',
     bloqueaPublico: false,
+    filtros:    [
+      { field: 'alerta_municipio', relation: '=', value: '1'              },
+      { field: 'uf',              relation: '=', value: '{uf}'            },
+      { field: 'municipio_cod',   relation: '=', value: '{municipio_cod}' },
+    ],
   },
   siope_homologado: {
     label:      '✅ SIOPE homologado',
@@ -41,6 +51,11 @@ const PUSH_TEMPLATES = {
     parametros: ['municipio', 'uf', 'municipio_cod', 'bimestre', 'ano'],
     publico:    'assinantes',
     bloqueaPublico: false,
+    filtros:    [
+      { field: 'alerta_municipio', relation: '=', value: '1'              },
+      { field: 'uf',              relation: '=', value: '{uf}'            },
+      { field: 'municipio_cod',   relation: '=', value: '{municipio_cod}' },
+    ],
   },
   siope_percentual_baixo: {
     label:      '⚠️ Percentual MDE baixo',
@@ -50,6 +65,11 @@ const PUSH_TEMPLATES = {
     parametros: ['municipio', 'uf', 'municipio_cod', 'bimestre', 'ano', 'percentual', 'minimo'],
     publico:    'assinantes',
     bloqueaPublico: false,
+    filtros:    [
+      { field: 'alerta_municipio', relation: '=', value: '1'              },
+      { field: 'uf',              relation: '=', value: '{uf}'            },
+      { field: 'municipio_cod',   relation: '=', value: '{municipio_cod}' },
+    ],
   },
   siope_nao_enviado: {
     label:      '🚨 SIOPE não enviado',
@@ -59,6 +79,11 @@ const PUSH_TEMPLATES = {
     parametros: ['municipio', 'uf', 'municipio_cod', 'bimestre', 'data_prazo'],
     publico:    'assinantes',
     bloqueaPublico: false,
+    filtros:    [
+      { field: 'alerta_municipio', relation: '=', value: '1'              },
+      { field: 'uf',              relation: '=', value: '{uf}'            },
+      { field: 'municipio_cod',   relation: '=', value: '{municipio_cod}' },
+    ],
   },
   fundeb_repasse_creditado: {
     label:      '💰 Repasse FUNDEB creditado',
@@ -68,6 +93,11 @@ const PUSH_TEMPLATES = {
     parametros: ['municipio', 'uf', 'municipio_cod', 'valor', 'mes', 'ano'],
     publico:    'assinantes',
     bloqueaPublico: false,
+    filtros:    [
+      { field: 'alerta_municipio', relation: '=', value: '1'              },
+      { field: 'uf',              relation: '=', value: '{uf}'            },
+      { field: 'municipio_cod',   relation: '=', value: '{municipio_cod}' },
+    ],
   },
   portaria_publicada: {
     label:      '📋 Nova portaria (Supreme)',
@@ -77,6 +107,7 @@ const PUSH_TEMPLATES = {
     parametros: ['titulo_portaria'],
     publico:    'assinantes',
     bloqueaPublico: false,
+    filtros:    [{ field: 'plano', relation: '=', value: 'supreme' }],
   },
 };
 
@@ -595,7 +626,7 @@ function _montarFiltros(tpl, params) {
   const feature  = document.getElementById('push-feature')?.value  ?? 'todos';
 
   // Filtros base do template
-  const filtros = tpl.filtros.map(f => ({ ...f, value: _sub(f.value, params) }));
+  const filtros = (tpl.filtros || []).map(f => ({ ...f, value: _sub(f.value, params) }));
 
   // Filtro de público (se não estiver já no template)
   const temSegmento = filtros.some(f => f.field === 'segmento');
