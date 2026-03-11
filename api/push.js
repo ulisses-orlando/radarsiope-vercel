@@ -28,9 +28,9 @@ import admin from 'firebase-admin';
 
 // ─── Supabase (lazy — só instanciado nas ações token/consent) ─────────────────
 let _supabase = null;
-function getSupabase() {
+async function getSupabase() {
   if (_supabase) return _supabase;
-  const { createClient } = require('@supabase/supabase-js');
+  const { createClient } = await import('@supabase/supabase-js');
   _supabase = createClient(
     process.env.SUPABASE_URL,
     process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -216,7 +216,7 @@ async function _handleToken({ leadId, playerId, plataforma }, res) {
     return res.status(400).json({ ok: false, error: 'leadId e playerId são obrigatórios.' });
   }
 
-  const supabase = getSupabase();
+  const supabase = await getSupabase();
   const { error } = await supabase
     .from('leads')
     .update({
@@ -245,7 +245,7 @@ async function _handleConsent({ leadId, aceito, plataforma }, res) {
 
   const agora = new Date().toISOString();
 
-  const supabase = getSupabase();
+  const supabase = await getSupabase();
   const { error } = await supabase
     .from('leads')
     .update({
