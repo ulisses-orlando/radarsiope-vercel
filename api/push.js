@@ -24,14 +24,19 @@
    - ALLOWED_ORIGIN
    ========================================================================== */
 
-import { createClient } from '@supabase/supabase-js';
-import admin            from 'firebase-admin';
+import admin from 'firebase-admin';
 
-// ─── Supabase ─────────────────────────────────────────────────────────────────
-const supabase = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
-);
+// ─── Supabase (lazy — só instanciado nas ações token/consent) ─────────────────
+let _supabase = null;
+function getSupabase() {
+  if (_supabase) return _supabase;
+  const { createClient } = require('@supabase/supabase-js');
+  _supabase = createClient(
+    process.env.SUPABASE_URL,
+    process.env.SUPABASE_SERVICE_ROLE_KEY
+  );
+  return _supabase;
+}
 
 // ─── Firebase Admin ───────────────────────────────────────────────────────────
 if (!admin.apps.length) {
@@ -211,6 +216,7 @@ async function _handleToken({ leadId, playerId, plataforma }, res) {
     return res.status(400).json({ ok: false, error: 'leadId e playerId são obrigatórios.' });
   }
 
+  const supabase = getSupabase();
   const { error } = await supabase
     .from('leads')
     .update({
@@ -239,6 +245,7 @@ async function _handleConsent({ leadId, aceito, plataforma }, res) {
 
   const agora = new Date().toISOString();
 
+  const supabase = getSupabase();
   const { error } = await supabase
     .from('leads')
     .update({
