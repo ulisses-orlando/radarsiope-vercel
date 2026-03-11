@@ -150,10 +150,50 @@ export default async function handler(req, res) {
   if (!acao) return res.status(400).json({ ok: false, error: 'Campo "acao" obrigatório.' });
 
   switch (acao) {
-    case 'token':   return _handleToken(dados, res);
-    case 'consent': return _handleConsent(dados, res);
-    case 'alerta':  return _handleAlerta(req, dados, res);
-    default:        return res.status(400).json({ ok: false, error: `Ação desconhecida: ${acao}` });
+    case 'token':        return _handleToken(dados, res);
+    case 'consent':      return _handleConsent(dados, res);
+    case 'admin-token':  return _handleAdminToken(dados, res);
+    case 'alerta':       return _handleAlerta(req, dados, res);
+    default:             return res.status(400).json({ ok: false, error: `Ação desconhecida: ${acao}` });
+  }
+}
+
+// ─── AÇÃO: admin-token ────────────────────────────────────────────────────────
+// Valida se o email pertence a um admin no Firestore e retorna o ADMIN_API_TOKEN.
+// O painel chama isso automaticamente no carregamento — zero digitação manual.
+// Body extra: { email }
+async function _handleAdminToken({ email }, res) {
+  if (!email) {
+    return res.status(400).json({ ok: false, error: 'email é obrigatório.' });
+  }
+
+  try {
+    // Busca o usuário no Firestore pelo email
+    const snap = await db.collection('usuarios')
+      .where('email', '==', email.toLowerCase().trim())
+      .limit(1)
+      .get();
+
+    if (snap.empty) {
+      return res.status(403).json({ ok: false, error: 'Usuário não encontrado.' });
+    }
+
+    const usuario = snap.docs[0].data();
+
+    // Só admins podem obter o token
+    if (usuario.tipo_perfil !== 'Admin') {
+      return res.status(403).json({ ok: false, error: 'Acesso negado.' });
+    }
+
+    // Retorna o token — trafega sobre HTTPS, exposto apenas para Admin validado
+    return res.status(200).json({
+      ok:    true,
+      token: process.env.ADMIN_API_TOKEN,
+    });
+
+  } catch (err) {
+    console.error('[push/admin-token] Firestore:', err);
+    return res.status(500).json({ ok: false, error: 'Erro interno.' });
   }
 }
 
