@@ -36,12 +36,12 @@ async function initRadarPWA() {
 async function registrarServiceWorker() {
   if (!('serviceWorker' in navigator)) return;
   try {
-    const reg = await navigator.serviceWorker.register('/sw.js', { scope: '/' });
+    const reg = await navigator.serviceWorker.register('/OneSignalSDKWorker.js', { scope: '/' });
     reg.addEventListener('updatefound', () => {
       const newWorker = reg.installing;
       newWorker?.addEventListener('statechange', () => {
         if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-          mostrarBannerAtualizacao();
+          mostrarBannerAtualizacao(reg);
         }
       });
     });
@@ -407,8 +407,12 @@ function mostrarBannerInstalacao() {
 }
 
 // ─── Banner de atualização disponível ────────────────────────────────────────
-function mostrarBannerAtualizacao() {
+function mostrarBannerAtualizacao(reg) {
+  // Evita múltiplos banners
+  if (document.getElementById('rs-update-banner')) return;
+
   const banner = document.createElement('div');
+  banner.id = 'rs-update-banner';
   banner.style.cssText = `
     position: fixed; top: 0; left: 0; right: 0; background: #0A3D62; color: #fff;
     padding: 12px 20px; display: flex; justify-content: space-between; align-items: center;
@@ -416,64 +420,23 @@ function mostrarBannerAtualizacao() {
   `;
   banner.innerHTML = `
     <span>🔄 Nova versão do Radar SIOPE disponível!</span>
-    <button onclick="window.location.reload()"
+    <button id="rs-update-btn"
       style="background:#16a34a; color:#fff; border:none; border-radius:6px; padding:6px 14px; cursor:pointer; font-weight:600">
       Atualizar
-    </button>`;
+    </button>
+  `;
   document.body.prepend(banner);
+
+  document.getElementById('rs-update-btn').addEventListener('click', () => {
+    if (reg?.waiting) {
+      // Novo SW assume controle imediatamente, só então recarrega
+      reg.waiting.postMessage({ type: 'SKIP_WAITING' });
+      navigator.serviceWorker.addEventListener('controllerchange',
+        () => window.location.reload(), { once: true });
+    } else {
+      window.location.reload();
+    }
+  });
 }
 
-// ─── API pública ──────────────────────────────────────────────────────────────
-window.RadarPush = {
-  async atualizarTagsPlano(novoSlug) {
-    if (typeof OneSignal === 'undefined') return;
-    try {
-      const user = window._radarUser || {};
-      user.plano_slug = novoSlug;
-      await OneSignal.User.addTags({
-        plano:            novoSlug,
-        alerta_municipio: _temAlertaMunicipio(user) ? '1' : '0',
-      });
-    } catch (e) { console.warn('[RadarPush] Erro ao atualizar tags:', e); }
-  },
 
-  solicitarConsentimento() {
-    localStorage.removeItem(LS_CONSENT_KEY);
-    mostrarBannerConsentimentoPush();
-  },
-
-  async estaInscrito() {
-    if (typeof OneSignal === 'undefined') return false;
-    try { return await OneSignal.User.PushSubscription.optedIn; }
-    catch { return false; }
-  },
-};
-
-// ─── Auto-init ────────────────────────────────────────────────────────────────
-// FIX 2: aguarda _radarUser estar disponível em vez de setTimeout fixo.
-// verNewsletterComToken.js deve disparar o evento 'radarUserReady' após definir window._radarUser.
-// Fallback: se o evento não chegar em 5s, tenta mesmo assim (compatibilidade).
-function _aguardarRadarUser(cb) {
-  if (window._radarUser) { cb(); return; }
-
-  let disparou = false;
-
-  window.addEventListener('radarUserReady', () => {
-    if (disparou) return;
-    disparou = true;
-    cb();
-  }, { once: true });
-
-  // Fallback: 5 segundos
-  setTimeout(() => {
-    if (disparou) return;
-    disparou = true;
-    cb();
-  }, 5000);
-}
-
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', () => _aguardarRadarUser(initRadarPWA));
-} else {
-  _aguardarRadarUser(initRadarPWA);
-}
