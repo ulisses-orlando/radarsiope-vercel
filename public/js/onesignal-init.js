@@ -82,8 +82,11 @@ async function _inicializarOneSignal() {
         allowLocalhostAsSecureOrigin: true,
       });
 
-      const permission = await OneSignal.Notifications.requestPermission();
-      if (permission) {
+      await OneSignal.Notifications.requestPermission();
+      // Aplica tags e salva player ID sempre que já houver permissão concedida
+      // (requestPermission retorna false em visitas subsequentes, mas a permissão existe)
+      const optedIn = OneSignal.User.PushSubscription.optedIn;
+      if (optedIn) {
         await _aplicarTagsSegmentacao();
         await _salvarPlayerId();
       }
