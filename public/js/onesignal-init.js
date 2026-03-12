@@ -36,15 +36,8 @@ async function initRadarPWA() {
 async function registrarServiceWorker() {
   if (!('serviceWorker' in navigator)) return;
   try {
-    const reg = await navigator.serviceWorker.register('/OneSignalSDKWorker.js', { scope: '/' });
-    reg.addEventListener('updatefound', () => {
-      const newWorker = reg.installing;
-      newWorker?.addEventListener('statechange', () => {
-        if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-          mostrarBannerAtualizacao(reg);
-        }
-      });
-    });
+    await navigator.serviceWorker.register('/OneSignalSDKWorker.js', { scope: '/' });
+    console.log('[PWA] Service Worker registrado.');
   } catch (err) {
     console.warn('[PWA] Falha ao registrar SW:', err);
   }
@@ -87,6 +80,9 @@ async function _inicializarOneSignal() {
       // (requestPermission retorna false em visitas subsequentes, mas a permissão existe)
       const optedIn = OneSignal.User.PushSubscription.optedIn;
       if (optedIn) {
+        // Aguarda 3s para o OneSignal finalizar o registro do device antes de enviar tags
+        // Evita erro 409 Conflict quando o PATCH chega antes do device ser criado
+        await new Promise(resolve => setTimeout(resolve, 3000));
         await _aplicarTagsSegmentacao();
         await _salvarPlayerId();
       }
