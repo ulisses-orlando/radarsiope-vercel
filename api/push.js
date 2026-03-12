@@ -67,7 +67,7 @@ const TEMPLATES = {
     corpo:   'A edição #{edicao} já está disponível. {titulo}',
     icon:    '/icons/icon-192x192.png',
     url:     '/verNewsletterComToken.html',
-    filtros: [{ field: 'alerta_nova_edicao', relation: '=', value: '1' }],
+    filtros: [{ field: 'tag', key: 'alerta_nova_edicao', relation: '=', value: '1' }],
   },
 
   nova_edicao_acesso_pro: {
@@ -76,8 +76,8 @@ const TEMPLATES = {
     icon:    '/icons/icon-192x192.png',
     url:     '/verNewsletterComToken.html',
     filtros: [
-      { field: 'segmento',           relation: '=', value: 'lead' },
-      { field: 'alerta_nova_edicao', relation: '=', value: '1'    },
+      { field: 'tag', key: 'segmento',           relation: '=', value: 'lead' },
+      { field: 'tag', key: 'alerta_nova_edicao', relation: '=', value: '1'    },
     ],
   },
 
@@ -87,9 +87,9 @@ const TEMPLATES = {
     icon:    '/icons/icon-192x192.png',
     url:     '/painel.html',
     filtros: [
-      { field: 'alerta_municipio', relation: '=', value: '1'              },
-      { field: 'uf',              relation: '=', value: '{uf}'            },
-      { field: 'municipio_cod',   relation: '=', value: '{municipio_cod}' },
+      { field: 'tag', key: 'alerta_municipio', relation: '=', value: '1'              },
+      { field: 'tag', key: 'uf',              relation: '=', value: '{uf}'            },
+      { field: 'tag', key: 'municipio_cod',   relation: '=', value: '{municipio_cod}' },
     ],
   },
 
@@ -99,9 +99,9 @@ const TEMPLATES = {
     icon:    '/icons/icon-192x192.png',
     url:     '/painel.html',
     filtros: [
-      { field: 'alerta_municipio', relation: '=', value: '1'              },
-      { field: 'uf',              relation: '=', value: '{uf}'            },
-      { field: 'municipio_cod',   relation: '=', value: '{municipio_cod}' },
+      { field: 'tag', key: 'alerta_municipio', relation: '=', value: '1'              },
+      { field: 'tag', key: 'uf',              relation: '=', value: '{uf}'            },
+      { field: 'tag', key: 'municipio_cod',   relation: '=', value: '{municipio_cod}' },
     ],
   },
 
@@ -111,9 +111,9 @@ const TEMPLATES = {
     icon:    '/icons/icon-192x192.png',
     url:     '/painel.html',
     filtros: [
-      { field: 'alerta_municipio', relation: '=', value: '1'              },
-      { field: 'uf',              relation: '=', value: '{uf}'            },
-      { field: 'municipio_cod',   relation: '=', value: '{municipio_cod}' },
+      { field: 'tag', key: 'alerta_municipio', relation: '=', value: '1'              },
+      { field: 'tag', key: 'uf',              relation: '=', value: '{uf}'            },
+      { field: 'tag', key: 'municipio_cod',   relation: '=', value: '{municipio_cod}' },
     ],
   },
 
@@ -123,9 +123,9 @@ const TEMPLATES = {
     icon:    '/icons/icon-192x192.png',
     url:     '/painel.html',
     filtros: [
-      { field: 'alerta_municipio', relation: '=', value: '1'              },
-      { field: 'uf',              relation: '=', value: '{uf}'            },
-      { field: 'municipio_cod',   relation: '=', value: '{municipio_cod}' },
+      { field: 'tag', key: 'alerta_municipio', relation: '=', value: '1'              },
+      { field: 'tag', key: 'uf',              relation: '=', value: '{uf}'            },
+      { field: 'tag', key: 'municipio_cod',   relation: '=', value: '{municipio_cod}' },
     ],
   },
 
@@ -135,9 +135,9 @@ const TEMPLATES = {
     icon:    '/icons/icon-192x192.png',
     url:     '/painel.html',
     filtros: [
-      { field: 'alerta_municipio', relation: '=', value: '1'              },
-      { field: 'uf',              relation: '=', value: '{uf}'            },
-      { field: 'municipio_cod',   relation: '=', value: '{municipio_cod}' },
+      { field: 'tag', key: 'alerta_municipio', relation: '=', value: '1'              },
+      { field: 'tag', key: 'uf',              relation: '=', value: '{uf}'            },
+      { field: 'tag', key: 'municipio_cod',   relation: '=', value: '{municipio_cod}' },
     ],
   },
 
@@ -146,7 +146,7 @@ const TEMPLATES = {
     corpo:   '{titulo_portaria}. Análise completa disponível no Radar SIOPE.',
     icon:    '/icons/icon-192x192.png',
     url:     '/verNewsletterComToken.html',
-    filtros: [{ field: 'plano', relation: '=', value: 'supreme' }],
+    filtros: [{ field: 'tag', key: 'plano', relation: '=', value: 'supreme' }],
   },
 };
 
@@ -401,26 +401,32 @@ async function _handleAlerta(req, { tipo, parametros = {}, habilitado = true }, 
   const url    = _url_override?.trim() || _sub(template.url, params);
 
   // ── Monta filtros base do template (sem municipio_cod — tratado abaixo) ────────
+  // OneSignal tags customizadas usam field:"tag" + key:"nome_da_tag"
   const filtrosBase = template.filtros
-    .filter(f => f.field !== 'municipio_cod')   // removido — tratado via _municipios
-    .map(f => ({ ...f, value: _sub(f.value, params) }));
+    .filter(f => f.field !== 'municipio_cod')
+    .map(f => ({
+      field:    'tag',
+      key:      f.field,
+      relation: f.relation,
+      value:    _sub(f.value, params),
+    }));
 
   // ── Filtro de público (_publico) ─────────────────────────────────────────────
-  const temSegmento = filtrosBase.some(f => f.field === 'segmento');
+  const temSegmento = filtrosBase.some(f => f.key === 'segmento');
   if (!temSegmento && _publico && _publico !== 'todos') {
     const val = _publico === 'assinantes' ? 'assinante' : 'lead';
-    filtrosBase.push({ field: 'segmento', relation: '=', value: val });
+    filtrosBase.push({ field: 'tag', key: 'segmento', relation: '=', value: val });
   }
 
   // ── Filtro de feature de alerta (_feature) ───────────────────────────────────
   if (_feature && _feature !== 'todos') {
-    const idx = filtrosBase.findIndex(f => f.field === 'alerta_municipio');
+    const idx = filtrosBase.findIndex(f => f.key === 'alerta_municipio');
     if (idx !== -1) filtrosBase.splice(idx, 1);
     const val = _feature === 'com' ? '1' : '0';
-    filtrosBase.push({ field: 'alerta_municipio', relation: '=', value: val });
+    filtrosBase.push({ field: 'tag', key: 'alerta_municipio', relation: '=', value: val });
     if (_feature === 'sem') {
-      const temSeg = filtrosBase.some(f => f.field === 'segmento');
-      if (!temSeg) filtrosBase.push({ field: 'segmento', relation: '=', value: 'assinante' });
+      const temSeg = filtrosBase.some(f => f.key === 'segmento');
+      if (!temSeg) filtrosBase.push({ field: 'tag', key: 'segmento', relation: '=', value: 'assinante' });
     }
   }
 
@@ -435,14 +441,14 @@ async function _handleAlerta(req, { tipo, parametros = {}, habilitado = true }, 
     filtros = filtrosBase;
   } else if (muns.length === 1) {
     // Município único — adiciona direto, sem OR
-    filtros = [...filtrosBase, { field: 'municipio_cod', relation: '=', value: String(muns[0].cod) }];
+    filtros = [...filtrosBase, { field: 'tag', key: 'municipio_cod', relation: '=', value: String(muns[0].cod) }];
   } else {
     // Múltiplos municípios — expande em grupos (filtrosBase AND cod=X) OR (filtrosBase AND cod=Y)
     filtros = [];
     muns.forEach((mun, i) => {
       if (i > 0) filtros.push({ operator: 'OR' });
       filtrosBase.forEach(f => filtros.push({ ...f }));
-      filtros.push({ field: 'municipio_cod', relation: '=', value: String(mun.cod) });
+      filtros.push({ field: 'tag', key: 'municipio_cod', relation: '=', value: String(mun.cod) });
     });
   }
 
