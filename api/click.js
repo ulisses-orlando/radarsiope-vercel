@@ -18,19 +18,19 @@ export default async function handler(req, res) {
     return res.status(400).send("Parâmetros inválidos");
   }
 
-/*   // Decodificação dupla para lidar com SES
-  let destino = decodeURIComponent(url);
-  try {
-    destino = decodeURIComponent(destino);
-  } catch {}
-
-  // Normalização: garantir http/https
-  if (!destino.startsWith("http://") && !destino.startsWith("https://")) {
-    destino = "https://" + destino;
-  }
-
-  console.log("Redirecionando para:", destino);
- */
+  /*   // Decodificação dupla para lidar com SES
+    let destino = decodeURIComponent(url);
+    try {
+      destino = decodeURIComponent(destino);
+    } catch {}
+  
+    // Normalização: garantir http/https
+    if (!destino.startsWith("http://") && !destino.startsWith("https://")) {
+      destino = "https://" + destino;
+    }
+  
+    console.log("Redirecionando para:", destino);
+   */
   const ua = req.headers["user-agent"] || "";
 
   try {
@@ -74,10 +74,16 @@ export default async function handler(req, res) {
       ultimoCliqueEm: new Date()
     }, { merge: true });
 
-  } catch (e) { 
-    console.error("Erro ao registrar clique:", e); 
+  } catch (e) {
+    console.error("Erro ao registrar clique:", e);
     // Retornamos erro sem redirecionar 
-    return res.status(500).json({ ok: false, message: "Erro ao registrar clique" }); 
+    return res.status(500).json({ ok: false, message: "Erro ao registrar clique" });
+  }
+  // Decodifica a URL de destino do parâmetro
+  let destino = decodeURIComponent(url);
+  try { destino = decodeURIComponent(destino); } catch { }
+  if (!destino.startsWith('http://') && !destino.startsWith('https://')) {
+    destino = 'https://' + destino;
   }
   return res.redirect(destino);
 }
