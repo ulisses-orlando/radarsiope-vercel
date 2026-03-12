@@ -2256,95 +2256,128 @@ async function verDestinatariosLoteUnificado(loteId) {
 }
 window.verDestinatariosLoteUnificado = verDestinatariosLoteUnificado; // para acesso global
 
-async function enviarLoteEmMassa(newsletterId, envioId, loteId, tipo) {
+async function enviarLoteEmMassa(newsletterId, envioId, loteId) {
     try {
+        // ── 1. Carrega lote e newsletter ──────────────────────────────────────
         const loteRef = db.collection("newsletters")
-            .doc(newsletterId).collection("envios")
-            .doc(envioId).collection("lotes").doc(loteId);
+            .doc(newsletterId)
+            .collection("envios").doc(envioId)
+            .collection("lotes").doc(loteId);
 
-        const loteSnap = await loteRef.get();
-        if (!loteSnap.exists) { mostrarMensagem("❌ Lote não encontrado."); return; }
+        const [loteSnap, newsletterSnap] = await Promise.all([
+            loteRef.get(),
+            db.collection("newsletters").doc(newsletterId).get(),
+        ]);
+
+        if (!loteSnap.exists) {
+            mostrarMensagem("❌ Lote não encontrado.");
+            return;
+        }
+        if (!newsletterSnap.exists) {
+            mostrarMensagem("❌ Newsletter não encontrada.");
+            return;
+        }
 
         const lote = loteSnap.data();
-        const newsletterSnap = await db.collection("newsletters").doc(newsletterId).get();
         const newsletter = newsletterSnap.data();
         const destinatarios = lote.destinatarios || [];
+
+        if (destinatarios.length === 0) {
+            mostrarMensagem("⚠️ Nenhum destinatário no lote.");
+            return;
+        }
+
+        mostrarMensagem(`⏳ Preparando ${destinatarios.length} destinatários...`);
+
+        const usuarioLogado = JSON.parse(localStorage.getItem("usuarioLogado") || "{}");
+        const operador = usuarioLogado?.nome || usuarioLogado?.email || "Desconhecido";
+
+        // ── 2. Cria registros pendentes e monta payload ───────────────────────
         const payloadEmails = [];
 
         for (const dest of destinatarios) {
-            const tipoLocal = dest.tipo || (dest.assinaturaId ? "usuarios" : "leads");
-            const idDest = dest.id;
+            const tipo = dest.tipo || (dest.assinaturaId ? "usuarios" : "leads");
+            const emailDest = (dest.email || "").trim();
+            const idDest = dest.id || "";
             const assinaturaId = dest.assinaturaId || null;
+            const segmento = tipo === "leads" ? "leads" : "assinantes";
             const token = gerarTokenAcesso();
             const expiraEm = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
 
             let registroEnvioId;
 
             try {
-                if (tipoLocal === "leads") {
+                if (tipo === "leads") {
+                    // Supabase — status "pendente"; backend atualiza após SES
                     const { data, error } = await window.supabase
                         .from("leads_envios")
                         .insert({
                             lead_id: idDest,
                             newsletter_id: newsletterId,
                             data_envio: new Date().toISOString(),
-                            status: "enviado",
+                            status: "pendente",
                             token_acesso: token,
-                            expira_em: expiraEm.toISOString()
+                            expira_em: expiraEm.toISOString(),
                         })
                         .select("id")
                         .single();
 
                     if (error) throw new Error("Supabase insert falhou: " + error.message);
-                    registroEnvioId = String(data.id);
+                    registroEnvioId = String(data.id); // bigint → string
 
                 } else {
+                    // Firestore — status "pendente"; backend atualiza após SES
                     const envioRef = await db
                         .collection("usuarios").doc(idDest)
-                        .collection("assinaturas").doc(dest.assinaturaId)
+                        .collection("assinaturas").doc(assinaturaId)
                         .collection("envios")
                         .add({
                             newsletter_id: newsletterId,
                             data_envio: firebase.firestore.Timestamp.now(),
-                            status: "enviado",
+                            status: "pendente",
                             destinatarioId: idDest,
-                            assinaturaId: dest.assinaturaId,
+                            assinaturaId,
                             token_acesso: token,
                             expira_em: firebase.firestore.Timestamp.fromDate(expiraEm),
                             ultimo_acesso: null,
-                            acessos_totais: 0
+                            acessos_totais: 0,
                         });
                     registroEnvioId = envioRef.id;
                 }
+
             } catch (err) {
-                console.error(`❌ Falha ao criar registro de envio para ${dest.email}:`, err);
-                continue; // pula este destinatário sem abortar o lote
+                console.error(`❌ Falha ao criar registro para ${emailDest}:`, err);
+                continue; // pula este destinatário, não aborta o lote
             }
 
-            const segmento = tipoLocal === "leads" ? "leads" : "assinantes";
+            // Monta HTML com substituições de placeholders + rastreamento
             const htmlMontado = montarHtmlNewsletterParaEnvio(newsletter, {
                 nome: dest.nome,
-                email: dest.email,
+                email: emailDest,
                 edicao: newsletter.edicao,
                 tipo: newsletter.tipo,
                 titulo: newsletter.titulo,
                 data_publicacao: newsletter.data_publicacao,
-                newsletterId
+                newsletterId,
             }, segmento);
 
             const htmlFinal = aplicarRastreamento(
-                htmlMontado, registroEnvioId, idDest, newsletterId, assinaturaId, token
+                htmlMontado,
+                registroEnvioId,
+                idDest,
+                newsletterId,
+                assinaturaId,
+                token
             );
 
             payloadEmails.push({
-                nome: dest.nome,
-                email: dest.email,
-                mensagemHtml: htmlFinal,
-                assunto: newsletter.titulo || "Newsletter Radar SIOPE",
-                envioId: registroEnvioId,
+                envioId: registroEnvioId,  // ID do registro criado acima
                 destinatarioId: idDest,
-                tipo: tipoLocal,
-                assinaturaId
+                tipo,
+                assinaturaId,
+                email: emailDest,
+                mensagemHtml: htmlFinal,         // HTML completo, já personalizado
+                assunto: newsletter.titulo || "Newsletter Radar SIOPE",
             });
         }
 
@@ -2353,55 +2386,35 @@ async function enviarLoteEmMassa(newsletterId, envioId, loteId, tipo) {
             return;
         }
 
-        // Envia em massa para o backend SES
+        // ── 3. Envia tudo para o backend ──────────────────────────────────────
+        mostrarMensagem(`📤 Enviando ${payloadEmails.length} e-mails via SES...`);
+
         const response = await fetch("https://api.radarsiope.com.br/api/sendBatchViaSES", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ newsletterId, envioId, loteId, emails: payloadEmails })
+            body: JSON.stringify({
+                newsletterId,
+                envioId,
+                loteId,
+                operador,
+                emails: payloadEmails,
+            }),
         });
 
         const result = await response.json().catch(() => ({}));
-        if (!response.ok) throw new Error(result.error || `Erro backend: ${response.status}`);
 
-        // Atualiza metadados
-        const enviados = payloadEmails.length;
-        const usuarioLogado = JSON.parse(localStorage.getItem("usuarioLogado"));
-        const feitoPor = usuarioLogado?.nome || usuarioLogado?.email || "Desconhecido";
-
-        await loteRef.collection("envios_log").add({
-            data_envio: firebase.firestore.Timestamp.now(),
-            quantidade: destinatarios.length,
-            enviados,
-            origem: "manual",
-            operador: feitoPor,
-            status: enviados === destinatarios.length ? "completo" : "parcial"
-        });
-
-        await loteRef.update({
-            enviados,
-            status: enviados === destinatarios.length ? "completo" : "parcial",
-            data_envio: firebase.firestore.Timestamp.now()
-        });
-
-        const loteGeralSnap = await db.collection("lotes_gerais")
-            .where("loteId", "==", loteId)
-            .where("envioId", "==", envioId)
-            .limit(1).get();
-
-        if (!loteGeralSnap.empty) {
-            await loteGeralSnap.docs[0].ref.update({
-                enviados,
-                status: enviados === destinatarios.length ? "completo" : "parcial",
-                data_envio: firebase.firestore.Timestamp.now()
-            });
+        if (!response.ok) {
+            throw new Error(result.error || `Erro backend: ${response.status}`);
         }
 
-        await db.collection("newsletters").doc(newsletterId).update({
-            enviada: true,
-            data_publicacao: firebase.firestore.Timestamp.now()
-        });
+        // ── 4. Exibe resultado (status vem do backend com contagem real do SES) ─
+        const { enviados = 0, total = payloadEmails.length, status = "?" } = result;
+        const numeroLote = lote.numero_lote || loteId;
 
-        mostrarMensagem(`✅ Lote nº ${lote.numero_lote} enviado! (${enviados}/${destinatarios.length})`);
+        mostrarMensagem(
+            `✅ Lote nº ${numeroLote} concluído: ${enviados}/${total} enviados (${status}).`
+        );
+
         return result;
 
     } catch (err) {
