@@ -439,4 +439,23 @@ function mostrarBannerAtualizacao(reg) {
   });
 }
 
+// ─── Gatilho: aguarda _radarUser estar pronto antes de inicializar ────────────
+// _radarUser é populado pelo verNewsletterComToken.js e sinalizado via evento.
+// Se já estiver pronto quando este script carrega, executa imediatamente.
+(function () {
+  function _iniciar() {
+    if (window._iniciouRadarPWA) return; // evita dupla execução
+    window._iniciouRadarPWA = true;
+    initRadarPWA();
+  }
 
+  if (window._radarUser) {
+    // Já está pronto (script carregou depois do evento)
+    _iniciar();
+  } else {
+    // Aguarda o evento (caso mais comum — script carrega antes)
+    window.addEventListener('radarUserReady', _iniciar, { once: true });
+    // Fallback: se em 8s o evento não disparar, tenta mesmo assim
+    setTimeout(_iniciar, 8000);
+  }
+})();
