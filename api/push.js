@@ -153,7 +153,13 @@ const TEMPLATES = {
 // ─── Handler principal ────────────────────────────────────────────────────────
 export default async function handler(req, res) {
   // CORS
-  res.setHeader('Access-Control-Allow-Origin',  process.env.ALLOWED_ORIGIN || 'https://app.radarsiope.com.br');
+  const _allowedOrigins = [
+    'https://app.radarsiope.com.br',
+    'https://radarsiope-vercel.vercel.app',
+    ...(process.env.ALLOWED_ORIGIN ? [process.env.ALLOWED_ORIGIN] : []),
+  ];
+  const _origin = req.headers.origin || '';
+  res.setHeader('Access-Control-Allow-Origin', _allowedOrigins.includes(_origin) ? _origin : _allowedOrigins[0]);
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, x-admin-token');
   if (req.method === 'OPTIONS') return res.status(204).end();
