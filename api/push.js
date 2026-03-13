@@ -399,15 +399,16 @@ async function _handleAlerta(req, { tipo, parametros = {}, habilitado = true }, 
   // ── Interpola variáveis {chave} nos templates (usa params limpos) ────────────
   const titulo = _sub(template.titulo, params);
   const corpo  = _sub(template.corpo,  params);
-  const url    = _url_override?.trim() || _sub(template.url, params);
+  const BASE_URL = 'https://app.radarsiope.com.br';
+  const url    = _url_override?.trim() || (BASE_URL + _sub(template.url, params));
 
   // ── Monta filtros base do template (sem municipio_cod — tratado abaixo) ────────
   // OneSignal tags customizadas usam field:"tag" + key:"nome_da_tag"
   const filtrosBase = template.filtros
-    .filter(f => f.field !== 'municipio_cod')
+    .filter(f => !(f.field === 'tag' && f.key === 'municipio_cod') && f.field !== 'municipio_cod')
     .map(f => ({
       field:    'tag',
-      key:      f.field,
+      key:      f.key || f.field,   // templates novos têm f.key, antigos usavam f.field
       relation: f.relation,
       value:    _sub(f.value, params),
     }));
