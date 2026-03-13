@@ -116,10 +116,30 @@ async function _aplicarTagsSegmentacao() {
     app_version:        '1.0',
   };
 
+  // Tenta via SDK primeiro; se falhar (409 Conflict), usa o backend como fallback
   try {
     await OneSignal.User.addTags(tags);
+    console.log('[OneSignal] Tags aplicadas via SDK.');
   } catch (err) {
-    console.warn('[OneSignal] Erro ao aplicar tags:', err);
+    console.warn('[OneSignal] SDK falhou, tentando via backend...', err);
+    await _aplicarTagsViaBackend(tags);
+  }
+}
+
+async function _aplicarTagsViaBackend(tags) {
+  try {
+    const playerId = OneSignal.User.PushSubscription.id;
+    if (!playerId) { console.warn('[OneSignal] Sem playerId para sync de tags.'); return; }
+    const r = await fetch('/api/push', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ acao: 'sincronizar-tags', playerId, tags }),
+    });
+    const data = await r.json();
+    if (data.ok) console.log('[OneSignal] Tags sincronizadas via backend.');
+    else console.warn('[OneSignal] Backend falhou:', data.error);
+  } catch (e) {
+    console.warn('[OneSignal] Erro no fallback de tags:', e.message);
   }
 }
 
