@@ -82,13 +82,13 @@ async function atualizarBadgeUsuarios() {
     const snap = await _CONTADOR_REF().get();
 
     if (!snap.exists) {
-      // Inicializa o doc com zeros — NÃO varre dados automaticamente
+      // Doc não existe — cria com zeros e dispara recálculo automático
       await _CONTADOR_REF().set({
         solicitacoes: 0, feedbacks: 0, parcelas_vencidas: 0,
         criado_em: firebase.firestore.FieldValue.serverTimestamp(),
       });
-      badge.textContent   = '0';
-      badge.style.display = 'none';
+      // Recalcula automaticamente para popular o contador
+      recalcularContadores();
       return;
     }
 
@@ -98,7 +98,23 @@ async function atualizarBadgeUsuarios() {
     const pag  = Math.max(0, d.parcelas_vencidas || 0);
     const total = sol + feed + pag;
 
-    badge.textContent   = total > 99 ? '99+' : total;
+    // Se tudo está zerado, faz uma verificação rápida de sanidade:
+    // conta solicitações abertas via collectionGroup para detectar dessincronização
+    if (total === 0) {
+      try {
+        const chk = await db.collectionGroup('solicitacoes')
+          .where('status', 'in', ['pendente', 'aberta'])
+          .limit(1).get();
+        if (!chk.empty) {
+          // Contador dessincronizado — recalcula silenciosamente
+          console.warn('[badge-usuarios] Contador dessincronizado, recalculando...');
+          recalcularContadores();
+          return;
+        }
+      } catch(e) { /* collectionGroup pode não ter índice ainda — ignora */ }
+    }
+
+    badge.textContent   = total > 99 ? '99+' : String(total);
     badge.style.display = total > 0 ? 'inline' : 'none';
     badge.title = [
       `📬 Solicitações pendentes/abertas: ${sol}`,
@@ -106,7 +122,6 @@ async function atualizarBadgeUsuarios() {
       `💳 Parcelas vencidas: ${pag}`,
     ].join('\n');
   } catch(e) {
-    // Permissão negada ou outra falha — não travar o admin
     badge.style.display = 'none';
     console.warn('[badge-usuarios]', e.message);
   }
