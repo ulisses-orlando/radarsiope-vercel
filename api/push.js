@@ -62,23 +62,22 @@ const ONESIGNAL_URL     = 'https://onesignal.com/api/v1/notifications';
 // Admin pode sobrescrever título/corpo via Firestore (coleção: config_alertas)
 const TEMPLATES = {
 
+  // nova_edicao: e-mail é o canal principal. Push aqui serve como aviso geral.
   nova_edicao: {
     titulo:  '📡 Nova edição Radar SIOPE!',
     corpo:   'A edição #{edicao} já está disponível. {titulo}',
     icon:    '/icons/icon-192x192.png',
     url:     '/verNewsletterComToken.html',
-    filtros: [{ field: 'tag', key: 'alerta_nova_edicao', relation: '=', value: '1' }],
+    filtros: [{ field: 'tag', key: 'segmento', relation: '=', value: 'assinante' }],
   },
 
+  // Acesso pro temporário para leads
   nova_edicao_acesso_pro: {
     titulo:  '🔓 Acesso especial liberado!',
     corpo:   'Edição #{edicao} com acesso completo por {horas}h. Exclusivo para você!',
     icon:    '/icons/icon-192x192.png',
     url:     '/verNewsletterComToken.html',
-    filtros: [
-      { field: 'tag', key: 'segmento',           relation: '=', value: 'lead' },
-      { field: 'tag', key: 'alerta_nova_edicao', relation: '=', value: '1'    },
-    ],
+    filtros: [{ field: 'tag', key: 'segmento', relation: '=', value: 'lead' }],
   },
 
   siope_prazo_proximo: {
@@ -454,7 +453,8 @@ async function _handleAlerta(req, { tipo, parametros = {}, habilitado = true }, 
     app_id:          ONESIGNAL_APP_ID,
     headings:        { pt: titulo, en: titulo },
     contents:        { pt: corpo,  en: corpo  },
-    web_url:         url,   // web push — não usar 'url' junto com 'web_url'
+    web_url:         url,
+    launch_url:      url,
     chrome_web_icon: template.icon,
     firefox_icon:    template.icon,
     filters:         filtros,
