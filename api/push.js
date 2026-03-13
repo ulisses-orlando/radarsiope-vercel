@@ -1,7 +1,7 @@
 /* ==========================================================================
    api/push.js — Radar SIOPE · Vercel Function
    Rota: POST /api/push
-// deploy force - 13/03/2026
+
    Ações (campo "acao" no body):
    ┌──────────────┬───────────────────────────────────────────────────────┐
    │ acao         │ descrição                                             │
@@ -467,6 +467,9 @@ async function _handleAlerta(req, { tipo, parametros = {}, habilitado = true }, 
     ttl:             86400,
     data:            { tipo, parametros: params, url },
   };
+
+  console.log('[push/alerta] url:', url);
+  console.log('[push/alerta] payload.url:', payload.url);
 
   // ── Dispara ───────────────────────────────────────────────────────────────────
   let result;
