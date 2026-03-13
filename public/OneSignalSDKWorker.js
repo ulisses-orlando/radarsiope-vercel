@@ -3,15 +3,15 @@
 // stopImmediatePropagation() impede que o SDK abra sua própria URL depois.
 
 self.addEventListener('notificationclick', event => {
-  // Impede que o handler do OneSignal SDK rode após o nosso
   event.stopImmediatePropagation();
   event.notification.close();
 
   const data = event.notification.data || {};
+  // app.html lê rs_pwa_session e busca o envio mais recente automaticamente
   const url  = data.url
     || data.web_url
     || data.launchURL
-    || 'https://app.radarsiope.com.br/verNewsletterComToken.html';
+    || 'https://app.radarsiope.com.br/app.html';
 
   event.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then(clientList => {
