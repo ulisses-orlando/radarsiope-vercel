@@ -86,7 +86,7 @@ const TEMPLATES = {
     icon:    '/icons/icon-192x192.png',
     url:     '/app.html',
     filtros: [
-      { field: 'tag', key: 'alerta_municipio', relation: '=', value: '1'              },
+      { field: 'tag', key: 'uf',              relation: '=', value: '{uf}'            },
       { field: 'tag', key: 'municipio_cod',   relation: '=', value: '{municipio_cod}' },
     ],
   },
@@ -97,7 +97,7 @@ const TEMPLATES = {
     icon:    '/icons/icon-192x192.png',
     url:     '/app.html',
     filtros: [
-      { field: 'tag', key: 'alerta_municipio', relation: '=', value: '1'              },
+      { field: 'tag', key: 'uf',              relation: '=', value: '{uf}'            },
       { field: 'tag', key: 'municipio_cod',   relation: '=', value: '{municipio_cod}' },
     ],
   },
@@ -108,7 +108,7 @@ const TEMPLATES = {
     icon:    '/icons/icon-192x192.png',
     url:     '/app.html',
     filtros: [
-      { field: 'tag', key: 'alerta_municipio', relation: '=', value: '1'              },
+      { field: 'tag', key: 'uf',              relation: '=', value: '{uf}'            },
       { field: 'tag', key: 'municipio_cod',   relation: '=', value: '{municipio_cod}' },
     ],
   },
@@ -119,7 +119,7 @@ const TEMPLATES = {
     icon:    '/icons/icon-192x192.png',
     url:     '/app.html',
     filtros: [
-      { field: 'tag', key: 'alerta_municipio', relation: '=', value: '1'              },
+      { field: 'tag', key: 'uf',              relation: '=', value: '{uf}'            },
       { field: 'tag', key: 'municipio_cod',   relation: '=', value: '{municipio_cod}' },
     ],
   },
@@ -130,7 +130,7 @@ const TEMPLATES = {
     icon:    '/icons/icon-192x192.png',
     url:     '/app.html',
     filtros: [
-      { field: 'tag', key: 'alerta_municipio', relation: '=', value: '1'              },
+      { field: 'tag', key: 'uf',              relation: '=', value: '{uf}'            },
       { field: 'tag', key: 'municipio_cod',   relation: '=', value: '{municipio_cod}' },
     ],
   },
@@ -140,7 +140,7 @@ const TEMPLATES = {
     corpo:   '{titulo_portaria}. Análise completa disponível no Radar SIOPE.',
     icon:    '/icons/icon-192x192.png',
     url:     '/app.html',
-    filtros: [{ field: 'tag', key: 'plano', relation: '=', value: 'supreme' }],
+    filtros: [{ field: 'tag', key: 'segmento', relation: '=', value: 'assinante' }],
   },
 };
 
