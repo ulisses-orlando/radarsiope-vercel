@@ -460,6 +460,7 @@ async function _handleAlerta(req, { tipo, parametros = {}, habilitado = true }, 
     headings:        { pt: titulo, en: titulo },
     contents:        { pt: corpo,  en: corpo  },
     url,
+    web_url:         url,   // web push usa web_url
     chrome_web_icon: template.icon,
     firefox_icon:    template.icon,
     filters:         filtros,
