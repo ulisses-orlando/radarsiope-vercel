@@ -67,7 +67,7 @@ const TEMPLATES = {
     titulo:  '📡 Nova edição Radar SIOPE!',
     corpo:   'A edição #{edicao} já está disponível. {titulo}',
     icon:    '/icons/icon-192x192.png',
-    url:     '/verNewsletterComToken.html',
+    url:     '/app.html',
     filtros: [{ field: 'tag', key: 'segmento', relation: '=', value: 'assinante' }],
   },
 
@@ -76,7 +76,7 @@ const TEMPLATES = {
     titulo:  '🔓 Acesso especial liberado!',
     corpo:   'Edição #{edicao} com acesso completo por {horas}h. Exclusivo para você!',
     icon:    '/icons/icon-192x192.png',
-    url:     '/verNewsletterComToken.html',
+    url:     '/app.html',
     filtros: [{ field: 'tag', key: 'segmento', relation: '=', value: 'lead' }],
   },
 
@@ -84,7 +84,7 @@ const TEMPLATES = {
     titulo:  '⏰ Prazo SIOPE se aproximando!',
     corpo:   '{municipio}/{uf}: prazo de envio em {dias} dias ({data_prazo}). Não perca!',
     icon:    '/icons/icon-192x192.png',
-    url:     '/painel.html',
+    url:     '/app.html',
     filtros: [
       { field: 'tag', key: 'alerta_municipio', relation: '=', value: '1'              },
       { field: 'tag', key: 'municipio_cod',   relation: '=', value: '{municipio_cod}' },
@@ -95,7 +95,7 @@ const TEMPLATES = {
     titulo:  '✅ SIOPE homologado!',
     corpo:   '{municipio}/{uf}: dados do {bimestre}º bimestre de {ano} foram homologados.',
     icon:    '/icons/icon-192x192.png',
-    url:     '/painel.html',
+    url:     '/app.html',
     filtros: [
       { field: 'tag', key: 'alerta_municipio', relation: '=', value: '1'              },
       { field: 'tag', key: 'municipio_cod',   relation: '=', value: '{municipio_cod}' },
@@ -106,7 +106,7 @@ const TEMPLATES = {
     titulo:  '⚠️ Alerta: percentual MDE baixo!',
     corpo:   '{municipio}/{uf}: {percentual}% em MDE ({bimestre}º bim/{ano}). Mínimo: {minimo}%.',
     icon:    '/icons/icon-192x192.png',
-    url:     '/painel.html',
+    url:     '/app.html',
     filtros: [
       { field: 'tag', key: 'alerta_municipio', relation: '=', value: '1'              },
       { field: 'tag', key: 'municipio_cod',   relation: '=', value: '{municipio_cod}' },
@@ -117,7 +117,7 @@ const TEMPLATES = {
     titulo:  '🚨 SIOPE não enviado!',
     corpo:   '{municipio}/{uf}: {bimestre}º bimestre não enviado. Prazo: {data_prazo}.',
     icon:    '/icons/icon-192x192.png',
-    url:     '/painel.html',
+    url:     '/app.html',
     filtros: [
       { field: 'tag', key: 'alerta_municipio', relation: '=', value: '1'              },
       { field: 'tag', key: 'municipio_cod',   relation: '=', value: '{municipio_cod}' },
@@ -128,7 +128,7 @@ const TEMPLATES = {
     titulo:  '💰 Repasse FUNDEB creditado!',
     corpo:   '{municipio}/{uf}: R$ {valor} referentes a {mes}/{ano}.',
     icon:    '/icons/icon-192x192.png',
-    url:     '/painel.html',
+    url:     '/app.html',
     filtros: [
       { field: 'tag', key: 'alerta_municipio', relation: '=', value: '1'              },
       { field: 'tag', key: 'municipio_cod',   relation: '=', value: '{municipio_cod}' },
@@ -139,7 +139,7 @@ const TEMPLATES = {
     titulo:  '📋 Nova portaria publicada!',
     corpo:   '{titulo_portaria}. Análise completa disponível no Radar SIOPE.',
     icon:    '/icons/icon-192x192.png',
-    url:     '/verNewsletterComToken.html',
+    url:     '/app.html',
     filtros: [{ field: 'tag', key: 'plano', relation: '=', value: 'supreme' }],
   },
 };
