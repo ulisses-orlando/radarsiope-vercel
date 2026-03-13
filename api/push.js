@@ -483,6 +483,7 @@ async function _handleAlerta(req, { tipo, parametros = {}, habilitado = true }, 
       body: JSON.stringify(payload),
     });
     result = await resp.json();
+    console.log('[push/alerta] OneSignal response:', JSON.stringify(result));
     if (!resp.ok) throw new Error(JSON.stringify(result));
   } catch (err) {
     console.error('[push/alerta] OneSignal:', err);
