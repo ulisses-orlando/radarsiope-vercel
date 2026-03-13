@@ -525,23 +525,25 @@ function _sub(str, params) {
 
 // ─── Sincronizar tags via REST API (contorna 409 do SDK browser) ──────────────
 async function _handleSincronizarTags(dados, res) {
-  const { playerId, tags } = dados;
-  if (!playerId || !tags) return res.status(400).json({ ok: false, error: 'playerId e tags obrigatórios.' });
+  // subscriptionId = PushSubscription.id (API v1 player_id)
+  const { subscriptionId, tags } = dados;
+  if (!subscriptionId || !tags) return res.status(400).json({ ok: false, error: 'subscriptionId e tags obrigatórios.' });
 
   try {
+    // API v1 — PUT /players/:id com app_id + tags
     const r = await fetch(
-      `https://api.onesignal.com/apps/${ONESIGNAL_APP_ID}/users/by/onesignal_id/${playerId}`,
+      `https://onesignal.com/api/v1/players/${subscriptionId}`,
       {
-        method:  'PATCH',
+        method:  'PUT',
         headers: {
           'Content-Type':  'application/json',
           'Authorization': `Key ${ONESIGNAL_API_KEY}`,
         },
-        body: JSON.stringify({ tags }),
+        body: JSON.stringify({ app_id: ONESIGNAL_APP_ID, tags }),
       }
     );
     const data = await r.json();
-    if (!r.ok) {
+    if (!r.ok || !data.success) {
       console.error('[push/sincronizar-tags] Erro OneSignal:', JSON.stringify(data));
       return res.status(500).json({ ok: false, error: JSON.stringify(data) });
     }
