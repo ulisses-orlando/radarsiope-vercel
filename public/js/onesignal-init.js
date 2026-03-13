@@ -116,14 +116,10 @@ async function _aplicarTagsSegmentacao() {
     app_version:        '1.0',
   };
 
-  // Tenta via SDK primeiro; se falhar (409 Conflict), usa o backend como fallback
-  try {
-    await OneSignal.User.addTags(tags);
-    console.log('[OneSignal] Tags aplicadas via SDK.');
-  } catch (err) {
-    console.warn('[OneSignal] SDK falhou, tentando via backend...', err);
-    await _aplicarTagsViaBackend(tags);
-  }
+  // Aplica tags via backend (método principal)
+  // O SDK addTags() é fire-and-forget e não confirma entrega — usamos o backend
+  // que faz o PATCH direto na REST API do OneSignal com a chave de serviço
+  await _aplicarTagsViaBackend(tags);
 }
 
 async function _aplicarTagsViaBackend(tags) {
