@@ -34,13 +34,9 @@ async function initRadarPWA() {
 
 // ─── Service Worker ───────────────────────────────────────────────────────────
 async function registrarServiceWorker() {
-  if (!('serviceWorker' in navigator)) return;
-  try {
-    await navigator.serviceWorker.register('/OneSignalSDKWorker.js', { scope: '/' });
-    console.log('[PWA] Service Worker registrado.');
-  } catch (err) {
-    console.warn('[PWA] Falha ao registrar SW:', err);
-  }
+  // O OneSignal v16 registra o SW automaticamente via SDK.
+  // Não registramos manualmente para evitar conflito de escopo.
+  console.log('[PWA] SW gerenciado pelo OneSignal SDK.');
 }
 
 // ─── OneSignal ────────────────────────────────────────────────────────────────
@@ -124,12 +120,12 @@ async function _aplicarTagsSegmentacao() {
 
 async function _aplicarTagsViaBackend(tags) {
   try {
-    const playerId = OneSignal.User.PushSubscription.id;
-    if (!playerId) { console.warn('[OneSignal] Sem playerId para sync de tags.'); return; }
+    const subscriptionId = OneSignal.User.PushSubscription.id;
+    if (!subscriptionId) { console.warn('[OneSignal] Sem subscriptionId para sync de tags.'); return; }
     const r = await fetch('/api/push', {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ acao: 'sincronizar-tags', playerId, tags }),
+      body:    JSON.stringify({ acao: 'sincronizar-tags', subscriptionId, tags }),
     });
     const data = await r.json();
     if (data.ok) console.log('[OneSignal] Tags sincronizadas via backend.');
