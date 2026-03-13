@@ -71,6 +71,16 @@ async function _inicializarOneSignal() {
         allowLocalhostAsSecureOrigin: true,
       });
 
+      // Listener de clique — redireciona para a URL correta da notificação
+      OneSignal.Notifications.addEventListener('click', (event) => {
+        const url = event?.notification?.launchURL
+          || event?.notification?.data?.url
+          || event?.result?.url;
+        if (url && url !== window.location.href) {
+          window.location.href = url;
+        }
+      });
+
       await OneSignal.Notifications.requestPermission();
       // Aplica tags e salva player ID sempre que já houver permissão concedida
       // (requestPermission retorna false em visitas subsequentes, mas a permissão existe)
