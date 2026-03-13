@@ -110,16 +110,14 @@ async function _aplicarTagsSegmentacao() {
   const user = window._radarUser;
   if (!user) return;
 
+  // 3 tags disponíveis no plano gratuito OneSignal:
+  // segmento → tipo de usuário (assinante | lead)
+  // municipio_cod → código IBGE do município monitorado
+  // uf → sigla do estado (permite alertas regionais)
   const tags = {
-    segmento:           user.segmento       || 'lead',
-    plano:              user.plano_slug     || 'none',
-    perfil:             user.perfil         || '',
-    uf:                 user.uf             || '',
-    municipio_cod:      user.municipio_cod  || '',
-    municipio_nome:     user.municipio_nome || '',
-    alerta_municipio:   _temAlertaMunicipio(user) ? '1' : '0',
-    alerta_nova_edicao: '1',
-    app_version:        '1.0',
+    segmento:      user.segmento      || 'lead',
+    municipio_cod: user.municipio_cod || '',
+    uf:            user.uf            || '',
   };
 
   // Aplica tags via backend (método principal)
@@ -145,15 +143,16 @@ async function _aplicarTagsViaBackend(tags) {
   }
 }
 
-function _temAlertaMunicipio(user) {
-  return ['profissional', 'premium', 'supreme'].includes(user?.plano_slug);
-}
 
-// ─── Salvar Player ID ─────────────────────────────────────────────────────────
+
+// ─── Salvar Subscription ID ──────────────────────────────────────────────────
+// subscriptionId = PushSubscription.id (API v1 player_id)
+// onesignalId    = User.onesignalId    (User ID, para referência)
 async function _salvarPlayerId() {
   try {
-    const playerId = await OneSignal.User.PushSubscription.id;
-    if (!playerId) return;
+    const subscriptionId = OneSignal.User.PushSubscription.id;
+    const onesignalId    = OneSignal.User.onesignalId;
+    if (!subscriptionId) return;
 
     const user = window._radarUser;
     if (!user?.uid) return;
@@ -163,25 +162,27 @@ async function _salvarPlayerId() {
       const db = window.db;
       if (!db) return;
       await db.collection('usuarios').doc(user.uid).update({
-        onesignal_player_id: playerId,
-        push_opt_in:         true,
-        push_opt_in_em:      firebase.firestore.FieldValue.serverTimestamp(),
-        push_plataforma:     _detectarPlataforma(),
+        onesignal_player_id:    subscriptionId,  // subscription ID (usado na API v1)
+        onesignal_id:           onesignalId || null, // user ID (para referência)
+        push_opt_in:            true,
+        push_opt_in_em:         firebase.firestore.FieldValue.serverTimestamp(),
+        push_plataforma:        _detectarPlataforma(),
       });
     } else {
       // Lead → Supabase via API
-      await fetch('/api/leads/push-token', {
+      await fetch('/api/push', {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
         body:    JSON.stringify({
+          acao:       'token',
           leadId:     user.uid,
-          playerId,
+          playerId:   subscriptionId,
           plataforma: _detectarPlataforma(),
         }),
       });
     }
   } catch (err) {
-    console.warn('[OneSignal] Erro ao salvar Player ID:', err);
+    console.warn('[OneSignal] Erro ao salvar Subscription ID:', err);
   }
 }
 

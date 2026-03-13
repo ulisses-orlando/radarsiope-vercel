@@ -40,7 +40,7 @@ const PUSH_TEMPLATES = {
     publico:    'assinantes',
     bloqueaPublico: false,
     filtros:    [
-      { field: 'alerta_municipio', relation: '=', value: '1'              },
+      { field: 'uf',              relation: '=', value: '{uf}'            },
       { field: 'municipio_cod',   relation: '=', value: '{municipio_cod}' },
     ],
   },
@@ -53,7 +53,7 @@ const PUSH_TEMPLATES = {
     publico:    'assinantes',
     bloqueaPublico: false,
     filtros:    [
-      { field: 'alerta_municipio', relation: '=', value: '1'              },
+      { field: 'uf',              relation: '=', value: '{uf}'            },
       { field: 'municipio_cod',   relation: '=', value: '{municipio_cod}' },
     ],
   },
@@ -66,7 +66,7 @@ const PUSH_TEMPLATES = {
     publico:    'assinantes',
     bloqueaPublico: false,
     filtros:    [
-      { field: 'alerta_municipio', relation: '=', value: '1'              },
+      { field: 'uf',              relation: '=', value: '{uf}'            },
       { field: 'municipio_cod',   relation: '=', value: '{municipio_cod}' },
     ],
   },
@@ -79,7 +79,7 @@ const PUSH_TEMPLATES = {
     publico:    'assinantes',
     bloqueaPublico: false,
     filtros:    [
-      { field: 'alerta_municipio', relation: '=', value: '1'              },
+      { field: 'uf',              relation: '=', value: '{uf}'            },
       { field: 'municipio_cod',   relation: '=', value: '{municipio_cod}' },
     ],
   },
@@ -92,7 +92,7 @@ const PUSH_TEMPLATES = {
     publico:    'assinantes',
     bloqueaPublico: false,
     filtros:    [
-      { field: 'alerta_municipio', relation: '=', value: '1'              },
+      { field: 'uf',              relation: '=', value: '{uf}'            },
       { field: 'municipio_cod',   relation: '=', value: '{municipio_cod}' },
     ],
   },
@@ -838,13 +838,7 @@ function _montarFiltros(tpl, params) {
     filtrosBase.push({ field: 'tag', key: 'segmento', relation: '=', value: val });
   }
 
-  // Filtro de feature (alerta_municipio)
-  if (publico === 'assinantes' && feature !== 'todos') {
-    const val = feature === 'com' ? '1' : '0';
-    const idx = filtrosBase.findIndex(f => f.key === 'alerta_municipio');
-    if (idx !== -1) filtrosBase.splice(idx, 1);
-    filtrosBase.push({ field: 'tag', key: 'alerta_municipio', relation: '=', value: val });
-  }
+  // (feature filter removido — alerta_municipio substituído por uf)
 
   // Múltiplos municípios → grupos com OR
   if (!muns || muns.length === 0) return filtrosBase;
