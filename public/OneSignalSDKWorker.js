@@ -1,29 +1,32 @@
 // OneSignalSDKWorker.js
-// Arquivo exigido pelo SDK do OneSignal v16 na raiz do domínio.
-importScripts('https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.sw.js');
-importScripts('/sw.js');
+// IMPORTANTE: o listener de notificationclick deve ser registrado ANTES
+// de importar o SDK do OneSignal, para que nosso handler tenha prioridade.
 
-// Sobrescreve o notificationclick do SDK para usar a URL correta do payload
 self.addEventListener('notificationclick', event => {
   event.notification.close();
 
-  // Tenta extrair URL do campo data (enviado no payload via campo "data")
+  // URL vem do campo "data" do payload (enviado por api/push.js)
   const data = event.notification.data || {};
   const url  = data.url
     || data.web_url
     || data.launchURL
-    || event.notification.actions?.[0]?.action
     || 'https://app.radarsiope.com.br/verNewsletterComToken.html';
 
   event.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then(clientList => {
+      // Se já tem aba do app aberta, navega nela
       for (const client of clientList) {
-        if ('focus' in client) {
+        if (client.url.startsWith('https://app.radarsiope.com.br') && 'focus' in client) {
           client.navigate(url);
           return client.focus();
         }
       }
+      // Senão abre nova aba
       if (clients.openWindow) return clients.openWindow(url);
     })
   );
-}, true); // true = capture phase, executa antes do handler do SDK
+});
+
+// SDK do OneSignal (registrado DEPOIS do nosso handler)
+importScripts('https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.sw.js');
+importScripts('/sw.js');
