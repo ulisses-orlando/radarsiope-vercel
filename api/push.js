@@ -469,7 +469,7 @@ async function _handleAlerta(req, { tipo, parametros = {}, habilitado = true }, 
   };
 
   console.log('[push/alerta] url:', url);
-  console.log('[push/alerta] payload.url:', payload.url);
+  console.log('[push/alerta] payload completo:', JSON.stringify(payload));
 
   // ── Dispara ───────────────────────────────────────────────────────────────────
   let result;
