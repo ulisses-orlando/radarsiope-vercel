@@ -88,7 +88,6 @@ const TEMPLATES = {
     url:     '/painel.html',
     filtros: [
       { field: 'tag', key: 'alerta_municipio', relation: '=', value: '1'              },
-      { field: 'tag', key: 'uf',              relation: '=', value: '{uf}'            },
       { field: 'tag', key: 'municipio_cod',   relation: '=', value: '{municipio_cod}' },
     ],
   },
@@ -100,7 +99,6 @@ const TEMPLATES = {
     url:     '/painel.html',
     filtros: [
       { field: 'tag', key: 'alerta_municipio', relation: '=', value: '1'              },
-      { field: 'tag', key: 'uf',              relation: '=', value: '{uf}'            },
       { field: 'tag', key: 'municipio_cod',   relation: '=', value: '{municipio_cod}' },
     ],
   },
@@ -112,7 +110,6 @@ const TEMPLATES = {
     url:     '/painel.html',
     filtros: [
       { field: 'tag', key: 'alerta_municipio', relation: '=', value: '1'              },
-      { field: 'tag', key: 'uf',              relation: '=', value: '{uf}'            },
       { field: 'tag', key: 'municipio_cod',   relation: '=', value: '{municipio_cod}' },
     ],
   },
@@ -124,7 +121,6 @@ const TEMPLATES = {
     url:     '/painel.html',
     filtros: [
       { field: 'tag', key: 'alerta_municipio', relation: '=', value: '1'              },
-      { field: 'tag', key: 'uf',              relation: '=', value: '{uf}'            },
       { field: 'tag', key: 'municipio_cod',   relation: '=', value: '{municipio_cod}' },
     ],
   },
@@ -136,7 +132,6 @@ const TEMPLATES = {
     url:     '/painel.html',
     filtros: [
       { field: 'tag', key: 'alerta_municipio', relation: '=', value: '1'              },
-      { field: 'tag', key: 'uf',              relation: '=', value: '{uf}'            },
       { field: 'tag', key: 'municipio_cod',   relation: '=', value: '{municipio_cod}' },
     ],
   },
@@ -468,9 +463,6 @@ async function _handleAlerta(req, { tipo, parametros = {}, habilitado = true }, 
     data:            { tipo, parametros: params, url },
   };
 
-  console.log('[push/alerta] url:', url);
-  console.log('[push/alerta] payload completo:', JSON.stringify(payload));
-
   // ── Dispara ───────────────────────────────────────────────────────────────────
   let result;
   try {
@@ -483,7 +475,6 @@ async function _handleAlerta(req, { tipo, parametros = {}, habilitado = true }, 
       body: JSON.stringify(payload),
     });
     result = await resp.json();
-    console.log('[push/alerta] OneSignal response:', JSON.stringify(result));
     if (!resp.ok) throw new Error(JSON.stringify(result));
   } catch (err) {
     console.error('[push/alerta] OneSignal:', err);
