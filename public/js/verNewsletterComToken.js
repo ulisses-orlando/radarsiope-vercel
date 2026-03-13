@@ -620,6 +620,102 @@ async function buscarPorNumero(numero) {
   return { id: snap.docs[0].id, ...snap.docs[0].data() };
 }
 
+// ─── MODO ALERTA (sem parâmetros de edição) ────────────────────────────────────
+// Ativado quando o app é aberto via notificação push sem link de edição específica.
+// Carrega usuário da sessão PWA e abre a Central de Mensagens automaticamente.
+
+async function _tentarModoAlerta() {
+  let sessao = null;
+  try {
+    const raw = localStorage.getItem('rs_pwa_session');
+    if (raw) sessao = JSON.parse(raw);
+  } catch (e) { /* ignora */ }
+
+  if (!sessao || !sessao.uid) {
+    // Sem sessão → erro padrão com link para login
+    mostrarErro(
+      '<strong>Link inválido ou incompleto.</strong>',
+      'Verifique o link recebido por e-mail ou acesse a <a href="/login.html">Área do Assinante</a>.'
+    );
+    return;
+  }
+
+  try {
+    // Busca dados do usuário no Firestore
+    const userSnap = await db.collection('usuarios').doc(sessao.uid).get();
+    if (!userSnap.exists) {
+      mostrarErro('Sessão expirada.', 'Acesse a <a href="/login.html">Área do Assinante</a>.');
+      return;
+    }
+
+    const destinatario = { _uid: userSnap.id, ...userSnap.data() };
+
+    // Busca assinatura ativa se disponível
+    if (sessao.assinaturaId) {
+      try {
+        const assinaturaSnap = await db.collection('usuarios').doc(sessao.uid)
+          .collection('assinaturas').doc(sessao.assinaturaId).get();
+        if (assinaturaSnap.exists) {
+          const assinaturaData = assinaturaSnap.data();
+          destinatario.features  = assinaturaData.features_snapshot || assinaturaData.features || destinatario.features || {};
+          destinatario.plano_slug = assinaturaData.plano_slug || destinatario.plano_slug || null;
+        }
+      } catch (e) { /* ignora, continua sem features */ }
+    }
+
+    // Popula _radarUser para que a Central de Mensagens funcione
+    publicarRadarUser(destinatario, sessao.segmento === 'assinante' ? 'assinantes' : 'leads', sessao.assinaturaId);
+
+    // Renderiza header mínimo (sem edição específica)
+    const headerSaudacao = document.getElementById('hd-saudacao');
+    const headerTitulo   = document.getElementById('hd-titulo');
+    const headerEdicao   = document.getElementById('hd-edicao');
+    const headerData     = document.getElementById('hd-data');
+    const nome = (destinatario.nome || '').split(' ')[0];
+    if (headerSaudacao) headerSaudacao.textContent = nome ? `Olá, ${nome}!` : '';
+    if (headerTitulo)   headerTitulo.textContent   = 'Radar SIOPE';
+    if (headerEdicao)   headerEdicao.textContent   = '';
+    if (headerData)     headerData.textContent     = '';
+    document.title = 'Radar SIOPE';
+
+    // Oculta seções de conteúdo de edição — não há edição carregada
+    ['rs-toggle-modo', 'modo-rapido', 'modo-completo', 'secao-midia',
+     'secao-faq', 'rs-banner-recente', 'rs-watermark', 'rs-cta-wrap'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.style.display = 'none';
+    });
+
+    // Mostra placeholder amigável na seção de município
+    const munConteudo = document.getElementById('municipio-conteudo');
+    if (munConteudo) {
+      munConteudo.innerHTML = `
+        <div style="padding:20px;text-align:center;color:var(--rs-muted)">
+          <div style="font-size:28px;margin-bottom:8px">📬</div>
+          <div style="font-size:13px;line-height:1.6">
+            Você chegou via notificação.<br>
+            Use o botão <strong>📚 Edições</strong> para ler a newsletter,<br>
+            ou confira seus alertas em <strong>🔔 Alertas</strong>.
+          </div>
+        </div>`;
+      const btnHist = document.getElementById('btn-ver-historico');
+      if (btnHist) btnHist.style.display = 'none';
+    }
+
+    // Exibe o app
+    mostrarApp();
+
+    // Abre a Central de Mensagens automaticamente após um pequeno delay
+    setTimeout(() => {
+      const btnAlertas = document.getElementById('rs-alertas-btn');
+      if (btnAlertas) btnAlertas.click();
+    }, 600);
+
+  } catch (err) {
+    console.error('[verNL] Erro no modo alerta:', err);
+    mostrarErro('Erro ao carregar seus dados.', err.message);
+  }
+}
+
 // ─── FLUXO PRINCIPAL ──────────────────────────────────────────────────────────
 
 async function VerNewsletterComToken() {
@@ -632,11 +728,10 @@ async function VerNewsletterComToken() {
   const edicaoNum = params.get('edicao_numero');
 
   // 0. Validação inicial
+  // Se não há parâmetros mas existe sessão PWA salva → abre em "modo alerta"
+  // (usuário chegou via notificação push sem link de edição específica)
   if ((!d_nid && !edicaoNum) || !env || !uid || !token) {
-    mostrarErro(
-      '<strong>Link inválido ou incompleto.</strong>',
-      'Verifique o link recebido por e-mail ou acesse a <a href="/login.html">Área do Assinante</a>.'
-    );
+    await _tentarModoAlerta();
     return;
   }
 
