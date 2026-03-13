@@ -175,6 +175,7 @@ export default async function handler(req, res) {
     case 'admin-token':       return _handleAdminToken(dados, res);
     case 'buscar-municipios': return _handleBuscarMunicipios(req, dados, res);
     case 'alerta':            return _handleAlerta(req, dados, res);
+    case 'sincronizar-tags':  return _handleSincronizarTags(dados, res);
     default:                  return res.status(400).json({ ok: false, error: `Ação desconhecida: ${acao}` });
   }
 }
@@ -519,4 +520,33 @@ function _sub(str, params) {
   return str.replace(/\{(\w+)\}/g, (_, k) =>
     params[k] !== undefined ? String(params[k]) : `{${k}}`
   );
+}
+
+// ─── Sincronizar tags via REST API (contorna 409 do SDK browser) ──────────────
+async function _handleSincronizarTags(dados, res) {
+  const { playerId, tags } = dados;
+  if (!playerId || !tags) return res.status(400).json({ ok: false, error: 'playerId e tags obrigatórios.' });
+
+  try {
+    const r = await fetch(
+      `https://api.onesignal.com/apps/${ONESIGNAL_APP_ID}/users/by/onesignal_id/${playerId}`,
+      {
+        method:  'PATCH',
+        headers: {
+          'Content-Type':  'application/json',
+          'Authorization': `Key ${ONESIGNAL_API_KEY}`,
+        },
+        body: JSON.stringify({ tags }),
+      }
+    );
+    const data = await r.json();
+    if (!r.ok) {
+      console.error('[push/sincronizar-tags] Erro OneSignal:', JSON.stringify(data));
+      return res.status(500).json({ ok: false, error: JSON.stringify(data) });
+    }
+    return res.status(200).json({ ok: true });
+  } catch (e) {
+    console.error('[push/sincronizar-tags] Exceção:', e.message);
+    return res.status(500).json({ ok: false, error: e.message });
+  }
 }
