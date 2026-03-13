@@ -5,41 +5,42 @@
    ========================================================================== */
 
 // ─── Configuração dos templates (espelha api/push.js) ─────────────────────────
+// ─── Tags disponíveis por device (plano gratuito OneSignal = 3 tags) ────────
+// segmento      → 'assinante' | 'lead'
+// municipio_cod → código IBGE do município monitorado
+// alerta_municipio → '1' = opt-in para alertas municipais
+// ─────────────────────────────────────────────────────────────────────────────
 const PUSH_TEMPLATES = {
   nova_edicao: {
-    label:      '📡 Nova edição',
+    label:      '📡 Nova edição (assinantes)',
     titulo:     '📡 Nova edição Radar SIOPE!',
     corpo:      'A edição #{edicao} já está disponível. {titulo}',
     url:        '/verNewsletterComToken.html',
     parametros: ['edicao', 'titulo'],
-    publico:    'todos',
-    bloqueaPublico: false,
-    filtros:    [{ field: 'alerta_nova_edicao', relation: '=', value: '1' }],
+    publico:    'assinantes',
+    bloqueaPublico: true,
+    filtros:    [{ field: 'segmento', relation: '=', value: 'assinante' }],
   },
   nova_edicao_acesso_pro: {
-    label:      '🔓 Acesso especial para leads',
+    label:      '🔓 Acesso especial (leads)',
     titulo:     '🔓 Acesso especial liberado!',
     corpo:      'Edição #{edicao} com acesso completo por {horas}h. Exclusivo para você!',
     url:        '/verNewsletterComToken.html',
     parametros: ['edicao', 'horas'],
     publico:    'leads',
     bloqueaPublico: true,
-    filtros:    [
-      { field: 'segmento',           relation: '=', value: 'lead' },
-      { field: 'alerta_nova_edicao', relation: '=', value: '1'   },
-    ],
+    filtros:    [{ field: 'segmento', relation: '=', value: 'lead' }],
   },
   siope_prazo_proximo: {
     label:      '⏰ Prazo SIOPE se aproximando',
     titulo:     '⏰ Prazo SIOPE se aproximando!',
     corpo:      '{municipio}/{uf}: prazo em {dias} dias ({data_prazo}). Não perca!',
-    url:        '/painel.html',
+    url:        '/verNewsletterComToken.html',
     parametros: ['municipio', 'uf', 'municipio_cod', 'dias', 'data_prazo'],
     publico:    'assinantes',
     bloqueaPublico: false,
     filtros:    [
       { field: 'alerta_municipio', relation: '=', value: '1'              },
-      { field: 'uf',              relation: '=', value: '{uf}'            },
       { field: 'municipio_cod',   relation: '=', value: '{municipio_cod}' },
     ],
   },
@@ -47,13 +48,12 @@ const PUSH_TEMPLATES = {
     label:      '✅ SIOPE homologado',
     titulo:     '✅ SIOPE homologado!',
     corpo:      '{municipio}/{uf}: dados do {bimestre}º bimestre de {ano} foram homologados.',
-    url:        '/painel.html',
+    url:        '/verNewsletterComToken.html',
     parametros: ['municipio', 'uf', 'municipio_cod', 'bimestre', 'ano'],
     publico:    'assinantes',
     bloqueaPublico: false,
     filtros:    [
       { field: 'alerta_municipio', relation: '=', value: '1'              },
-      { field: 'uf',              relation: '=', value: '{uf}'            },
       { field: 'municipio_cod',   relation: '=', value: '{municipio_cod}' },
     ],
   },
@@ -61,13 +61,12 @@ const PUSH_TEMPLATES = {
     label:      '⚠️ Percentual MDE baixo',
     titulo:     '⚠️ Alerta: percentual MDE baixo!',
     corpo:      '{municipio}/{uf}: {percentual}% em MDE ({bimestre}º bim/{ano}). Mínimo: {minimo}%.',
-    url:        '/painel.html',
+    url:        '/verNewsletterComToken.html',
     parametros: ['municipio', 'uf', 'municipio_cod', 'bimestre', 'ano', 'percentual', 'minimo'],
     publico:    'assinantes',
     bloqueaPublico: false,
     filtros:    [
       { field: 'alerta_municipio', relation: '=', value: '1'              },
-      { field: 'uf',              relation: '=', value: '{uf}'            },
       { field: 'municipio_cod',   relation: '=', value: '{municipio_cod}' },
     ],
   },
@@ -75,13 +74,12 @@ const PUSH_TEMPLATES = {
     label:      '🚨 SIOPE não enviado',
     titulo:     '🚨 SIOPE não enviado!',
     corpo:      '{municipio}/{uf}: {bimestre}º bimestre não enviado. Prazo: {data_prazo}.',
-    url:        '/painel.html',
+    url:        '/verNewsletterComToken.html',
     parametros: ['municipio', 'uf', 'municipio_cod', 'bimestre', 'data_prazo'],
     publico:    'assinantes',
     bloqueaPublico: false,
     filtros:    [
       { field: 'alerta_municipio', relation: '=', value: '1'              },
-      { field: 'uf',              relation: '=', value: '{uf}'            },
       { field: 'municipio_cod',   relation: '=', value: '{municipio_cod}' },
     ],
   },
@@ -89,25 +87,24 @@ const PUSH_TEMPLATES = {
     label:      '💰 Repasse FUNDEB creditado',
     titulo:     '💰 Repasse FUNDEB creditado!',
     corpo:      '{municipio}/{uf}: R$ {valor} referentes a {mes}/{ano}.',
-    url:        '/painel.html',
+    url:        '/verNewsletterComToken.html',
     parametros: ['municipio', 'uf', 'municipio_cod', 'valor', 'mes', 'ano'],
     publico:    'assinantes',
     bloqueaPublico: false,
     filtros:    [
       { field: 'alerta_municipio', relation: '=', value: '1'              },
-      { field: 'uf',              relation: '=', value: '{uf}'            },
       { field: 'municipio_cod',   relation: '=', value: '{municipio_cod}' },
     ],
   },
   portaria_publicada: {
-    label:      '📋 Nova portaria (Supreme)',
+    label:      '📋 Nova portaria (todos assinantes)',
     titulo:     '📋 Nova portaria publicada!',
     corpo:      '{titulo_portaria}. Análise completa disponível no Radar SIOPE.',
     url:        '/verNewsletterComToken.html',
     parametros: ['titulo_portaria'],
     publico:    'assinantes',
-    bloqueaPublico: false,
-    filtros:    [{ field: 'plano', relation: '=', value: 'supreme' }],
+    bloqueaPublico: true,
+    filtros:    [{ field: 'segmento', relation: '=', value: 'assinante' }],
   },
 };
 
@@ -635,8 +632,8 @@ window._pushAtualizarPreview = function () {
   if (filtros.length) {
     filtrosInfo.style.display = 'block';
     filtrosTags.innerHTML     = filtros.map(f => {
-      const isUpsell = f.field === 'alerta_municipio' && f.value === '0';
-      return `<span class="push-tag${isUpsell ? ' upsell' : ''}">${f.field} ${f.relation} "${f.value}"</span>`;
+      const key = f.key || f.field;
+      return `<span class="push-tag">${key} ${f.relation} "${f.value}"</span>`;
     }).join(' ');
   } else {
     filtrosInfo.style.display = 'none';
@@ -661,7 +658,7 @@ window._pushConfirmar = function () {
   const filtros = _montarFiltros(tpl, params);
   const titulo  = _sub(tpl.titulo, params);
 
-  const desc = filtros.map(f => `${f.field} = "${f.value}"`).join(', ');
+  const desc = filtros.map(f => `${f.key || f.field} = "${f.value}"`).join(', ');
   document.getElementById('push-modal-texto').innerHTML =
     `Você está prestes a enviar:<br><br>
      <strong>${titulo}</strong><br><br>
@@ -829,36 +826,37 @@ function _montarFiltros(tpl, params) {
   const muns     = params._municipios || null;
 
   // Filtros base do template — sem municipio_cod (tratado abaixo via _municipios)
+  // Normaliza para formato { field:'tag', key:'...', relation, value } exigido pela API OneSignal
   const filtrosBase = (tpl.filtros || [])
-    .filter(f => f.field !== 'municipio_cod')
-    .map(f => ({ ...f, value: _sub(f.value, params) }));
+    .filter(f => (f.key || f.field) !== 'municipio_cod')
+    .map(f => ({ field: 'tag', key: f.key || f.field, relation: f.relation, value: _sub(f.value, params) }));
 
-  // Filtro de público
-  const temSegmento = filtrosBase.some(f => f.field === 'segmento');
+  // Filtro de público (só adiciona se o template não tiver segmento)
+  const temSegmento = filtrosBase.some(f => f.key === 'segmento');
   if (!temSegmento && publico !== 'todos') {
     const val = publico === 'assinantes' ? 'assinante' : 'lead';
-    filtrosBase.push({ field: 'segmento', relation: '=', value: val });
+    filtrosBase.push({ field: 'tag', key: 'segmento', relation: '=', value: val });
   }
 
-  // Filtro de feature
+  // Filtro de feature (alerta_municipio)
   if (publico === 'assinantes' && feature !== 'todos') {
     const val = feature === 'com' ? '1' : '0';
-    const idx = filtrosBase.findIndex(f => f.field === 'alerta_municipio');
+    const idx = filtrosBase.findIndex(f => f.key === 'alerta_municipio');
     if (idx !== -1) filtrosBase.splice(idx, 1);
-    filtrosBase.push({ field: 'alerta_municipio', relation: '=', value: val });
+    filtrosBase.push({ field: 'tag', key: 'alerta_municipio', relation: '=', value: val });
   }
 
   // Múltiplos municípios → grupos com OR
   if (!muns || muns.length === 0) return filtrosBase;
   if (muns.length === 1) {
-    return [...filtrosBase, { field: 'municipio_cod', relation: '=', value: String(muns[0].cod) }];
+    return [...filtrosBase, { field: 'tag', key: 'municipio_cod', relation: '=', value: String(muns[0].cod) }];
   }
   // Expande: (base AND cod=A) OR (base AND cod=B) ...
   const filtros = [];
   muns.forEach((mun, i) => {
     if (i > 0) filtros.push({ operator: 'OR' });
     filtrosBase.forEach(f => filtros.push({ ...f }));
-    filtros.push({ field: 'municipio_cod', relation: '=', value: String(mun.cod) });
+    filtros.push({ field: 'tag', key: 'municipio_cod', relation: '=', value: String(mun.cod) });
   });
   return filtros;
 }
