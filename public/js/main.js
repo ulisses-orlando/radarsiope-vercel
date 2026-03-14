@@ -1814,8 +1814,8 @@ async function carregarLeads(resetar = false) {
           </td>
           <td style="white-space:nowrap">
             ${temMensagem && !respondida
-          ? `<span class="icon-btn" title="Responder mensagem"
-                  onclick="abrirModalResponderMensagem('${d.id}','${(d.mensagem || '').replace(/'/g, "\\'")}')">💬</span>`
+          ? `<span class="icon-btn" title="Responder mensagem por e-mail"
+                  onclick="abrirModalResponderMensagem('${d.id}','${(d.mensagem || '').replace(/'/g, "\\'")}')">📧</span>`
           : ""}
             <span class="icon-btn" title="Mensagens"
               onclick="abrirModalMensagensLead(this)" data-lead-id="${d.id}" data-lead-nome="${(d.nome||'').replace(/"/g,'&quot;')}">💬</span>
