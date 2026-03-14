@@ -170,6 +170,7 @@ export default async function handler(req, res) {
     case 'buscar-municipios': return _handleBuscarMunicipios(req, dados, res);
     case 'alerta':            return _handleAlerta(req, dados, res);
     case 'sincronizar-tags':  return _handleSincronizarTags(dados, res);
+    case 'resposta-mensagem': return _handleRespostaMensagem(dados, res);
     default:                  return res.status(400).json({ ok: false, error: `Ação desconhecida: ${acao}` });
   }
 }
@@ -508,6 +509,39 @@ async function _handleAlerta(req, { tipo, parametros = {}, habilitado = true }, 
     destinatarios: result.recipients || 0,
     onesignal_id:  result.id,
   });
+}
+
+// ─── Push individual: notifica usuário sobre resposta recebida ───────────────
+async function _handleRespostaMensagem(dados, res) {
+  const { playerId, titulo, corpo } = dados;
+  if (!playerId) return res.status(400).json({ ok: false, error: 'playerId obrigatório.' });
+
+  const t = titulo || '💬 Você tem uma resposta!';
+  const c = corpo  || 'A equipe Radar SIOPE respondeu sua mensagem. Acesse o Fale Conosco.';
+  const url = `${BASE_URL}/verNewsletterComToken.html`;
+
+  try {
+    const resp = await fetch('https://onesignal.com/api/v1/notifications', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Key ${ONESIGNAL_API_KEY}` },
+      body: JSON.stringify({
+        app_id:          ONESIGNAL_APP_ID,
+        headings:        { pt: t, en: t },
+        contents:        { pt: c, en: c },
+        web_url:         url,
+        chrome_web_icon: '/icons/icon-192x192.png',
+        include_subscription_ids: [playerId],
+        data: { tipo: 'resposta_mensagem', url },
+        ttl: 86400,
+      }),
+    });
+    const result = await resp.json();
+    if (!resp.ok) throw new Error(JSON.stringify(result));
+    return res.status(200).json({ ok: true, onesignal_id: result.id });
+  } catch(e) {
+    console.error('[push/resposta-mensagem]', e.message);
+    return res.status(500).json({ ok: false, error: e.message });
+  }
 }
 
 // ─── Utilitário: substitui {chave} no template ────────────────────────────────
