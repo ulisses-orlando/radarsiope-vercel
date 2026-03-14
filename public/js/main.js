@@ -1818,7 +1818,7 @@ async function carregarLeads(resetar = false) {
                   onclick="abrirModalResponderMensagem('${d.id}','${(d.mensagem || '').replace(/'/g, "\\'")}')">💬</span>`
           : ""}
             <span class="icon-btn" title="Mensagens"
-              onclick="abrirModalMensagensLead('${d.id}', '${(d.nome||'').replace(/'/g,\"\\'\")}')">💬</span>
+              onclick="abrirModalMensagensLead(this)" data-lead-id="${d.id}" data-lead-nome="${(d.nome||'').replace(/"/g,'&quot;')}">💬</span>
             <span class="icon-btn" title="Prorrogar acesso"
               onclick="abrirModalProrrogarAcesso('${d.id}', '${(d.nome || '').replace(/'/g, "\\'")}')">⏰</span>
           </td>
@@ -2091,7 +2091,13 @@ let dadosLeadAtual = null;
 // ─── Modal unificado de Mensagens do Lead ────────────────────────────────────
 let _msgLeadAtual = null;
 
-async function abrirModalMensagensLead(leadId, nome) {
+async function abrirModalMensagensLead(elOuId, nome) {
+  // Aceita elemento DOM (via data attributes) ou ID direto
+  let leadId = elOuId;
+  if (elOuId && typeof elOuId === 'object') {
+    leadId = elOuId.dataset.leadId;
+    nome   = elOuId.dataset.leadNome || leadId;
+  }
   _msgLeadAtual = leadId;
   const modal   = document.getElementById('modal-mensagens-lead');
   const titulo  = document.getElementById('modal-mensagens-lead-titulo');
