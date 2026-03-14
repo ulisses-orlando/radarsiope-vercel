@@ -388,9 +388,10 @@
       const munCod = String(user.municipio_cod || '');
       if (!munCod) return false; // usuário sem município não vê alertas municipais
 
-      // Verifica via campo municipios (lista)
+      // Verifica via campo municipios (array de objetos {cod, nome} ou strings)
       if (alerta.municipios && Array.isArray(alerta.municipios)) {
-        if (!alerta.municipios.map(String).includes(munCod)) return false;
+        const cods = alerta.municipios.map(m => String(m?.cod || m));
+        if (!cods.includes(munCod)) return false;
       }
 
       // Verifica via filtros do OneSignal salvos no Firestore
