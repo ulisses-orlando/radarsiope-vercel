@@ -1857,39 +1857,47 @@ async function carregarLeads(resetar = false) {
 async function atualizarStatusLeadSupabase(leadId, novoStatus) {
   const { error } = await window.supabase
     .from("leads").update({ status: novoStatus }).eq("id", leadId);
-  if (error) mostrarMensagem("Erro ao atualizar status: " + error.message);
+  if (error) { mostrarMensagem("Erro ao atualizar status: " + error.message); return; }
+
+  // Se saiu do status "Novo" → decrementa leads_novos
+  if (novoStatus !== 'Novo') {
+    try {
+      if (window.db) {
+        await window.db.collection('admin_contadores').doc('pendencias')
+          .set({ leads_novos: firebase.firestore.FieldValue.increment(-1) }, { merge: true });
+      }
+    } catch(e) { console.warn('[leads] contador leads_novos:', e.message); }
+  }
+  verificarPendenciasLeads();
 }
 
 // ─── Badge: verificar pendências ─────────────────────────────────────────────
 async function verificarPendenciasLeads() {
   try {
-    // Mensagens não respondidas
-    const { count: msgAbertas } = await window.supabase
-      .from("leads")
-      .select("*", { count: "exact", head: true })
-      .or("mensagem_respondida.is.null,mensagem_respondida.eq.false")
-      .not("mensagem", "is", null);
+    // Lê contadores centralizados — sem varrer dados
+    const snap = await window.db.collection('admin_contadores').doc('pendencias').get();
+    const d = snap.exists ? snap.data() : {};
 
-    // Feedbacks sem resposta (todos os feedbacks de newsletters)
-    const snap = await db.collection("newsletters")
-      .where("enviada", "==", true).get();
-    let fbAbertas = 0;
-    snap.forEach(doc => {
-      const feedbacks = doc.data().feedbacks || [];
-      fbAbertas += feedbacks.filter(f => !f.respondido).length;
-    });
+    const leadsNovos     = Math.max(0, d.leads_novos     || 0);
+    const leadsMensagens = Math.max(0, d.leads_mensagens || 0);
+    const feedbacks      = Math.max(0, d.feedbacks       || 0);
 
-    const total = (msgAbertas || 0) + fbAbertas;
-    const badge = document.getElementById("badge-leads");
+    const totalLeads = leadsNovos + leadsMensagens;
+
+    const badge   = document.getElementById("badge-leads");
     const badgeFb = document.getElementById("badge-feedbacks");
 
     if (badge) {
-      badge.textContent = total;
-      badge.style.display = total > 0 ? "inline" : "none";
+      badge.textContent   = totalLeads > 99 ? '99+' : String(totalLeads);
+      badge.style.display = totalLeads > 0 ? "inline" : "none";
+      badge.title = [
+        `🆕 Leads novos: ${leadsNovos}`,
+        `💬 Mensagens não respondidas: ${leadsMensagens}`,
+      ].join('\n');
     }
     if (badgeFb) {
-      badgeFb.textContent = fbAbertas;
-      badgeFb.style.display = fbAbertas > 0 ? "inline" : "none";
+      badgeFb.textContent   = feedbacks > 99 ? '99+' : String(feedbacks);
+      badgeFb.style.display = feedbacks > 0 ? "inline" : "none";
     }
   } catch (e) { console.warn("[pendências]", e); }
 }
@@ -1935,6 +1943,15 @@ async function enviarRespostaMensagemLead() {
 
     document.getElementById("modal-responder-mensagem").style.display = "none";
     mostrarMensagem("✅ Resposta enviada com sucesso!");
+
+    // Decrementa contador de mensagens pendentes
+    try {
+      if (window.db) {
+        await window.db.collection('admin_contadores').doc('pendencias')
+          .set({ leads_mensagens: firebase.firestore.FieldValue.increment(-1) }, { merge: true });
+      }
+    } catch(e) { console.warn('[leads] contador leads_mensagens:', e.message); }
+
     carregarLeads(true);
     verificarPendenciasLeads();
 

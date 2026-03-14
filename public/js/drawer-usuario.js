@@ -186,12 +186,29 @@ async function recalcularContadores() {
       }));
     } catch(e) {}
 
+    // Leads novos e mensagens não respondidas — via Supabase
+    let leads_novos = 0, leads_mensagens = 0;
+    try {
+      if (window.supabase) {
+        const { count: n } = await window.supabase.from('leads')
+          .select('*', { count: 'exact', head: true }).eq('status', 'Novo');
+        leads_novos = n || 0;
+
+        const { count: m } = await window.supabase.from('leads')
+          .select('*', { count: 'exact', head: true })
+          .or('mensagem_respondida.is.null,mensagem_respondida.eq.false')
+          .not('mensagem', 'is', null);
+        leads_mensagens = m || 0;
+      }
+    } catch(e) { console.warn('[recalcular] leads:', e.message); }
+
     await _CONTADOR_REF().set({
       solicitacoes, feedbacks, parcelas_vencidas,
+      leads_novos, leads_mensagens,
       recalculado_em: firebase.firestore.FieldValue.serverTimestamp(),
     });
 
-    mostrarMensagem(`✅ Contadores atualizados: ${solicitacoes} sol. | ${feedbacks} fb | ${parcelas_vencidas} parc.`);
+    mostrarMensagem(`✅ Contadores atualizados: ${solicitacoes} sol. | ${feedbacks} fb | ${parcelas_vencidas} parc. | ${leads_novos} leads novos | ${leads_mensagens} msg`);
     atualizarBadgeUsuarios();
   } catch(e) {
     mostrarMensagem('Erro no recálculo: ' + e.message);

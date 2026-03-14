@@ -1901,6 +1901,12 @@ async function enviarFeedback(nid) {
     // Marcar como enviado
     localStorage.setItem(`rs_fb_${nid}`, '1');
 
+    // Incrementa contador de feedbacks no admin_contadores
+    try {
+      await db.collection('admin_contadores').doc('pendencias')
+        .set({ feedbacks: firebase.firestore.FieldValue.increment(1) }, { merge: true });
+    } catch(e) { console.warn('[Feedback] contador:', e.message); }
+
     // Atualizar UI
     const wrap = document.getElementById('rs-feedback-wrap');
     if (wrap) wrap.innerHTML = `

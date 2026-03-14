@@ -173,6 +173,17 @@ async function processarEnvioInteresse(e) {
             municipio: dadosUf.nome_municipio,
             perfil: perfil
         }, "lead");
+        // Incrementa contadores no admin_contadores
+        try {
+          const _db = window.db;
+          if (_db) {
+            const incrementos = { leads_novos: firebase.firestore.FieldValue.increment(1) };
+            if (mensagem) incrementos.leads_mensagens = firebase.firestore.FieldValue.increment(1);
+            await _db.collection('admin_contadores').doc('pendencias')
+              .set(incrementos, { merge: true });
+          }
+        } catch(e) { console.warn('[capturaLead] contador:', e.message); }
+
         status.innerText = "Enviado com sucesso!";
         status.style.color = "green";
 
