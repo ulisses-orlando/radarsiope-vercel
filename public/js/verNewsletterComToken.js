@@ -586,11 +586,14 @@ function renderWatermark(destinatario, newsletter) {
 // ─── _radarUser para OneSignal ────────────────────────────────────────────────
 
 function publicarRadarUser(destinatario, segmento, assinaturaId) {
+  // Para assinantes: uid = Firebase doc ID (_uid)
+  // Para leads: uid = Supabase row ID (id) — usado em leads_mensagens.lead_id
+  const isAssinante = segmento === 'assinantes';
   window._radarUser = {
-    uid:           destinatario._uid || null,
+    uid:           isAssinante ? (destinatario._uid || null) : String(destinatario.id || ''),
     email:         destinatario.email || '',
     nome:          destinatario.nome || '',
-    segmento:      segmento === 'assinantes' ? 'assinante' : 'lead',
+    segmento:      isAssinante ? 'assinante' : 'lead',
     plano_slug:    destinatario.plano_slug || null,
     features:      destinatario.features || {},
     uf:            destinatario.cod_uf || '',
@@ -604,9 +607,9 @@ function publicarRadarUser(destinatario, segmento, assinaturaId) {
   // Salva sessão para o PWA (app.html usa ao abrir sem parâmetros)
   try {
     localStorage.setItem('rs_pwa_session', JSON.stringify({
-      uid:         destinatario._uid || null,
+      uid:         isAssinante ? (destinatario._uid || null) : String(destinatario.id || ''),
       assinaturaId: assinaturaId || null,
-      segmento:    segmento === 'assinantes' ? 'assinante' : 'lead',
+      segmento:    isAssinante ? 'assinante' : 'lead',
     }));
   } catch (e) { /* ignora se localStorage bloqueado */ }
 }
@@ -1900,12 +1903,6 @@ async function enviarFeedback(nid) {
 
     // Marcar como enviado
     localStorage.setItem(`rs_fb_${nid}`, '1');
-
-    // Incrementa contador de feedbacks no admin_contadores
-    try {
-      await db.collection('admin_contadores').doc('pendencias')
-        .set({ feedbacks: firebase.firestore.FieldValue.increment(1) }, { merge: true });
-    } catch(e) { console.warn('[Feedback] contador:', e.message); }
 
     // Atualizar UI
     const wrap = document.getElementById('rs-feedback-wrap');

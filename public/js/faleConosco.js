@@ -533,9 +533,11 @@
 
       } else {
         // Lead → Supabase leads_mensagens
+        const leadId = parseInt(user.uid, 10);
+        if (!leadId) throw new Error('ID do lead inválido.');
         const { error } = await window.supabase
           .from('leads_mensagens')
-          .insert({ lead_id: Number(user.uid), texto, tipo });
+          .insert({ lead_id: leadId, texto, tipo });
         if (error) throw new Error(error.message);
         // Incrementa contador
         await window.db.collection('admin_contadores').doc('pendencias')
@@ -568,7 +570,7 @@
         const { data, error } = await window.supabase
           .from('leads_mensagens')
           .select('*')
-          .eq('lead_id', Number(user.uid))
+          .eq('lead_id', parseInt(user.uid, 10))
           .order('criado_em', { ascending: false })
           .limit(20);
         if (error) throw new Error(error.message);
