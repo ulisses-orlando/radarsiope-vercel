@@ -368,16 +368,15 @@
   function _alertaRelevanteParaUsuario(alerta, user) {
     if (!user) return true; // sem usuário, mostra tudo
 
-    const publico = alerta.publico || 'todos';
-    const seg     = user.segmento || 'lead'; // 'assinante' ou 'lead'
+    const seg = user.segmento || 'lead'; // 'assinante' ou 'lead'
 
-    // Filtro por público
-    if (publico !== 'todos') {
-      if (publico === 'assinantes' && seg !== 'assinante') return false;
-      if (publico === 'leads'      && seg !== 'lead')      return false;
-    }
+    // Filtro por público — alertas municipais não têm campo publico definido
+    // então só filtramos quando o campo existir explicitamente
+    const publico = alerta.publico || '';
+    if (publico === 'assinantes' && seg !== 'assinante') return false;
+    if (publico === 'leads'      && seg !== 'lead')      return false;
 
-    // Filtro por município (alertas municipais só aparecem se for do mesmo município)
+    // Filtro por município — alertas municipais só aparecem se for do mesmo município
     const tipo = alerta.tipo || '';
     const tiposMunicipais = [
       'siope_prazo_proximo', 'siope_homologado',
@@ -386,15 +385,21 @@
     ];
 
     if (tiposMunicipais.includes(tipo)) {
-      const munCod = user.municipio_cod || '';
-      // Se o alerta tem lista de municípios, verifica se inclui o do usuário
+      const munCod = String(user.municipio_cod || '');
+      if (!munCod) return false; // usuário sem município não vê alertas municipais
+
+      // Verifica via campo municipios (lista)
       if (alerta.municipios && Array.isArray(alerta.municipios)) {
-        if (!alerta.municipios.includes(munCod)) return false;
+        if (!alerta.municipios.map(String).includes(munCod)) return false;
       }
-      // Se tem filtro por tag municipio_cod
+
+      // Verifica via filtros do OneSignal salvos no Firestore
       if (alerta.filtros && Array.isArray(alerta.filtros)) {
-        const filtroMun = alerta.filtros.find(f => f.key === 'municipio_cod');
-        if (filtroMun && filtroMun.value !== munCod) return false;
+        const filtroMun = alerta.filtros.find(f =>
+          f.key === 'municipio_cod' || f.field === 'municipio_cod'
+        );
+        // Se tem filtro de município e não bate — não mostra
+        if (filtroMun && String(filtroMun.value) !== munCod) return false;
       }
     }
 
