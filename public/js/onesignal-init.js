@@ -278,7 +278,8 @@ function mostrarBannerConsentimentoPush() {
   const user = window._radarUser;
   const note = document.getElementById('rs-push-plano-note');
   if (user && note) {
-    if (_temAlertaMunicipio(user)) {
+    // Assinante com município configurado → tem alertas municipais
+    if (user.segmento === 'assinante' && user.municipio_cod) {
       note.style.display = 'inline';
       note.textContent   = ` Seu plano inclui alertas específicos de ${user.municipio_nome || 'seu município'}.`;
     } else if (user.segmento === 'lead') {
