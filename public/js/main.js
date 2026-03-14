@@ -1817,10 +1817,8 @@ async function carregarLeads(resetar = false) {
           ? `<span class="icon-btn" title="Responder mensagem"
                   onclick="abrirModalResponderMensagem('${d.id}','${(d.mensagem || '').replace(/'/g, "\\'")}')">💬</span>`
           : ""}
-            <span class="icon-btn" title="Registrar contato"
-              onclick="abrirModalContatoLead('${d.id}')">📞</span>
-            <span class="icon-btn" title="Ver histórico de interações"
-              onclick="abrirModalHistorico('${d.id}')">📜</span>
+            <span class="icon-btn" title="Mensagens"
+              onclick="abrirModalMensagensLead('${d.id}', '${(d.nome||'').replace(/'/g,\"\\'\")}')">💬</span>
             <span class="icon-btn" title="Prorrogar acesso"
               onclick="abrirModalProrrogarAcesso('${d.id}', '${(d.nome || '').replace(/'/g, "\\'")}')">⏰</span>
           </td>
@@ -2090,6 +2088,196 @@ async function salvarRespostaFeedback() {
 let leadAtual = null;
 let dadosLeadAtual = null;
 
+// ─── Modal unificado de Mensagens do Lead ────────────────────────────────────
+let _msgLeadAtual = null;
+
+async function abrirModalMensagensLead(leadId, nome) {
+  _msgLeadAtual = leadId;
+  const modal   = document.getElementById('modal-mensagens-lead');
+  const titulo  = document.getElementById('modal-mensagens-lead-titulo');
+  const conteudo = document.getElementById('conteudo-mensagens-lead');
+  const formResp = document.getElementById('form-resposta-lead');
+
+  if (!modal) return;
+  titulo.textContent  = `💬 Mensagens — ${nome || leadId}`;
+  conteudo.innerHTML  = '<p style="color:#94a3b8;font-size:13px">🔄 Carregando…</p>';
+  formResp.style.display = 'none';
+  modal.style.display = 'flex';
+
+  await _carregarMensagensLead(leadId);
+}
+
+async function _carregarMensagensLead(leadId) {
+  const conteudo = document.getElementById('conteudo-mensagens-lead');
+  try {
+    // Busca dados do lead (mensagem inicial legada)
+    const { data: lead } = await window.supabase
+      .from('leads').select('mensagem,mensagem_resposta,mensagem_respondida,mensagem_respondida_em,data_criacao')
+      .eq('id', leadId).single();
+
+    // Busca mensagens do Fale Conosco
+    const { data: msgs } = await window.supabase
+      .from('leads_mensagens').select('*')
+      .eq('lead_id', Number(leadId))
+      .order('criado_em', { ascending: true });
+
+    let html = '';
+
+    // Mensagem inicial do formulário de captura
+    if (lead?.mensagem) {
+      const dataCaptura = lead.data_criacao
+        ? new Date(lead.data_criacao).toLocaleString('pt-BR') : '—';
+      html += _renderMsgCard({
+        id:        'legado',
+        tipo:      'Mensagem inicial (formulário)',
+        texto:     lead.mensagem,
+        resposta:  lead.mensagem_resposta,
+        respondido: !!lead.mensagem_respondida,
+        data:      dataCaptura,
+        origem:    'legado',
+      });
+    }
+
+    // Mensagens do Fale Conosco
+    if (msgs && msgs.length > 0) {
+      msgs.forEach(m => {
+        const data = m.criado_em
+          ? new Date(m.criado_em).toLocaleString('pt-BR') : '—';
+        html += _renderMsgCard({
+          id:        m.id,
+          tipo:      m.tipo === 'sugestao_tema' ? '💡 Sugestão de tema' : '💬 Fale Conosco',
+          texto:     m.texto,
+          resposta:  m.resposta,
+          respondido: m.respondido,
+          data,
+          origem:    'leads_mensagens',
+        });
+      });
+    }
+
+    if (!html) {
+      html = '<p style="color:#94a3b8;font-size:13px;text-align:center;padding:20px">Nenhuma mensagem ainda.</p>';
+    }
+
+    conteudo.innerHTML = html;
+  } catch(e) {
+    conteudo.innerHTML = `<p style="color:#ef4444">Erro: ${e.message}</p>`;
+  }
+}
+
+function _renderMsgCard({ id, tipo, texto, resposta, respondido, data, origem }) {
+  const corBorda  = respondido ? '#22c55e' : '#f59e0b';
+  const badgeCor  = respondido ? '#dcfce7' : '#fef3c7';
+  const badgeTxt  = respondido ? '#16a34a' : '#b45309';
+  const badgeLabel = respondido ? 'Respondida' : 'Aguardando resposta';
+
+  const respostaHtml = resposta ? `
+    <div style="background:#f0fdf4;border-left:3px solid #22c55e;border-radius:4px;
+      padding:8px 10px;font-size:12px;color:#15803d;margin-top:8px;line-height:1.5">
+      <div style="font-size:10px;font-weight:700;text-transform:uppercase;
+        letter-spacing:.5px;margin-bottom:4px;color:#16a34a">✅ Resposta da equipe</div>
+      ${resposta}
+    </div>` : '';
+
+  const btnResponder = !respondido ? `
+    <button onclick="_abrirFormRespostaLead('${id}','${origem}')"
+      style="margin-top:8px;padding:5px 12px;background:#0A3D62;color:#fff;
+             border:none;border-radius:5px;font-size:12px;cursor:pointer">
+      ✍️ Responder
+    </button>` : '';
+
+  return `
+    <div style="border-left:4px solid ${corBorda};border-radius:8px;
+      background:#f8fafc;padding:12px 14px">
+      <div style="display:flex;justify-content:space-between;align-items:center;
+        gap:8px;flex-wrap:wrap;margin-bottom:6px">
+        <span style="font-size:11px;font-weight:700;color:#475569;
+          text-transform:uppercase;letter-spacing:.5px">${tipo}</span>
+        <div style="display:flex;gap:6px;align-items:center">
+          <span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:99px;
+            background:${badgeCor};color:${badgeTxt}">${badgeLabel}</span>
+          <span style="font-size:11px;color:#94a3b8">${data}</span>
+        </div>
+      </div>
+      <div style="font-size:13px;color:#334155;line-height:1.5">${texto}</div>
+      ${respostaHtml}
+      ${btnResponder}
+    </div>`;
+}
+
+function _abrirFormRespostaLead(msgId, origem) {
+  document.getElementById('resposta-lead-msg-id').value   = msgId;
+  document.getElementById('resposta-lead-msg-tipo').value = origem;
+  document.getElementById('resposta-lead-txt').value      = '';
+  document.getElementById('form-resposta-lead').style.display = 'block';
+  document.getElementById('resposta-lead-txt').focus();
+}
+
+async function enviarRespostaLeadMensagem() {
+  const msgId  = document.getElementById('resposta-lead-msg-id').value;
+  const origem = document.getElementById('resposta-lead-msg-tipo').value;
+  const texto  = document.getElementById('resposta-lead-txt').value.trim();
+  if (!texto) return mostrarMensagem('Digite uma resposta.');
+
+  try {
+    if (origem === 'legado') {
+      // Responde campo legado na tabela leads
+      const { error } = await window.supabase.from('leads').update({
+        mensagem_respondida:    true,
+        mensagem_resposta:      texto,
+        mensagem_respondida_em: new Date().toISOString(),
+      }).eq('id', _msgLeadAtual);
+      if (error) throw error;
+    } else {
+      // Responde na tabela leads_mensagens
+      const { error } = await window.supabase.from('leads_mensagens').update({
+        respondido:    true,
+        resposta:      texto,
+        respondido_em: new Date().toISOString(),
+      }).eq('id', Number(msgId));
+      if (error) throw error;
+
+      // Decrementa contador
+      try {
+        await window.db.collection('admin_contadores').doc('pendencias')
+          .set({ leads_mensagens: firebase.firestore.FieldValue.increment(-1) }, { merge: true });
+      } catch(e) { console.warn('[leads] contador:', e.message); }
+
+      // Dispara push ao lead
+      try {
+        const { data: leadPush } = await window.supabase
+          .from('leads').select('onesignal_player_id').eq('id', _msgLeadAtual).single();
+        if (leadPush?.onesignal_player_id) {
+          await fetch('/api/push', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'x-admin-token': window._adminToken || '' },
+            body: JSON.stringify({
+              acao:     'resposta-mensagem',
+              playerId: leadPush.onesignal_player_id,
+              titulo:   '💬 Você tem uma resposta!',
+              corpo:    'A equipe Radar SIOPE respondeu sua mensagem. Acesse o Fale Conosco.',
+            }),
+          });
+        }
+      } catch(e) { console.warn('[leads] push:', e.message); }
+    }
+
+    document.getElementById('form-resposta-lead').style.display = 'none';
+    mostrarMensagem('✅ Resposta enviada!');
+    await _carregarMensagensLead(_msgLeadAtual);
+    verificarPendenciasLeads();
+
+  } catch(e) {
+    mostrarMensagem('Erro ao responder: ' + e.message);
+  }
+}
+
+function fecharModalMensagensLead() {
+  document.getElementById('modal-mensagens-lead').style.display = 'none';
+  _msgLeadAtual = null;
+}
+
+// ─── Funções legadas mantidas para compatibilidade ───────────────────────────
 async function abrirModalContatoLead(leadId) {
   leadAtual = leadId;
 
