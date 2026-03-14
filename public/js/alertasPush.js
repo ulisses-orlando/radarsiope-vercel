@@ -40,7 +40,7 @@ const PUSH_TEMPLATES = {
     publico:    'assinantes',
     bloqueaPublico: false,
     filtros:    [
-      { field: 'uf',              relation: '=', value: '{uf}'            },
+      { field: 'alerta_municipio', relation: '=', value: '1'              },
       { field: 'municipio_cod',   relation: '=', value: '{municipio_cod}' },
     ],
   },
@@ -53,7 +53,7 @@ const PUSH_TEMPLATES = {
     publico:    'assinantes',
     bloqueaPublico: false,
     filtros:    [
-      { field: 'uf',              relation: '=', value: '{uf}'            },
+      { field: 'alerta_municipio', relation: '=', value: '1'              },
       { field: 'municipio_cod',   relation: '=', value: '{municipio_cod}' },
     ],
   },
@@ -66,7 +66,7 @@ const PUSH_TEMPLATES = {
     publico:    'assinantes',
     bloqueaPublico: false,
     filtros:    [
-      { field: 'uf',              relation: '=', value: '{uf}'            },
+      { field: 'alerta_municipio', relation: '=', value: '1'              },
       { field: 'municipio_cod',   relation: '=', value: '{municipio_cod}' },
     ],
   },
@@ -79,7 +79,7 @@ const PUSH_TEMPLATES = {
     publico:    'assinantes',
     bloqueaPublico: false,
     filtros:    [
-      { field: 'uf',              relation: '=', value: '{uf}'            },
+      { field: 'alerta_municipio', relation: '=', value: '1'              },
       { field: 'municipio_cod',   relation: '=', value: '{municipio_cod}' },
     ],
   },
@@ -92,7 +92,7 @@ const PUSH_TEMPLATES = {
     publico:    'assinantes',
     bloqueaPublico: false,
     filtros:    [
-      { field: 'uf',              relation: '=', value: '{uf}'            },
+      { field: 'alerta_municipio', relation: '=', value: '1'              },
       { field: 'municipio_cod',   relation: '=', value: '{municipio_cod}' },
     ],
   },
@@ -341,6 +341,7 @@ async function _bindEventos() {
   const cached = sessionStorage.getItem('_pushAdminToken');
   if (cached) {
     _pushAdminToken = cached;
+    window._adminToken = cached; // restaura globalmente
     if (statusEl) {
       statusEl.style.background = '#f0fdf4';
       statusEl.style.color      = '#166534';
@@ -385,6 +386,7 @@ async function _bindEventos() {
     if (data.ok && data.token) {
       _pushAdminToken = data.token;
       sessionStorage.setItem('_pushAdminToken', data.token);
+      window._adminToken = data.token; // expõe globalmente para drawer-usuario.js e main.js
       if (statusEl) {
         statusEl.style.background = '#f0fdf4';
         statusEl.style.color      = '#166534';
@@ -838,7 +840,13 @@ function _montarFiltros(tpl, params) {
     filtrosBase.push({ field: 'tag', key: 'segmento', relation: '=', value: val });
   }
 
-  // (feature filter removido — alerta_municipio substituído por uf)
+  // Filtro de feature (alerta_municipio)
+  if (publico === 'assinantes' && feature !== 'todos') {
+    const val = feature === 'com' ? '1' : '0';
+    const idx = filtrosBase.findIndex(f => f.key === 'alerta_municipio');
+    if (idx !== -1) filtrosBase.splice(idx, 1);
+    filtrosBase.push({ field: 'tag', key: 'alerta_municipio', relation: '=', value: val });
+  }
 
   // Múltiplos municípios → grupos com OR
   if (!muns || muns.length === 0) return filtrosBase;

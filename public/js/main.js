@@ -1952,6 +1952,24 @@ async function enviarRespostaMensagemLead() {
       }
     } catch(e) { console.warn('[leads] contador leads_mensagens:', e.message); }
 
+    // Dispara push ao lead (se tiver player_id)
+    try {
+      const { data: leadPush } = await window.supabase
+        .from('leads').select('onesignal_player_id').eq('id', leadId).single();
+      if (leadPush?.onesignal_player_id) {
+        await fetch('/api/push', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'x-admin-token': window._adminToken || '' },
+          body: JSON.stringify({
+            acao:     'resposta-mensagem',
+            playerId: leadPush.onesignal_player_id,
+            titulo:   '💬 Você tem uma resposta!',
+            corpo:    'A equipe Radar SIOPE respondeu sua mensagem. Acesse o Fale Conosco.',
+          }),
+        });
+      }
+    } catch(e) { console.warn('[leads] push resposta:', e.message); }
+
     carregarLeads(true);
     verificarPendenciasLeads();
 

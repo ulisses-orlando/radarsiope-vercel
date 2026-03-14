@@ -194,11 +194,18 @@ async function recalcularContadores() {
           .select('*', { count: 'exact', head: true }).eq('status', 'Novo');
         leads_novos = n || 0;
 
-        const { count: m } = await window.supabase.from('leads')
+        // Mensagens via campo legado (leads.mensagem)
+        const { count: mLegado } = await window.supabase.from('leads')
           .select('*', { count: 'exact', head: true })
           .or('mensagem_respondida.is.null,mensagem_respondida.eq.false')
           .not('mensagem', 'is', null);
-        leads_mensagens = m || 0;
+
+        // Mensagens via nova tabela leads_mensagens (Fale Conosco)
+        const { count: mNovo } = await window.supabase.from('leads_mensagens')
+          .select('*', { count: 'exact', head: true })
+          .eq('respondido', false);
+
+        leads_mensagens = (mLegado || 0) + (mNovo || 0);
       }
     } catch(e) { console.warn('[recalcular] leads:', e.message); }
 
@@ -546,15 +553,13 @@ async function _renderSolicitacoes() {
             ❌ Cancelar
           </button>
           <button class="btn-drawer-sm"
-            onclick="abrirModalEnvioManual('${uid}','${doc.id}',${JSON.stringify({
-              ...s, email: _drawerDados.email, nome: _drawerDados.nome
-            }).replace(/"/g,'&quot;')})">
-            📧 Responder
+            onclick="_drawerResponderSolicitacao('${uid}','${doc.id}','atendida')">
+            ✍️ Responder
           </button>
         </div>` : '';
 
       html += `
-        <div style="border-left:4px solid ${c};border-radius:8px;background:#f8fafc;
+        <div id="sol-card-${doc.id}" style="border-left:4px solid ${c};border-radius:8px;background:#f8fafc;
           padding:10px 12px;margin-bottom:10px">
           <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">
             <span style="font-size:12px;font-weight:700;color:#334155">
@@ -580,16 +585,86 @@ async function _renderSolicitacoes() {
   }
 }
 
-// Responder solicitação → decrementa contador
+// Responder solicitação → mostra campo inline, decrementa contador, dispara push
 async function _drawerResponderSolicitacao(uid, solId, novoStatus) {
-  const resposta = prompt(`Resposta para o usuário (status → ${novoStatus}):`);
-  if (resposta === null) return;
+  // Abre modal inline de resposta
+  const body   = document.getElementById('drawer-usuario-body');
+  const solRef = db.collection('usuarios').doc(uid).collection('solicitacoes').doc(solId);
+  const solSnap = await solRef.get();
+  if (!solSnap.exists) return;
+  const sol = solSnap.data();
+
+  // Injeta form inline no card da solicitação
+  const cardId = `sol-card-${solId}`;
+  const card   = document.getElementById(cardId);
+  if (!card) {
+    // Fallback — recarrega aba e usa prompt
+    const resposta = prompt(`Resposta para o usuário:`);
+    if (!resposta) return;
+    await _salvarResposta(uid, solId, solSnap, novoStatus, resposta);
+    return;
+  }
+
+  // Injeta form de resposta inline
+  card.insertAdjacentHTML('beforeend', `
+    <div id="rs-resp-form-${solId}" style="margin-top:10px">
+      <textarea id="rs-resp-txt-${solId}"
+        style="width:100%;background:#f1f5f9;border:1px solid #cbd5e1;
+               border-radius:6px;padding:8px;font-size:13px;resize:vertical;min-height:80px"
+        placeholder="Digite a resposta para o usuário…" maxlength="500"></textarea>
+      <div style="display:flex;gap:6px;margin-top:6px">
+        <button class="btn-drawer-sm btn-verde"
+          onclick="_confirmarResposta('${uid}','${solId}','${novoStatus}')">
+          ✅ Enviar resposta
+        </button>
+        <button class="btn-drawer-sm"
+          onclick="document.getElementById('rs-resp-form-${solId}').remove()">
+          Cancelar
+        </button>
+      </div>
+    </div>`);
+  document.getElementById(`rs-resp-txt-${solId}`)?.focus();
+}
+
+async function _confirmarResposta(uid, solId, novoStatus) {
+  const textarea = document.getElementById(`rs-resp-txt-${solId}`);
+  const resposta = textarea?.value?.trim();
+  if (!resposta) { alert('Digite uma resposta.'); return; }
+
+  const solRef  = db.collection('usuarios').doc(uid).collection('solicitacoes').doc(solId);
+  const solSnap = await solRef.get();
+  if (!solSnap.exists) return;
+
+  await _salvarResposta(uid, solId, solSnap, novoStatus, resposta);
+}
+
+async function _salvarResposta(uid, solId, solSnap, novoStatus, resposta) {
   try {
     await db.collection('usuarios').doc(uid).collection('solicitacoes').doc(solId)
       .update({ status: novoStatus, resposta, data_resposta: new Date() });
-    // ▼ decrementa contador central
+
+    // Decrementa contador
     await _incrementarContador('solicitacoes', -1);
-    mostrarMensagem('Solicitação atualizada!');
+
+    // Dispara push de notificação ao usuário (se tiver player_id)
+    try {
+      const userSnap = await db.collection('usuarios').doc(uid).get();
+      const playerId = userSnap.data()?.onesignal_player_id;
+      if (playerId) {
+        await fetch('/api/push', {
+          method:  'POST',
+          headers: { 'Content-Type': 'application/json', 'x-admin-token': window._adminToken || '' },
+          body: JSON.stringify({
+            acao:        'resposta-mensagem',
+            playerId,
+            titulo:      '💬 Você tem uma resposta!',
+            corpo:       'A equipe Radar SIOPE respondeu sua mensagem. Acesse o Fale Conosco.',
+          }),
+        });
+      }
+    } catch(e) { console.warn('[drawer] push resposta:', e.message); }
+
+    mostrarMensagem('Resposta enviada!');
     _ativarDrawerTab('solicitacoes');
     atualizarBadgeUsuarios();
   } catch(e) { mostrarMensagem('Erro: ' + e.message); }
@@ -942,6 +1017,7 @@ window._confirmarProrrogacaoUsuario = _confirmarProrrogacaoUsuario;
 window._toggleAcessoSel             = _toggleAcessoSel;
 window._selecionarTodosAcesso       = _selecionarTodosAcesso;
 window.atualizarBadgeUsuarios       = atualizarBadgeUsuarios;
+window._confirmarResposta            = _confirmarResposta;
 window.recalcularContadores         = recalcularContadores;
 window._incrementarContador         = _incrementarContador;
 
