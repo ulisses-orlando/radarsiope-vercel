@@ -1865,96 +1865,59 @@
         <tbody id="tabela-leads"></tbody>
       </table>
 
-      <div id="modal-contato-lead" style="
-        display:none;
-        position:fixed;
-        top:0;
-        left:0;
-        width:100%;
-        height:100%;
+      <!-- ── Modal unificado de Mensagens do Lead ──────────────────────── -->
+      <div id="modal-mensagens-lead" style="
+        display:none; position:fixed; top:0; left:0;
+        width:100%; height:100%;
         background:rgba(0,0,0,0.5);
-        z-index:9999;
-        justify-content:center;
-        align-items:center;
-        ">
+        z-index:9999; justify-content:center; align-items:center;">
         <div style="
-          background:#fff;
-          padding:20px;
-          border-radius:8px;
-          max-width:500px;
-          width:90%;
-          position:relative;
-          box-shadow:0 0 20px rgba(0,0,0,0.3);
-          ">
-          <button onclick="fecharModalContatoLead()" style="
-            position:absolute;
-            top:10px;
-            right:10px;
-            font-size:18px;
-            background:none;
-            border:none;
-            cursor:pointer;
-            ">❌ Fechar</button>
-          <h3>📞 Registrar contato</h3>
-          <div class="field">
-            <label>Tipo de contato:</label>
-            <input type="text" id="tipo-contato-lead" readonly
-              style="background:#eee; padding:6px; border:1px solid #ccc; width:100%">
+          background:#fff; padding:24px; border-radius:10px;
+          max-width:620px; width:92%; position:relative;
+          box-shadow:0 4px 32px rgba(0,0,0,0.25);
+          max-height:85vh; display:flex; flex-direction:column;">
+          <button onclick="fecharModalMensagensLead()" style="
+            position:absolute; top:12px; right:12px;
+            font-size:18px; background:none; border:none; cursor:pointer;">❌</button>
+          <h3 id="modal-mensagens-lead-titulo" style="margin:0 0 16px;font-size:16px">
+            💬 Mensagens do Lead
+          </h3>
+          <!-- Timeline de mensagens -->
+          <div id="conteudo-mensagens-lead" style="
+            flex:1; overflow-y:auto; display:flex; flex-direction:column; gap:12px;
+            padding-right:4px; margin-bottom:16px;">
           </div>
-          <div class="field" id="campo-email-lead" style="display:none">
-            <label>E-mail do lead:</label>
-            <input type="text" id="email-contato-lead" readonly
-              style="background:#eee; padding:6px; border:1px solid #ccc; width:100%">
-          </div>
-          <div class="field">
-            <label>Resultado do contato:</label>
-            <textarea id="resultado-contato-lead" rows="4" style="width:100%"></textarea>
-          </div>
-          <div style="display:flex; justify-content:space-between; align-items:center; margin-top:10px;">
-            <div id="acao-email-lead" style="display:none">
-              <button id="btn-enviar-email-lead">📧 Enviar e-mail manual</button>
+          <!-- Campo para nova resposta (aparece ao clicar em Responder) -->
+          <div id="form-resposta-lead" style="display:none; border-top:1px solid #e2e8f0; padding-top:14px">
+            <input type="hidden" id="resposta-lead-msg-id">
+            <input type="hidden" id="resposta-lead-msg-tipo">
+            <label style="font-size:12px;font-weight:600;color:#475569;display:block;margin-bottom:6px">
+              ✍️ Resposta:
+            </label>
+            <textarea id="resposta-lead-txt" rows="3"
+              style="width:100%;padding:8px;border:1px solid #cbd5e1;border-radius:6px;
+                     font-size:13px;resize:vertical"
+              placeholder="Digite a resposta…" maxlength="500"></textarea>
+            <div style="display:flex;gap:8px;margin-top:8px">
+              <button onclick="enviarRespostaLeadMensagem()"
+                style="padding:8px 18px;background:#0A3D62;color:#fff;border:none;
+                       border-radius:6px;font-size:13px;font-weight:600;cursor:pointer">
+                ✅ Enviar resposta
+              </button>
+              <button onclick="document.getElementById('form-resposta-lead').style.display='none'"
+                style="padding:8px 14px;background:#f1f5f9;color:#475569;border:none;
+                       border-radius:6px;font-size:13px;cursor:pointer">
+                Cancelar
+              </button>
             </div>
-            <button onclick="salvarInteracaoLead()">💾 Salvar interação</button>
           </div>
-          <div id="historico-interacoes-lead" style="margin-top:20px; max-height:300px; overflow-y:auto;"></div>
         </div>
       </div>
 
-      <div id="modal-historico-lead" style="
-        display:none;
-        position:fixed;
-        top:0;
-        left:0;
-        width:100%;
-        height:100%;
-        background:rgba(0,0,0,0.5);
-        z-index:9999;
-        justify-content:center;
-        align-items:center;
-      ">
-        <div style="
-          background:#fff;
-          padding:20px;
-          border-radius:8px;
-          max-width:600px;
-          width:90%;
-          position:relative;
-          box-shadow:0 0 20px rgba(0,0,0,0.3);
-          max-height:80%;
-          overflow-y:auto;
-        ">
-          <button onclick="fecharModalHistorico()" style="
-            position:absolute;
-            top:10px;
-            right:10px;
-            font-size:18px;
-            background:none;
-            border:none;
-            cursor:pointer;
-          ">❌ Fechar</button>
-          <h3>📜 Histórico de Interações</h3>
-          <div id="conteudo-historico-lead"></div>
-        </div>
+      <!-- Mantém modais legados ocultos para compatibilidade com funções existentes -->
+      <div id="modal-contato-lead" style="display:none"></div>
+      <div id="modal-historico-lead" style="display:none">
+        <div><div id="conteudo-historico-lead"></div></div>
       </div>
       <div id="modal-vincular-lead" style="
         display:none;
