@@ -8,6 +8,10 @@ let filtroAvaliacao = "todos";
 let filtroTipoSolicitacao = "todos";
 let filtroPeriodoAvaliacoes = "todos";
 let filtroPerfilAvaliacoes = "todos";
+let paginaAtual = 1;
+let historicoDocs = [];
+let totalUsuarios = 0;
+let totalPaginas  = 0;
 
 const momentosEnvio = [
   // ——— Entrada e fluxo inicial ———
@@ -3264,10 +3268,7 @@ document.getElementById('usuarios').addEventListener('click', () => {
 });
 
 
-let paginaAtual = 1;
-let historicoDocs = []; // guarda o último doc de cada página
-let totalUsuarios = 0;
-let totalPaginas = 0;
+// paginaAtual, historicoDocs, totalUsuarios, totalPaginas declarados no topo do arquivo
 const limitePorPagina = 10;
 
 async function carregarUsuariosComFiltro() {
