@@ -12,6 +12,7 @@ let paginaAtual = 1;
 let historicoDocs = [];
 let totalUsuarios = 0;
 let totalPaginas  = 0;
+let termoBuscaUsuario = "";
 
 const momentosEnvio = [
   // ——— Entrada e fluxo inicial ———
@@ -3408,8 +3409,6 @@ async function carregarUsuariosComFiltro() {
   document.getElementById('btn-listar').disabled = false;
 }
 
-
-let termoBuscaUsuario = "";
 
 async function iniciarConsultaUsuarios() {
   paginaAtual = 1;
