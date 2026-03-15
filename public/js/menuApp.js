@@ -272,9 +272,17 @@
           window.open('/admin.html', '_blank');
           _fecharModalLogin();
         } else {
-          // Assinante/usuário → carrega painel no mesmo iframe
+          // Assinante/usuário → carrega painel no mesmo iframe e expande modal
           const iframe = document.getElementById('rs-login-iframe');
+          const wrap   = document.getElementById('rs-login-iframe-wrap');
           if (iframe) {
+            // Expande para quase fullscreen antes de carregar o painel
+            if (wrap) {
+              wrap.style.transition = 'all .3s ease';
+              wrap.style.width      = 'min(900px, 97vw)';
+              wrap.style.height     = '92vh';
+              wrap.style.borderRadius = '12px';
+            }
             iframe.src = '/painel.html';
           }
           // Atualiza saudação
