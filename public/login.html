@@ -183,6 +183,20 @@
         return _origSetTimeout.call(window, fn, delay, ...args);
       };
 
+      // Preenche e-mail se veio como parâmetro na URL
+      document.addEventListener('DOMContentLoaded', () => {
+        const params = new URLSearchParams(window.location.search);
+        const email  = params.get('email');
+        if (email) {
+          const input = document.getElementById('email-login');
+          if (input) {
+            input.value = decodeURIComponent(email);
+            // Foca na senha para facilitar
+            document.getElementById('senha-login')?.focus();
+          }
+        }
+      });
+
       // Botão de voltar discreto no topo
       document.addEventListener('DOMContentLoaded', () => {
         const voltar = document.createElement('button');
