@@ -420,6 +420,13 @@
       </div>
       <div class="header-actions">
         <div id="nome-usuario" aria-live="polite">Usuário</div>
+        <!-- Botão voltar ao app — só visível quando em iframe -->
+        <button id="btn-voltar-app" onclick="window.parent.postMessage({tipo:'rs:fecharModal'},'*')"
+          style="display:none;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.2);
+                 color:#fff;border-radius:6px;padding:5px 10px;font-size:12px;
+                 cursor:pointer;font-weight:600">
+          ← App
+        </button>
         <button id="menu-toggle" class="menu-toggle" aria-expanded="false" aria-controls="main-nav">☰ Menu</button>
         <button id="btn-logout" class="btn-logout">⏏ Sair</button>
       </div>
@@ -653,5 +660,12 @@
   <script src="js/functions.js"></script>
   <script src="js/perfil.js"></script>
   <script src="js/painel.js"></script>
+  <script>
+    // Se estiver em iframe (aberto pelo app), mostra botão "← App"
+    if (window.self !== window.top) {
+      const btn = document.getElementById('btn-voltar-app');
+      if (btn) btn.style.display = 'inline-block';
+    }
+  </script>
 </body>
 </html>
