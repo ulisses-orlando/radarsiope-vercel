@@ -256,12 +256,26 @@
         window._rsFcAbrir?.();
       });
 
-    // Minha Área
+    // Minha Área — abre modal com iframe
     document.getElementById('rs-menu-area')
       ?.addEventListener('click', () => {
         _fecharMenu();
-        window.location.href = '/login.html';
+        _abrirModalLogin();
       });
+
+    // Escuta mensagens do iframe
+    window.addEventListener('message', e => {
+      if (e.data?.tipo === 'rs:loginSucesso') {
+        _fecharModalLogin();
+        // Atualiza saudação se possível
+        const nome = (e.data.usuario?.nome || '').split(' ')[0];
+        const hd = document.getElementById('hd-saudacao');
+        if (hd && nome) hd.textContent = `Olá, ${nome}!`;
+      }
+      if (e.data?.tipo === 'rs:fecharModal') {
+        _fecharModalLogin();
+      }
+    });
 
     // ESC fecha
     document.addEventListener('keydown', e => {
@@ -342,6 +356,70 @@
     el.textContent   = count > 9 ? '9+' : String(count);
     el.style.display = count > 0 ? 'inline-block' : 'none';
   }
+
+  // ── Modal de login ───────────────────────────────────────────────────────
+  function _abrirModalLogin() {
+    // Cria modal se não existe
+    if (!document.getElementById('rs-login-modal')) {
+      const modal = document.createElement('div');
+      modal.id = 'rs-login-modal';
+      modal.style.cssText = `
+        position: fixed; inset: 0; z-index: 9000;
+        background: rgba(0,0,0,.7);
+        display: flex; align-items: center; justify-content: center;
+        backdrop-filter: blur(3px);
+        animation: rsFadeIn .2s ease;
+      `;
+      modal.innerHTML = `
+        <style>
+          @keyframes rsFadeIn { from { opacity:0 } to { opacity:1 } }
+          @keyframes rsSlideUp { from { opacity:0; transform:translateY(20px) } to { opacity:1; transform:translateY(0) } }
+          #rs-login-iframe-wrap {
+            background: #fff; border-radius: 16px;
+            width: min(420px, 94vw); height: min(520px, 90vh);
+            position: relative; overflow: hidden;
+            box-shadow: 0 8px 40px rgba(0,0,0,.4);
+            animation: rsSlideUp .25s ease;
+          }
+          #rs-login-iframe {
+            width: 100%; height: 100%;
+            border: none;
+          }
+          #rs-login-fechar {
+            position: absolute; top: 10px; right: 12px;
+            background: rgba(0,0,0,.15); border: none;
+            border-radius: 50%; width: 28px; height: 28px;
+            color: #fff; font-size: 16px; cursor: pointer;
+            display: flex; align-items: center; justify-content: center;
+            z-index: 1; transition: background .15s;
+          }
+          #rs-login-fechar:hover { background: rgba(0,0,0,.3); }
+        </style>
+        <div id="rs-login-iframe-wrap">
+          <button id="rs-login-fechar" onclick="window._rsFecharLogin()">×</button>
+          <iframe id="rs-login-iframe" src="/login.html" title="Minha Área"></iframe>
+        </div>
+      `;
+      // Fecha ao clicar fora
+      modal.addEventListener('click', e => {
+        if (e.target === modal) _fecharModalLogin();
+      });
+      document.body.appendChild(modal);
+    } else {
+      document.getElementById('rs-login-modal').style.display = 'flex';
+    }
+  }
+
+  function _fecharModalLogin() {
+    const modal = document.getElementById('rs-login-modal');
+    if (modal) {
+      modal.style.opacity = '0';
+      modal.style.transition = 'opacity .2s';
+      setTimeout(() => modal.remove(), 200);
+    }
+  }
+
+  window._rsFecharLogin = _fecharModalLogin;
 
   // Expõe para uso externo
   window._rsMenuFechar          = _fecharMenu;
