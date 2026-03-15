@@ -1041,6 +1041,100 @@ async function abrirModalNewsletter(docId = null, isEdit = false) {
   if (isEdit && data.blocos) {
     setTimeout(() => carregarBlocosDaEdicao(data), 50);
   }
+
+  // -----------------------------
+  // PAINEL DE AVALIAÇÕES
+  // -----------------------------
+  if (isEdit && docId) {
+    _renderPainelAvaliacoes(body, data);
+  }
+}
+
+// ─── Painel de Avaliações da Newsletter ──────────────────────────────────────
+function _renderPainelAvaliacoes(body, data) {
+  const reactions = data.reactions || {};
+
+  const niveis = [
+    { key: 'excelente',   emoji: '😍', label: 'Excelente'    },
+    { key: 'muito_bom',   emoji: '👍', label: 'Muito bom'    },
+    { key: 'bom',         emoji: '😊', label: 'Bom'          },
+    { key: 'regular',     emoji: '😐', label: 'Regular'      },
+    { key: 'decepcionou', emoji: '😞', label: 'Decepcionou'  },
+  ];
+
+  const total = niveis.reduce((s, n) => s + (Number(reactions[n.key]) || 0), 0);
+
+  const painel = document.createElement('div');
+  painel.style.cssText = `
+    margin-top: 24px;
+    padding: 18px 20px;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+  `;
+
+  let barrasHtml = niveis.map(n => {
+    const count = Number(reactions[n.key]) || 0;
+    const pct   = total > 0 ? Math.round((count / total) * 100) : 0;
+    const pctBar = total > 0 ? Math.round((count / total) * 100) : 0;
+
+    return `
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+        <span style="font-size:18px;width:24px;text-align:center">${n.emoji}</span>
+        <span style="width:90px;font-size:13px;color:#334155;font-weight:600">${n.label}</span>
+        <div style="flex:1;background:#e2e8f0;border-radius:99px;height:10px;overflow:hidden">
+          <div style="
+            width:${pctBar}%;
+            height:100%;
+            background:${_reactionCor(n.key)};
+            border-radius:99px;
+            transition:width .4s ease;
+          "></div>
+        </div>
+        <span style="width:28px;text-align:right;font-size:13px;font-weight:700;color:#334155">${count}</span>
+        <span style="width:38px;font-size:11px;color:#94a3b8">(${pct}%)</span>
+      </div>`;
+  }).join('');
+
+  painel.innerHTML = `
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+      <h3 style="margin:0;font-size:14px;font-weight:700;color:#1e293b">⭐ Avaliações desta edição</h3>
+      <span style="font-size:12px;color:#64748b;font-weight:600">
+        ${total > 0 ? `${total} avaliação${total > 1 ? 'ões' : ''}` : 'Sem avaliações ainda'}
+      </span>
+    </div>
+    ${total > 0 ? barrasHtml : '<p style="color:#94a3b8;font-size:13px;text-align:center;padding:12px 0">Nenhuma avaliação registrada para esta edição.</p>'}
+    ${total > 0 ? `
+      <div style="border-top:1px solid #e2e8f0;margin-top:10px;padding-top:10px;
+        font-size:11px;color:#94a3b8;text-align:right">
+        Média ponderada:
+        <strong style="color:#334155;font-size:13px">${_calcularMedia(reactions, niveis).toFixed(1)} / 5.0</strong>
+      </div>` : ''}
+  `;
+
+  body.appendChild(painel);
+}
+
+function _reactionCor(key) {
+  const cores = {
+    excelente:   '#22c55e',
+    muito_bom:   '#84cc16',
+    bom:         '#facc15',
+    regular:     '#fb923c',
+    decepcionou: '#ef4444',
+  };
+  return cores[key] || '#94a3b8';
+}
+
+function _calcularMedia(reactions, niveis) {
+  const pesos = { excelente: 5, muito_bom: 4, bom: 3, regular: 2, decepcionou: 1 };
+  let soma = 0, total = 0;
+  niveis.forEach(n => {
+    const c = Number(reactions[n.key]) || 0;
+    soma  += c * (pesos[n.key] || 0);
+    total += c;
+  });
+  return total > 0 ? soma / total : 0;
 }
 
 function montarHtmlNewsletterPreview(modo, segmento = null, bordas = false) {
