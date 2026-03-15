@@ -142,6 +142,43 @@
 
   <!-- Lógica de login -->
   <script src="js/site.js"></script>
+
+  <!-- Integração com app (iframe mode) -->
+  <script>
+    // Se estiver dentro de um iframe (aberto pelo app via "Minha Área")
+    // intercepta o redirect pós-login e notifica o app pai
+    if (window.self !== window.top) {
+      // Sobrescreve window.location para interceptar o redirect
+      const _origDescriptor = Object.getOwnPropertyDescriptor(window, 'location');
+
+      // Monitora mudanças de location via MutationObserver no msg de sucesso
+      const _observer = new MutationObserver(() => {
+        const msg = document.getElementById('mensagem-login');
+        if (msg && msg.style.color === 'green') {
+          // Login bem-sucedido — envia dados para o app pai
+          const dados = JSON.parse(localStorage.getItem('usuarioLogado') || '{}');
+          window.parent.postMessage({
+            tipo: 'rs:loginSucesso',
+            usuario: {
+              nome:          dados.nome  || dados.email || '',
+              email:         dados.email || '',
+              tipo_perfil:   dados.tipo_perfil || 'usuario',
+            }
+          }, '*');
+        }
+      });
+
+      const msgEl = document.getElementById('mensagem-login');
+      if (msgEl) _observer.observe(msgEl, { attributes: true, attributeFilter: ['style'], childList: true, characterData: true });
+
+      // Também adiciona botão de voltar discreto no topo
+      const voltar = document.createElement('button');
+      voltar.textContent = '← Voltar ao app';
+      voltar.style.cssText = 'position:fixed;top:12px;left:12px;background:none;border:none;color:#007acc;font-size:13px;cursor:pointer;font-weight:600;';
+      voltar.onclick = () => window.parent.postMessage({ tipo: 'rs:fecharModal' }, '*');
+      document.body.appendChild(voltar);
+    }
+  </script>
 </body>
 
 </html>
