@@ -266,11 +266,19 @@
     // Escuta mensagens do iframe
     window.addEventListener('message', e => {
       if (e.data?.tipo === 'rs:loginSucesso') {
-        _fecharModalLogin();
-        // Atualiza saudação se possível
-        const nome = (e.data.usuario?.nome || '').split(' ')[0];
-        const hd = document.getElementById('hd-saudacao');
-        if (hd && nome) hd.textContent = `Olá, ${nome}!`;
+        const destino = e.data.destino || 'painel.html';
+        if (destino === 'admin.html') {
+          // Admin → abre o painel admin numa nova aba
+          window.open('/admin.html', '_blank');
+          _fecharModalLogin();
+        } else {
+          // Assinante/usuário → fecha modal e fica no app
+          _fecharModalLogin();
+          // Atualiza saudação
+          const nome = (e.data.usuario?.nome || '').split(' ')[0];
+          const hd = document.getElementById('hd-saudacao');
+          if (hd && nome) hd.textContent = `Olá, ${nome}!`;
+        }
       }
       if (e.data?.tipo === 'rs:fecharModal') {
         _fecharModalLogin();
