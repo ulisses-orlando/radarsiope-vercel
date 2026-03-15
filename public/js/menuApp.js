@@ -389,6 +389,8 @@
         backdrop-filter: blur(3px);
         animation: rsFadeIn .2s ease;
       `;
+      const _emailParam = window._radarUser?.email
+        ? '?email=' + encodeURIComponent(window._radarUser.email) : '';
       modal.innerHTML = `
         <style>
           @keyframes rsFadeIn { from { opacity:0 } to { opacity:1 } }
@@ -416,7 +418,7 @@
         </style>
         <div id="rs-login-iframe-wrap">
           <button id="rs-login-fechar" onclick="window._rsFecharLogin()">×</button>
-          <iframe id="rs-login-iframe" src="/login.html" title="Minha Área"></iframe>
+          <iframe id="rs-login-iframe" src="/login.html${_emailParam}" title="Minha Área"></iframe>
         </div>
       `;
       // Fecha ao clicar fora
