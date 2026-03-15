@@ -146,37 +146,60 @@
   <!-- Integração com app (iframe mode) -->
   <script>
     // Se estiver dentro de um iframe (aberto pelo app via "Minha Área")
-    // intercepta o redirect pós-login e notifica o app pai
     if (window.self !== window.top) {
-      // Sobrescreve window.location para interceptar o redirect
-      const _origDescriptor = Object.getOwnPropertyDescriptor(window, 'location');
 
-      // Monitora mudanças de location via MutationObserver no msg de sucesso
-      const _observer = new MutationObserver(() => {
-        const msg = document.getElementById('mensagem-login');
-        if (msg && msg.style.color === 'green') {
-          // Login bem-sucedido — envia dados para o app pai
-          const dados = JSON.parse(localStorage.getItem('usuarioLogado') || '{}');
-          window.parent.postMessage({
-            tipo: 'rs:loginSucesso',
-            usuario: {
-              nome:          dados.nome  || dados.email || '',
-              email:         dados.email || '',
-              tipo_perfil:   dados.tipo_perfil || 'usuario',
-            }
-          }, '*');
+      // Intercepta window.location.href ANTES do site.js carregar
+      // Assim o redirect pós-login vai para o pai, não o iframe
+      let _destinoLogin = null;
+      try {
+        Object.defineProperty(window, 'location', {
+          get: function() { return window._locationProxy || window.document.location; },
+          configurable: true
+        });
+      } catch(e) { /* fallback: usa MutationObserver */ }
+
+      // Abordagem robusta: sobrescreve o setTimeout do site.js
+      const _origSetTimeout = window.setTimeout;
+      window.setTimeout = function(fn, delay, ...args) {
+        const fnStr = fn.toString();
+        // Detecta o setTimeout do redirect pós-login (contém admin.html ou painel.html)
+        if (fnStr.includes('admin.html') || fnStr.includes('painel.html')) {
+          return _origSetTimeout.call(window, function() {
+            // Captura o destino antes de navegar
+            const dados = JSON.parse(localStorage.getItem('usuarioLogado') || '{}');
+            const destino = dados.tipo_perfil === 'Admin' ? 'admin.html' : 'painel.html';
+            // Notifica o pai
+            window.parent.postMessage({
+              tipo: 'rs:loginSucesso',
+              destino,
+              usuario: {
+                nome:        dados.nome  || dados.email || '',
+                email:       dados.email || '',
+                tipo_perfil: dados.tipo_perfil || 'usuario',
+              }
+            }, '*');
+          }, delay, ...args);
         }
+        return _origSetTimeout.call(window, fn, delay, ...args);
+      };
+
+      // Botão de voltar discreto no topo
+      document.addEventListener('DOMContentLoaded', () => {
+        const voltar = document.createElement('button');
+        voltar.textContent = '← Voltar ao app';
+        voltar.style.cssText = `
+          position: fixed; top: 12px; left: 12px;
+          background: none; border: none;
+          color: #007acc; font-size: 13px;
+          cursor: pointer; font-weight: 600;
+          padding: 4px 8px; border-radius: 6px;
+          transition: background .15s;
+        `;
+        voltar.onmouseenter = () => voltar.style.background = 'rgba(0,122,204,.08)';
+        voltar.onmouseleave = () => voltar.style.background = 'none';
+        voltar.onclick = () => window.parent.postMessage({ tipo: 'rs:fecharModal' }, '*');
+        document.body.appendChild(voltar);
       });
-
-      const msgEl = document.getElementById('mensagem-login');
-      if (msgEl) _observer.observe(msgEl, { attributes: true, attributeFilter: ['style'], childList: true, characterData: true });
-
-      // Também adiciona botão de voltar discreto no topo
-      const voltar = document.createElement('button');
-      voltar.textContent = '← Voltar ao app';
-      voltar.style.cssText = 'position:fixed;top:12px;left:12px;background:none;border:none;color:#007acc;font-size:13px;cursor:pointer;font-weight:600;';
-      voltar.onclick = () => window.parent.postMessage({ tipo: 'rs:fecharModal' }, '*');
-      document.body.appendChild(voltar);
     }
   </script>
 </body>
