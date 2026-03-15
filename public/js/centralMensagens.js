@@ -31,14 +31,6 @@
 
   // ── HTML: botão + overlay + drawer ───────────────────────────────────────
   function _injetarHTML() {
-    // Botão fixo
-    const btn = document.createElement('button');
-    btn.id            = 'rs-alertas-btn';
-    btn.type          = 'button';
-    btn.setAttribute('aria-label', 'Central de Alertas');
-    btn.innerHTML     = '🔔 Alertas<span id="rs-alertas-badge" style="display:none">0</span>';
-    document.body.appendChild(btn);
-
     // Overlay
     const overlay = document.createElement('div');
     overlay.id = 'rs-alertas-overlay';
@@ -67,50 +59,6 @@
   function _injetarCSS() {
     const style = document.createElement('style');
     style.textContent = `
-      /* ── Botão Alertas ─────────────────────────────────────────────────── */
-      /* Fica abaixo do botão Edições (que está em top:14px / right:14px)   */
-      #rs-alertas-btn {
-        position: fixed;
-        top: 54px;      /* abaixo do botão Edições (~40px altura + 14px top) */
-        right: 14px;
-        z-index: 200;
-        display: flex;
-        align-items: center;
-        gap: 6px;
-        padding: 8px 14px;
-        background: var(--azul-mid, #1A5276);
-        color: #fff;
-        border: none;
-        border-radius: 20px;
-        font-size: 12px;
-        font-weight: 700;
-        font-family: 'Syne', system-ui, sans-serif;
-        cursor: pointer;
-        box-shadow: 0 2px 10px rgba(0,0,0,.25);
-        transition: background .15s, transform .15s;
-        touch-action: manipulation;
-        -webkit-tap-highlight-color: transparent;
-        letter-spacing: .3px;
-      }
-      #rs-alertas-btn:hover { background: var(--azul, #0A3D62); transform: translateY(-1px); }
-      [data-theme="exito"]  #rs-alertas-btn { background: #16a34a; color: #fff; }
-      [data-theme="aurora"] #rs-alertas-btn { background: #7c3aed; color: #fff; }
-
-      /* Badge de não lidos */
-      #rs-alertas-badge {
-        min-width: 18px;
-        height: 18px;
-        padding: 0 5px;
-        background: #ef4444;
-        color: #fff;
-        border-radius: 99px;
-        font-size: 10px;
-        font-weight: 800;
-        line-height: 18px;
-        text-align: center;
-        margin-left: 2px;
-      }
-
       /* ── Overlay ───────────────────────────────────────────────────────── */
       #rs-alertas-overlay {
         position: fixed;
@@ -255,18 +203,13 @@
       }
       #rs-alertas-marcar-lidos:hover { color: var(--rs-text, #f8fafc); border-color: var(--rs-text, #f8fafc); }
 
-      /* Mobile: tamanho menor mas mesma posição (abaixo do Edições) */
-      @media (max-width: 480px) {
-        #rs-alertas-btn { font-size: 11px; padding: 7px 10px; top: 52px; }
-      }
+      
     `;
     document.head.appendChild(style);
   }
 
   // ── Eventos ───────────────────────────────────────────────────────────────
   function _bindEventos() {
-    document.getElementById('rs-alertas-btn')
-      .addEventListener('click', _abrirDrawer);
     document.getElementById('rs-alertas-fechar')
       .addEventListener('click', _fecharDrawer);
     document.getElementById('rs-alertas-overlay')
@@ -507,5 +450,9 @@
   } else {
     _boot();
   }
+
+  // Expõe para o menuApp.js
+  window._rsAlertasAbrir         = _abrirDrawer;
+  window._rsAlertasBadgeAtualizar = _atualizarBadge;
 
 })();

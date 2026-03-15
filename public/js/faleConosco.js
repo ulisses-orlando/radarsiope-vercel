@@ -19,14 +19,6 @@
 
   // ── HTML ──────────────────────────────────────────────────────────────────
   function _injetarHTML() {
-    // Botão fixo (abaixo do 🔔 Alertas que está em top:54px)
-    const btn = document.createElement('button');
-    btn.id   = 'rs-fc-btn';
-    btn.type = 'button';
-    btn.setAttribute('aria-label', 'Fale Conosco');
-    btn.innerHTML = '💬 Fale Conosco<span id="rs-fc-badge" style="display:none">0</span>';
-    document.body.appendChild(btn);
-
     // Overlay
     const overlay = document.createElement('div');
     overlay.id = 'rs-fc-overlay';
@@ -55,34 +47,6 @@
   function _injetarCSS() {
     const style = document.createElement('style');
     style.textContent = `
-      /* ── Botão Fale Conosco ─────────────────────────────────────────────── */
-      #rs-fc-btn {
-        position: fixed;
-        top: 94px;       /* abaixo do 🔔 Alertas (54px + ~40px altura) */
-        right: 14px;
-        z-index: 200;
-        display: flex;
-        align-items: center;
-        gap: 6px;
-        padding: 8px 14px;
-        background: #0e7490;
-        color: #fff;
-        border: none;
-        border-radius: 20px;
-        font-size: 12px;
-        font-weight: 700;
-        font-family: 'Syne', system-ui, sans-serif;
-        cursor: pointer;
-        box-shadow: 0 2px 10px rgba(0,0,0,.25);
-        transition: background .15s, transform .15s;
-        touch-action: manipulation;
-        -webkit-tap-highlight-color: transparent;
-        letter-spacing: .3px;
-      }
-      #rs-fc-btn:hover { background: #0c6680; transform: translateY(-1px); }
-      [data-theme="exito"]  #rs-fc-btn { background: #15803d; }
-      [data-theme="aurora"] #rs-fc-btn { background: #6d28d9; }
-
       /* Badge de respostas recebidas */
       #rs-fc-badge {
         min-width: 18px; height: 18px;
@@ -93,11 +57,6 @@
         font-size: 10px; font-weight: 800;
         line-height: 18px; text-align: center;
         margin-left: 2px;
-      }
-
-      /* Mobile */
-      @media (max-width: 480px) {
-        #rs-fc-btn { font-size: 11px; padding: 7px 10px; top: 90px; }
       }
 
       /* ── Overlay ────────────────────────────────────────────────────────── */
@@ -300,8 +259,6 @@
 
   // ── Eventos ───────────────────────────────────────────────────────────────
   function _bindEventos() {
-    document.getElementById('rs-fc-btn')
-      .addEventListener('click', _abrirDrawer);
     document.getElementById('rs-fc-fechar')
       .addEventListener('click', _fecharDrawer);
     document.getElementById('rs-fc-overlay')
@@ -635,5 +592,9 @@
   } else {
     _boot();
   }
+
+  // Expõe para o menuApp.js
+  window._rsFcAbrir          = _abrirDrawer;
+  window._rsFcBadgeAtualizar = _atualizarBadge;
 
 })();

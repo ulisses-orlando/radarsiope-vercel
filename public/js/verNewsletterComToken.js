@@ -1270,8 +1270,8 @@ async function iniciarDrawer(newsletter) {
   }
 
   // Registrar event listeners
-  document.getElementById('rs-drawer-btn')
-    ?.addEventListener('click', abrirDrawer);
+  // Botão Edições agora é chamado via evento do menuApp.js
+  window.addEventListener('rs:abrirEdicoes', abrirDrawer);
   document.getElementById('rs-drawer-overlay')
     ?.addEventListener('click', fecharDrawer);
   document.getElementById('rs-drawer-fechar')
