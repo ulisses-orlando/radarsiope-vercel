@@ -272,8 +272,11 @@
           window.open('/admin.html', '_blank');
           _fecharModalLogin();
         } else {
-          // Assinante/usuário → fecha modal e fica no app
-          _fecharModalLogin();
+          // Assinante/usuário → carrega painel no mesmo iframe
+          const iframe = document.getElementById('rs-login-iframe');
+          if (iframe) {
+            iframe.src = '/painel.html';
+          }
           // Atualiza saudação
           const nome = (e.data.usuario?.nome || '').split(' ')[0];
           const hd = document.getElementById('hd-saudacao');
