@@ -13,6 +13,7 @@ let historicoDocs = [];
 let totalUsuarios = 0;
 let totalPaginas  = 0;
 let termoBuscaUsuario = "";
+const limitePorPagina = 10;
 
 const momentosEnvio = [
   // ——— Entrada e fluxo inicial ———
@@ -3270,7 +3271,6 @@ document.getElementById('usuarios').addEventListener('click', () => {
 
 
 // paginaAtual, historicoDocs, totalUsuarios, totalPaginas declarados no topo do arquivo
-const limitePorPagina = 10;
 
 async function carregarUsuariosComFiltro() {
   const tbody = document.getElementById('lista-usuarios');
