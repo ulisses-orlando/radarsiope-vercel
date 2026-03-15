@@ -14,6 +14,7 @@ let totalUsuarios = 0;
 let totalPaginas  = 0;
 let termoBuscaUsuario = "";
 const limitePorPagina = 10;
+const backlogRef = db.collection("backlog");
 
 const momentosEnvio = [
   // ——— Entrada e fluxo inicial ———
@@ -3741,9 +3742,6 @@ function atualizarGraficosPorPeriodo() {
   carregarResumoAssinaturas(dias);
   carregarComparativoPreferenciasAssinaturas(dias);
 }
-
-// Referência ao Firestore
-const backlogRef = db.collection("backlog");
 
 // Adicionar novo item
 async function adicionarItemBacklog() {
