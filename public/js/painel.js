@@ -234,7 +234,7 @@ async function carregarBibliotecaNewsletters(uid) {
     const enviosArrays = await Promise.all(enviosPromises);
     const todosEnviosRaw = enviosArrays.flat();
  
-    if (!todosEnvios.length) {
+    if (!todosEnviosRaw.length) {
       container.innerHTML = `
         <div class="empty-state">
           <div style="font-size:32px">📭</div>
@@ -244,7 +244,7 @@ async function carregarBibliotecaNewsletters(uid) {
     }
  
     // Buscar dados das newsletters em paralelo (deduplica por newsletter_id)
-    const nidsSet = [...new Set(todosEnvios.map(e => e.newsletter_id).filter(Boolean))];
+    const nidsSet = [...new Set(todosEnviosRaw.map(e => e.newsletter_id).filter(Boolean))];
     const nlsMap = {};
     await Promise.all(nidsSet.map(async nid => {
       try {
@@ -522,3 +522,4 @@ function expandirMensagem(id, mensagemEncoded) {
     btn.textContent = 'Recolher';
   }
 }
+ 
