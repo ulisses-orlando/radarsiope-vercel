@@ -1,25 +1,25 @@
 // ─── Estado global ────────────────────────────────────────────────────────────
 let filtroStatusSolicitacoes = 'todos';
 let solicitacaoEmEdicao = { usuarioId: null, solicitacaoId: null };
-
+ 
 // ─── Inicialização ────────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
   const usuario = JSON.parse(localStorage.getItem('usuarioLogado'));
   if (!usuario) { window.location.href = 'login.html'; return; }
-
+ 
   const uid = usuario.id;
-
+ 
   carregarAssinaturas(uid);
   carregarBibliotecaNewsletters(uid);
   carregarHistoricoSolicitacoes(uid);
-
+ 
   const nomeEl = document.getElementById('nome-usuario');
   if (nomeEl) {
     nomeEl.textContent = (usuario.nome || usuario.email || 'Usuário') +
       (usuario.tipo_perfil ? ` (${usuario.tipo_perfil})` : '');
   }
 });
-
+ 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 function fmtData(valor) {
   if (!valor) return '—';
@@ -27,12 +27,12 @@ function fmtData(valor) {
   if (isNaN(d)) return String(valor);
   return d.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' });
 }
-
+ 
 function fmtBRL(centavos) {
   if (!centavos && centavos !== 0) return '—';
   return (Number(centavos) / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 }
-
+ 
 function fmtStatus(status) {
   const mapa = {
     ativa: { cor: '#22c55e', icone: '✅', label: 'Ativa' },
@@ -49,7 +49,7 @@ function fmtStatus(status) {
   };
   return mapa[String(status).toLowerCase()] || { cor: '#94a3b8', icone: '❔', label: status || '—' };
 }
-
+ 
 // Monta URL base64 para o web app (mesma lógica do EnvioLeads)
 function montarUrlWebApp(nid, envioId, uid, assinaturaId, token) {
   const qs = [
@@ -62,17 +62,17 @@ function montarUrlWebApp(nid, envioId, uid, assinaturaId, token) {
   const b64 = btoa(qs);
   return `https://app.radarsiope.com.br/verNewsletterComToken.html?d=${encodeURIComponent(b64)}`;
 }
-
+ 
 // ─── Minhas Assinaturas ───────────────────────────────────────────────────────
 async function carregarAssinaturas(uid) {
   const container = document.getElementById('minhas-assinaturas');
   if (!container) return;
   container.innerHTML = '<p class="loading">Carregando...</p>';
-
+ 
   try {
     const assinSnap = await db.collection('usuarios').doc(uid)
       .collection('assinaturas').orderBy('createdAt', 'desc').get();
-
+ 
     if (assinSnap.empty) {
       container.innerHTML = `
         <div class="empty-state">
@@ -84,15 +84,15 @@ async function carregarAssinaturas(uid) {
         </div>`;
       return;
     }
-
+ 
     let html = '';
-
+ 
     for (const doc of assinSnap.docs) {
       const a = doc.data();
       const assinaturaId = doc.id;
       const st = fmtStatus(a.status);
       const features = a.features_snapshot || {};
-
+ 
       // Buscar pagamentos desta assinatura
       let pagamentosHtml = '';
       try {
@@ -101,7 +101,7 @@ async function carregarAssinaturas(uid) {
           .collection('pagamentos')
           .orderBy('data_pagamento', 'desc')
           .limit(12).get();
-
+ 
         if (!pagSnap.empty) {
           const linhas = pagSnap.docs.map(pd => {
             const p = pd.data();
@@ -122,7 +122,7 @@ async function carregarAssinaturas(uid) {
                 </div>
               </div>`;
           }).join('');
-
+ 
           pagamentosHtml = `
             <div class="pagamentos-lista">
               <div class="pagamentos-titulo">💳 Pagamentos</div>
@@ -130,7 +130,7 @@ async function carregarAssinaturas(uid) {
             </div>`;
         }
       } catch (e) { /* pagamentos não críticos */ }
-
+ 
       // Features badges
       const featuresLabels = {
         newsletter_texto: { label: 'Newsletter', icone: '📰' },
@@ -141,14 +141,14 @@ async function carregarAssinaturas(uid) {
         alertas_prioritarios: { label: 'Alertas', icone: '🔔' },
         grupo_whatsapp_vip: { label: 'WhatsApp VIP', icone: '💬' },
       };
-
+ 
       const featuresHtml = Object.entries(featuresLabels)
         .filter(([k]) => features[k])
         .map(([, v]) => `
           <span class="feature-badge">
             ${v.icone} ${v.label}
           </span>`).join('');
-
+ 
       html += `
         <div class="assinatura-card" style="--st-cor:${st.cor}">
           <div class="assinatura-header">
@@ -160,16 +160,16 @@ async function carregarAssinaturas(uid) {
               ${st.icone} ${st.label}
             </div>
           </div>
-
+ 
           <div class="assinatura-datas">
             <span>📅 Início: <strong>${fmtData(a.data_inicio)}</strong></span>
             <span>🔄 Renovação: <strong>${fmtData(a.data_proxima_renovacao)}</strong></span>
           </div>
-
+ 
           ${featuresHtml ? `<div class="features-lista">${featuresHtml}</div>` : ''}
-
+ 
           ${pagamentosHtml}
-
+ 
           ${a.status !== 'ativa' && a.status !== 'ativo' ? `
             <div style="margin-top:10px">
               <a href="/assinatura.html" class="btn-primary" style="display:inline-block;text-decoration:none;font-size:12px">
@@ -178,28 +178,28 @@ async function carregarAssinaturas(uid) {
             </div>` : ''}
         </div>`;
     }
-
+ 
     container.innerHTML = html;
-
+ 
   } catch (err) {
     console.error('[assinaturas]', err);
     container.innerHTML = '<p class="erro">Erro ao carregar assinaturas.</p>';
   }
 }
-
+ 
 // ─── Biblioteca de Newsletters ────────────────────────────────────────────────
 async function carregarBibliotecaNewsletters(uid) {
   const container = document.getElementById('biblioteca-tecnica');
   if (!container) return;
   container.innerHTML = '<p class="loading">Carregando newsletters...</p>';
-
+ 
   try {
     // Buscar todas as assinaturas do usuário
     const assinSnap = await db.collection('usuarios').doc(uid)
       .collection('assinaturas')
       .where('status', 'in', ['ativa', 'ativo'])
       .get();
-
+ 
     if (assinSnap.empty) {
       container.innerHTML = `
         <div class="empty-state">
@@ -208,25 +208,32 @@ async function carregarBibliotecaNewsletters(uid) {
         </div>`;
       return;
     }
-
-    // Buscar envios de todas as assinaturas em paralelo
-    const enviosPromises = assinSnap.docs.map(doc =>
-      db.collection('usuarios').doc(uid)
+ 
+    // Buscar envios e tipos_selecionados de todas as assinaturas em paralelo
+    const enviosPromises = assinSnap.docs.map(async doc => {
+      const assinData = doc.data();
+      const tiposSelecionados = Array.isArray(assinData.tipos_selecionados)
+        ? assinData.tipos_selecionados.map(String)
+        : [];
+ 
+      const snap = await db.collection('usuarios').doc(uid)
         .collection('assinaturas').doc(doc.id)
         .collection('envios')
         .orderBy('data_envio', 'desc')
-        .limit(50)
-        .get()
-        .then(snap => snap.docs.map(d => ({
-          ...d.data(),
-          envioId: d.id,
-          assinaturaId: doc.id,
-        })))
-    );
-
+        .limit(100)
+        .get();
+ 
+      return snap.docs.map(d => ({
+        ...d.data(),
+        envioId:          d.id,
+        assinaturaId:     doc.id,
+        tiposSelecionados, // carrega junto para filtrar depois
+      }));
+    });
+ 
     const enviosArrays = await Promise.all(enviosPromises);
-    const todosEnvios = enviosArrays.flat();
-
+    const todosEnviosRaw = enviosArrays.flat();
+ 
     if (!todosEnvios.length) {
       container.innerHTML = `
         <div class="empty-state">
@@ -235,7 +242,7 @@ async function carregarBibliotecaNewsletters(uid) {
         </div>`;
       return;
     }
-
+ 
     // Buscar dados das newsletters em paralelo (deduplica por newsletter_id)
     const nidsSet = [...new Set(todosEnvios.map(e => e.newsletter_id).filter(Boolean))];
     const nlsMap = {};
@@ -245,14 +252,35 @@ async function carregarBibliotecaNewsletters(uid) {
         if (snap.exists) nlsMap[nid] = { id: snap.id, ...snap.data() };
       } catch (e) { /* não crítico */ }
     }));
-
+ 
+    // Deduplicar por newsletter_id (mantém o envio mais recente de cada edição)
+    // e filtrar apenas newsletters cujo tipo está em tipos_selecionados da assinatura
+    const vistos = new Set();
+    const todosEnvios = todosEnviosRaw.filter(envio => {
+      const nid  = envio.newsletter_id;
+      if (!nid || vistos.has(nid)) return false;
+      vistos.add(nid);
+ 
+      // Filtra por tipo: só mostra se o tipo da newsletter está nos tipos selecionados
+      const nl   = nlsMap[nid];
+      const tipo = nl?.tipo || nl?.Tipo;
+      const tiposSel = envio.tiposSelecionados || [];
+ 
+      // Se a assinatura não tem tipos selecionados, mostra tudo
+      if (tiposSel.length === 0) return true;
+      // Se a newsletter não tem tipo, mostra (não bloqueia)
+      if (!tipo) return true;
+      // Verifica se o tipo está nos selecionados
+      return tiposSel.includes(String(tipo));
+    });
+ 
     // Ordenar por data_envio desc e montar cards
     todosEnvios.sort((a, b) => {
       const da = a.data_envio?.toDate ? a.data_envio.toDate() : new Date(a.data_envio || 0);
       const db_ = b.data_envio?.toDate ? b.data_envio.toDate() : new Date(b.data_envio || 0);
       return db_ - da;
     });
-
+ 
     const cards = todosEnvios.map(envio => {
       const nl = nlsMap[envio.newsletter_id] || {};
       const titulo = nl.titulo || `Edição ${nl.numero || '—'}`;
@@ -268,7 +296,7 @@ async function carregarBibliotecaNewsletters(uid) {
         envio.assinaturaId,
         envio.token_acesso
       );
-
+ 
       return `
         <article class="nl-card ${expirado ? 'nl-card-expirado' : ''}">
           <div class="nl-card-header">
@@ -287,16 +315,16 @@ async function carregarBibliotecaNewsletters(uid) {
           </div>
         </article>`;
     }).join('');
-
+ 
     container.innerHTML = `
       <div class="nl-grid">${cards}</div>`;
-
+ 
   } catch (err) {
     console.error('[biblioteca]', err);
     container.innerHTML = '<p class="erro">Erro ao carregar newsletters.</p>';
   }
 }
-
+ 
 // ─── Suporte ──────────────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
   const btnSuporte = document.getElementById('btn-enviar-suporte');
@@ -304,19 +332,19 @@ document.addEventListener('DOMContentLoaded', () => {
     btnSuporte.addEventListener('click', enviarSolicitacao);
   }
 });
-
+ 
 function enviarSolicitacao() {
   const usuario = JSON.parse(localStorage.getItem('usuarioLogado'));
   const tipo = document.getElementById('tipo-suporte').value;
   const descricao = document.getElementById('mensagem-suporte').value.trim();
   const feedback = document.getElementById('suporte-feedback');
-
+ 
   feedback.innerHTML = '';
   if (!descricao) {
     feedback.innerHTML = `<span style="color:#ef4444">❌ Descreva sua solicitação.</span>`;
     return;
   }
-
+ 
   db.collection('usuarios').doc(usuario.id).collection('solicitacoes').add({
     tipo,
     descricao,
@@ -330,13 +358,13 @@ function enviarSolicitacao() {
     console.error('[suporte]', err);
     feedback.innerHTML = `<span style="color:#ef4444">❌ Erro ao enviar. Tente novamente.</span>`;
   });
-
+ 
   db.collection('admin_contadores').doc('pendencias').set(
     { solicitacoes: firebase.firestore.FieldValue.increment(1) },
     { merge: true }
   );
 }
-
+ 
 // ─── Histórico de Solicitações ────────────────────────────────────────────────
 function filtrarSolicitacoes(status) {
   filtroStatusSolicitacoes = status;
@@ -347,14 +375,14 @@ function filtrarSolicitacoes(status) {
   const usuario = JSON.parse(localStorage.getItem('usuarioLogado'));
   carregarHistoricoSolicitacoes(usuario.id);
 }
-
+ 
 function carregarHistoricoSolicitacoes(uid) {
   const container = document.getElementById('historico-solicitacoes');
   if (!container) return;
   container.innerHTML = '<p class="loading">Carregando...</p>';
-
+ 
   const contadores = { aberta: 0, pendente: 0, atendida: 0, cancelada: 0 };
-
+ 
   db.collection('usuarios').doc(uid).collection('solicitacoes')
     .orderBy('data_solicitacao', 'desc')
     .get()
@@ -363,18 +391,18 @@ function carregarHistoricoSolicitacoes(uid) {
         container.innerHTML = '<p style="color:var(--muted);font-size:13px">Nenhuma solicitação registrada.</p>';
         return;
       }
-
+ 
       let html = '';
-
+ 
       snap.forEach(doc => {
         const s = doc.data();
         const status = (s.status || 'pendente').toLowerCase();
         contadores[status] = (contadores[status] || 0) + 1;
-
+ 
         if (filtroStatusSolicitacoes !== 'todos' && status !== filtroStatusSolicitacoes) return;
-
+ 
         const st = fmtStatus(status);
-
+ 
         // Mensagem administrativa
         if (s.tipo === 'envio_manual_admin') {
           html += `
@@ -394,12 +422,12 @@ function carregarHistoricoSolicitacoes(uid) {
             </div>`;
           return;
         }
-
+ 
         const respostaHtml = s.resposta && (status === 'atendida' || status === 'cancelada')
           ? `<div class="solicitacao-resposta">
                💡 <strong>Resposta:</strong> ${s.resposta}
              </div>` : '';
-
+ 
         html += `
           <div class="solicitacao-item" style="--st-cor:${st.cor}">
             <div class="solicitacao-header">
@@ -419,7 +447,7 @@ function carregarHistoricoSolicitacoes(uid) {
             </div>
           </div>`;
       });
-
+ 
       // Atualiza contadores nos filtros
       document.querySelectorAll('#filtros-solicitacoes button').forEach(btn => {
         const f = btn.dataset.filter;
@@ -427,7 +455,7 @@ function carregarHistoricoSolicitacoes(uid) {
         const c = contadores[f] || 0;
         btn.textContent = `${f.charAt(0).toUpperCase() + f.slice(1)}${c ? ` (${c})` : ''}`;
       });
-
+ 
       container.innerHTML = html || '<p style="color:var(--muted);font-size:13px">Nenhuma solicitação neste filtro.</p>';
     })
     .catch(err => {
@@ -435,18 +463,18 @@ function carregarHistoricoSolicitacoes(uid) {
       container.innerHTML = '<p class="erro">Erro ao carregar histórico.</p>';
     });
 }
-
+ 
 // ─── Editar / Cancelar Solicitação ────────────────────────────────────────────
 function editarSolicitacao(uid, solicitacaoId, descricaoAtual) {
   solicitacaoEmEdicao = { usuarioId: uid, solicitacaoId };
   document.getElementById('nova-descricao').value = descricaoAtual;
   document.getElementById('modal-editar-solicitacao').classList.add('show');
 }
-
+ 
 function salvarEdicaoSolicitacao() {
   const novaDescricao = document.getElementById('nova-descricao').value.trim();
   if (!novaDescricao) { mostrarMensagem('A descrição não pode estar vazia.'); return; }
-
+ 
   db.collection('usuarios')
     .doc(solicitacaoEmEdicao.usuarioId)
     .collection('solicitacoes')
@@ -458,31 +486,31 @@ function salvarEdicaoSolicitacao() {
     })
     .catch(err => { console.error(err); mostrarMensagem('Erro ao atualizar.'); });
 }
-
+ 
 function fecharModalEdicao() {
   document.getElementById('modal-editar-solicitacao').classList.remove('show');
 }
-
+ 
 function cancelarSolicitacao(uid, solicitacaoId) {
   if (!confirm('Deseja realmente cancelar esta solicitação?')) return;
   db.collection('usuarios').doc(uid).collection('solicitacoes').doc(solicitacaoId)
     .update({ status: 'cancelada' })
     .then(() => carregarHistoricoSolicitacoes(uid))
     .catch(err => { console.error(err); mostrarMensagem('Erro ao cancelar.'); });
-
+ 
   db.collection('admin_contadores').doc('pendencias').set(
     { solicitacoes: firebase.firestore.FieldValue.increment(-1) },
     { merge: true }
   );
-
+ 
 }
-
+ 
 // ─── Expandir mensagem admin ──────────────────────────────────────────────────
 function expandirMensagem(id, mensagemEncoded) {
   const div = document.getElementById('msg-' + id);
   const btn = document.getElementById('btn-exp-' + id);
   if (!div || !btn) return;
-
+ 
   if (div.dataset.expandido === 'true') {
     div.innerHTML = div.dataset.curta;
     div.dataset.expandido = 'false';
