@@ -1475,14 +1475,12 @@ async function abrirTipo(tipoId, tipoNome, tipoIcone) {
 
   // Rodapé condicional por segmento
   const rodape = isAssinante
-    ? `<div class="rs-drawer-rodape">
-        <a href="/painel.html#bloco-biblioteca" style="color:var(--azul);font-size:12px;font-weight:600">
-          Ver edições mais antigas → Área do Assinante
-        </a>
+    ? `<div class="rs-drawer-rodape" style="color:var(--rs-muted);font-size:12px">
+        Para visualizar todas as edições da sua assinatura, acesse <strong style="color:var(--azul)">"Minha Área"</strong> no menu.
       </div>`
     : `<div class="rs-drawer-rodape">
         <a href="/assinatura.html" style="color:var(--azul);font-size:12px;font-weight:600">
-          📬 Assine para receber todas as edições →
+          📬 Assine para ter acesso a todas as edições →
         </a>
       </div>`;
 
