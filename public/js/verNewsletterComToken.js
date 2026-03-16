@@ -1445,8 +1445,18 @@ async function abrirTipo(tipoId, tipoNome, tipoIcone) {
     } catch (e) { /* não fatal — trata como não recebido */ }
   }
 
+  // Para leads: exibir apenas edições que foram enviadas a ele E ainda com expira_em vigente
+  const edicoesVisiveis = isAssinante
+    ? edicoes
+    : edicoes.filter(ed => {
+        const envio = enviosLead[ed.id];
+        if (!envio) return false;                                       // nunca recebida
+        if (envio.expira_em && new Date(envio.expira_em) <= new Date()) return false; // expirada
+        return true;
+      });
+
   // Renderizar cards
-  const listaHTML = edicoes.map(ed => {
+  const listaHTML = edicoesVisiveis.map(ed => {
     const isAtual = ed.id === _drawer.edicaoAtual;
     if (isAssinante) {
       return _cardEdicaoAssinante(ed, isAtual, temAcesso);
@@ -1455,18 +1465,32 @@ async function abrirTipo(tipoId, tipoNome, tipoIcone) {
     }
   }).join('');
 
-  const rodape = `
-    <div class="rs-drawer-rodape">
-      <a href="/painel.html#bloco-biblioteca" style="color:var(--azul);font-size:12px;font-weight:600">
-        Ver edições mais antigas → Área do Assinante
-      </a>
-    </div>`;
+  // Mensagem de lista vazia para leads sem edições vigentes
+  const listaOuVazio = (!isAssinante && edicoesVisiveis.length === 0)
+    ? `<div style="padding:32px 20px;text-align:center;color:var(--rs-muted)">
+        <div style="font-size:36px;margin-bottom:12px">📭</div>
+        <p style="font-size:14px;line-height:1.7">Você ainda não possui edições disponíveis.</p>
+      </div>`
+    : `<div class="rs-drawer-edicoes-lista">${listaHTML}</div>`;
 
-  body.innerHTML = `${upSellBanner}<div class="rs-drawer-edicoes-lista">${listaHTML}</div>${rodape}`;
+  // Rodapé condicional por segmento
+  const rodape = isAssinante
+    ? `<div class="rs-drawer-rodape">
+        <a href="/painel.html#bloco-biblioteca" style="color:var(--azul);font-size:12px;font-weight:600">
+          Ver edições mais antigas → Área do Assinante
+        </a>
+      </div>`
+    : `<div class="rs-drawer-rodape">
+        <a href="/assinatura.html" style="color:var(--azul);font-size:12px;font-weight:600">
+          📬 Assine para receber todas as edições →
+        </a>
+      </div>`;
+
+  body.innerHTML = `${upSellBanner}${listaOuVazio}${rodape}`;
 
   // Iniciar contadores regressivos para leads
   if (!isAssinante) {
-    edicoes.forEach(ed => {
+    edicoesVisiveis.forEach(ed => {
       const envio = enviosLead[ed.id];
       if (envio?.expira_em) {
         iniciarContador(envio.expira_em, `rs-contador-${ed.id}`);
