@@ -762,12 +762,13 @@ async function VerNewsletterComToken() {
         mostrarErro('Acesso negado.', 'Token inválido.'); return;
       }
 
-      // Validar expiração
+      // Validar expiração — se o link venceu, não bloqueia o app:
+      // redireciona para modo alerta para que o assinante ainda acesse
+      // "Minha Área", alertas e drawer sem depender do link.
       if (envio.expira_em) {
         const exp = envio.expira_em.toDate ? envio.expira_em.toDate() : new Date(envio.expira_em);
         if (new Date() > exp) {
-          mostrarErro('Este link expirou.',
-            'Acesse a <a href="/login.html">Área do Assinante</a> para ler edições anteriores.');
+          await _tentarModoAlerta();
           return;
         }
       }
@@ -778,13 +779,12 @@ async function VerNewsletterComToken() {
         acessos_totais: firebase.firestore.FieldValue.increment(1),
       }).catch(() => { });
 
-      // Verificar compartilhamento excessivo
+      // Verificar compartilhamento excessivo — mesmo tratamento: abre o app
+      // em modo alerta em vez de bloquear, mas sinaliza para revisão manual.
       const envioAtual = (await envioRef.get()).data() || envio;
       if (Number(envioAtual.acessos_totais || 0) > 5) {
         envioRef.update({ sinalizacao_compartilhamento: true }).catch(() => { });
-        mostrarErro('<strong>Conteúdo exclusivo.</strong>',
-          'Identificamos múltiplos acessos. ' +
-          '<a href="/login.html">Acesse a Área do Assinante</a> para ler com segurança.');
+        await _tentarModoAlerta();
         return;
       }
 
@@ -1476,11 +1476,11 @@ async function abrirTipo(tipoId, tipoNome, tipoIcone) {
   // Rodapé condicional por segmento
   const rodape = isAssinante
     ? `<div class="rs-drawer-rodape" style="color:var(--rs-muted);font-size:12px">
-        Para visualizar todas as edições da sua assinatura, acesse <strong style="color:var(--azul)">"Minha Área"</strong> no menu.
+        Para edições mais antigas, acesse <strong style="color:var(--azul)">"Minha Área"</strong> no menu.
       </div>`
     : `<div class="rs-drawer-rodape">
         <a href="/assinatura.html" style="color:var(--azul);font-size:12px;font-weight:600">
-          📬 Assine para ter acesso a todas as edições →
+          📬 Assine para receber todas as edições →
         </a>
       </div>`;
 
