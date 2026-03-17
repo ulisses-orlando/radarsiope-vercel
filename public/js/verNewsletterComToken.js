@@ -808,7 +808,7 @@ async function VerNewsletterComToken() {
   const edicaoNum = params.get('edicao_numero');
   const origem = normalizeParam(params.get('origem')); 
 
-  // 0. Validação inicial
+  // 1. Validação básica de segurança
   if ((!d_nid && !edicaoNum) || !env || !uid || !token) {
     await _tentarModoAlerta();
     return;
@@ -817,7 +817,7 @@ async function VerNewsletterComToken() {
   try {
     let envio;
 
-    // 1. Busca dados do envio (Firestore)
+    // 2. Busca o registro do envio
     if (assinaturaId) {
       const envioRef = db.collection('usuarios').doc(uid)
         .collection('assinaturas').doc(assinaturaId)
@@ -835,31 +835,32 @@ async function VerNewsletterComToken() {
         const exp = envio.expira_em.toDate ? envio.expira_em.toDate() : new Date(envio.expira_em);
         
         if (new Date() > exp) {
-          // 🛑 AQUI ESTÁ A CORREÇÃO PARA O "CARREGANDO..."
-          
-          // 1. Forçamos o loader a sumir imediatamente
-          const loader = document.getElementById('rs-app-loader');
-          if (loader) loader.style.display = 'none';
-          
-          // 2. Garantimos que o container do App fique visível para mostrar o card
-          const appWrap = document.getElementById('rs-app-wrap');
-          if (appWrap) appWrap.style.opacity = '1';
-          if (appWrap) appWrap.style.display = 'block';
-
-          // 3. Chamamos a função que renderiza a mensagem de expirado
+          // EXPIROU:
+          // Chamamos a função que você já tem para renderizar o erro
           await _abrirModoAssinanteExpirado(uid, assinaturaId);
           
-          console.log("[Radar] Fluxo interrompido: Link expirado.");
-          return; // ⛔ Sai da função aqui e não faz mais nada
+          // Removemos classes que possam travar o menu aberto
+          document.body.classList.remove('menu-open', 'drawer-open');
+
+          // USAMOS A FUNÇÃO NATIVA DO SEU APP PARA MOSTRAR A TELA (Tirar o loading)
+          if (typeof mostrarApp === 'function') {
+             mostrarApp(); 
+          } else {
+             const loader = document.getElementById('rs-app-loader');
+             if (loader) loader.style.display = 'none';
+          }
+          
+          console.warn("[Radar] Acesso bloqueado: Edição expirada.");
+          return; // Encerra aqui.
         }
       }
 
-      // Validação de Token (após check de expiração)
+      // Validação do Token
       if (!envio.token_acesso || envio.token_acesso !== token) {
         mostrarErro('Acesso negado.'); 
         return;
       }
-
+      
       envioRef.update({ ultimo_acesso: new Date() }).catch(() => {});
 
     } else {
@@ -870,16 +871,14 @@ async function VerNewsletterComToken() {
       if (!leRow) { await _tentarModoAlerta(); return; }
       
       if (leRow.expira_em && origem !== 'painel' && new Date() > new Date(leRow.expira_em)) {
-        // Remove loader antes de mostrar erro
-        const loader = document.getElementById('rs-app-loader');
-        if (loader) loader.style.display = 'none';
+        mostrarApp(); // Tira o loader antes de mostrar erro
         mostrarErro('Este link expirou.');
         return;
       }
       envio = { token_acesso: leRow.token_acesso };
     }
 
-    // 2. Carregamento da Newsletter (Só chega aqui se o acesso for válido)
+    // 3. Busca a Newsletter (Só chega aqui se estiver tudo OK ou vier do Painel)
     let newsletter;
     if (d_nid) {
       const snap = await db.collection('newsletters').doc(d_nid).get();
@@ -890,27 +889,27 @@ async function VerNewsletterComToken() {
       if (!newsletter) { mostrarErro(`Edição "${edicaoNum}" não encontrada.`); return; }
     }
 
-    // 3. Busca dados do Destinatário
+    // 4. Busca dados do Destinatário
     const destinatarioSnap = await db.collection("usuarios").doc(uid).get();
     if (!destinatarioSnap.exists) { mostrarErro('Usuário não localizado.'); return; }
     const destinatario = { _uid: destinatarioSnap.id, ...destinatarioSnap.data() };
 
-    // 4. Renderização Final
+    // 5. Renderização Final da Edição Ativa
     renderHeader(newsletter, destinatario);
     
-    // Função padrão que esconde o loader e mostra o app
+    // Libera a interface
     mostrarApp(); 
     
+    // Inicia o menu lateral apenas se a edição carregou
     if (window.iniciarDrawer) {
         iniciarDrawer(newsletter);
     }
 
   } catch (err) {
-    console.error('[verNL] Erro:', err);
-    // Em caso de erro, também precisamos remover o loader
-    const loader = document.getElementById('rs-app-loader');
-    if (loader) loader.style.display = 'none';
-    mostrarErro('Erro ao carregar.');
+    console.error('[verNL] Erro fatal:', err);
+    // Se der erro, tenta ao menos liberar a tela para não ficar em loop
+    if (typeof mostrarApp === 'function') mostrarApp();
+    mostrarErro('Erro ao carregar a edição.');
   }
 }
 
