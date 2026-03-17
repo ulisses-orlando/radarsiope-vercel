@@ -806,9 +806,10 @@ async function VerNewsletterComToken() {
   const token = params.get('token');
   const assinaturaId = normalizeParam(params.get('assinaturaId'));
   const edicaoNum = params.get('edicao_numero');
-  const origem = normalizeParam(params.get('origem')); // Captura o parâmetro de origem
+  const origem = normalizeParam(params.get('origem')); 
 
-  // 0. Validação inicial de parâmetros
+  // 0. Validação inicial de parâmetros (Falta de dados básicos)
+  // Se faltar dado essencial, aí sim cai no "Você chegou via notificação"
   if ((!d_nid && !edicaoNum) || !env || !uid || !token) {
     await _tentarModoAlerta();
     return;
@@ -817,7 +818,7 @@ async function VerNewsletterComToken() {
   try {
     let envio;
 
-    // 1. Buscar envio no Firestore ou Supabase
+    // 1. Buscar envio no Firestore
     if (assinaturaId) {
       const envioRef = db.collection('usuarios').doc(uid)
         .collection('assinaturas').doc(assinaturaId)
@@ -825,7 +826,8 @@ async function VerNewsletterComToken() {
       
       const envioSnap = await envioRef.get();
       if (!envioSnap.exists) {
-        mostrarErro('Envio não encontrado.', 'O link pode ter expirado.');
+        // Se o registro de envio sumiu, tratamos como alerta genérico
+        await _tentarModoAlerta();
         return;
       }
       envio = envioSnap.data();
@@ -836,17 +838,19 @@ async function VerNewsletterComToken() {
         return;
       }
 
-      // --- VALIDAÇÃO DE EXPIRAÇÃO CORRIGIDA ---
-      // Só bloqueia se houver data de expiração E a origem NÃO FOR 'painel'
+      // --- VALIDAÇÃO DE EXPIRAÇÃO ---
+      // Se expirou e NÃO veio do painel, chamamos o fluxo de Assinante Expirado
+      // Esse fluxo deve invocar o seu _cardEdicaoAssinante com o aviso correto
       if (envio.expira_em && origem !== 'painel') {
         const exp = envio.expira_em.toDate ? envio.expira_em.toDate() : new Date(envio.expira_em);
         if (new Date() > exp) {
-          await _tentarModoAlerta();
-          return;
+          // CHAMADA CORRETA: Direciona para o fluxo de assinatura expirada
+          await _abrirModoAssinanteExpirado(uid, assinaturaId);
+          return; 
         }
       }
 
-      // Atualizar metadados de acesso (fire & forget)
+      // Atualizar metadados de acesso
       envioRef.update({
         ultimo_acesso: new Date(),
         acessos_totais: firebase.firestore.FieldValue.increment(1),
@@ -862,12 +866,12 @@ async function VerNewsletterComToken() {
         .maybeSingle();
 
       if (leErr || !leRow) {
-        mostrarErro('Envio não encontrado.');
+        await _tentarModoAlerta();
         return;
       }
 
-      // Validação de expiração para Leads (também respeitando a origem)
       if (leRow.expira_em && origem !== 'painel' && new Date() > new Date(leRow.expira_em)) {
+        // Para leads, geralmente redirecionamos para renovação ou erro de expiração
         mostrarErro('Este link expirou.');
         return;
       }
@@ -894,24 +898,31 @@ async function VerNewsletterComToken() {
     let destinatario = null;
     let segmento = null;
 
-    if (assinaturaId) {
-      const destinatarioSnap = await db.collection("usuarios").doc(uid).get();
-      if (!destinatarioSnap.exists) { mostrarErro('Destinatário não encontrado.'); return; }
+    const destinatarioSnap = await db.collection("usuarios").doc(uid).get();
+    if (destinatarioSnap.exists) {
       destinatario = { _uid: destinatarioSnap.id, ...destinatarioSnap.data() };
-      
-      // Carregar features da assinatura
-      const assinaturaSnap = await db.collection('usuarios').doc(uid)
-        .collection('assinaturas').doc(assinaturaId).get();
-      if (assinaturaSnap.exists) {
-        const ad = assinaturaSnap.data();
-        destinatario.features = ad.features_snapshot || ad.features || destinatario.features || {};
-        destinatario.plano_slug = ad.plano_slug || null;
+      if (assinaturaId) {
+        const assinaturaSnap = await db.collection('usuarios').doc(uid)
+          .collection('assinaturas').doc(assinaturaId).get();
+        if (assinaturaSnap.exists) {
+          const ad = assinaturaSnap.data();
+          destinatario.features = ad.features_snapshot || ad.features || destinatario.features || {};
+          destinatario.plano_slug = ad.plano_slug || null;
+        }
       }
       segmento = "assinantes";
     } else {
-      const { data: leadData } = await window.supabase.from('leads').select('*').eq('id', uid).single();
-      destinatario = leadData;
-      segmento = "leads";
+      // Se não está no Firebase, busca no Supabase (Leads)
+      const { data: leadData } = await window.supabase.from('leads').select('*').eq('id', uid).maybeSingle();
+      if (leadData) {
+        destinatario = leadData;
+        segmento = "leads";
+      }
+    }
+
+    if (!destinatario) {
+       mostrarErro('Usuário não localizado.');
+       return;
     }
 
     // 4. Regras de Acesso e Renderização
@@ -938,8 +949,8 @@ async function VerNewsletterComToken() {
     renderMidia(newsletter, acesso);
     renderFAQ(newsletter, acesso);
     await renderReactions(newsletter.id, uid);
-    renderCTA(acesso, newsletter);
     renderWatermark(destinatario, newsletter);
+    renderCTA(acesso, newsletter);
 
     // 5. Finalização
     mostrarApp();
@@ -947,7 +958,7 @@ async function VerNewsletterComToken() {
 
   } catch (err) {
     console.error('[verNL] Erro geral:', err);
-    mostrarErro('Erro ao carregar a edição.', err.message);
+    mostrarErro('Erro ao carregar a edição.');
   }
 }
 
