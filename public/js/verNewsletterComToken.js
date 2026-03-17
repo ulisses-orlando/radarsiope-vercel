@@ -590,26 +590,26 @@ function publicarRadarUser(destinatario, segmento, assinaturaId) {
   // Para leads: uid = Supabase row ID (id) — usado em leads_mensagens.lead_id
   const isAssinante = segmento === 'assinantes';
   window._radarUser = {
-    uid:           isAssinante ? (destinatario._uid || null) : String(destinatario.id || ''),
-    email:         destinatario.email || '',
-    nome:          destinatario.nome || '',
-    segmento:      isAssinante ? 'assinante' : 'lead',
-    plano_slug:    destinatario.plano_slug || null,
-    features:      destinatario.features || {},
-    uf:            destinatario.cod_uf || '',
+    uid: isAssinante ? (destinatario._uid || null) : String(destinatario.id || ''),
+    email: destinatario.email || '',
+    nome: destinatario.nome || '',
+    segmento: isAssinante ? 'assinante' : 'lead',
+    plano_slug: destinatario.plano_slug || null,
+    features: destinatario.features || {},
+    uf: destinatario.cod_uf || '',
     municipio_cod: destinatario.cod_municipio || '',
-    municipio_nome:destinatario.nome_municipio || '',
-    perfil:        destinatario.perfil || '',
-    assinaturaId:  assinaturaId || null,
+    municipio_nome: destinatario.nome_municipio || '',
+    perfil: destinatario.perfil || '',
+    assinaturaId: assinaturaId || null,
   };
   window.dispatchEvent(new Event('radarUserReady')); // ← aqui, indentado junto
 
   // Salva sessão para o PWA (app.html usa ao abrir sem parâmetros)
   try {
     localStorage.setItem('rs_pwa_session', JSON.stringify({
-      uid:         isAssinante ? (destinatario._uid || null) : String(destinatario.id || ''),
+      uid: isAssinante ? (destinatario._uid || null) : String(destinatario.id || ''),
       assinaturaId: assinaturaId || null,
-      segmento:    isAssinante ? 'assinante' : 'lead',
+      segmento: isAssinante ? 'assinante' : 'lead',
     }));
   } catch (e) { /* ignora se localStorage bloqueado */ }
 }
@@ -658,7 +658,7 @@ async function _tentarModoAlerta() {
           .collection('assinaturas').doc(sessao.assinaturaId).get();
         if (assinaturaSnap.exists) {
           const assinaturaData = assinaturaSnap.data();
-          destinatario.features  = assinaturaData.features_snapshot || assinaturaData.features || destinatario.features || {};
+          destinatario.features = assinaturaData.features_snapshot || assinaturaData.features || destinatario.features || {};
           destinatario.plano_slug = assinaturaData.plano_slug || destinatario.plano_slug || null;
         }
       } catch (e) { /* ignora, continua sem features */ }
@@ -669,22 +669,22 @@ async function _tentarModoAlerta() {
 
     // Renderiza header mínimo (sem edição específica)
     const headerSaudacao = document.getElementById('hd-saudacao');
-    const headerTitulo   = document.getElementById('hd-titulo');
-    const headerEdicao   = document.getElementById('hd-edicao');
-    const headerData     = document.getElementById('hd-data');
+    const headerTitulo = document.getElementById('hd-titulo');
+    const headerEdicao = document.getElementById('hd-edicao');
+    const headerData = document.getElementById('hd-data');
     const nome = (destinatario.nome || '').split(' ')[0];
     if (headerSaudacao) headerSaudacao.textContent = nome ? `Olá, ${nome}!` : '';
-    if (headerTitulo)   headerTitulo.textContent   = 'Radar SIOPE';
-    if (headerEdicao)   headerEdicao.textContent   = '';
-    if (headerData)     headerData.textContent     = '';
+    if (headerTitulo) headerTitulo.textContent = 'Radar SIOPE';
+    if (headerEdicao) headerEdicao.textContent = '';
+    if (headerData) headerData.textContent = '';
     document.title = 'Radar SIOPE';
 
     // Oculta seções de conteúdo de edição — não há edição carregada
     ['rs-toggle-modo', 'modo-rapido', 'modo-completo', 'secao-midia',
-     'secao-faq', 'rs-banner-recente', 'rs-watermark', 'rs-cta-wrap'].forEach(id => {
-      const el = document.getElementById(id);
-      if (el) el.style.display = 'none';
-    });
+      'secao-faq', 'rs-banner-recente', 'rs-watermark', 'rs-cta-wrap'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.style.display = 'none';
+      });
 
     // Mostra placeholder amigável na seção de município
     const munConteudo = document.getElementById('municipio-conteudo');
@@ -748,23 +748,23 @@ async function _abrirModoAssinanteExpirado(uid, assinaturaId) {
 
     // 4. Renderiza header mínimo amigável
     const headerSaudacao = document.getElementById('hd-saudacao');
-    const headerTitulo   = document.getElementById('hd-titulo');
-    const headerEdicao   = document.getElementById('hd-edicao');
-    const headerData     = document.getElementById('hd-data');
+    const headerTitulo = document.getElementById('hd-titulo');
+    const headerEdicao = document.getElementById('hd-edicao');
+    const headerData = document.getElementById('hd-data');
     const nome = (destinatario.nome || '').split(' ')[0];
-    
+
     if (headerSaudacao) headerSaudacao.textContent = nome ? `Olá, ${nome}!` : '';
-    if (headerTitulo)   headerTitulo.textContent   = 'Radar SIOPE';
-    if (headerEdicao)   headerEdicao.textContent   = '';
-    if (headerData)     headerData.textContent     = '';
+    if (headerTitulo) headerTitulo.textContent = 'Radar SIOPE';
+    if (headerEdicao) headerEdicao.textContent = '';
+    if (headerData) headerData.textContent = '';
     document.title = 'Radar SIOPE';
 
     // 5. Oculta secções normais da edição
     ['rs-toggle-modo', 'modo-rapido', 'modo-completo', 'secao-midia',
-     'secao-faq', 'rs-banner-recente', 'rs-watermark', 'rs-cta-wrap'].forEach(id => {
-      const el = document.getElementById(id);
-      if (el) el.style.display = 'none';
-    });
+      'secao-faq', 'rs-banner-recente', 'rs-watermark', 'rs-cta-wrap'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.style.display = 'none';
+      });
 
     // 6. Mostra mensagem específica no centro do ecrã
     const munConteudo = document.getElementById('municipio-conteudo');
@@ -806,11 +806,16 @@ async function VerNewsletterComToken() {
   const token = params.get('token');
   const assinaturaId = normalizeParam(params.get('assinaturaId'));
   const edicaoNum = params.get('edicao_numero');
+  const origem = normalizeParam(params.get('origem'));
 
-  // 0. Validação inicial
-  if ((!d_nid && !edicaoNum) || !env || !uid || !token) {
-    await _tentarModoAlerta();
-    return;
+  // Validar expiração — redireciona para o novo fluxo _abrirModoAssinanteExpirado
+  // 👇 AJUSTA ESTA LINHA: Só bloqueia se a origem NÃO FOR o painel
+  if (envio.expira_em && origem !== 'painel') {
+    const exp = envio.expira_em.toDate ? envio.expira_em.toDate() : new Date(envio.expira_em);
+    if (new Date() > exp) {
+      await _abrirModoAssinanteExpirado(uid, assinaturaId);
+      return;
+    }
   }
 
   try {
@@ -1457,11 +1462,11 @@ async function abrirTipo(tipoId, tipoNome, tipoIcone) {
   const edicoesVisiveis = isAssinante
     ? edicoes
     : edicoes.filter(ed => {
-        const envio = enviosLead[ed.id];
-        if (!envio) return false;                                       
-        if (envio.expira_em && new Date(envio.expira_em) <= new Date()) return false; 
-        return true;
-      });
+      const envio = enviosLead[ed.id];
+      if (!envio) return false;
+      if (envio.expira_em && new Date(envio.expira_em) <= new Date()) return false;
+      return true;
+    });
 
   const listaHTML = edicoesVisiveis.map(ed => {
     const isAtual = ed.id === _drawer.edicaoAtual;

@@ -58,6 +58,7 @@ function montarUrlWebApp(nid, envioId, uid, assinaturaId, token) {
     `uid=${uid || ''}`,
     assinaturaId ? `assinaturaId=${assinaturaId}` : '',
     token ? `token=${token}` : '',
+    `origem=painel` // ⭐ AJUSTE: Adicionámos o parâmetro de origem para saltar a verificação de expiração
   ].filter(Boolean).join('&');
   const b64 = btoa(qs);
   return `https://app.radarsiope.com.br/verNewsletterComToken.html?d=${encodeURIComponent(b64)}`;
@@ -297,6 +298,7 @@ async function carregarBibliotecaNewsletters(uid) {
         envio.token_acesso
       );
  
+      // ⭐ AJUSTE: O `target` mudou de "_blank" para "_top" para manter a navegação na mesma janela
       return `
         <article class="nl-card ${expirado ? 'nl-card-expirado' : ''}">
           <div class="nl-card-header">
@@ -307,7 +309,7 @@ async function carregarBibliotecaNewsletters(uid) {
             </div>
           </div>
           <div class="nl-card-footer">
-            <a href="${url}" class="btn-ver-nl" target="_blank">
+            <a href="${url}" class="btn-ver-nl" target="_top">
               Ler edição →
             </a>
           </div>
@@ -520,4 +522,3 @@ function expandirMensagem(id, mensagemEncoded) {
     btn.textContent = 'Recolher';
   }
 }
- 
