@@ -806,62 +806,54 @@ async function VerNewsletterComToken() {
   const token = params.get('token');
   const assinaturaId = normalizeParam(params.get('assinaturaId'));
   const edicaoNum = params.get('edicao_numero');
-  const origem = normalizeParam(params.get('origem'));
+  const origem = normalizeParam(params.get('origem')); // Captura o parâmetro de origem
 
-  // Validar expiração — redireciona para o novo fluxo _abrirModoAssinanteExpirado
-  // 👇 AJUSTA ESTA LINHA: Só bloqueia se a origem NÃO FOR o painel
-  if (envio.expira_em && origem !== 'painel') {
-    const exp = envio.expira_em.toDate ? envio.expira_em.toDate() : new Date(envio.expira_em);
-    if (new Date() > exp) {
-      await _abrirModoAssinanteExpirado(uid, assinaturaId);
-      return;
-    }
+  // 0. Validação inicial de parâmetros
+  if ((!d_nid && !edicaoNum) || !env || !uid || !token) {
+    await _tentarModoAlerta();
+    return;
   }
 
   try {
     let envio;
 
+    // 1. Buscar envio no Firestore ou Supabase
     if (assinaturaId) {
-      // ── Assinante: Firestore ──────────────────────────────────────────────
       const envioRef = db.collection('usuarios').doc(uid)
         .collection('assinaturas').doc(assinaturaId)
         .collection('envios').doc(env);
+      
       const envioSnap = await envioRef.get();
       if (!envioSnap.exists) {
-        mostrarErro('Envio não encontrado.',
-          'O link pode ter expirado. Acesse a <a href="/login.html">Área do Assinante</a>.');
+        mostrarErro('Envio não encontrado.', 'O link pode ter expirado.');
         return;
       }
       envio = envioSnap.data();
 
+      // Validar token
       if (!envio.token_acesso || envio.token_acesso !== token) {
-        mostrarErro('Acesso negado.', 'Token inválido.'); return;
+        mostrarErro('Acesso negado.', 'Token inválido.'); 
+        return;
       }
 
-      // Validar expiração — redireciona para o novo fluxo _abrirModoAssinanteExpirado
-      if (envio.expira_em) {
+      // --- VALIDAÇÃO DE EXPIRAÇÃO CORRIGIDA ---
+      // Só bloqueia se houver data de expiração E a origem NÃO FOR 'painel'
+      if (envio.expira_em && origem !== 'painel') {
         const exp = envio.expira_em.toDate ? envio.expira_em.toDate() : new Date(envio.expira_em);
         if (new Date() > exp) {
-          await _abrirModoAssinanteExpirado(uid, assinaturaId);
+          await _tentarModoAlerta();
           return;
         }
       }
 
+      // Atualizar metadados de acesso (fire & forget)
       envioRef.update({
         ultimo_acesso: new Date(),
         acessos_totais: firebase.firestore.FieldValue.increment(1),
       }).catch(() => { });
 
-      // Verificar partilha excessiva — redireciona para o fluxo expirado para bloquear e notificar
-      const envioAtual = (await envioRef.get()).data() || envio;
-      if (Number(envioAtual.acessos_totais || 0) > 5) {
-        envioRef.update({ sinalizacao_compartilhamento: true }).catch(() => { });
-        await _abrirModoAssinanteExpirado(uid, assinaturaId);
-        return;
-      }
-
     } else {
-      // ── Lead: Supabase (leads_envios) ─────────────────────────────────────
+      // Fluxo de Lead (Supabase)
       const { data: leRow, error: leErr } = await window.supabase
         .from('leads_envios')
         .select('*')
@@ -870,49 +862,24 @@ async function VerNewsletterComToken() {
         .maybeSingle();
 
       if (leErr || !leRow) {
-        mostrarErro('Envio não encontrado.',
-          'O link pode ter expirado. Assine agora <a href="/assinatura.html">Assine agora</a>.');
+        mostrarErro('Envio não encontrado.');
         return;
       }
 
-      if (!leRow.token_acesso || leRow.token_acesso !== token) {
-        mostrarErro('Acesso negado.', 'Token inválido.'); return;
-      }
-
-      if (leRow.expira_em && new Date() > new Date(leRow.expira_em)) {
-        mostrarErro('Este link expirou.',
-          'Assine agora<a href="/assinatura.html">Assine agora</a> para continuar tendo acesso.');
+      // Validação de expiração para Leads (também respeitando a origem)
+      if (leRow.expira_em && origem !== 'painel' && new Date() > new Date(leRow.expira_em)) {
+        mostrarErro('Este link expirou.');
         return;
       }
-
-      const novoTotal = (leRow.acessos_totais || 0) + 1;
-      window.supabase
-        .from('leads_envios')
-        .update({ ultimo_acesso: new Date().toISOString(), acessos_totais: novoTotal })
-        .eq('id', env)
-        .then(() => { })
-        .catch(() => { });
-
-      if (novoTotal > 5) {
-        window.supabase
-          .from('leads_envios')
-          .update({ sinalizacao_compartilhamento: true })
-          .eq('id', env)
-          .then(() => { }).catch(() => { });
-        mostrarErro('<strong>Conteúdo exclusivo.</strong>',
-          'Identificamos múltiplos acessos. ' +
-          '<a href="/assinatura.html">Assine agora</a> para continuar tendo acesso.');
-        return;
-      }
-
+      
       envio = {
         token_acesso: leRow.token_acesso,
         expira_em: leRow.expira_em,
-        acessos_totais: novoTotal,
+        acessos_totais: (leRow.acessos_totais || 0) + 1,
       };
     }
 
-    // 6. Buscar newsletter
+    // 2. Buscar a Newsletter (Edição)
     let newsletter;
     if (d_nid) {
       const snap = await db.collection('newsletters').doc(d_nid).get();
@@ -922,94 +889,61 @@ async function VerNewsletterComToken() {
       newsletter = await buscarPorNumero(edicaoNum);
       if (!newsletter) { mostrarErro(`Edição "${edicaoNum}" não encontrada.`); return; }
     }
-    const nid = newsletter.id;
 
-    // 7. Buscar destinatário
+    // 3. Buscar dados do Destinatário
     let destinatario = null;
     let segmento = null;
 
     if (assinaturaId) {
       const destinatarioSnap = await db.collection("usuarios").doc(uid).get();
-
       if (!destinatarioSnap.exists) { mostrarErro('Destinatário não encontrado.'); return; }
-
       destinatario = { _uid: destinatarioSnap.id, ...destinatarioSnap.data() };
-
-      try {
-        const assinaturaSnap = await db.collection('usuarios').doc(uid)
-          .collection('assinaturas').doc(assinaturaId).get();
-        if (assinaturaSnap.exists) {
-          const assinaturaData = assinaturaSnap.data();
-          destinatario.features = assinaturaData.features_snapshot || assinaturaData.features || destinatario.features || {};
-          destinatario.plano_slug = assinaturaData.plano_slug || destinatario.plano_slug || null;
-
-          if (!destinatario.plano_slug && assinaturaData.planId) {
-            try {
-              const planoSnap = await db.collection('planos').doc(assinaturaData.planId).get();
-              if (planoSnap.exists) {
-                destinatario.plano_slug = planoSnap.data().slug || planoSnap.data().nome || assinaturaData.planId;
-              }
-            } catch (e) {
-              console.warn('[acesso] Não foi possível ler plano:', e);
-            }
-          }
-        }
-      } catch (e) {
-        console.warn('[acesso] Não foi possível ler features_snapshot da assinatura:', e);
+      
+      // Carregar features da assinatura
+      const assinaturaSnap = await db.collection('usuarios').doc(uid)
+        .collection('assinaturas').doc(assinaturaId).get();
+      if (assinaturaSnap.exists) {
+        const ad = assinaturaSnap.data();
+        destinatario.features = ad.features_snapshot || ad.features || destinatario.features || {};
+        destinatario.plano_slug = ad.plano_slug || null;
       }
-
       segmento = "assinantes";
     } else {
-      const { data: leadData, error: leadError } = await window.supabase
-        .from('leads')
-        .select('*')
-        .eq('id', uid)
-        .single();
-
-      if (leadError || !leadData) { mostrarErro('Destinatário não encontrado.'); return; }
-
+      const { data: leadData } = await window.supabase.from('leads').select('*').eq('id', uid).single();
       destinatario = leadData;
       segmento = "leads";
     }
 
+    // 4. Regras de Acesso e Renderização
     const acesso = detectarAcesso(destinatario, newsletter, segmento, envio);
-    registrarClique(env, uid, nid);
-    publicarRadarUser(destinatario, segmento, assinaturaId);
-
     const dados = {
       nome: destinatario.nome || '',
       email: destinatario.email || '',
       edicao: newsletter.numero || newsletter.edicao || '',
       titulo: newsletter.titulo || '',
-      data_publicacao: newsletter.data_publicacao || null,
-      cod_uf: destinatario.cod_uf || '',
       nome_municipio: destinatario.nome_municipio || '',
-      perfil: destinatario.perfil || '',
-      plano: destinatario.plano_slug || '',
+      cod_uf: destinatario.cod_uf || ''
     };
 
-    renderHeader(newsletter, destinatario);
+    registrarClique(env, uid, newsletter.id);
+    publicarRadarUser(destinatario, segmento, assinaturaId);
 
+    renderHeader(newsletter, destinatario);
     const modoPadrao = sessionStorage.getItem('rs_modo_leitura') || acesso.modoPadrao;
     trocarModo(modoPadrao);
-
+    
     renderModoRapido(newsletter, acesso);
     await renderModoCompleto(newsletter, dados, segmento, acesso);
-
     renderMunicipio(destinatario, acesso);
-
     renderMidia(newsletter, acesso);
     renderFAQ(newsletter, acesso);
-    await renderReactions(nid, uid);
+    await renderReactions(newsletter.id, uid);
     renderCTA(acesso, newsletter);
     renderWatermark(destinatario, newsletter);
 
+    // 5. Finalização
     mostrarApp();
-    iniciarDrawer(newsletter);
-
-    if (segmento === 'assinantes') {
-      verificarEdicaoMaisRecente(newsletter);
-    }
+    if (window.iniciarDrawer) iniciarDrawer(newsletter);
 
   } catch (err) {
     console.error('[verNL] Erro geral:', err);
