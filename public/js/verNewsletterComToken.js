@@ -808,16 +808,16 @@ async function VerNewsletterComToken() {
   const edicaoNum = params.get('edicao_numero');
   const origem = normalizeParam(params.get('origem')); 
 
-  // 0. Validação inicial de parâmetros
+  // 0. Validação inicial
   if ((!d_nid && !edicaoNum) || !env || !uid || !token) {
     await _tentarModoAlerta();
-    return; // Encerra aqui para links mal formados
+    return;
   }
 
   try {
     let envio;
 
-    // 1. Busca os dados do envio
+    // 1. Busca dados do envio
     if (assinaturaId) {
       const envioRef = db.collection('usuarios').doc(uid)
         .collection('assinaturas').doc(assinaturaId)
@@ -830,29 +830,37 @@ async function VerNewsletterComToken() {
       }
       envio = envioSnap.data();
 
-      if (!envio.token_acesso || envio.token_acesso !== token) {
-        mostrarErro('Acesso negado.', 'Token inválido.'); 
-        return;
-      }
-
-      // --- VALIDAÇÃO DE EXPIRAÇÃO ---
+      // --- VALIDAÇÃO DE EXPIRAÇÃO (O PONTO CRÍTICO) ---
       if (envio.expira_em && origem !== 'painel') {
         const exp = envio.expira_em.toDate ? envio.expira_em.toDate() : new Date(envio.expira_em);
         if (new Date() > exp) {
-          // Chama o modo expirado que mostra a mensagem correta
+          
+          // AQUI ESTÁ O SEGREDO:
+          // 1. Removemos qualquer classe que force o menu a abrir
+          document.body.classList.remove('menu-open', 'drawer-open');
+          
+          // 2. Escondemos o overlay de carregamento para o utilizador ver o card
+          const loader = document.getElementById('rs-app-loader');
+          if (loader) loader.style.display = 'none';
+
+          // 3. Chamamos a função que renderiza o aviso de expirado
           await _abrirModoAssinanteExpirado(uid, assinaturaId);
           
-          // IMPORTANTE: Aqui removemos o 'mostrarApp()' e o 'iniciarDrawer()'
-          // O utilizador verá apenas o card de erro com o botão para a Minha Área.
-          console.log("[verNL] Edição expirada. Interrompendo fluxo automático.");
-          return; // ⛔ PARA TUDO AQUI. Não deixa abrir menu nem carregar resto do app.
+          // 4. Forçamos a paragem de qualquer inicialização automática
+          window.stop(); // Opcional: para requisições pendentes
+          
+          console.log("[verNL] Bloqueio total: Edição expirada.");
+          return; // Finaliza e não deixa chegar ao mostrarApp() ou iniciarDrawer()
         }
       }
 
-      envioRef.update({
-        ultimo_acesso: new Date(),
-        acessos_totais: firebase.firestore.FieldValue.increment(1),
-      }).catch(() => { });
+      // Se passou na validade, continua...
+      if (!envio.token_acesso || envio.token_acesso !== token) {
+        mostrarErro('Acesso negado.'); 
+        return;
+      }
+
+      envioRef.update({ ultimo_acesso: new Date() }).catch(() => {});
 
     } else {
       // Fluxo Lead
@@ -860,16 +868,14 @@ async function VerNewsletterComToken() {
         .from('leads_envios').select('*').eq('id', env).eq('lead_id', uid).maybeSingle();
 
       if (!leRow) { await _tentarModoAlerta(); return; }
-
       if (leRow.expira_em && origem !== 'painel' && new Date() > new Date(leRow.expira_em)) {
         mostrarErro('Este link expirou.');
-        return; // ⛔ Para aqui também.
+        return;
       }
-      envio = { token_acesso: leRow.token_acesso, expira_em: leRow.expira_em };
+      envio = { token_acesso: leRow.token_acesso };
     }
 
-    // 2. Se chegou aqui, a edição é válida ou vem do Painel.
-    // Carregamos a newsletter normalmente...
+    // 2. Carregamento da Newsletter (Só chega aqui se NÃO estiver expirado ou se vier do Painel)
     let newsletter;
     if (d_nid) {
       const snap = await db.collection('newsletters').doc(d_nid).get();
@@ -880,17 +886,24 @@ async function VerNewsletterComToken() {
       if (!newsletter) { mostrarErro(`Edição "${edicaoNum}" não encontrada.`); return; }
     }
 
-    // ... (restante do código de busca de destinatário e renderização) ...
-    // [MANTÉM O CÓDIGO DE BUSCA DO DESTINATÁRIO IGUAL AO ANTERIOR]
-    
+    // 3. Busca destinatário (Lógica simplificada para o exemplo)
+    const destinatarioSnap = await db.collection("usuarios").doc(uid).get();
+    if (!destinatarioSnap.exists) { mostrarErro('Usuário não localizado.'); return; }
+    const destinatario = { _uid: destinatarioSnap.id, ...destinatarioSnap.data() };
+
     // 4. Renderização Final
-    // Só chamamos estas funções se o acesso for permitido
+    // Estas funções só são chamadas para acessos VÁLIDOS
+    renderHeader(newsletter, destinatario);
     mostrarApp(); 
-    if (window.iniciarDrawer) iniciarDrawer(newsletter);
+    
+    // O drawer (menu lateral) só inicia se o acesso for permitido
+    if (window.iniciarDrawer) {
+        iniciarDrawer(newsletter);
+    }
 
   } catch (err) {
-    console.error('[verNL] Erro geral:', err);
-    mostrarErro('Erro ao carregar a edição.');
+    console.error('[verNL] Erro:', err);
+    mostrarErro('Erro ao carregar.');
   }
 }
 
