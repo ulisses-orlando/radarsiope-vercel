@@ -307,11 +307,9 @@ async function carregarBibliotecaNewsletters(uid) {
             </div>
           </div>
           <div class="nl-card-footer">
-            ${expirado
-          ? `<span class="nl-badge-expirado">⏰ Acesso expirado</span>`
-          : `<a href="${url}" class="btn-ver-nl" target="_blank">
-                   Ler edição →
-                 </a>`}
+            <a href="${url}" class="btn-ver-nl" target="_blank">
+              Ler edição →
+            </a>
           </div>
         </article>`;
     }).join('');
