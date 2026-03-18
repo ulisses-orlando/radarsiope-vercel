@@ -295,7 +295,7 @@ async function carregarBibliotecaNewsletters(uid) {
         uid,
         envio.assinaturaId,
         envio.token_acesso,
-        expirado  // bypass_exp=1 para expiradas — app ignora validação de expiração
+        expirado  // bypassExp=true para expiradas → app ignora expiração
       );
  
       return `
@@ -308,7 +308,7 @@ async function carregarBibliotecaNewsletters(uid) {
             </div>
           </div>
           <div class="nl-card-footer">
-            <a href="${url}" class="btn-ver-nl ${expirado ? 'btn-ver-nl-exp' : ''}">
+            <a href="${url}" class="btn-ver-nl ${expirado ? 'btn-ver-nl-exp' : ''}" target="_blank">
               ${expirado ? '⏰ Ver edição expirada →' : 'Ler edição →'}
             </a>
           </div>

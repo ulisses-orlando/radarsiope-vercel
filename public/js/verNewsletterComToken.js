@@ -623,14 +623,14 @@ async function buscarPorNumero(numero) {
   return { id: snap.docs[0].id, ...snap.docs[0].data() };
 }
 
-// ─── MODO ASSINANTE EXPIRADO ─────────────────────────────────────────────────
-// Ativado quando o assinante abre um link com expira_em vencido ou acessos > 5.
+// ─── MODO ASSINANTE — LINK EXPIRADO ──────────────────────────────────────────
+// Ativado quando o assinante abre um link com expira_em vencido (sem bypass).
 // Carrega os dados do assinante pelos parâmetros da URL (uid + assinaturaId),
-// exibe um banner orientativo e abre o drawer automaticamente.
+// exibe um banner orientativo e mantém o app funcionando normalmente.
+// O drawer NÃO é aberto automaticamente — o assinante navega por conta própria.
 
 async function _abrirModoAssinanteExpirado(uid, assinaturaId) {
   try {
-    // Busca dados do usuário no Firestore
     const userSnap = await db.collection('usuarios').doc(uid).get();
     if (!userSnap.exists) {
       mostrarErro('Sessão inválida.', 'Acesse a <a href="/login.html">Área do Assinante</a>.');
@@ -638,23 +638,22 @@ async function _abrirModoAssinanteExpirado(uid, assinaturaId) {
     }
     const destinatario = { _uid: userSnap.id, ...userSnap.data() };
 
-    // Busca features da assinatura
     if (assinaturaId) {
       try {
         const assSnap = await db.collection('usuarios').doc(uid)
           .collection('assinaturas').doc(assinaturaId).get();
         if (assSnap.exists) {
           const d = assSnap.data();
-          destinatario.features  = d.features_snapshot || d.features || destinatario.features || {};
+          destinatario.features   = d.features_snapshot || d.features || destinatario.features || {};
           destinatario.plano_slug = d.plano_slug || destinatario.plano_slug || null;
         }
       } catch (e) { /* não fatal */ }
     }
 
-    // Popula _radarUser (necessário para o drawer e alertas)
+    // Popula _radarUser (drawer e alertas dependem disso)
     publicarRadarUser(destinatario, 'assinantes', assinaturaId);
 
-    // Renderiza header mínimo
+    // Header mínimo
     const nome = (destinatario.nome || '').split(' ')[0];
     _set('hd-saudacao', nome ? `Olá, ${nome}!` : '');
     _set('hd-titulo', 'Radar SIOPE');
@@ -662,14 +661,14 @@ async function _abrirModoAssinanteExpirado(uid, assinaturaId) {
     _set('hd-data', '');
     document.title = 'Radar SIOPE';
 
-    // Oculta seções de conteúdo de edição
+    // Oculta seções de conteúdo da edição
     ['rs-toggle-modo', 'modo-rapido', 'modo-completo', 'secao-midia',
      'secao-faq', 'rs-banner-recente', 'rs-watermark', 'rs-cta-wrap'].forEach(id => {
       const el = document.getElementById(id);
       if (el) el.style.display = 'none';
     });
 
-    // Exibe banner orientativo na área de conteúdo
+    // Banner orientativo
     const munConteudo = document.getElementById('municipio-conteudo');
     if (munConteudo) {
       munConteudo.innerHTML = `
@@ -680,19 +679,16 @@ async function _abrirModoAssinanteExpirado(uid, assinaturaId) {
           </p>
           <p style="font-size:13px;line-height:1.6">
             Selecione uma edição disponível no menu <strong>Edições</strong>.<br>
-            Para visualizar edições expiradas, acesse o menu <strong>"Minha Área"</strong>.
+            Caso deseje visualizar edições expiradas, acesse o menu <strong>"Minha Área"</strong>.
           </p>
         </div>`;
       const btnHist = document.getElementById('btn-ver-historico');
       if (btnHist) btnHist.style.display = 'none';
     }
 
-    // Exibe o app
+    // Exibe o app e inicializa o drawer (sem abri-lo automaticamente)
     mostrarApp();
-
-    // Inicializa o drawer com objeto mínimo e abre automaticamente
-    await iniciarDrawer({ id: null, tipo: null });
-    setTimeout(() => window.dispatchEvent(new Event('rs:abrirEdicoes')), 500);
+    iniciarDrawer({ id: null, tipo: null });
 
   } catch (err) {
     console.error('[verNL] Erro no modo assinante expirado:', err);
@@ -806,7 +802,8 @@ async function VerNewsletterComToken() {
   const token = params.get('token');
   const assinaturaId = normalizeParam(params.get('assinaturaId'));
   const edicaoNum = params.get('edicao_numero');
-  const bypass_exp = params.get('bypass_exp') === '1'; // vindo do painel.js (Minha Área)
+  // bypass_exp=1 vem do painel (Minha Área) para ignorar expiração do link
+  const bypass_exp = params.get('bypass_exp') === '1';
 
   // 0. Validação inicial
   // Se não há parâmetros mas existe sessão PWA salva → abre em "modo alerta"
@@ -841,8 +838,8 @@ async function VerNewsletterComToken() {
       }
 
       // Validar expiração.
-      // bypass_exp=1 (vindo do painel/Minha Área) → ignora expiração e exibe a edição.
-      // Link expirado sem bypass → abre o app em modo "assinante expirado" com drawer.
+      // bypass_exp=1 (vindo do painel/Minha Área): ignora expiração e abre a edição.
+      // Link expirado sem bypass: abre app com banner orientativo + drawer disponível.
       if (envio.expira_em && !bypass_exp) {
         const exp = envio.expira_em.toDate ? envio.expira_em.toDate() : new Date(envio.expira_em);
         if (new Date() > exp) {
@@ -851,15 +848,14 @@ async function VerNewsletterComToken() {
         }
       }
 
-      // Atualizar metadados (fire & forget) — só quando não é acesso via bypass
+      // Atualizar metadados (fire & forget) — não contabiliza acesso via bypass
       if (!bypass_exp) {
         envioRef.update({
           ultimo_acesso: new Date(),
           acessos_totais: firebase.firestore.FieldValue.increment(1),
         }).catch(() => { });
 
-        // Verificar compartilhamento excessivo — abre modo expirado em vez de bloquear,
-        // mas sinaliza para revisão manual.
+        // Compartilhamento excessivo → mesmo fluxo do link expirado
         const envioAtual = (await envioRef.get()).data() || envio;
         if (Number(envioAtual.acessos_totais || 0) > 5) {
           envioRef.update({ sinalizacao_compartilhamento: true }).catch(() => { });
@@ -1525,7 +1521,17 @@ async function abrirTipo(tipoId, tipoNome, tipoIcone) {
     } catch (e) { /* não fatal — trata como não recebido */ }
   }
 
-  // Para assinantes: buscar envios para identificar edições com expira_em vencido
+  // Para leads: exibir apenas edições que foram enviadas a ele E ainda com expira_em vigente
+  const edicoesVisiveis = isAssinante
+    ? edicoes
+    : edicoes.filter(ed => {
+        const envio = enviosLead[ed.id];
+        if (!envio) return false;                                       // nunca recebida
+        if (envio.expira_em && new Date(envio.expira_em) <= new Date()) return false; // expirada
+        return true;
+      });
+
+  // Para assinantes: buscar envios para identificar expiradas no drawer
   let enviosAssinante = {};
   if (isAssinante && ctx?.uid && ctx?.assinaturaId) {
     try {
@@ -1543,16 +1549,6 @@ async function abrirTipo(tipoId, tipoNome, tipoIcone) {
       }
     } catch (e) { /* não fatal */ }
   }
-
-  // Para leads: exibir apenas edições que foram enviadas a ele E ainda com expira_em vigente
-  const edicoesVisiveis = isAssinante
-    ? edicoes
-    : edicoes.filter(ed => {
-        const envio = enviosLead[ed.id];
-        if (!envio) return false;                                       // nunca recebida
-        if (envio.expira_em && new Date(envio.expira_em) <= new Date()) return false; // expirada
-        return true;
-      });
 
   // Renderizar cards
   const listaHTML = edicoesVisiveis.map(ed => {
@@ -1615,7 +1611,7 @@ function _cardEdicaoAssinante(ed, isAtual, temAcesso, envio) {
       </div>`;
   }
 
-  // Verifica se o envio desta edição está expirado
+  // Verifica se este envio específico está expirado
   const expiraRaw = envio?.expira_em;
   const expiraDate = expiraRaw
     ? (expiraRaw?.toDate ? expiraRaw.toDate() : new Date(expiraRaw))
@@ -1625,17 +1621,17 @@ function _cardEdicaoAssinante(ed, isAtual, temAcesso, envio) {
   if (expirou) {
     return `
       <div class="rs-drawer-ed-card rs-drawer-ed-expirada"
-           title="Edição expirada, acesso somente pela \'Minha Área\'"
+           title="Edição expirada, acesso somente pela &quot;Minha Área&quot;"
            onclick="_alertarEdicaoExpiradaAssinante()"
            style="cursor:pointer">
         <div class="rs-drawer-ed-info">
           <div class="rs-drawer-ed-titulo">${titulo}</div>
           <div class="rs-drawer-ed-data">${data}${num ? ` · Ed. ${num}` : ''}</div>
           <div class="rs-drawer-ed-status rs-drawer-ed-status-exp">
-            ⏰ Acesso via "Minha Área"
+            ⏰ Acesse pela "Minha Área"
           </div>
         </div>
-        <span class="rs-drawer-chevron" style="opacity:.4">›</span>
+        <span class="rs-drawer-chevron" style="opacity:.3">›</span>
       </div>`;
   }
 
@@ -1653,9 +1649,8 @@ function _cardEdicaoAssinante(ed, isAtual, temAcesso, envio) {
     </button>`;
 }
 
-// ─── Alerta para edição expirada no drawer (assinante) ───────────────────────
+// ─── Toast para edição expirada no drawer (assinante) ────────────────────────
 function _alertarEdicaoExpiradaAssinante() {
-  // Fecha o drawer e exibe toast orientativo
   fecharDrawer();
   let toast = document.getElementById('rs-toast-expirado');
   if (!toast) {
@@ -1665,13 +1660,14 @@ function _alertarEdicaoExpiradaAssinante() {
       'position:fixed;bottom:80px;left:50%;transform:translateX(-50%)',
       'background:#1e293b;color:#f8fafc;padding:12px 20px;border-radius:10px',
       'font-size:13px;font-weight:600;z-index:9999;text-align:center',
-      'box-shadow:0 4px 20px rgba(0,0,0,.4);max-width:90vw;line-height:1.5',
+      'box-shadow:0 4px 20px rgba(0,0,0,.4);max-width:90vw;line-height:1.6',
     ].join(';');
     document.body.appendChild(toast);
   }
-  toast.innerHTML = '⏰ Edição expirada.<br><span style="font-weight:400">Acesse pelo menu <strong>"Minha Área"</strong> para visualizá-la.</span>';
+  toast.innerHTML = '⏰ Edição expirada.<br>'
+    + '<span style="font-weight:400">Acesse pelo menu <strong>"Minha Área"</strong> para visualizá-la.</span>';
   toast.style.display = 'block';
-  setTimeout(() => { toast.style.display = 'none'; }, 4000);
+  setTimeout(() => { if (toast) toast.style.display = 'none'; }, 4500);
 }
 
 // ─── Card de edição — lead ───────────────────────────────────────────────────
