@@ -1,5 +1,5 @@
 /* ==========================================================================
-   verNewsletterComToken.js — Radar SIOPE  (versão final ajustada)
+   verNewsletterComToken.js — Radar SIOPE  (versão final)
    Dependências globais:
      window.db                → firebase-init.js
      window.supabase          → supabase-browser.js
@@ -590,26 +590,26 @@ function publicarRadarUser(destinatario, segmento, assinaturaId) {
   // Para leads: uid = Supabase row ID (id) — usado em leads_mensagens.lead_id
   const isAssinante = segmento === 'assinantes';
   window._radarUser = {
-    uid: isAssinante ? (destinatario._uid || null) : String(destinatario.id || ''),
-    email: destinatario.email || '',
-    nome: destinatario.nome || '',
-    segmento: isAssinante ? 'assinante' : 'lead',
-    plano_slug: destinatario.plano_slug || null,
-    features: destinatario.features || {},
-    uf: destinatario.cod_uf || '',
+    uid:           isAssinante ? (destinatario._uid || null) : String(destinatario.id || ''),
+    email:         destinatario.email || '',
+    nome:          destinatario.nome || '',
+    segmento:      isAssinante ? 'assinante' : 'lead',
+    plano_slug:    destinatario.plano_slug || null,
+    features:      destinatario.features || {},
+    uf:            destinatario.cod_uf || '',
     municipio_cod: destinatario.cod_municipio || '',
-    municipio_nome: destinatario.nome_municipio || '',
-    perfil: destinatario.perfil || '',
-    assinaturaId: assinaturaId || null,
+    municipio_nome:destinatario.nome_municipio || '',
+    perfil:        destinatario.perfil || '',
+    assinaturaId:  assinaturaId || null,
   };
   window.dispatchEvent(new Event('radarUserReady')); // ← aqui, indentado junto
 
   // Salva sessão para o PWA (app.html usa ao abrir sem parâmetros)
   try {
     localStorage.setItem('rs_pwa_session', JSON.stringify({
-      uid: isAssinante ? (destinatario._uid || null) : String(destinatario.id || ''),
+      uid:         isAssinante ? (destinatario._uid || null) : String(destinatario.id || ''),
       assinaturaId: assinaturaId || null,
-      segmento: isAssinante ? 'assinante' : 'lead',
+      segmento:    isAssinante ? 'assinante' : 'lead',
     }));
   } catch (e) { /* ignora se localStorage bloqueado */ }
 }
@@ -623,7 +623,86 @@ async function buscarPorNumero(numero) {
   return { id: snap.docs[0].id, ...snap.docs[0].data() };
 }
 
+// ─── MODO ASSINANTE EXPIRADO ─────────────────────────────────────────────────
+// Ativado quando o assinante abre um link com expira_em vencido ou acessos > 5.
+// Carrega os dados do assinante pelos parâmetros da URL (uid + assinaturaId),
+// exibe um banner orientativo e abre o drawer automaticamente.
+
+async function _abrirModoAssinanteExpirado(uid, assinaturaId) {
+  try {
+    // Busca dados do usuário no Firestore
+    const userSnap = await db.collection('usuarios').doc(uid).get();
+    if (!userSnap.exists) {
+      mostrarErro('Sessão inválida.', 'Acesse a <a href="/login.html">Área do Assinante</a>.');
+      return;
+    }
+    const destinatario = { _uid: userSnap.id, ...userSnap.data() };
+
+    // Busca features da assinatura
+    if (assinaturaId) {
+      try {
+        const assSnap = await db.collection('usuarios').doc(uid)
+          .collection('assinaturas').doc(assinaturaId).get();
+        if (assSnap.exists) {
+          const d = assSnap.data();
+          destinatario.features  = d.features_snapshot || d.features || destinatario.features || {};
+          destinatario.plano_slug = d.plano_slug || destinatario.plano_slug || null;
+        }
+      } catch (e) { /* não fatal */ }
+    }
+
+    // Popula _radarUser (necessário para o drawer e alertas)
+    publicarRadarUser(destinatario, 'assinantes', assinaturaId);
+
+    // Renderiza header mínimo
+    const nome = (destinatario.nome || '').split(' ')[0];
+    _set('hd-saudacao', nome ? `Olá, ${nome}!` : '');
+    _set('hd-titulo', 'Radar SIOPE');
+    _set('hd-edicao', '');
+    _set('hd-data', '');
+    document.title = 'Radar SIOPE';
+
+    // Oculta seções de conteúdo de edição
+    ['rs-toggle-modo', 'modo-rapido', 'modo-completo', 'secao-midia',
+     'secao-faq', 'rs-banner-recente', 'rs-watermark', 'rs-cta-wrap'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.style.display = 'none';
+    });
+
+    // Exibe banner orientativo na área de conteúdo
+    const munConteudo = document.getElementById('municipio-conteudo');
+    if (munConteudo) {
+      munConteudo.innerHTML = `
+        <div style="padding:24px 20px;text-align:center;color:var(--rs-muted)">
+          <div style="font-size:32px;margin-bottom:12px">⏰</div>
+          <p style="font-size:14px;line-height:1.7;margin-bottom:4px;color:var(--rs-text)">
+            <strong>Seu acesso a esta edição expirou.</strong>
+          </p>
+          <p style="font-size:13px;line-height:1.6">
+            Selecione uma edição disponível no menu <strong>Edições</strong>.<br>
+            Para visualizar edições expiradas, acesse o menu <strong>"Minha Área"</strong>.
+          </p>
+        </div>`;
+      const btnHist = document.getElementById('btn-ver-historico');
+      if (btnHist) btnHist.style.display = 'none';
+    }
+
+    // Exibe o app
+    mostrarApp();
+
+    // Inicializa o drawer com objeto mínimo e abre automaticamente
+    await iniciarDrawer({ id: null, tipo: null });
+    setTimeout(() => window.dispatchEvent(new Event('rs:abrirEdicoes')), 500);
+
+  } catch (err) {
+    console.error('[verNL] Erro no modo assinante expirado:', err);
+    mostrarErro('Erro ao carregar seus dados.', err.message);
+  }
+}
+
 // ─── MODO ALERTA (sem parâmetros de edição) ────────────────────────────────────
+// Ativado quando o app é aberto via notificação push sem link de edição específica.
+// Carrega usuário da sessão PWA e abre a Central de Mensagens automaticamente.
 
 async function _tentarModoAlerta() {
   let sessao = null;
@@ -658,7 +737,7 @@ async function _tentarModoAlerta() {
           .collection('assinaturas').doc(sessao.assinaturaId).get();
         if (assinaturaSnap.exists) {
           const assinaturaData = assinaturaSnap.data();
-          destinatario.features = assinaturaData.features_snapshot || assinaturaData.features || destinatario.features || {};
+          destinatario.features  = assinaturaData.features_snapshot || assinaturaData.features || destinatario.features || {};
           destinatario.plano_slug = assinaturaData.plano_slug || destinatario.plano_slug || null;
         }
       } catch (e) { /* ignora, continua sem features */ }
@@ -669,22 +748,22 @@ async function _tentarModoAlerta() {
 
     // Renderiza header mínimo (sem edição específica)
     const headerSaudacao = document.getElementById('hd-saudacao');
-    const headerTitulo = document.getElementById('hd-titulo');
-    const headerEdicao = document.getElementById('hd-edicao');
-    const headerData = document.getElementById('hd-data');
+    const headerTitulo   = document.getElementById('hd-titulo');
+    const headerEdicao   = document.getElementById('hd-edicao');
+    const headerData     = document.getElementById('hd-data');
     const nome = (destinatario.nome || '').split(' ')[0];
     if (headerSaudacao) headerSaudacao.textContent = nome ? `Olá, ${nome}!` : '';
-    if (headerTitulo) headerTitulo.textContent = 'Radar SIOPE';
-    if (headerEdicao) headerEdicao.textContent = '';
-    if (headerData) headerData.textContent = '';
+    if (headerTitulo)   headerTitulo.textContent   = 'Radar SIOPE';
+    if (headerEdicao)   headerEdicao.textContent   = '';
+    if (headerData)     headerData.textContent     = '';
     document.title = 'Radar SIOPE';
 
     // Oculta seções de conteúdo de edição — não há edição carregada
     ['rs-toggle-modo', 'modo-rapido', 'modo-completo', 'secao-midia',
-      'secao-faq', 'rs-banner-recente', 'rs-watermark', 'rs-cta-wrap'].forEach(id => {
-        const el = document.getElementById(id);
-        if (el) el.style.display = 'none';
-      });
+     'secao-faq', 'rs-banner-recente', 'rs-watermark', 'rs-cta-wrap'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.style.display = 'none';
+    });
 
     // Mostra placeholder amigável na seção de município
     const munConteudo = document.getElementById('municipio-conteudo');
@@ -717,85 +796,6 @@ async function _tentarModoAlerta() {
   }
 }
 
-// ─── MODO ASSINANTE EXPIRADO (Abertura Direta do Drawer) ───────────────────────
-
-async function _abrirModoAssinanteExpirado(uid, assinaturaId) {
-  try {
-    // 1. Busca dados do utilizador no Firestore
-    const userSnap = await db.collection('usuarios').doc(uid).get();
-    if (!userSnap.exists) {
-      mostrarErro('Sessão expirada.', 'Acesse a <a href="/login.html">Área do Assinante</a>.');
-      return;
-    }
-
-    const destinatario = { _uid: userSnap.id, ...userSnap.data() };
-
-    // 2. Busca dados da assinatura
-    if (assinaturaId) {
-      try {
-        const assinaturaSnap = await db.collection('usuarios').doc(uid)
-          .collection('assinaturas').doc(assinaturaId).get();
-        if (assinaturaSnap.exists) {
-          const assinaturaData = assinaturaSnap.data();
-          destinatario.features = assinaturaData.features_snapshot || assinaturaData.features || destinatario.features || {};
-          destinatario.plano_slug = assinaturaData.plano_slug || destinatario.plano_slug || null;
-        }
-      } catch (e) { /* ignora */ }
-    }
-
-    // 3. Popula _radarUser para carregar o contexto correto
-    publicarRadarUser(destinatario, 'assinantes', assinaturaId);
-
-    // 4. Renderiza header mínimo amigável
-    const headerSaudacao = document.getElementById('hd-saudacao');
-    const headerTitulo = document.getElementById('hd-titulo');
-    const headerEdicao = document.getElementById('hd-edicao');
-    const headerData = document.getElementById('hd-data');
-    const nome = (destinatario.nome || '').split(' ')[0];
-
-    if (headerSaudacao) headerSaudacao.textContent = nome ? `Olá, ${nome}!` : '';
-    if (headerTitulo) headerTitulo.textContent = 'Radar SIOPE';
-    if (headerEdicao) headerEdicao.textContent = '';
-    if (headerData) headerData.textContent = '';
-    document.title = 'Radar SIOPE';
-
-    // 5. Oculta secções normais da edição
-    ['rs-toggle-modo', 'modo-rapido', 'modo-completo', 'secao-midia',
-      'secao-faq', 'rs-banner-recente', 'rs-watermark', 'rs-cta-wrap'].forEach(id => {
-        const el = document.getElementById(id);
-        if (el) el.style.display = 'none';
-      });
-
-    // 6. Mostra mensagem específica no centro do ecrã
-    const munConteudo = document.getElementById('municipio-conteudo');
-    if (munConteudo) {
-      munConteudo.innerHTML = `
-        <div style="padding:24px;text-align:center;color:var(--rs-muted);background:#f8fafc;border-radius:12px;border:1px solid #e2e8f0;margin-top:20px;">
-          <div style="font-size:32px;margin-bottom:12px">⌛</div>
-          <div style="font-size:14px;line-height:1.6;color:#334155;">
-            <strong>Seu acesso a esta edição expirou.</strong><br>
-            Selecione uma edição disponível abaixo.<br>
-            Caso deseje visualizar edições expiradas, acesse o menu <strong>"Minha Área"</strong>.
-          </div>
-        </div>`;
-      const btnHist = document.getElementById('btn-ver-historico');
-      if (btnHist) btnHist.style.display = 'none';
-    }
-
-    // 7. Exibe o app
-    mostrarApp();
-
-    // 8. Abre o Drawer automaticamente após a renderização visual
-    setTimeout(() => {
-      abrirDrawer();
-    }, 600);
-
-  } catch (err) {
-    console.error('[verNL] Erro no modo expirado:', err);
-    mostrarErro('Erro ao carregar dados da sua conta.', err.message);
-  }
-}
-
 // ─── FLUXO PRINCIPAL ──────────────────────────────────────────────────────────
 
 async function VerNewsletterComToken() {
@@ -806,79 +806,128 @@ async function VerNewsletterComToken() {
   const token = params.get('token');
   const assinaturaId = normalizeParam(params.get('assinaturaId'));
   const edicaoNum = params.get('edicao_numero');
-  const origem = normalizeParam(params.get('origem')); 
+  const bypass_exp = params.get('bypass_exp') === '1'; // vindo do painel.js (Minha Área)
 
-  // 1. Validação básica de segurança
+  // 0. Validação inicial
+  // Se não há parâmetros mas existe sessão PWA salva → abre em "modo alerta"
+  // (usuário chegou via notificação push sem link de edição específica)
   if ((!d_nid && !edicaoNum) || !env || !uid || !token) {
     await _tentarModoAlerta();
     return;
   }
 
   try {
+    // 1. Buscar envio
+    // Assinantes → Firestore (usuarios/{uid}/assinaturas/{aid}/envios/{env})
+    // Leads      → Supabase  (tabela leads_envios, id = env)
     let envio;
 
-    // 2. Busca o registro do envio
     if (assinaturaId) {
+      // ── Assinante: Firestore ──────────────────────────────────────────────
       const envioRef = db.collection('usuarios').doc(uid)
         .collection('assinaturas').doc(assinaturaId)
         .collection('envios').doc(env);
-      
       const envioSnap = await envioRef.get();
       if (!envioSnap.exists) {
-        await _tentarModoAlerta();
+        mostrarErro('Envio não encontrado.',
+          'O link pode ter expirado. Acesse a <a href="/login.html">Área do Assinante</a>.');
         return;
       }
       envio = envioSnap.data();
 
-      // --- VALIDAÇÃO DE EXPIRAÇÃO ---
-      if (envio.expira_em && origem !== 'painel') {
-        const exp = envio.expira_em.toDate ? envio.expira_em.toDate() : new Date(envio.expira_em);
-        
-        if (new Date() > exp) {
-          // EXPIROU:
-          // Chamamos a função que você já tem para renderizar o erro
-          await _abrirModoAssinanteExpirado(uid, assinaturaId);
-          
-          // Removemos classes que possam travar o menu aberto
-          document.body.classList.remove('menu-open', 'drawer-open');
+      // Validar token
+      if (!envio.token_acesso || envio.token_acesso !== token) {
+        mostrarErro('Acesso negado.', 'Token inválido.'); return;
+      }
 
-          // USAMOS A FUNÇÃO NATIVA DO SEU APP PARA MOSTRAR A TELA (Tirar o loading)
-          if (typeof mostrarApp === 'function') {
-             mostrarApp(); 
-          } else {
-             const loader = document.getElementById('rs-app-loader');
-             if (loader) loader.style.display = 'none';
-          }
-          
-          console.warn("[Radar] Acesso bloqueado: Edição expirada.");
-          return; // Encerra aqui.
+      // Validar expiração.
+      // bypass_exp=1 (vindo do painel/Minha Área) → ignora expiração e exibe a edição.
+      // Link expirado sem bypass → abre o app em modo "assinante expirado" com drawer.
+      if (envio.expira_em && !bypass_exp) {
+        const exp = envio.expira_em.toDate ? envio.expira_em.toDate() : new Date(envio.expira_em);
+        if (new Date() > exp) {
+          await _abrirModoAssinanteExpirado(uid, assinaturaId);
+          return;
         }
       }
 
-      // Validação do Token
-      if (!envio.token_acesso || envio.token_acesso !== token) {
-        mostrarErro('Acesso negado.'); 
-        return;
+      // Atualizar metadados (fire & forget) — só quando não é acesso via bypass
+      if (!bypass_exp) {
+        envioRef.update({
+          ultimo_acesso: new Date(),
+          acessos_totais: firebase.firestore.FieldValue.increment(1),
+        }).catch(() => { });
+
+        // Verificar compartilhamento excessivo — abre modo expirado em vez de bloquear,
+        // mas sinaliza para revisão manual.
+        const envioAtual = (await envioRef.get()).data() || envio;
+        if (Number(envioAtual.acessos_totais || 0) > 5) {
+          envioRef.update({ sinalizacao_compartilhamento: true }).catch(() => { });
+          await _abrirModoAssinanteExpirado(uid, assinaturaId);
+          return;
+        }
       }
-      
-      envioRef.update({ ultimo_acesso: new Date() }).catch(() => {});
 
     } else {
-      // Fluxo Lead (Supabase)
-      const { data: leRow } = await window.supabase
-        .from('leads_envios').select('*').eq('id', env).eq('lead_id', uid).maybeSingle();
+      // ── Lead: Supabase (leads_envios) ─────────────────────────────────────
+      // env = id numérico do registro em leads_envios
+      // Usa anon key — a policy "le_select_by_token" permite SELECT onde token IS NOT NULL
+      const { data: leRow, error: leErr } = await window.supabase
+        .from('leads_envios')
+        .select('*')
+        .eq('id', env)
+        .eq('lead_id', uid)
+        .maybeSingle();
 
-      if (!leRow) { await _tentarModoAlerta(); return; }
-      
-      if (leRow.expira_em && origem !== 'painel' && new Date() > new Date(leRow.expira_em)) {
-        mostrarApp(); // Tira o loader antes de mostrar erro
-        mostrarErro('Este link expirou.');
+      if (leErr || !leRow) {
+        mostrarErro('Envio não encontrado.',
+          'O link pode ter expirado. Assine agora <a href="/assinatura.html">Assine agora</a>.');
         return;
       }
-      envio = { token_acesso: leRow.token_acesso };
+
+      // Validar token
+      if (!leRow.token_acesso || leRow.token_acesso !== token) {
+        mostrarErro('Acesso negado.', 'Token inválido.'); return;
+      }
+
+      // Validar expiração
+      if (leRow.expira_em && new Date() > new Date(leRow.expira_em)) {
+        mostrarErro('Este link expirou.',
+          'Assine agora<a href="/assinatura.html">Assine agora</a> para continuar tendo acesso.');
+        return;
+      }
+
+      // Atualizar metadados (fire & forget) — anon pode UPDATE via policy le_update_acesso
+      const novoTotal = (leRow.acessos_totais || 0) + 1;
+      window.supabase
+        .from('leads_envios')
+        .update({ ultimo_acesso: new Date().toISOString(), acessos_totais: novoTotal })
+        .eq('id', env)
+        .then(() => { })
+        .catch(() => { });
+
+      // Verificar compartilhamento excessivo
+      if (novoTotal > 5) {
+        window.supabase
+          .from('leads_envios')
+          .update({ sinalizacao_compartilhamento: true })
+          .eq('id', env)
+          .then(() => { }).catch(() => { });
+        mostrarErro('<strong>Conteúdo exclusivo.</strong>',
+          'Identificamos múltiplos acessos. ' +
+          '<a href="/assinatura.html">Assine agora</a> para continuar tendo acesso.');
+        return;
+      }
+
+      // Normaliza para o mesmo formato usado no restante do fluxo
+      envio = {
+        token_acesso: leRow.token_acesso,
+        expira_em: leRow.expira_em,
+        acessos_totais: novoTotal,
+      };
     }
 
-    // 3. Busca a Newsletter (Só chega aqui se estiver tudo OK ou vier do Painel)
+    // 6. Buscar newsletter
     let newsletter;
     if (d_nid) {
       const snap = await db.collection('newsletters').doc(d_nid).get();
@@ -888,34 +937,120 @@ async function VerNewsletterComToken() {
       newsletter = await buscarPorNumero(edicaoNum);
       if (!newsletter) { mostrarErro(`Edição "${edicaoNum}" não encontrada.`); return; }
     }
+    const nid = newsletter.id;
 
-    // 4. Busca dados do Destinatário
-    const destinatarioSnap = await db.collection("usuarios").doc(uid).get();
-    if (!destinatarioSnap.exists) { mostrarErro('Usuário não localizado.'); return; }
-    const destinatario = { _uid: destinatarioSnap.id, ...destinatarioSnap.data() };
+    // 7. Buscar destinatário
+    let destinatario = null;
+    let segmento = null;
 
-    // 5. Renderização Final da Edição Ativa
+    if (assinaturaId) {
+      // ✅ Assinante → Firebase
+      const destinatarioSnap = await db.collection("usuarios").doc(uid).get();
+
+      if (!destinatarioSnap.exists) { mostrarErro('Destinatário não encontrado.'); return; }
+
+      destinatario = { _uid: destinatarioSnap.id, ...destinatarioSnap.data() };
+
+      // Lê features_snapshot da assinatura (fonte de verdade das permissões)
+      try {
+        const assinaturaSnap = await db.collection('usuarios').doc(uid)
+          .collection('assinaturas').doc(assinaturaId).get();
+        if (assinaturaSnap.exists) {
+          const assinaturaData = assinaturaSnap.data();
+          // features_snapshot tem precedência sobre qualquer features do usuário
+          destinatario.features = assinaturaData.features_snapshot || assinaturaData.features || destinatario.features || {};
+          destinatario.plano_slug = assinaturaData.plano_slug || destinatario.plano_slug || null;
+
+          // Fallback: busca pelo planId se plano_slug não estiver na assinatura
+          if (!destinatario.plano_slug && assinaturaData.planId) {
+            try {
+              const planoSnap = await db.collection('planos').doc(assinaturaData.planId).get();
+              if (planoSnap.exists) {
+                destinatario.plano_slug = planoSnap.data().slug || planoSnap.data().nome || assinaturaData.planId;
+              }
+            } catch (e) {
+              console.warn('[acesso] Não foi possível ler plano:', e);
+            }
+          }
+        }
+      } catch (e) {
+        console.warn('[acesso] Não foi possível ler features_snapshot da assinatura:', e);
+      }
+
+      segmento = "assinantes";
+    } else {
+      // ✅ Lead → Supabase
+      const { data: leadData, error: leadError } = await window.supabase
+        .from('leads')
+        .select('*')
+        .eq('id', uid)
+        .single();
+
+      if (leadError || !leadData) { mostrarErro('Destinatário não encontrado.'); return; }
+
+      destinatario = leadData;
+      segmento = "leads";
+    }
+
+    // 8. Regras de acesso
+    const acesso = detectarAcesso(destinatario, newsletter, segmento, envio);
+
+    // 9. Side effects não bloqueantes
+    registrarClique(env, uid, nid);
+    publicarRadarUser(destinatario, segmento, assinaturaId);
+
+    // 10. Dados para placeholders
+    const dados = {
+      nome: destinatario.nome || '',
+      email: destinatario.email || '',
+      edicao: newsletter.numero || newsletter.edicao || '',
+      titulo: newsletter.titulo || '',
+      data_publicacao: newsletter.data_publicacao || null,
+      cod_uf: destinatario.cod_uf || '',
+      nome_municipio: destinatario.nome_municipio || '',
+      perfil: destinatario.perfil || '',
+      plano: destinatario.plano_slug || '',
+    };
+
+    // 11. Render (header + conteúdo primeiro para UX)
     renderHeader(newsletter, destinatario);
-    
-    // Libera a interface
-    mostrarApp(); 
-    
-    // Inicia o menu lateral apenas se a edição carregou
-    if (window.iniciarDrawer) {
-        iniciarDrawer(newsletter);
+
+    const modoPadrao = sessionStorage.getItem('rs_modo_leitura') || acesso.modoPadrao;
+    trocarModo(modoPadrao);
+
+    renderModoRapido(newsletter, acesso);
+    await renderModoCompleto(newsletter, dados, segmento, acesso);
+
+    // Município em paralelo — não bloqueia o conteúdo principal
+    renderMunicipio(destinatario, acesso);
+
+    renderMidia(newsletter, acesso);
+    renderFAQ(newsletter, acesso);
+    await renderReactions(nid, uid);
+    renderCTA(acesso, newsletter);
+    renderWatermark(destinatario, newsletter);
+
+    // 12. Exibe com fade-in
+    mostrarApp();
+
+    // 13. Iniciar drawer (após app visível)
+    iniciarDrawer(newsletter);
+
+    // 14. Notificação de edição mais recente (somente assinante)
+    if (segmento === 'assinantes') {
+      verificarEdicaoMaisRecente(newsletter);
     }
 
   } catch (err) {
-    console.error('[verNL] Erro fatal:', err);
-    // Se der erro, tenta ao menos liberar a tela para não ficar em loop
-    if (typeof mostrarApp === 'function') mostrarApp();
-    mostrarErro('Erro ao carregar a edição.');
+    console.error('[verNL] Erro geral:', err);
+    mostrarErro('Erro ao carregar a edição.', err.message);
   }
 }
 
 // ══════════════════════════════════════════════════════════════════════════
 // CONTROLE DE HISTÓRICO DO MUNICÍPIO
 // ══════════════════════════════════════════════════════════════════════════
+
 async function verHistoricoCompleto() {
   if (!dadosMunicipioAtual || !dadosMunicipioAtual.cod_municipio) {
     alert('Município não identificado');
@@ -931,9 +1066,11 @@ async function verHistoricoCompleto() {
     return;
   }
 
+  // Ocultar resumo, mostrar histórico
   resumo.style.display = 'none';
   historico.style.display = 'block';
 
+  // Loading
   historico.innerHTML = `
     <div style="text-align:center;padding:40px">
       <div class="rs-spinner" style="margin:0 auto 16px"></div>
@@ -942,14 +1079,17 @@ async function verHistoricoCompleto() {
   `;
 
   try {
+    // Aguardar módulo estar pronto
     if (!window.SupabaseMunicipio) {
       throw new Error('Módulo SupabaseMunicipio não carregado');
     }
 
+    // Buscar histórico
     const dados = await window.SupabaseMunicipio.getHistoricoCompleto(
       dadosMunicipioAtual.cod_municipio
     );
 
+    // Renderizar
     window.SupabaseMunicipio.renderHistoricoCompleto(
       historico,
       dados,
@@ -980,6 +1120,7 @@ function voltarResumo() {
   if (resumo) resumo.style.display = 'block';
 }
 
+// Inicializar listener do botão quando DOM estiver pronto
 function initHistoricoButton() {
   const btn = document.getElementById('btn-ver-historico');
   if (btn) {
@@ -987,32 +1128,42 @@ function initHistoricoButton() {
   }
 }
 
+// Expor funções globalmente
 window.verHistoricoCompleto = verHistoricoCompleto;
 window.voltarResumo = voltarResumo;
 
+// Inicializar quando DOM carregar
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', initHistoricoButton);
 } else {
   initHistoricoButton();
 }
 
+// ─── Expõe para inline handlers ──────────────────────────────────────────────
 window.trocarModo = trocarModo;
 window.toggleFaq = toggleFaq;
 
 // ══════════════════════════════════════════════════════════════════════════
 // SISTEMA DE TEMAS
 // ══════════════════════════════════════════════════════════════════════════
+
+// Temas disponíveis
 const TEMAS_DISPONIVEIS = ['claro', 'escuro', 'suave', 'minimalista', 'exito', 'aurora'];
 
+// Carregar tema salvo (ou usar 'claro' como padrão)
 function carregarTema() {
   const temaSalvo = localStorage.getItem('radar-tema');
+
+  // Verificar se o tema salvo é válido
   if (temaSalvo && TEMAS_DISPONIVEIS.includes(temaSalvo)) {
     aplicarTema(temaSalvo);
   } else {
+    // Tema padrão: claro
     aplicarTema('claro');
   }
 }
 
+// Aplicar tema ao documento
 function aplicarTema(tema) {
   if (!TEMAS_DISPONIVEIS.includes(tema)) {
     console.warn('[Tema] Tema inválido:', tema);
@@ -1021,6 +1172,7 @@ function aplicarTema(tema) {
 
   document.body.setAttribute('data-theme', tema);
 
+  // Atualizar botões ativos (se existirem)
   document.querySelectorAll('[data-theme-btn]').forEach(btn => {
     const btnTema = btn.getAttribute('data-theme-btn');
     if (btnTema === tema) {
@@ -1029,17 +1181,24 @@ function aplicarTema(tema) {
       btn.classList.remove('ativo');
     }
   });
+
 }
 
+// Trocar tema (chamado pelo onclick dos botões)
 function setTheme(tema) {
+
   if (!TEMAS_DISPONIVEIS.includes(tema)) {
     console.warn('[Tema] Tema inválido:', tema);
     return;
   }
 
+  // Aplicar tema
   aplicarTema(tema);
+
+  // Salvar no localStorage
   localStorage.setItem('radar-tema', tema);
 
+  // Feedback visual (opcional)
   const btn = document.querySelector(`[data-theme-btn="${tema}"]`);
   if (btn) {
     btn.style.transform = 'scale(1.1)';
@@ -1049,31 +1208,36 @@ function setTheme(tema) {
   }
 }
 
+// Expor função globalmente (para onclick do HTML)
 window.setTheme = setTheme;
 window.carregarTema = carregarTema;
+
+// Carregar tema ao iniciar (imediatamente)
 carregarTema();
 
+// Também carregar quando DOM estiver pronto (por segurança)
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', carregarTema);
 }
-
 // ══════════════════════════════════════════════════════════════════════════
 // DRAWER DE NAVEGAÇÃO DE EDIÇÕES
 // ══════════════════════════════════════════════════════════════════════════
 
+// ─── Estado do drawer ────────────────────────────────────────────────────────
 const _drawer = {
   aberto: false,
-  nivel: 1,
-  tipoAtivo: null,
-  edicaoAtual: null,
-  tipoAtual: null,
-  edicoesCache: {},
-  contadores: [],
+  nivel: 1,          // 1 = tipos, 2 = edições do tipo
+  tipoAtivo: null,       // { id, nome, icone }
+  edicaoAtual: null,       // id da edição sendo lida
+  tipoAtual: null,       // tipo da edição sendo lida
+  edicoesCache: {},         // { [tipoId]: [array de edições] } — memória de sessão
+  contadores: [],         // refs dos setInterval dos contadores regressivos
 };
 
+// ─── Cache de tipos no localStorage (24h) ───────────────────────────────────
 const DRAWER_CACHE_KEY = 'rs_tipos_cache';
 const DRAWER_CACHE_TS_KEY = 'rs_tipos_cache_ts';
-const DRAWER_CACHE_TTL = 24 * 60 * 60 * 1000;
+const DRAWER_CACHE_TTL = 24 * 60 * 60 * 1000; // 24h em ms
 
 async function _getTipos() {
   try {
@@ -1082,7 +1246,7 @@ async function _getTipos() {
     if (raw && (Date.now() - ts) < DRAWER_CACHE_TTL) {
       return JSON.parse(raw);
     }
-  } catch (e) { /* ignora */ }
+  } catch (e) { /* cache corrompido — vai buscar no Firestore */ }
 
   const snap = await db.collection('tipo_newsletters')
     .where('is_newsletter', '==', true)
@@ -1097,17 +1261,20 @@ async function _getTipos() {
   try {
     localStorage.setItem(DRAWER_CACHE_KEY, JSON.stringify(tipos));
     localStorage.setItem(DRAWER_CACHE_TS_KEY, String(Date.now()));
-  } catch (e) { /* ignora */ }
+  } catch (e) { /* quota excedida — ignora */ }
 
   return tipos;
 }
 
+// ─── Verificar acesso do assinante a um tipo ─────────────────────────────────
 function _assinanteTemAcesso(tipoId) {
   const ctx = _getCtx();
   if (!ctx || ctx.segmento !== 'assinante') return false;
+  // Normaliza para String para evitar mismatch number vs string do Firestore
   return (_drawer.tiposInclusos || []).map(String).includes(String(tipoId));
 }
 
+// ─── Contexto de identidade ──────────────────────────────────────────────────
 function _getCtx() {
   if (window._radarUser) return window._radarUser;
   try {
@@ -1116,7 +1283,9 @@ function _getCtx() {
   } catch (e) { return null; }
 }
 
+// ─── Inicializar drawer ──────────────────────────────────────────────────────
 async function iniciarDrawer(newsletter) {
+  // Salvar contexto de identidade no sessionStorage (proteção contra reload)
   if (window._radarUser) {
     try {
       sessionStorage.setItem('rs_drawer_ctx', JSON.stringify({
@@ -1130,13 +1299,18 @@ async function iniciarDrawer(newsletter) {
     } catch (e) { /* ignora */ }
   }
 
+  // Guardar referência da edição atual
   _drawer.edicaoAtual = newsletter.id;
   _drawer.tipoAtual = newsletter.Tipo || newsletter.tipo || null;
 
+  // Carregar tipos_selecionados da assinatura do usuário
+  // (fonte de verdade: o que o assinante efetivamente contratou)
   const ctx = _getCtx();
   if (ctx && ctx.segmento === 'assinante' && ctx.uid) {
     try {
       let tiposCarregados = false;
+
+      // 1ª tentativa: assinaturaId direto (mais rápido)
       if (ctx.assinaturaId) {
         const assSnap = await db.collection('usuarios')
           .doc(ctx.uid)
@@ -1152,6 +1326,7 @@ async function iniciarDrawer(newsletter) {
         }
       }
 
+      // 2ª tentativa: busca a assinatura ativa (fallback)
       if (!tiposCarregados) {
         const assSnap = await db.collection('usuarios')
           .doc(ctx.uid)
@@ -1174,6 +1349,8 @@ async function iniciarDrawer(newsletter) {
     }
   }
 
+  // Registrar event listeners
+  // Botão Edições agora é chamado via evento do menuApp.js
   window.addEventListener('rs:abrirEdicoes', abrirDrawer);
   document.getElementById('rs-drawer-overlay')
     ?.addEventListener('click', fecharDrawer);
@@ -1182,9 +1359,11 @@ async function iniciarDrawer(newsletter) {
   document.getElementById('rs-drawer-voltar')
     ?.addEventListener('click', voltarParaTipos);
 
+  // Swipe para fechar (mobile)
   _initSwipeFechar();
 }
 
+// ─── Swipe para fechar ───────────────────────────────────────────────────────
 function _initSwipeFechar() {
   const panel = document.getElementById('rs-drawer-panel');
   if (!panel) return;
@@ -1195,12 +1374,14 @@ function _initSwipeFechar() {
   }, { passive: true });
 }
 
+// ─── Abrir / fechar drawer ───────────────────────────────────────────────────
 function abrirDrawer() {
   const ctx = _getCtx();
   const overlay = document.getElementById('rs-drawer-overlay');
   const panel = document.getElementById('rs-drawer-panel');
   if (!overlay || !panel) return;
 
+  // Edge case: sem identificação
   if (!ctx) {
     _renderDrawerSemContexto();
     overlay.classList.add('rs-drawer-show');
@@ -1225,6 +1406,7 @@ function fecharDrawer() {
   _limparContadores();
 }
 
+// ─── Edge case sem contexto ──────────────────────────────────────────────────
 function _renderDrawerSemContexto() {
   _setDrawerHeader('Edições', false);
   document.getElementById('rs-drawer-body').innerHTML = `
@@ -1241,6 +1423,7 @@ function _renderDrawerSemContexto() {
     </div>`;
 }
 
+// ─── Nível 1 — lista de tipos ────────────────────────────────────────────────
 async function _renderNivel1() {
   _drawer.nivel = 1;
   _setDrawerHeader('Edições por tipo', false);
@@ -1280,6 +1463,7 @@ async function _renderNivel1() {
   body.innerHTML = `<div class="rs-drawer-tipos-lista">${cards}</div>`;
 }
 
+// ─── Nível 2 — lista de edições do tipo ─────────────────────────────────────
 async function abrirTipo(tipoId, tipoNome, tipoIcone) {
   _drawer.nivel = 2;
   _drawer.tipoAtivo = { id: tipoId, nome: tipoNome, icone: tipoIcone };
@@ -1297,6 +1481,7 @@ async function abrirTipo(tipoId, tipoNome, tipoIcone) {
   const isAssinante = ctx?.segmento === 'assinante';
   const temAcesso = !isAssinante || _assinanteTemAcesso(tipoId);
 
+  // Cabeçalho de up-sell para assinante sem acesso ao tipo
   const upSellBanner = (!isAssinante || temAcesso) ? '' : `
     <div class="rs-drawer-upsell">
       🔒 Este tipo não está no seu plano atual.<br>
@@ -1305,6 +1490,7 @@ async function abrirTipo(tipoId, tipoNome, tipoIcone) {
       </a>
     </div>`;
 
+  // Buscar edições (cache de memória por sessão)
   let edicoes = _drawer.edicoesCache[tipoId];
   if (!edicoes) {
     try {
@@ -1324,6 +1510,7 @@ async function abrirTipo(tipoId, tipoNome, tipoIcone) {
     }
   }
 
+  // Para leads: buscar envios recebidos para cruzar com as edições
   let enviosLead = {};
   if (!isAssinante && ctx?.uid) {
     try {
@@ -1335,45 +1522,49 @@ async function abrirTipo(tipoId, tipoNome, tipoIcone) {
       if (data) {
         data.forEach(row => { enviosLead[row.newsletter_id] = row; });
       }
-    } catch (e) { /* ignora */ }
+    } catch (e) { /* não fatal — trata como não recebido */ }
   }
 
-  // ─── NOVIDADE: Buscar envios do Assinante para verificar expiração ─────────
+  // Para assinantes: buscar envios para identificar edições com expira_em vencido
   let enviosAssinante = {};
-  if (isAssinante && ctx?.uid && ctx?.assinaturaId && edicoes.length > 0) {
+  if (isAssinante && ctx?.uid && ctx?.assinaturaId) {
     try {
-      const snap = await db.collection('usuarios').doc(ctx.uid)
-        .collection('assinaturas').doc(ctx.assinaturaId)
-        .collection('envios')
-        .where('newsletter_id', 'in', edicoes.map(e => e.id))
-        .get();
-      snap.forEach(d => {
-        enviosAssinante[d.data().newsletter_id] = d.data();
-      });
-    } catch (e) {
-      console.warn('[Drawer] Falha ao carregar envios do assinante:', e);
-    }
+      const nids = edicoes.map(e => e.id).filter(Boolean);
+      if (nids.length > 0) {
+        const snap = await db.collection('usuarios').doc(ctx.uid)
+          .collection('assinaturas').doc(ctx.assinaturaId)
+          .collection('envios')
+          .where('newsletter_id', 'in', nids)
+          .get();
+        snap.docs.forEach(d => {
+          const row = d.data();
+          if (row.newsletter_id) enviosAssinante[row.newsletter_id] = row;
+        });
+      }
+    } catch (e) { /* não fatal */ }
   }
 
+  // Para leads: exibir apenas edições que foram enviadas a ele E ainda com expira_em vigente
   const edicoesVisiveis = isAssinante
     ? edicoes
     : edicoes.filter(ed => {
-      const envio = enviosLead[ed.id];
-      if (!envio) return false;
-      if (envio.expira_em && new Date(envio.expira_em) <= new Date()) return false;
-      return true;
-    });
+        const envio = enviosLead[ed.id];
+        if (!envio) return false;                                       // nunca recebida
+        if (envio.expira_em && new Date(envio.expira_em) <= new Date()) return false; // expirada
+        return true;
+      });
 
+  // Renderizar cards
   const listaHTML = edicoesVisiveis.map(ed => {
     const isAtual = ed.id === _drawer.edicaoAtual;
     if (isAssinante) {
-      // Passamos agora o envio correto do assinante para validar expiração
       return _cardEdicaoAssinante(ed, isAtual, temAcesso, enviosAssinante[ed.id] || null);
     } else {
       return _cardEdicaoLead(ed, isAtual, enviosLead[ed.id] || null);
     }
   }).join('');
 
+  // Mensagem de lista vazia para leads sem edições vigentes
   const listaOuVazio = (!isAssinante && edicoesVisiveis.length === 0)
     ? `<div style="padding:32px 20px;text-align:center;color:var(--rs-muted)">
         <div style="font-size:36px;margin-bottom:12px">📭</div>
@@ -1381,6 +1572,7 @@ async function abrirTipo(tipoId, tipoNome, tipoIcone) {
       </div>`
     : `<div class="rs-drawer-edicoes-lista">${listaHTML}</div>`;
 
+  // Rodapé condicional por segmento
   const rodape = isAssinante
     ? `<div class="rs-drawer-rodape" style="color:var(--rs-muted);font-size:12px">
         Para edições mais antigas, acesse <strong style="color:var(--azul)">"Minha Área"</strong> no menu.
@@ -1393,6 +1585,7 @@ async function abrirTipo(tipoId, tipoNome, tipoIcone) {
 
   body.innerHTML = `${upSellBanner}${listaOuVazio}${rodape}`;
 
+  // Iniciar contadores regressivos para leads
   if (!isAssinante) {
     edicoesVisiveis.forEach(ed => {
       const envio = enviosLead[ed.id];
@@ -1403,17 +1596,13 @@ async function abrirTipo(tipoId, tipoNome, tipoIcone) {
   }
 }
 
-// ─── Card de edição — assinante (Agora com validação de Expiração) ───────────
+// ─── Card de edição — assinante ──────────────────────────────────────────────
 function _cardEdicaoAssinante(ed, isAtual, temAcesso, envio) {
   const num = ed.numero || ed.edicao || '';
   const titulo = _esc(ed.titulo || `Edição ${num}`);
   const data = _fmtData(ed.data_publicacao);
   const classeAtual = isAtual ? 'rs-drawer-ed-atual' : '';
   const bloqueado = !temAcesso;
-
-  // Verifica se o envio do assinante expirou
-  const expira = envio?.expira_em ? (envio.expira_em.toDate ? envio.expira_em.toDate() : new Date(envio.expira_em)) : null;
-  const expirou = expira && new Date() > expira;
 
   if (bloqueado) {
     return `
@@ -1426,19 +1615,27 @@ function _cardEdicaoAssinante(ed, isAtual, temAcesso, envio) {
       </div>`;
   }
 
-  // Novo estado bloqueado por expiração para assinantes
-  if (expirou && !isAtual) {
+  // Verifica se o envio desta edição está expirado
+  const expiraRaw = envio?.expira_em;
+  const expiraDate = expiraRaw
+    ? (expiraRaw?.toDate ? expiraRaw.toDate() : new Date(expiraRaw))
+    : null;
+  const expirou = expiraDate && new Date() > expiraDate;
+
+  if (expirou) {
     return `
       <div class="rs-drawer-ed-card rs-drawer-ed-expirada"
-           onclick="alert('Edição expirada, acesso somente pela \\'Minha Área\\'')"
-           title="Edição expirada, acesso somente pela 'Minha Área'"
-           style="cursor: pointer;">
+           title="Edição expirada, acesso somente pela \'Minha Área\'"
+           onclick="_alertarEdicaoExpiradaAssinante()"
+           style="cursor:pointer">
         <div class="rs-drawer-ed-info">
           <div class="rs-drawer-ed-titulo">${titulo}</div>
           <div class="rs-drawer-ed-data">${data}${num ? ` · Ed. ${num}` : ''}</div>
-          <div class="rs-drawer-ed-status rs-drawer-ed-status-exp" style="margin-top:4px">⏰ Edição expirada</div>
+          <div class="rs-drawer-ed-status rs-drawer-ed-status-exp">
+            ⏰ Acesso via "Minha Área"
+          </div>
         </div>
-        <span class="rs-drawer-ed-lock">🔒</span>
+        <span class="rs-drawer-chevron" style="opacity:.4">›</span>
       </div>`;
   }
 
@@ -1456,12 +1653,34 @@ function _cardEdicaoAssinante(ed, isAtual, temAcesso, envio) {
     </button>`;
 }
 
+// ─── Alerta para edição expirada no drawer (assinante) ───────────────────────
+function _alertarEdicaoExpiradaAssinante() {
+  // Fecha o drawer e exibe toast orientativo
+  fecharDrawer();
+  let toast = document.getElementById('rs-toast-expirado');
+  if (!toast) {
+    toast = document.createElement('div');
+    toast.id = 'rs-toast-expirado';
+    toast.style.cssText = [
+      'position:fixed;bottom:80px;left:50%;transform:translateX(-50%)',
+      'background:#1e293b;color:#f8fafc;padding:12px 20px;border-radius:10px',
+      'font-size:13px;font-weight:600;z-index:9999;text-align:center',
+      'box-shadow:0 4px 20px rgba(0,0,0,.4);max-width:90vw;line-height:1.5',
+    ].join(';');
+    document.body.appendChild(toast);
+  }
+  toast.innerHTML = '⏰ Edição expirada.<br><span style="font-weight:400">Acesse pelo menu <strong>"Minha Área"</strong> para visualizá-la.</span>';
+  toast.style.display = 'block';
+  setTimeout(() => { toast.style.display = 'none'; }, 4000);
+}
+
 // ─── Card de edição — lead ───────────────────────────────────────────────────
 function _cardEdicaoLead(ed, isAtual, envio) {
   const num = ed.numero || ed.edicao || '';
   const titulo = _esc(ed.titulo || `Edição ${num}`);
   const data = _fmtData(ed.data_publicacao);
 
+  // Sem envio = edição nunca recebida
   if (!envio) {
     return `
       <div class="rs-drawer-ed-card rs-drawer-ed-naorecebida">
@@ -1479,6 +1698,7 @@ function _cardEdicaoLead(ed, isAtual, envio) {
   const expirou = expira && agora > expira;
   const expira2h = expira && !expirou && (expira - agora) < 2 * 60 * 60 * 1000;
 
+  // Acesso expirado
   if (expirou) {
     const horas = ed.acesso_pro_horas || 24;
     return `
@@ -1493,6 +1713,7 @@ function _cardEdicaoLead(ed, isAtual, envio) {
       </div>`;
   }
 
+  // Acesso ativo (normal ou expirando)
   const classeExpirando = expira2h ? 'rs-drawer-ed-expirando' : '';
   const badgeExpirando = expira2h
     ? '<div class="rs-drawer-ed-status rs-drawer-ed-status-warn">⚠️ Expira em breve</div>'
@@ -1517,6 +1738,7 @@ function _cardEdicaoLead(ed, isAtual, envio) {
     </button>`;
 }
 
+// ─── Modal de edição expirada ────────────────────────────────────────────────
 function _mostrarExpirado(edicaoId, titulo, horas) {
   const modal = document.getElementById('rs-drawer-modal-expirado');
   if (!modal) return;
@@ -1525,11 +1747,13 @@ function _mostrarExpirado(edicaoId, titulo, horas) {
   modal.classList.add('rs-drawer-show');
 }
 
+// ─── Voltar para nível 1 ─────────────────────────────────────────────────────
 function voltarParaTipos() {
   _limparContadores();
   _renderNivel1();
 }
 
+// ─── Utilitários de drawer ───────────────────────────────────────────────────
 function _setDrawerHeader(titulo, mostrarVoltar) {
   const el = document.getElementById('rs-drawer-titulo');
   const btnVoltar = document.getElementById('rs-drawer-voltar');
@@ -1542,6 +1766,7 @@ function _limparContadores() {
   _drawer.contadores = [];
 }
 
+// ─── Contador regressivo ─────────────────────────────────────────────────────
 function iniciarContador(expiraEm, elementId) {
   const expira = new Date(expiraEm);
 
@@ -1554,6 +1779,7 @@ function iniciarContador(expiraEm, elementId) {
       el.textContent = 'Acesso expirado';
       el.style.color = 'var(--vermelho)';
       clearInterval(intervId);
+      // Atualizar o card para estado expirado
       const card = el.closest('.rs-drawer-ed-ativa');
       if (card) {
         card.classList.remove('rs-drawer-ed-ativa', 'rs-drawer-ed-expirando');
@@ -1584,6 +1810,7 @@ function iniciarContador(expiraEm, elementId) {
   _drawer.contadores.push(intervId);
 }
 
+// ─── Navegar para edição via drawer ─────────────────────────────────────────
 async function navegarParaEdicao(edicaoId) {
   if (edicaoId === _drawer.edicaoAtual) {
     fecharDrawer();
@@ -1592,6 +1819,7 @@ async function navegarParaEdicao(edicaoId) {
 
   fecharDrawer();
 
+  // Mostrar loading
   const appEl = document.getElementById('rs-app');
   if (appEl) {
     appEl.style.opacity = '.3';
@@ -1600,6 +1828,7 @@ async function navegarParaEdicao(edicaoId) {
   mostrarLoading(true);
 
   try {
+    // Buscar edição
     const snap = await db.collection('newsletters').doc(edicaoId).get();
     if (!snap.exists) { mostrarErro('Edição não encontrada.'); return; }
     const newsletter = { id: snap.id, ...snap.data() };
@@ -1607,6 +1836,7 @@ async function navegarParaEdicao(edicaoId) {
     const ctx = _getCtx();
     if (!ctx) { mostrarErro('Sessão expirada. Acesse pelo link do e-mail.'); return; }
 
+    // Verificar acesso para lead
     if (ctx.segmento === 'lead') {
       const { data: envio } = await window.supabase
         .from('leads_envios')
@@ -1629,6 +1859,7 @@ async function navegarParaEdicao(edicaoId) {
       }
     }
 
+    // Reconstruir dados do destinatário a partir do contexto
     const destinatario = {
       _uid: ctx.uid,
       email: ctx.email || '',
@@ -1642,6 +1873,7 @@ async function navegarParaEdicao(edicaoId) {
     };
     const segmento = ctx.segmento === 'assinante' ? 'assinantes' : 'leads';
 
+    // Acesso sem envio real (drawer) — cria objeto envio mínimo
     const envioDrawer = ctx.segmento === 'assinante'
       ? { token_acesso: null, expira_em: null }
       : null;
@@ -1659,9 +1891,11 @@ async function navegarParaEdicao(edicaoId) {
       plano: destinatario.plano_slug,
     };
 
+    // Atualizar edição atual no estado do drawer
     _drawer.edicaoAtual = edicaoId;
     _drawer.tipoAtual = newsletter.Tipo || newsletter.tipo || null;
 
+    // Limpar e re-renderizar
     renderHeader(newsletter, destinatario);
     const modoPadrao = sessionStorage.getItem('rs_modo_leitura') || acesso.modoPadrao;
     trocarModo(modoPadrao);
@@ -1674,6 +1908,7 @@ async function navegarParaEdicao(edicaoId) {
     renderCTA(acesso, newsletter);
     renderWatermark(destinatario, newsletter);
 
+    // Notificação de edição mais recente (apenas assinante)
     if (ctx.segmento === 'assinante') {
       verificarEdicaoMaisRecente(newsletter);
     }
@@ -1684,6 +1919,7 @@ async function navegarParaEdicao(edicaoId) {
       appEl.style.opacity = '1';
     }
 
+    // Scroll ao topo
     window.scrollTo({ top: 0, behavior: 'smooth' });
 
   } catch (err) {
@@ -1692,6 +1928,7 @@ async function navegarParaEdicao(edicaoId) {
   }
 }
 
+// ─── CTA de conversão inline (para lead sem acesso via drawer) ───────────────
 function _mostrarCTAConversao(motivo, horas) {
   const ctaWrap = document.getElementById('rs-cta-wrap');
   if (!ctaWrap) return;
@@ -1724,6 +1961,7 @@ function _mostrarCTAConversao(motivo, horas) {
   ctaWrap.scrollIntoView({ behavior: 'smooth', block: 'center' });
 }
 
+// ─── Notificação de edição mais recente ──────────────────────────────────────
 async function verificarEdicaoMaisRecente(newsletter) {
   if (!newsletter.tipo) return;
   const tipoId = newsletter.tipo;
@@ -1737,8 +1975,9 @@ async function verificarEdicaoMaisRecente(newsletter) {
 
     if (snap.empty) return;
     const maisRecente = snap.docs[0];
-    if (maisRecente.id === newsletter.id) return;
+    if (maisRecente.id === newsletter.id) return; // já é a mais recente
 
+    // Exibir notificação
     const banner = document.getElementById('rs-banner-recente');
     const link = document.getElementById('rs-banner-recente-link');
     if (!banner || !link) return;
@@ -1752,7 +1991,9 @@ async function verificarEdicaoMaisRecente(newsletter) {
   } catch (e) { /* não fatal */ }
 }
 
+// ─── Expor globalmente ───────────────────────────────────────────────────────
 window.abrirDrawer = abrirDrawer;
+window._alertarEdicaoExpiradaAssinante = _alertarEdicaoExpiradaAssinante;
 window.fecharDrawer = fecharDrawer;
 window.abrirTipo = abrirTipo;
 window.voltarParaTipos = voltarParaTipos;
@@ -1767,6 +2008,7 @@ async function renderFeedback(nid) {
   const wrap = document.getElementById('rs-feedback-wrap');
   if (!wrap) return;
 
+  // Verificar se já enviou feedback nesta edição
   if (localStorage.getItem(`rs_fb_${nid}`)) {
     wrap.innerHTML = `
       <div class="rs-feedback-enviado">
@@ -1793,6 +2035,7 @@ async function renderFeedback(nid) {
       </div>
     </div>`;
 
+  // Contador de caracteres + habilitar botão
   document.getElementById('rs-feedback-txt')?.addEventListener('input', function () {
     const len = this.value.length;
     const counter = document.getElementById('rs-feedback-chars');
@@ -1825,8 +2068,10 @@ async function enviarFeedback(nid) {
         nome: ctx?.nome || null,
       });
 
+    // Marcar como enviado
     localStorage.setItem(`rs_fb_${nid}`, '1');
 
+    // Atualizar UI
     const wrap = document.getElementById('rs-feedback-wrap');
     if (wrap) wrap.innerHTML = `
       <div class="rs-feedback-enviado">✅ Obrigado pelo seu feedback!</div>`;
@@ -1841,3 +2086,4 @@ window.enviarFeedback = enviarFeedback;
 
 // ─── Inicia ───────────────────────────────────────────────────────────────────
 VerNewsletterComToken();
+
