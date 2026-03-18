@@ -455,11 +455,16 @@ async function renderReactions(nid, uid) {
   const wrap = document.getElementById('reactions-wrap');
   if (!wrap) return;
 
+  // Limpa imediatamente para não exibir reação de edição anterior enquanto carrega
+  wrap.innerHTML = '<div style="opacity:.35;font-size:12px;color:var(--rs-muted);padding:8px 0">Carregando avaliação…</div>';
+  const fbWrap = document.getElementById('rs-feedback-wrap');
+  if (fbWrap) fbWrap.innerHTML = '';
+
   let minha = null;
 
   try {
     await db.collection('newsletters').doc(nid).get(); // mantém listener ativo
-    // Chave inclui uid para isolar voto por usuário no mesmo browser
+    // Chave inclui nid + uid para isolar voto por edição e por usuário
     minha = localStorage.getItem(`rs_rx_${nid}_${uid || 'anon'}`);
   } catch (e) { /* não fatal */ }
 
@@ -479,7 +484,14 @@ async function renderReactions(nid, uid) {
   // Renderizar campo de feedback abaixo das reações
   renderFeedback(nid);
 
+  // Registra esta chamada como a "ativa" para evitar que closures antigas votem
+  const _rxToken = nid + '_' + (uid || 'anon');
+  renderReactions._tokenAtivo = _rxToken;
+
   window.votar = async (newsletterId, userId, key) => {
+    // Guard: ignora clique se já foi carregada uma edição mais recente
+    if (renderReactions._tokenAtivo !== newsletterId + '_' + (userId || 'anon')) return;
+
     const fb = document.getElementById('reaction-feedback');
     const lsKey = `rs_rx_${newsletterId}_${userId || 'anon'}`;
     const anterior = localStorage.getItem(lsKey);
@@ -623,79 +635,6 @@ async function buscarPorNumero(numero) {
   return { id: snap.docs[0].id, ...snap.docs[0].data() };
 }
 
-// ─── MODO ASSINANTE — LINK EXPIRADO ──────────────────────────────────────────
-// Ativado quando o assinante abre um link com expira_em vencido (sem bypass).
-// Carrega os dados do assinante pelos parâmetros da URL (uid + assinaturaId),
-// exibe um banner orientativo e mantém o app funcionando normalmente.
-// O drawer NÃO é aberto automaticamente — o assinante navega por conta própria.
-
-async function _abrirModoAssinanteExpirado(uid, assinaturaId) {
-  try {
-    const userSnap = await db.collection('usuarios').doc(uid).get();
-    if (!userSnap.exists) {
-      mostrarErro('Sessão inválida.', 'Acesse a <a href="/login.html">Área do Assinante</a>.');
-      return;
-    }
-    const destinatario = { _uid: userSnap.id, ...userSnap.data() };
-
-    if (assinaturaId) {
-      try {
-        const assSnap = await db.collection('usuarios').doc(uid)
-          .collection('assinaturas').doc(assinaturaId).get();
-        if (assSnap.exists) {
-          const d = assSnap.data();
-          destinatario.features   = d.features_snapshot || d.features || destinatario.features || {};
-          destinatario.plano_slug = d.plano_slug || destinatario.plano_slug || null;
-        }
-      } catch (e) { /* não fatal */ }
-    }
-
-    // Popula _radarUser (drawer e alertas dependem disso)
-    publicarRadarUser(destinatario, 'assinantes', assinaturaId);
-
-    // Header mínimo
-    const nome = (destinatario.nome || '').split(' ')[0];
-    _set('hd-saudacao', nome ? `Olá, ${nome}!` : '');
-    _set('hd-titulo', 'Radar SIOPE');
-    _set('hd-edicao', '');
-    _set('hd-data', '');
-    document.title = 'Radar SIOPE';
-
-    // Oculta seções de conteúdo da edição
-    ['rs-toggle-modo', 'modo-rapido', 'modo-completo', 'secao-midia',
-     'secao-faq', 'rs-banner-recente', 'rs-watermark', 'rs-cta-wrap'].forEach(id => {
-      const el = document.getElementById(id);
-      if (el) el.style.display = 'none';
-    });
-
-    // Banner orientativo
-    const munConteudo = document.getElementById('municipio-conteudo');
-    if (munConteudo) {
-      munConteudo.innerHTML = `
-        <div style="padding:24px 20px;text-align:center;color:var(--rs-muted)">
-          <div style="font-size:32px;margin-bottom:12px">⏰</div>
-          <p style="font-size:14px;line-height:1.7;margin-bottom:4px;color:var(--rs-text)">
-            <strong>Seu acesso a esta edição expirou.</strong>
-          </p>
-          <p style="font-size:13px;line-height:1.6">
-            Selecione uma edição disponível no menu <strong>Edições</strong>.<br>
-            Caso deseje visualizar edições expiradas, acesse o menu <strong>"Minha Área"</strong>.
-          </p>
-        </div>`;
-      const btnHist = document.getElementById('btn-ver-historico');
-      if (btnHist) btnHist.style.display = 'none';
-    }
-
-    // Exibe o app e inicializa o drawer (sem abri-lo automaticamente)
-    mostrarApp();
-    iniciarDrawer({ id: null, tipo: null });
-
-  } catch (err) {
-    console.error('[verNL] Erro no modo assinante expirado:', err);
-    mostrarErro('Erro ao carregar seus dados.', err.message);
-  }
-}
-
 // ─── MODO ALERTA (sem parâmetros de edição) ────────────────────────────────────
 // Ativado quando o app é aberto via notificação push sem link de edição específica.
 // Carrega usuário da sessão PWA e abre a Central de Mensagens automaticamente.
@@ -802,8 +741,6 @@ async function VerNewsletterComToken() {
   const token = params.get('token');
   const assinaturaId = normalizeParam(params.get('assinaturaId'));
   const edicaoNum = params.get('edicao_numero');
-  // bypass_exp=1 vem do painel (Minha Área) para ignorar expiração do link
-  const bypass_exp = params.get('bypass_exp') === '1';
 
   // 0. Validação inicial
   // Se não há parâmetros mas existe sessão PWA salva → abre em "modo alerta"
@@ -837,31 +774,30 @@ async function VerNewsletterComToken() {
         mostrarErro('Acesso negado.', 'Token inválido.'); return;
       }
 
-      // Validar expiração.
-      // bypass_exp=1 (vindo do painel/Minha Área): ignora expiração e abre a edição.
-      // Link expirado sem bypass: abre app com banner orientativo + drawer disponível.
-      if (envio.expira_em && !bypass_exp) {
+      // Validar expiração — se o link venceu, não bloqueia o app:
+      // redireciona para modo alerta para que o assinante ainda acesse
+      // "Minha Área", alertas e drawer sem depender do link.
+      if (envio.expira_em) {
         const exp = envio.expira_em.toDate ? envio.expira_em.toDate() : new Date(envio.expira_em);
         if (new Date() > exp) {
-          await _abrirModoAssinanteExpirado(uid, assinaturaId);
+          await _tentarModoAlerta();
           return;
         }
       }
 
-      // Atualizar metadados (fire & forget) — não contabiliza acesso via bypass
-      if (!bypass_exp) {
-        envioRef.update({
-          ultimo_acesso: new Date(),
-          acessos_totais: firebase.firestore.FieldValue.increment(1),
-        }).catch(() => { });
+      // Atualizar metadados (fire & forget)
+      envioRef.update({
+        ultimo_acesso: new Date(),
+        acessos_totais: firebase.firestore.FieldValue.increment(1),
+      }).catch(() => { });
 
-        // Compartilhamento excessivo → mesmo fluxo do link expirado
-        const envioAtual = (await envioRef.get()).data() || envio;
-        if (Number(envioAtual.acessos_totais || 0) > 5) {
-          envioRef.update({ sinalizacao_compartilhamento: true }).catch(() => { });
-          await _abrirModoAssinanteExpirado(uid, assinaturaId);
-          return;
-        }
+      // Verificar compartilhamento excessivo — mesmo tratamento: abre o app
+      // em modo alerta em vez de bloquear, mas sinaliza para revisão manual.
+      const envioAtual = (await envioRef.get()).data() || envio;
+      if (Number(envioAtual.acessos_totais || 0) > 5) {
+        envioRef.update({ sinalizacao_compartilhamento: true }).catch(() => { });
+        await _tentarModoAlerta();
+        return;
       }
 
     } else {
@@ -1531,30 +1467,11 @@ async function abrirTipo(tipoId, tipoNome, tipoIcone) {
         return true;
       });
 
-  // Para assinantes: buscar envios para identificar expiradas no drawer
-  let enviosAssinante = {};
-  if (isAssinante && ctx?.uid && ctx?.assinaturaId) {
-    try {
-      const nids = edicoes.map(e => e.id).filter(Boolean);
-      if (nids.length > 0) {
-        const snap = await db.collection('usuarios').doc(ctx.uid)
-          .collection('assinaturas').doc(ctx.assinaturaId)
-          .collection('envios')
-          .where('newsletter_id', 'in', nids)
-          .get();
-        snap.docs.forEach(d => {
-          const row = d.data();
-          if (row.newsletter_id) enviosAssinante[row.newsletter_id] = row;
-        });
-      }
-    } catch (e) { /* não fatal */ }
-  }
-
   // Renderizar cards
   const listaHTML = edicoesVisiveis.map(ed => {
     const isAtual = ed.id === _drawer.edicaoAtual;
     if (isAssinante) {
-      return _cardEdicaoAssinante(ed, isAtual, temAcesso, enviosAssinante[ed.id] || null);
+      return _cardEdicaoAssinante(ed, isAtual, temAcesso);
     } else {
       return _cardEdicaoLead(ed, isAtual, enviosLead[ed.id] || null);
     }
@@ -1593,7 +1510,7 @@ async function abrirTipo(tipoId, tipoNome, tipoIcone) {
 }
 
 // ─── Card de edição — assinante ──────────────────────────────────────────────
-function _cardEdicaoAssinante(ed, isAtual, temAcesso, envio) {
+function _cardEdicaoAssinante(ed, isAtual, temAcesso) {
   const num = ed.numero || ed.edicao || '';
   const titulo = _esc(ed.titulo || `Edição ${num}`);
   const data = _fmtData(ed.data_publicacao);
@@ -1611,30 +1528,6 @@ function _cardEdicaoAssinante(ed, isAtual, temAcesso, envio) {
       </div>`;
   }
 
-  // Verifica se este envio específico está expirado
-  const expiraRaw = envio?.expira_em;
-  const expiraDate = expiraRaw
-    ? (expiraRaw?.toDate ? expiraRaw.toDate() : new Date(expiraRaw))
-    : null;
-  const expirou = expiraDate && new Date() > expiraDate;
-
-  if (expirou) {
-    return `
-      <div class="rs-drawer-ed-card rs-drawer-ed-expirada"
-           title="Edição expirada, acesso somente pela &quot;Minha Área&quot;"
-           onclick="_alertarEdicaoExpiradaAssinante()"
-           style="cursor:pointer">
-        <div class="rs-drawer-ed-info">
-          <div class="rs-drawer-ed-titulo">${titulo}</div>
-          <div class="rs-drawer-ed-data">${data}${num ? ` · Ed. ${num}` : ''}</div>
-          <div class="rs-drawer-ed-status rs-drawer-ed-status-exp">
-            ⏰ Acesse pela "Minha Área"
-          </div>
-        </div>
-        <span class="rs-drawer-chevron" style="opacity:.3">›</span>
-      </div>`;
-  }
-
   return `
     <button class="rs-drawer-ed-card ${classeAtual}"
             onclick="navegarParaEdicao('${_esc(ed.id)}')"
@@ -1647,27 +1540,6 @@ function _cardEdicaoAssinante(ed, isAtual, temAcesso, envio) {
       ? '<span class="rs-drawer-ed-badge-atual">👁 lendo agora</span>'
       : '<span class="rs-drawer-chevron">›</span>'}
     </button>`;
-}
-
-// ─── Toast para edição expirada no drawer (assinante) ────────────────────────
-function _alertarEdicaoExpiradaAssinante() {
-  fecharDrawer();
-  let toast = document.getElementById('rs-toast-expirado');
-  if (!toast) {
-    toast = document.createElement('div');
-    toast.id = 'rs-toast-expirado';
-    toast.style.cssText = [
-      'position:fixed;bottom:80px;left:50%;transform:translateX(-50%)',
-      'background:#1e293b;color:#f8fafc;padding:12px 20px;border-radius:10px',
-      'font-size:13px;font-weight:600;z-index:9999;text-align:center',
-      'box-shadow:0 4px 20px rgba(0,0,0,.4);max-width:90vw;line-height:1.6',
-    ].join(';');
-    document.body.appendChild(toast);
-  }
-  toast.innerHTML = '⏰ Edição expirada.<br>'
-    + '<span style="font-weight:400">Acesse pelo menu <strong>"Minha Área"</strong> para visualizá-la.</span>';
-  toast.style.display = 'block';
-  setTimeout(() => { if (toast) toast.style.display = 'none'; }, 4500);
 }
 
 // ─── Card de edição — lead ───────────────────────────────────────────────────
@@ -1988,47 +1860,7 @@ async function verificarEdicaoMaisRecente(newsletter) {
 }
 
 // ─── Expor globalmente ───────────────────────────────────────────────────────
-// ─── Abrir edição expirada vinda do painel (Minha Área) ─────────────────────
-// Chamada pelo menuApp.js quando recebe postMessage rs:abrirEdicao com bypassExp=true.
-// Busca o envio do assinante para montar a URL com bypass_exp=1 e recarrega o app.
-async function _rsAbrirEdicaoExpirada(newsletterId) {
-  const ctx = _getCtx();
-  if (!ctx?.uid || !ctx?.assinaturaId) return;
-
-  try {
-    // Busca o envio correspondente a esta newsletter na assinatura
-    const snap = await db.collection('usuarios').doc(ctx.uid)
-      .collection('assinaturas').doc(ctx.assinaturaId)
-      .collection('envios')
-      .where('newsletter_id', '==', newsletterId)
-      .limit(1)
-      .get();
-
-    if (snap.empty) return;
-    const envio = snap.docs[0].data();
-    const envioId = snap.docs[0].id;
-
-    // Monta URL com bypass_exp=1
-    const qs = [
-      `nid=${newsletterId}`,
-      `env=${envioId}`,
-      `uid=${ctx.uid}`,
-      `assinaturaId=${ctx.assinaturaId}`,
-      envio.token_acesso ? `token=${envio.token_acesso}` : '',
-      'bypass_exp=1',
-    ].filter(Boolean).join('&');
-    const b64 = btoa(qs);
-    const url = `/verNewsletterComToken.html?d=${encodeURIComponent(b64)}`;
-    window.location.href = url;
-
-  } catch (e) {
-    console.error('[verNL] Erro ao abrir edição expirada:', e);
-  }
-}
-window._rsAbrirEdicaoExpirada = _rsAbrirEdicaoExpirada;
-
 window.abrirDrawer = abrirDrawer;
-window._alertarEdicaoExpiradaAssinante = _alertarEdicaoExpiradaAssinante;
 window.fecharDrawer = fecharDrawer;
 window.abrirTipo = abrirTipo;
 window.voltarParaTipos = voltarParaTipos;
