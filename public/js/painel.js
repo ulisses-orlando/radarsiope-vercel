@@ -289,14 +289,26 @@ async function carregarBibliotecaNewsletters(uid) {
       const expirado = envio.expira_em && new Date() > new Date(
         envio.expira_em?.toDate ? envio.expira_em.toDate() : envio.expira_em
       );
+      // Se rodando dentro do iframe do app → usa postMessage para navegar sem abrir nova aba
+      const _noIframe = window.parent !== window;
+      const _nid = envio.newsletter_id;
+      const _bypassExp = !!expirado;
       const url = montarUrlWebApp(
-        envio.newsletter_id,
+        _nid,
         envio.envioId,
         uid,
         envio.assinaturaId,
         envio.token_acesso,
-        expirado  // bypassExp=true para expiradas → app ignora expiração
+        _bypassExp
       );
+      const _btnAcao = _noIframe
+        ? `<button class="btn-ver-nl ${_bypassExp ? 'btn-ver-nl-exp' : ''}"
+             onclick="window.parent.postMessage({tipo:'rs:abrirEdicao',newsletterId:'${_nid}',bypassExp:${_bypassExp}}, '*')">
+             ${_bypassExp ? '⏰ Ver edição expirada →' : 'Ler edição →'}
+           </button>`
+        : `<a href="${url}" class="btn-ver-nl ${_bypassExp ? 'btn-ver-nl-exp' : ''}" target="_blank">
+             ${_bypassExp ? '⏰ Ver edição expirada →' : 'Ler edição →'}
+           </a>`;
  
       return `
         <article class="nl-card ${expirado ? 'nl-card-expirado' : ''}">
@@ -308,9 +320,9 @@ async function carregarBibliotecaNewsletters(uid) {
             </div>
           </div>
           <div class="nl-card-footer">
-            <a href="${url}" class="btn-ver-nl ${expirado ? 'btn-ver-nl-exp' : ''}" target="_blank">
-              ${expirado ? '⏰ Ver edição expirada →' : 'Ler edição →'}
-            </a>
+            ${expirado && !_noIframe
+              ? `<span class="nl-badge-expirado">⏰ Acesso expirado</span>${_btnAcao}`
+              : _btnAcao}
           </div>
         </article>`;
     }).join('');

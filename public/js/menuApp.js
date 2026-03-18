@@ -265,6 +265,27 @@
 
     // Escuta mensagens do iframe
     window.addEventListener('message', e => {
+
+      // Painel solicita abrir edição no app (evita abrir nova aba)
+      if (e.data?.tipo === 'rs:abrirEdicao') {
+        const { newsletterId, bypassExp } = e.data;
+        _fecharModalLogin();
+        if (bypassExp) {
+          // Edição expirada: usa fluxo de bypass (recarrega app com bypass_exp=1)
+          // Busca o envio correspondente no contexto do _radarUser para montar a URL
+          const user = window._radarUser;
+          if (user && newsletterId) {
+            window._rsAbrirEdicaoExpirada?.(newsletterId);
+          }
+        } else {
+          // Edição ativa: navega diretamente via drawer sem recarregar o app
+          if (typeof window.navegarParaEdicao === 'function') {
+            window.navegarParaEdicao(newsletterId);
+          }
+        }
+        return;
+      }
+
       if (e.data?.tipo === 'rs:loginSucesso') {
         const destino = e.data.destino || 'painel.html';
         if (destino === 'admin.html') {

@@ -1988,6 +1988,45 @@ async function verificarEdicaoMaisRecente(newsletter) {
 }
 
 // ─── Expor globalmente ───────────────────────────────────────────────────────
+// ─── Abrir edição expirada vinda do painel (Minha Área) ─────────────────────
+// Chamada pelo menuApp.js quando recebe postMessage rs:abrirEdicao com bypassExp=true.
+// Busca o envio do assinante para montar a URL com bypass_exp=1 e recarrega o app.
+async function _rsAbrirEdicaoExpirada(newsletterId) {
+  const ctx = _getCtx();
+  if (!ctx?.uid || !ctx?.assinaturaId) return;
+
+  try {
+    // Busca o envio correspondente a esta newsletter na assinatura
+    const snap = await db.collection('usuarios').doc(ctx.uid)
+      .collection('assinaturas').doc(ctx.assinaturaId)
+      .collection('envios')
+      .where('newsletter_id', '==', newsletterId)
+      .limit(1)
+      .get();
+
+    if (snap.empty) return;
+    const envio = snap.docs[0].data();
+    const envioId = snap.docs[0].id;
+
+    // Monta URL com bypass_exp=1
+    const qs = [
+      `nid=${newsletterId}`,
+      `env=${envioId}`,
+      `uid=${ctx.uid}`,
+      `assinaturaId=${ctx.assinaturaId}`,
+      envio.token_acesso ? `token=${envio.token_acesso}` : '',
+      'bypass_exp=1',
+    ].filter(Boolean).join('&');
+    const b64 = btoa(qs);
+    const url = `/verNewsletterComToken.html?d=${encodeURIComponent(b64)}`;
+    window.location.href = url;
+
+  } catch (e) {
+    console.error('[verNL] Erro ao abrir edição expirada:', e);
+  }
+}
+window._rsAbrirEdicaoExpirada = _rsAbrirEdicaoExpirada;
+
 window.abrirDrawer = abrirDrawer;
 window._alertarEdicaoExpiradaAssinante = _alertarEdicaoExpiradaAssinante;
 window.fecharDrawer = fecharDrawer;
