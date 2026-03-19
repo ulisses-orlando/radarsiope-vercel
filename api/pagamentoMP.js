@@ -1,6 +1,6 @@
 // pages/api/pagamentoMP.js
 // Runtime Node para garantir compatibilidade com firebase-admin e crypto
-// desabilitar bodyParser para permitir validação HMAC no futuro
+// desabilitar bodyParser para permitir validação HMAC
 export const config = { runtime: 'nodejs', api: { bodyParser: false } };
 
 import crypto from 'crypto';
@@ -18,7 +18,8 @@ if (!admin.apps.length) {
 }
 const db = admin.firestore();
 
-// Utilitários
+// ─── Utilitários ──────────────────────────────────────────────────────────────
+
 function json(res, status, payload) {
   res.status(status).setHeader('Content-Type', 'application/json').end(JSON.stringify(payload));
 }
@@ -27,7 +28,7 @@ function logCompleto() {
   return process.env.MP_LOG_COMPLETO === 'true';
 }
 
-// fetch com timeout
+// fetch com timeout — usado tanto para MP quanto para e-mail (fix #7)
 async function fetchWithTimeout(url, opts = {}, ms = 10000) {
   const controller = new AbortController();
   const id = setTimeout(() => controller.abort(), ms);
@@ -41,12 +42,11 @@ async function fetchWithTimeout(url, opts = {}, ms = 10000) {
   }
 }
 
+// ─── Seleção de token MP ──────────────────────────────────────────────────────
 /*
-  Centralizar seleção do access token do Mercado Pago
-  - MP_FORCE_SANDBOX === 'true' => usar MP_ACCESS_TOKEN_TEST (ou fallback MP_ACCESS_TOKEN legado)
+  - MP_FORCE_SANDBOX === 'true' => usar MP_ACCESS_TOKEN_TEST
   - caso contrário, preferir MP_ACCESS_TOKEN_PROD
-  - fallback para MP_ACCESS_TOKEN (legado) se nenhuma das novas variáveis estiver presente
-  Observação: evitar usar token legado em produção; monitore logs.
+  - fallback para MP_ACCESS_TOKEN_TEST se PROD não estiver presente
 */
 function getMpAccessToken() {
   const forceSandbox = process.env.MP_FORCE_SANDBOX === 'true';
@@ -54,31 +54,27 @@ function getMpAccessToken() {
   const prodToken = process.env.MP_ACCESS_TOKEN_PROD || null;
 
   if (forceSandbox) {
-    if (!testToken) {
-      throw new Error('MP_FORCE_SANDBOX=true mas MP_ACCESS_TOKEN_TEST não está configurado.');
-    }
+    if (!testToken) throw new Error('MP_FORCE_SANDBOX=true mas MP_ACCESS_TOKEN_TEST não está configurado.');
     return testToken;
   }
-
   if (prodToken) return prodToken;
   if (testToken) return testToken;
-
   throw new Error('Nenhum token MP configurado. Configure MP_ACCESS_TOKEN_PROD ou MP_ACCESS_TOKEN_TEST.');
 }
 
+function getMpTokenType() {
+  if (process.env.MP_FORCE_SANDBOX === 'true') return 'TEST';
+  if (process.env.MP_ACCESS_TOKEN_PROD) return 'PROD';
+  if (process.env.MP_ACCESS_TOKEN_TEST) return 'TEST';
+  return 'UNKNOWN';
+}
 
-// Chamada à API do Mercado Pago (lança erro com status/body em não-2xx)
+// ─── Chamada à API do Mercado Pago ────────────────────────────────────────────
+
 async function mpFetch(pathOrUrl, method = 'GET', body = null) {
   const token = getMpAccessToken();
-  if (!token) throw new Error('MP access token não definido');
-
-  // permitir passar URL completa ou apenas path
   let url = String(pathOrUrl);
-  if (!url.startsWith('http')) {
-    // usar sempre api.mercadopago.com (merchant_orders também está aqui)
-    const base = 'https://api.mercadopago.com';
-    url = `${base}${pathOrUrl}`;
-  }
+  if (!url.startsWith('http')) url = `https://api.mercadopago.com${pathOrUrl}`;
 
   const headers = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
   const opts = { method, headers };
@@ -106,10 +102,12 @@ async function mpFetch(pathOrUrl, method = 'GET', body = null) {
   return data;
 }
 
-// Monta external_reference determinístico
+// ─── external_reference ───────────────────────────────────────────────────────
+
 function montarExternalReference(userId, assinaturaId, pedidoId) {
   return `${String(userId)}|${String(assinaturaId)}|${String(pedidoId)}`;
 }
+
 function parseExternalReference(externalRef) {
   if (!externalRef) return null;
   const parts = String(externalRef).split('|');
@@ -117,7 +115,8 @@ function parseExternalReference(externalRef) {
   return { userId: parts[0], assinaturaId: parts[1], pedidoId: parts[2] };
 }
 
-// Gera parcelas no backend (idempotente quando pedidoId fornecido)
+// ─── Geração de parcelas ──────────────────────────────────────────────────────
+
 async function gerarParcelasAssinaturaBackend(userId, assinaturaId, amountCentavos, numParcelas = 1, metodoPagamento = null, dataPrimeiroVencimento = null, pedidoId = null) {
   if (!userId || !assinaturaId) throw new Error('userId e assinaturaId são obrigatórios');
   const parcelas = Math.max(1, parseInt(numParcelas, 10) || 1);
@@ -129,7 +128,7 @@ async function gerarParcelasAssinaturaBackend(userId, assinaturaId, amountCentav
 
   let primeiro;
   if (dataPrimeiroVencimento) {
-    primeiro = (typeof dataPrimeiroVencimento === 'string') ? new Date(dataPrimeiroVencimento) : new Date(dataPrimeiroVencimento);
+    primeiro = new Date(dataPrimeiroVencimento);
     if (isNaN(primeiro.getTime())) primeiro = new Date();
   } else {
     primeiro = new Date();
@@ -150,7 +149,7 @@ async function gerarParcelasAssinaturaBackend(userId, assinaturaId, amountCentav
 
     const docId = pedidoId ? `${pedidoId}-${numero}` : pagamentosRef.doc().id;
     const docRef = pagamentosRef.doc(docId);
-    const data = {
+    batch.set(docRef, {
       numero_parcela: numero,
       valor_centavos: valorCentavos,
       metodo_pagamento: metodoPagamento || null,
@@ -158,16 +157,16 @@ async function gerarParcelasAssinaturaBackend(userId, assinaturaId, amountCentav
       data_pagamento: null,
       status: 'pendente',
       criadoEm: admin.firestore.FieldValue.serverTimestamp()
-    };
-    batch.set(docRef, data, { merge: true });
+    }, { merge: true });
   }
 
   await batch.commit();
   return true;
 }
 
+// ─── Resolver recurso MP (payment | merchant_order | search) ──────────────────
+
 async function resolverRecursoMP(id, topic) {
-  // 1) se veio topic=payment, buscar direto em /v1/payments/{id}
   if (topic === 'payment') {
     try {
       const p = await mpFetch(`/v1/payments/${encodeURIComponent(id)}`, 'GET');
@@ -177,11 +176,9 @@ async function resolverRecursoMP(id, topic) {
     }
   }
 
-  // 2) se veio topic=merchant_order, buscar direto em /merchant_orders/{id}
   if (topic === 'merchant_order') {
     try {
       const mo = await mpFetch(`/merchant_orders/${encodeURIComponent(id)}`, 'GET');
-      // extrair external_reference também de mo.order.external_reference quando aplicável
       if (mo && !mo.external_reference && mo.order && mo.order.external_reference) {
         mo.external_reference = mo.order.external_reference;
       }
@@ -191,7 +188,6 @@ async function resolverRecursoMP(id, topic) {
     }
   }
 
-  // 3) fallback: tentar payment direto
   try {
     const p = await mpFetch(`/v1/payments/${encodeURIComponent(id)}`, 'GET');
     return { tipo: 'payment', data: p };
@@ -199,7 +195,6 @@ async function resolverRecursoMP(id, topic) {
     if (!(err && err.status === 404)) throw err;
   }
 
-  // 4) fallback: tentar merchant_order
   try {
     const mo = await mpFetch(`/merchant_orders/${encodeURIComponent(id)}`, 'GET');
     if (mo && !mo.external_reference && mo.order && mo.order.external_reference) {
@@ -210,13 +205,9 @@ async function resolverRecursoMP(id, topic) {
     if (!(err && err.status === 404)) throw err;
   }
 
-  // 5) se id parece notification id (contém ';' ou 'UTC'), não tentar endpoints diretos
   const idStr = String(id || '');
-  if (idStr.includes(';') || idStr.toLowerCase().includes('utc')) {
-    return null;
-  }
+  if (idStr.includes(';') || idStr.toLowerCase().includes('utc')) return null;
 
-  // 6) tentar search por order.id
   try {
     const searchOrder = await mpFetch(`/v1/payments/search?order.id=${encodeURIComponent(id)}`, 'GET');
     if (searchOrder && Array.isArray(searchOrder.results) && searchOrder.results.length) {
@@ -226,7 +217,6 @@ async function resolverRecursoMP(id, topic) {
     if (!(err && err.status === 404)) console.warn('Erro search order.id:', err.message || err);
   }
 
-  // 7) tentar search por external_reference
   try {
     const searchExt = await mpFetch(`/v1/payments/search?external_reference=${encodeURIComponent(id)}`, 'GET');
     if (searchExt && Array.isArray(searchExt.results) && searchExt.results.length) {
@@ -239,37 +229,24 @@ async function resolverRecursoMP(id, topic) {
   return null;
 }
 
-function getMpTokenType() {
-  // não chama getMpAccessToken() para evitar lançar erro aqui
-  if (process.env.MP_FORCE_SANDBOX === 'true') return 'TEST';
-  if (process.env.MP_ACCESS_TOKEN_PROD) return 'PROD';
-  if (process.env.MP_ACCESS_TOKEN_TEST) return 'TEST';
-  return 'UNKNOWN';
-}
-
-/**
- * validateMpWebhookSignature(rawBody, req)
- * - Lê headers comuns de assinatura do Mercado Pago
- * - Suporta header no formato "t=..., v1=..." ou apenas o hash (hex/base64)
- * - Por padrão usa HMAC-SHA256 sobre rawBody; se precisar de string canônica, ajuste baseString
- * - Só executa quando MP_VALIDATE_WEBHOOK === 'true'
- *
- * Retorno: { ok: true } ou { ok: false, reason: 'mensagem', ts?: '...' }
- */
-
+// ─── Validação de assinatura do webhook (HMAC-SHA256) ─────────────────────────
+/*
+  fix #2: rawBody é string — parsear para JSON antes de acessar propriedades.
+  Suporta header "t=...,v1=..." ou hash direto (hex/base64).
+  Só executa quando MP_VALIDATE_WEBHOOK === 'true'.
+*/
 function validateMpWebhookSignature(rawBody, req) {
   if (process.env.MP_VALIDATE_WEBHOOK !== 'true') {
     return { ok: true, reason: 'validation disabled by MP_VALIDATE_WEBHOOK' };
   }
 
-  // escolher segredo conforme ambiente
   const forceSandbox = process.env.MP_FORCE_SANDBOX === 'true';
   const secret = forceSandbox
     ? process.env.MP_WEBHOOK_SECRET_TEST
     : process.env.MP_WEBHOOK_SECRET;
 
   if (!secret) {
-    console.error("❌ Segredo não configurado para ambiente:", forceSandbox ? 'SANDBOX' : 'PROD');
+    console.error('❌ Segredo webhook não configurado para ambiente:', forceSandbox ? 'SANDBOX' : 'PROD');
     return { ok: false, reason: 'webhook secret not configured' };
   }
 
@@ -288,7 +265,7 @@ function validateMpWebhookSignature(rawBody, req) {
     sigHeaderRaw.split(',').forEach(p => {
       const [k, v] = p.trim().split('=');
       if (!k || !v) return;
-      if (k === 'ts') ts = v;   // <-- corrigido
+      if (k === 'ts') ts = v;
       if (k === 'v1') sigV1 = v;
     });
   } else {
@@ -296,18 +273,21 @@ function validateMpWebhookSignature(rawBody, req) {
   }
 
   if (!sigV1) {
-    console.error("❌ Nenhuma assinatura presente no header");
+    console.error('❌ Nenhuma assinatura presente no header');
     return { ok: false, reason: 'no signature header present', ts };
   }
 
-  // pegar id corretamente
+  // fix #2: parsear rawBody (string) para acessar propriedades
+  let parsedBody = null;
+  try { parsedBody = rawBody ? JSON.parse(rawBody) : null; } catch (e) { /* ignora */ }
+
   let dataId = '';
   if (req.query && req.query['data.id']) {
     dataId = String(req.query['data.id']);
-  } else if (rawBody && rawBody.data && rawBody.data.id) {
-    dataId = String(rawBody.data.id);
-  } else if (rawBody && rawBody.id) {
-    dataId = String(rawBody.id);
+  } else if (parsedBody && parsedBody.data && parsedBody.data.id) {
+    dataId = String(parsedBody.data.id);
+  } else if (parsedBody && parsedBody.id) {
+    dataId = String(parsedBody.id);
   }
 
   const requestId = req.headers['x-request-id'] || '';
@@ -319,7 +299,7 @@ function validateMpWebhookSignature(rawBody, req) {
     h.update(baseString, 'utf8');
     expected = h.digest();
   } catch (e) {
-    console.error("❌ Falha ao calcular HMAC:", e);
+    console.error('❌ Falha ao calcular HMAC:', e);
     return { ok: false, reason: 'hmac computation failed' };
   }
 
@@ -335,107 +315,99 @@ function validateMpWebhookSignature(rawBody, req) {
           const tsNum = parseInt(ts, 10);
           const now = Math.floor(Date.now() / 1000);
           if (Math.abs(now - tsNum) > 300) {
-            console.error("⚠️ Timestamp fora da tolerância");
+            console.error('⚠️ Timestamp fora da tolerância');
             return { ok: false, reason: 'timestamp out of tolerance', ts };
           }
         }
         return { ok: true, ts, id: dataId };
       }
     } catch (e) {
-      console.error("❌ Erro ao comparar assinaturas:", e);
+      console.error('❌ Erro ao comparar assinaturas:', e);
     }
   }
 
-  console.error("❌ Nenhuma comparação bateu. Assinatura inválida.");
+  console.error('❌ Assinatura inválida.');
   return { ok: false, reason: 'signature mismatch', ts, id: dataId };
 }
 
+// ─── Disparo de mensagem automática ──────────────────────────────────────────
+// fix #7: fetchWithTimeout com 8s para não travar o handler do webhook
+// fix #11: código morto (loop comentado) removido
+// fix #13: esta é a versão autoritativa backend de aplicarPlaceholders
 
 async function dispararMensagemAutomatica(momento, dados) {
   try {
-    // 1. Buscar template ativo e automático
-    const snapshot = await db.collection("respostas_automaticas")
-      .where("momento_envio", "==", momento)
-      .where("ativo", "==", true)
-      .where("enviar_automaticamente", "==", true)
+    const snapshot = await db.collection('respostas_automaticas')
+      .where('momento_envio', '==', momento)
+      .where('ativo', '==', true)
+      .where('enviar_automaticamente', '==', true)
       .get();
 
-    if (snapshot.empty) {
-      return;
-    }
-    // usar apenas o primeiro template encontrado (isolamento de teste) 
+    if (snapshot.empty) return;
+
     const doc = snapshot.docs[0];
     if (!doc) return;
     const msg = doc.data();
 
     const mensagemHtml = aplicarPlaceholders(msg.mensagem_html, dados);
 
-    // 4. Chamar API enviarEmail.js
-    await fetch(`${process.env.NEXT_PUBLIC_BASE_URL}/api/enviarEmail`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        nome: dados.nome,
-        email: dados.email,
-        assunto: msg.titulo,
-        mensagemHtml
-      })
-    });
-
-    /*     // 2. Para cada template encontrado
-        for (const doc of snapshot.docs) {
-          const msg = doc.data();
-    
-          // 3. Substituir placeholders usando sua função
-          const mensagemHtml = aplicarPlaceholders(msg.mensagem_html, dados);
-    
-          // 4. Chamar API enviarEmail.js
-          await fetch(`${process.env.NEXT_PUBLIC_BASE_URL}/api/enviarEmail`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              nome: dados.nome,
-              email: dados.email,
-              assunto: msg.titulo,
-              mensagemHtml
-            })
-          });
-        } */
+    await fetchWithTimeout(
+      `${process.env.NEXT_PUBLIC_BASE_URL}/api/enviarEmail`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          nome: dados.nome,
+          email: dados.email,
+          assunto: msg.titulo,
+          mensagemHtml
+        })
+      },
+      8000   // 8s — não bloqueia o handler além desse tempo
+    );
   } catch (error) {
-    console.error("❌ Erro no disparo automático:", error);
+    console.error('❌ Erro no disparo automático:', error);
   }
 }
 
+// ─── Helpers de formatação e placeholders ─────────────────────────────────────
+
 function formatDateBR(date) {
-  if (!date) return "";
+  if (!date) return '';
   const d = new Date(date.seconds ? date.seconds * 1000 : date);
-  return d.toLocaleDateString("pt-BR");
+  return d.toLocaleDateString('pt-BR');
 }
 
+// fix #13: versão autoritativa backend — manter sincronizado com functions.js
 function aplicarPlaceholders(template, dados) {
-  const nome = dados.nome || "(nome não informado)";
-  const email = dados.email || "(email não informado)";
-  const edicao = dados.edicao || "(sem edição)";
-  let tipo = "(sem tipo)";
+  if (!template) return '';
+  const nome = dados.nome || '(nome não informado)';
+  const email = dados.email || '(email não informado)';
+  const edicao = dados.edicao || '(sem edição)';
+  let tipo = '(sem tipo)';
   if (Array.isArray(dados.interesses) && dados.interesses.length > 0) {
-    tipo = dados.interesses.join(", ");
+    tipo = dados.interesses.join(', ');
   } else if (dados.tipo) {
     tipo = dados.tipo;
   }
-  const titulo = dados.titulo || "(sem título)";
-  const newsletterId = dados.newsletterId || "(sem newsletterId)";
-  const envioId = dados.envioId || "(sem envioId)";
-  const destinatarioId = dados.destinatarioId || "(sem destinatarioId)";
-  const cod_uf = dados.cod_uf || "(sem UFId)";
-  const nome_municipio = dados.nome_municipio || "(sem municipioId)";
-  const cargo = dados.tipo_perfil || dados.perfil || "(sem cargoId)";
-  const interesse = dados.interesse || "(sem interesse)";
-  const interesseId = dados.interesseId || "(sem interesseId)";
-  const token = dados.token_acesso || "(sem token)";
-  const plano = dados.plano || "(sem plano)";
-  const data_assinatura = dados.data_assinatura || "(sem data de assinatura)";
+  const titulo = dados.titulo || '(sem título)';
+  const newsletterId = dados.newsletterId || '(sem newsletterId)';
+  const envioId = dados.envioId || '(sem envioId)';
+  const destinatarioId = dados.destinatarioId || '(sem destinatarioId)';
+  const cod_uf = dados.cod_uf || '(sem UFId)';
+  const nome_municipio = dados.nome_municipio || '(sem municipioId)';
+  const cargo = dados.tipo_perfil || dados.perfil || '(sem cargoId)';
+  const interesse = dados.interesse || '(sem interesse)';
+  const interesseId = dados.interesseId || '(sem interesseId)';
+  const token = dados.token_acesso || '(sem token)';
+  const plano = dados.plano || '(sem plano)';
+  const data_assinatura = dados.data_assinatura
+    ? (dados.data_assinatura instanceof Date
+        ? dados.data_assinatura.toLocaleDateString('pt-BR')
+        : String(dados.data_assinatura))
+    : '(sem data de assinatura)';
 
-  let dataFormatada = "";
+  let dataFormatada = '';
   if (dados.data_publicacao) {
     const dataObj = dados.data_publicacao.toDate?.() || dados.data_publicacao;
     dataFormatada = formatDateBR(dataObj);
@@ -461,18 +433,14 @@ function aplicarPlaceholders(template, dados) {
     .replace(/{{data_assinatura}}/gi, data_assinatura);
 }
 
-// ---------- Handler principal (sem validação HMAC) ----------
+// ─── Handler principal ────────────────────────────────────────────────────────
 export default async function handler(req, res) {
   try {
-    // debug seguro: não logar prefixo do token; logar apenas o tipo (TEST/PROD)
-    // ativar logs detalhados apenas com MP_DEBUG='true'
     if (process.env.MP_DEBUG === 'true') {
       console.info('DEBUG MP token type:', getMpTokenType());
-    } else {
-      console.info('DEBUG MP token type: [redacted]');
     }
 
-    // ler raw body (string) para compatibilidade com webhooks
+    // Ler raw body como string (necessário para HMAC e para webhooks)
     const rawBody = await new Promise((resolve, reject) => {
       let data = '';
       req.on('data', chunk => { data += chunk; });
@@ -480,44 +448,93 @@ export default async function handler(req, res) {
       req.on('error', err => reject(err));
     });
 
-    // validar assinatura (se habilitado) 
-    // só validar assinatura se NÃO for criar-pedido
-    const temAcaoCriarPedido = (req.query && req.query.acao) ? String(req.query.acao) : null;
+    // Validar assinatura apenas para webhooks (não para criar-pedido / status-pedido)
+    const acao = (req.query && req.query.acao) ? String(req.query.acao) : null;
+    const acoesPublicas = ['criar-pedido', 'status-pedido'];
 
-    if (!temAcaoCriarPedido) {
+    if (!acao || !acoesPublicas.includes(acao)) {
       const sigCheck = validateMpWebhookSignature(rawBody, req);
       if (!sigCheck.ok) {
-        console.warn('Webhook assinatura inválida ou validação desativada:', sigCheck.reason, 'ts:', sigCheck.ts || null);
+        console.warn('Webhook assinatura inválida:', sigCheck.reason, 'ts:', sigCheck.ts || null);
         return json(res, 200, { ok: true, message: 'signature invalid (ignored)' });
       }
     }
 
-    // tentar popular req.body se for JSON
+    // Parsear body JSON para rotas que recebem JSON
     try {
-      if (rawBody && rawBody.length > 0 && req.headers['content-type'] && req.headers['content-type'].includes('application/json')) {
+      if (rawBody && rawBody.length > 0 &&
+          req.headers['content-type']?.includes('application/json')) {
         req.body = JSON.parse(rawBody);
       }
-    } catch (e) {
-      // ok em sandbox; manter rawBody para auditoria
+    } catch (e) { /* ok — manter rawBody para auditoria */ }
+
+    // ── GET ?acao=status-pedido ── fix #10 ────────────────────────────────────
+    if (req.method === 'GET' && acao === 'status-pedido') {
+      const { userId, assinaturaId, pedidoId } = req.query;
+      if (!userId || !assinaturaId || !pedidoId) {
+        return json(res, 400, { ok: false, message: 'userId, assinaturaId e pedidoId são obrigatórios.' });
+      }
+      const pedidoSnap = await db.collection('usuarios').doc(userId)
+        .collection('assinaturas').doc(assinaturaId)
+        .collection('pedidos_mp').doc(pedidoId).get();
+
+      if (!pedidoSnap.exists) {
+        return json(res, 404, { ok: false, message: 'Pedido não encontrado.' });
+      }
+      const pd = pedidoSnap.data();
+      return json(res, 200, {
+        ok: true,
+        pedidoId,
+        status: pd.status,
+        mpStatus: pd.mpStatus || null,
+        mpPaymentMethod: pd.mpPaymentMethod || null,
+        mpInstallments: pd.mpInstallments || null,
+        atualizadoEm: pd.atualizadoEm || null
+      });
     }
 
-    // rota e ação
-    const acao = (req.query && req.query.acao) ? String(req.query.acao) : null;
-
-    // ---------- criar-pedido (Checkout Pro) ----------
+    // ── POST ?acao=criar-pedido ───────────────────────────────────────────────
     if (req.method === 'POST' && acao === 'criar-pedido') {
       const body = req.body || {};
       const { userId, assinaturaId } = body;
       const amountCentavos = parseInt(body.amountCentavos, 10);
-      const descricao = body.descricao || `Assinatura`;
+      const descricao      = body.descricao || 'Assinatura';
       const installmentsMax = body.installmentsMax ? Math.max(1, parseInt(body.installmentsMax, 10)) : 1;
       const dataPrimeiroVencimento = body.dataPrimeiroVencimento || null;
-      const nome = body.nome || "";
-      const email = body.email || "";
-      const cpf = body.cpf || "";
+      const nome   = body.nome  || '';
+      const email  = body.email || '';
+      const cpf    = body.cpf   || '';
 
-      if (!userId || !assinaturaId || !amountCentavos || isNaN(amountCentavos) || amountCentavos <= 0) {
-        return json(res, 400, { ok: false, message: 'Parâmetros inválidos: userId, assinaturaId e amountCentavos (>0) são obrigatórios.' });
+      // fix #14: validar parâmetros incluindo valor mínimo de R$ 0,50
+      if (!userId || !assinaturaId) {
+        return json(res, 400, { ok: false, message: 'userId e assinaturaId são obrigatórios.' });
+      }
+      if (!amountCentavos || isNaN(amountCentavos) || amountCentavos < 50) {
+        return json(res, 400, { ok: false, message: 'amountCentavos deve ser um número ≥ 50 (mínimo R$ 0,50).' });
+      }
+
+      // fix #9: validar back_urls antes de chamar o MP
+      const backUrlSuccess = process.env.MP_BACK_URL_SUCCESS;
+      const backUrlFailure = process.env.MP_BACK_URL_FAILURE;
+      const backUrlPending = process.env.MP_BACK_URL_PENDING || '';
+      const notifUrl       = process.env.MP_WEBHOOK_URL;
+
+      if (!backUrlSuccess || !backUrlFailure || !notifUrl) {
+        console.error('Variáveis MP_BACK_URL_SUCCESS, MP_BACK_URL_FAILURE ou MP_WEBHOOK_URL não configuradas.');
+        return json(res, 500, { ok: false, message: 'Configuração de URLs do Mercado Pago incompleta no servidor.' });
+      }
+
+      // fix #5: verificar no backend se já existe assinatura ativa (proteção server-side)
+      try {
+        const assSnap = await db.collection('usuarios').doc(userId)
+          .collection('assinaturas')
+          .where('status', 'in', ['ativa', 'aprovada'])
+          .limit(1).get();
+        if (!assSnap.empty) {
+          return json(res, 409, { ok: false, message: 'Usuário já possui assinatura ativa.' });
+        }
+      } catch (err) {
+        console.warn('[criar-pedido] Verificação de assinatura ativa falhou (não bloqueante):', err.message);
       }
 
       const pedidosRef = db.collection('usuarios').doc(userId)
@@ -525,7 +542,7 @@ export default async function handler(req, res) {
         .collection('pedidos_mp');
 
       const novoPedidoRef = pedidosRef.doc();
-      const pedidoData = {
+      await novoPedidoRef.set({
         userId,
         assinaturaId,
         amountCentavos,
@@ -533,49 +550,44 @@ export default async function handler(req, res) {
         installmentsMax,
         status: 'pendente',
         criadoEm: admin.firestore.FieldValue.serverTimestamp()
-      };
-      await novoPedidoRef.set(pedidoData);
+      });
 
       const external_reference = montarExternalReference(userId, assinaturaId, novoPedidoRef.id);
-      const cpfNormalizado = (cpf || "").replace(/\D/g, "");
+      const cpfNormalizado = (cpf || '').replace(/\D/g, '');
+
+      // fix #12: extrair primeiro nome e sobrenome do nome completo
+      const nomePartes   = nome.trim().split(' ');
+      const primeiroNome = nomePartes[0] || nome;
+      const sobrenome    = nomePartes.length > 1 ? nomePartes.slice(1).join(' ') : '';
 
       const preferencePayload = {
-        items: [
-          {
-            id: novoPedidoRef.id,
-            title: descricao,
-            quantity: 1,
-            currency_id: 'BRL',
-            unit_price: (amountCentavos / 100)
-          }
-        ],
+        items: [{
+          id: novoPedidoRef.id,
+          title: descricao,
+          quantity: 1,
+          currency_id: 'BRL',
+          unit_price: amountCentavos / 100
+        }],
         payer: {
-          name: nome,
-          surname: "",
-          email: email,
-          identification: {
-            type: "CPF",
-            number: cpfNormalizado
-          }
+          name: primeiroNome,
+          surname: sobrenome,       // fix #12: sobrenome extraído do nome completo
+          email,
+          identification: { type: 'CPF', number: cpfNormalizado }
         },
         external_reference,
-
         binary_mode: true,
-        auto_return: "approved",
-
+        auto_return: 'approved',
         back_urls: {
-          success: process.env.MP_BACK_URL_SUCCESS || '',
-          failure: process.env.MP_BACK_URL_FAILURE || '',
-          pending: process.env.MP_BACK_URL_PENDING || ''
+          success: backUrlSuccess,
+          failure: backUrlFailure,
+          pending: backUrlPending
         },
-        notification_url: process.env.MP_WEBHOOK_URL || '',
-
-        installments: installmentsMax,   // limite de parcelas definido pelo plano
-
-        // 🚫 Bloquear boleto 
-        excluded_payment_types: [
-          { id: "ticket" }
-        ]
+        notification_url: notifUrl,
+        // fix #1: installments e excluded_payment_types dentro de payment_methods
+        payment_methods: {
+          installments: installmentsMax,
+          excluded_payment_types: [{ id: 'ticket' }]
+        }
       };
 
       let mpResp;
@@ -583,16 +595,14 @@ export default async function handler(req, res) {
         mpResp = await mpFetch('/checkout/preferences', 'POST', preferencePayload);
       } catch (err) {
         console.error('Erro ao criar preference no Mercado Pago:', err.message || err);
-        await novoPedidoRef.set({ status: 'erro_mp', atualizadoEm: admin.firestore.FieldValue.serverTimestamp(), mpError: err.body || String(err) }, { merge: true });
+        await novoPedidoRef.set({
+          status: 'erro_mp',
+          atualizadoEm: admin.firestore.FieldValue.serverTimestamp(),
+          mpError: err.body || String(err)
+        }, { merge: true });
         return json(res, 500, { ok: false, message: 'Erro ao criar preferência no Mercado Pago', detail: err.body || String(err) });
       }
 
-      /*       const preferSandbox = process.env.MP_FORCE_SANDBOX === 'true';
-            const initPoint = preferSandbox
-              ? (mpResp.sandbox_init_point || mpResp.init_point || null)
-              : (mpResp.init_point || mpResp.sandbox_init_point || null); */
-
-      // Sempre usar init_point, mesmo em sandbox/teste 
       const initPoint = mpResp.init_point || mpResp.sandbox_init_point || null;
 
       await novoPedidoRef.set({
@@ -603,7 +613,7 @@ export default async function handler(req, res) {
         atualizadoEm: admin.firestore.FieldValue.serverTimestamp()
       }, { merge: true });
 
-      // gerar parcelas no backend usando installmentsMax
+      // Gerar registro de pagamento
       if (logCompleto()) {
         try {
           await gerarParcelasAssinaturaBackend(
@@ -614,66 +624,77 @@ export default async function handler(req, res) {
           console.warn('Falha ao gerar parcelas no backend:', err.message || err);
         }
       } else {
-        const pagamentoRef = db.collection('usuarios').doc(userId)
+        await db.collection('usuarios').doc(userId)
           .collection('assinaturas').doc(assinaturaId)
-          .collection('pagamentos').doc(novoPedidoRef.id);
-        await pagamentoRef.set({
-          valor_centavos: amountCentavos,
-          numero_parcelas: installmentsMax,
-          status: 'pendente',
-          criadoEm: admin.firestore.FieldValue.serverTimestamp()
-        });
+          .collection('pagamentos').doc(novoPedidoRef.id)
+          .set({
+            valor_centavos: amountCentavos,
+            numero_parcelas: installmentsMax,
+            status: 'pendente',
+            criadoEm: admin.firestore.FieldValue.serverTimestamp()
+          });
       }
 
       return json(res, 200, { ok: true, redirectUrl: initPoint, pedidoId: novoPedidoRef.id });
     }
 
-    // ---------- webhook (MP POST sem acao) ----------
+    // ── POST webhook (MP notificação) ─────────────────────────────────────────
     if (req.method === 'POST' && !acao) {
-      const topic = req.query.topic || req.query.type || (req.body && (req.body.topic || req.body.type)) || null;
-      const id = req.query.id || (req.query && req.query.notification_id) || (req.body && (req.body.id || (req.body.data && req.body.data.id))) || null;
+      const topic = req.query.topic || req.query.type ||
+        (req.body && (req.body.topic || req.body.type)) || null;
+      const id = req.query.id || req.query.notification_id ||
+        (req.body && (req.body.id || (req.body.data && req.body.data.id))) || null;
 
       if (!topic || !id) {
         return json(res, 200, { ok: true, message: 'notificação recebida (sem topic/id)' });
       }
 
-      // idempotência: notificacoes_mp/{topic}_{id}
       const notifId = `${topic}_${id}`;
 
-      // tentar resolver recurso MP (payment | merchant_order | search)
+      // fix #6: idempotência antecipada via transação na coleção global,
+      // antes de qualquer chamada à API do MP
+      const globalNotifRef = db.collection('notificacoes_mp_global').doc(notifId);
+      let outroProcessoJaIniciou = false;
+      try {
+        outroProcessoJaIniciou = await db.runTransaction(async (tx) => {
+          const snap = await tx.get(globalNotifRef);
+          if (snap.exists) return true; // outro processo já registrou esta notificação
+          tx.set(globalNotifRef, {
+            topic,
+            id,
+            recebidoEm: admin.firestore.FieldValue.serverTimestamp(),
+            processado: false
+          });
+          return false;
+        });
+      } catch (e) {
+        // falha na transação não deve bloquear o processamento — apenas logar
+        console.warn('[webhook] Falha na idempotência global antecipada:', e.message);
+      }
+      if (outroProcessoJaIniciou) {
+        return json(res, 200, { ok: true, message: 'já processado' });
+      }
+
+      // Resolver recurso no MP
       let resolved = null;
       try {
         resolved = await resolverRecursoMP(id, topic);
       } catch (err) {
         console.warn('Falha ao buscar recurso no Mercado Pago:', err.message || err);
-        // se erro de rede ou permissão, responder 200 para evitar retries agressivos do MP
         return json(res, 200, { ok: true, message: 'notificação recebida (erro ao buscar MP)' });
       }
 
       if (!resolved) {
-        // registrar notificação mínima para auditoria
-        if (logCompleto()) {
-          const globalNotifRef = db.collection('notificacoes_mp_global').doc(notifId);
-          await globalNotifRef.set({
-            topic,
-            id,
-            rawBody: rawBody ? rawBody.slice(0, 2000) : null,
-            recebidoEm: admin.firestore.FieldValue.serverTimestamp(),
-            resolved: false
-          }, { merge: true });
-        }
+        await globalNotifRef.set({ resolved: false }, { merge: true });
         return json(res, 200, { ok: true, message: 'mp resource not found (simulação ou id inválido)' });
       }
 
-      // effectiveId começa com o id da notificação; pode ser substituído pelo payment.id real
       let effectiveId = String(id);
       let mpData = resolved.data;
 
-      // Se veio merchant_order, não gravar mpPaymentId com o id do MO.
-      // Se houver um payment dentro do merchant_order, buscar o payment real e usar seu status/id.
+      // Se merchant_order com payment interno: buscar o payment real
       if (resolved.tipo === 'merchant_order') {
         const mo = mpData;
-        // extrair external_reference também de mo.order.external_reference quando aplicável
         if (!mo.external_reference && mo.order && mo.order.external_reference) {
           mo.external_reference = mo.order.external_reference;
         }
@@ -681,52 +702,33 @@ export default async function handler(req, res) {
         if (payId) {
           try {
             const payment = await mpFetch(`/v1/payments/${encodeURIComponent(payId)}`, 'GET');
-            // substituir mpData pelo payment real para lógica abaixo (status, installments, etc)
             mpData = payment;
-            // ajustar resolved.tipo para 'payment' para tratamento unificado
             resolved.tipo = 'payment';
             effectiveId = String(payment.id);
           } catch (err) {
-            // se não conseguir buscar payment, manter mo como mpData e gravar moId separadamente mais abaixo
             console.warn('Falha ao buscar payment dentro do merchant_order:', err && err.message ? err.message : err);
           }
         }
       }
 
-      // extrair external_reference (userId|assinaturaId|pedidoId)
-      const externalRef = mpData.external_reference || (mpData.order && mpData.order.external_reference) || null;
+      const externalRef = mpData.external_reference ||
+        (mpData.order && mpData.order.external_reference) || null;
+
       if (!externalRef) {
-        // salvar globalmente para auditoria
-        if (logCompleto()) {
-          const globalNotifRef = db.collection('notificacoes_mp_global').doc(notifId);
-          await globalNotifRef.set({
-            topic,
-            id,
-            rawBody: rawBody ? rawBody.slice(0, 2000) : null,
-            recebidoEm: admin.firestore.FieldValue.serverTimestamp(),
-            resolved: false
-          }, { merge: true });
-        }
+        await globalNotifRef.set({ resolved: false, motivo: 'sem external_reference' }, { merge: true });
         return json(res, 200, { ok: true, message: 'sem external_reference' });
       }
 
       const parsed = parseExternalReference(externalRef);
       if (!parsed) {
-        if (logCompleto()) {
-          const globalNotifRef = db.collection('notificacoes_mp_global').doc(notifId);
-          await globalNotifRef.set({
-            topic,
-            id,
-            rawBody: rawBody ? rawBody.slice(0, 2000) : null,
-            recebidoEm: admin.firestore.FieldValue.serverTimestamp(),
-            resolved: false
-          }, { merge: true });
-        }
+        await globalNotifRef.set({ resolved: false, motivo: 'external_reference inválido' }, { merge: true });
         return json(res, 200, { ok: true, message: 'external_reference inválido' });
       }
 
       const { userId, assinaturaId, pedidoId } = parsed;
 
+      // fix #8: salvar notificação SEMPRE em notificacoes_mp (com mais ou menos dados)
+      // remove a bifurcação que descartava histórico em produção (logCompleto=false)
       const notifRef = db.collection('usuarios').doc(userId)
         .collection('assinaturas').doc(assinaturaId)
         .collection('notificacoes_mp').doc(notifId);
@@ -736,249 +738,200 @@ export default async function handler(req, res) {
         return json(res, 200, { ok: true, message: 'já processado' });
       }
 
-      // salvar notificação com mpData para auditoria
-      if (logCompleto()) {
-        await notifRef.set({
-          topic,
-          id,
-          mpData,
-          recebidoEm: admin.firestore.FieldValue.serverTimestamp(),
-          resolvedTipo: resolved.tipo,
-          signature_verified: false
-        });
-      } else {
-        const notifRefSimple = db.collection('usuarios').doc(userId)
-          .collection('assinaturas').doc(assinaturaId)
-          .collection('ultima_notificacao').doc('last');
-        await notifRefSimple.set({
-          topic,
-          id,
-          mpStatus: mpData.status || mpData.payment_status || null,
-          recebidoEm: admin.firestore.FieldValue.serverTimestamp()
-        }, { merge: true });
-      }
+      await notifRef.set(logCompleto()
+        ? { topic, id, mpData, recebidoEm: admin.firestore.FieldValue.serverTimestamp(), resolvedTipo: resolved.tipo }
+        : { topic, id, mpStatus: mpData.status || mpData.payment_status || null, recebidoEm: admin.firestore.FieldValue.serverTimestamp() }
+      );
 
-      // atualizar pedido
+      // Atualizar pedido
       const pedidoRef = db.collection('usuarios').doc(userId)
         .collection('assinaturas').doc(assinaturaId)
         .collection('pedidos_mp').doc(pedidoId);
 
       const pedidoSnap = await pedidoRef.get();
-      if (pedidoSnap.exists) {
-        const mpStatus = mpData.status || mpData.payment_status || null;
-        let novoStatusPedido = 'pendente';
+      if (!pedidoSnap.exists) {
+        console.warn('Pedido não encontrado para external_reference:', externalRef);
+        await globalNotifRef.set({ processado: true, motivo: 'pedido não encontrado' }, { merge: true });
+        return json(res, 200, { ok: true, message: 'processado' });
+      }
 
-        // se veio de payment, confiar no status do pagamento
-        if (resolved.tipo === 'payment' || resolved.tipo === 'payment_search' || resolved.tipo === 'payment_search_ext') {
-          if (mpStatus === 'approved' || mpStatus === 'paid') novoStatusPedido = 'pago';
-          else if (mpStatus === 'pending') novoStatusPedido = 'pendente';
-          else if (['cancelled', 'rejected', 'refunded'].includes(mpStatus)) novoStatusPedido = 'falha';
-        }
+      const mpStatus = mpData.status || mpData.payment_status || null;
+      let novoStatusPedido = 'pendente';
 
-        // se veio de merchant_order, marcar como pendente/aberto (caso não tenha sido convertido para payment acima)
-        if (resolved.tipo === 'merchant_order') {
-          novoStatusPedido = 'pendente';
-        }
+      if (['payment', 'payment_search', 'payment_search_ext'].includes(resolved.tipo)) {
+        if (mpStatus === 'approved' || mpStatus === 'paid') novoStatusPedido = 'pago';
+        else if (mpStatus === 'pending') novoStatusPedido = 'pendente';
+        else if (['cancelled', 'rejected', 'refunded'].includes(mpStatus)) novoStatusPedido = 'falha';
+      }
+      if (resolved.tipo === 'merchant_order') novoStatusPedido = 'pendente';
 
-        const updateObj = {
-          status: novoStatusPedido,
-          mpStatus,
-          mpPaymentMethod: mpData.payment_method_id || null,   // método escolhido (ex.: visa, pix, boleto)
-          mpInstallments: (mpData.installments && Number(mpData.installments)) ? Number(mpData.installments) : 1, // número de parcelas
-          atualizadoEm: admin.firestore.FieldValue.serverTimestamp()
-        };
+      const updateObj = {
+        status: novoStatusPedido,
+        mpStatus,
+        mpPaymentMethod: mpData.payment_method_id || null,
+        mpInstallments: (mpData.installments && Number(mpData.installments)) ? Number(mpData.installments) : 1,
+        atualizadoEm: admin.firestore.FieldValue.serverTimestamp()
+      };
+      if (resolved.tipo === 'payment') updateObj.mpPaymentId = effectiveId;
+      else if (resolved.tipo === 'merchant_order') updateObj.mpMerchantOrderId = id;
 
-        // se veio payment, gravar mpPaymentId usando effectiveId
-        if (resolved.tipo === 'payment') {
-          updateObj.mpPaymentId = effectiveId;
-        } else if (resolved.tipo === 'merchant_order') {
-          // gravar merchant_order id separadamente (usar id original da notificação)
-          updateObj.mpMerchantOrderId = id;
-        }
-        await pedidoRef.set(updateObj, { merge: true });
+      await pedidoRef.set(updateObj, { merge: true });
 
-        // atualizar pagamentos pré-criados: marcar parcelas pagas conforme installments
-        const pagamentosRef = db.collection('usuarios').doc(userId)
-          .collection('assinaturas').doc(assinaturaId)
-          .collection('pagamentos');
+      // Atualizar registros de pagamento
+      const pagamentosRef = db.collection('usuarios').doc(userId)
+        .collection('assinaturas').doc(assinaturaId)
+        .collection('pagamentos');
 
-        const installments = (mpData.installments && Number(mpData.installments)) ? Number(mpData.installments) : 1;
+      const installments = (mpData.installments && Number(mpData.installments)) ? Number(mpData.installments) : 1;
 
-        if (logCompleto()) {
-          const pendentesSnap = await pagamentosRef.where('status', '==', 'pendente')
-            .orderBy('numero_parcela', 'asc').get();
-
-          if (!pendentesSnap.empty) {
-            let toMark = installments;
-            const batch = db.batch();
-            for (const doc of pendentesSnap.docs) {
-              if (toMark <= 0) break;
-              const pRef = pagamentosRef.doc(doc.id);
-              batch.set(pRef, {
-                status: 'pago',
-                data_pagamento: admin.firestore.FieldValue.serverTimestamp(),
-                mpPaymentId: effectiveId,
-                mpPaymentMethod: mpData.payment_method_id || null,
-                mpInstallments: installments,
-                tipoNotificacao: resolved.tipo,
-                atualizadoEm: admin.firestore.FieldValue.serverTimestamp()
-              }, { merge: true });
-              toMark--;
-            }
-            await batch.commit();
+      if (logCompleto()) {
+        const pendentesSnap = await pagamentosRef
+          .where('status', '==', 'pendente')
+          .orderBy('numero_parcela', 'asc').get();
+        if (!pendentesSnap.empty) {
+          let toMark = installments;
+          const batch = db.batch();
+          for (const doc of pendentesSnap.docs) {
+            if (toMark <= 0) break;
+            batch.set(pagamentosRef.doc(doc.id), {
+              status: 'pago',
+              data_pagamento: admin.firestore.FieldValue.serverTimestamp(),
+              mpPaymentId: effectiveId,
+              mpPaymentMethod: mpData.payment_method_id || null,
+              mpInstallments: installments,
+              tipoNotificacao: resolved.tipo,
+              atualizadoEm: admin.firestore.FieldValue.serverTimestamp()
+            }, { merge: true });
+            toMark--;
           }
-        } else {
-          // Atualizar o documento criado no fluxo de pedido (pedidoId).
-          // Se por algum motivo pedidoId não estiver disponível, usar fallback para effectiveId.
-          const targetDocId = pedidoId ? String(pedidoId) : String(effectiveId);
-          const pagamentoRef = pagamentosRef.doc(targetDocId);
-
-          await pagamentoRef.set({
-            // manter referência ao payment do MP para reconciliação
-            paymentId: effectiveId,
-            pedidoId: pedidoId || null,
-            status: novoStatusPedido,
-            mpPaymentMethod: mpData.payment_method_id || null,
-            mpInstallments: installments,
-            data_pagamento: admin.firestore.FieldValue.serverTimestamp(),
-            atualizadoEm: admin.firestore.FieldValue.serverTimestamp()
-          }, { merge: true });
-        }
-
-        // atualizar status da assinatura de acordo com o status do pedido
-        const assinRef = db.collection('usuarios').doc(userId)
-          .collection('assinaturas').doc(assinaturaId);
-
-        if (novoStatusPedido === 'pago') {
-          await assinRef.set({
-            status: 'ativa',   // assinatura passa a ativa
-            paymentProvider: 'mercadopago',
-            orderId: pedidoId,
-            ativadoEm: admin.firestore.FieldValue.serverTimestamp(),
-            atualizadoEm: admin.firestore.FieldValue.serverTimestamp()
-          }, { merge: true });
-          // --- Início do bloco substituto ---
-          // Buscar dados da assinatura
-          const assinaturaDoc = await db.collection("usuarios").doc(userId)
-            .collection("assinaturas").doc(assinaturaId).get();
-          const assinaturaData = assinaturaDoc.exists ? assinaturaDoc.data() : {};
-
-          // Buscar dados do usuário (coleção raiz)
-          const usuarioDoc = await db.collection("usuarios").doc(userId).get();
-          const usuarioData = usuarioDoc.exists ? usuarioDoc.data() : {};
-
-          // Buscar nome do plano na coleção planos
-          let nomePlano = "(plano não informado)";
-          if (assinaturaData.planId) {
-            const planoDoc = await db.collection("planos").doc(assinaturaData.planId).get();
-            if (planoDoc.exists) {
-              nomePlano = planoDoc.data().nome || nomePlano;
-            }
-          }
-
-          // Controle de envio direto no documento assinatura usando enviosAutomaticos.<pedidoId>
-          // Chave determinística para travar por pedido
-          const assinDocRef = db.collection('usuarios').doc(userId)
-            .collection('assinaturas').doc(assinaturaId);
-          const logKey = `enviosAutomaticos.${String(pedidoId)}`;
-
-          let devoEnviar = false;
-          try {
-            devoEnviar = await db.runTransaction(async (tx) => {
-              const snap = await tx.get(assinDocRef);
-              const data = snap.exists ? snap.data() : {};
-
-              // Se já existe entrada para esse pedidoId, outro processo já iniciou/enviou
-              if (data && data.enviosAutomaticos && data.enviosAutomaticos[String(pedidoId)]) {
-                return false; // não somos responsáveis
-              }
-
-              // Criar entrada inicial (status iniciado)
-              const payload = {};
-              payload[logKey] = {
-                momento: 'pos_cadastro_assinante',
-                titulo: 'Confirmação de assinatura',
-                email: usuarioData?.email || mpData.payer?.email || "(email não informado)",
-                status: 'iniciado',
-                criadoEm: admin.firestore.FieldValue.serverTimestamp()
-              };
-
-              tx.set(assinDocRef, payload, { merge: true });
-
-              return true; // commit fará a criação; somos responsáveis
-            });
-            console.info('resultado transacao enviosAutomaticos', { pedidoId, assinaturaId, devoEnviar });
-
-          } catch (err) {
-            console.error('Erro na transação de marcação de envio:', err && err.message ? err.message : err);
-            devoEnviar = false;
-          }
-
-          if (devoEnviar) {
-            try {
-              // log diagnóstico: confirmar tentativa de envio e contexto
-              console.info('tentativa envio', { pedidoId, assinaturaId, userId, devoEnviar });
-
-              // Enviar e-mail (mantendo sua lógica de template)
-              await dispararMensagemAutomatica("pos_cadastro_assinante", {
-                userId,
-                assinaturaId,
-                nome: usuarioData?.nome || mpData.payer?.first_name || assinaturaData?.nome || "",
-                email: usuarioData?.email || mpData.payer?.email || "(email não informado)",
-                plano: nomePlano,
-                data_assinatura: new Date()
-              });
-
-              // Marcar sucesso no doc da assinatura
-              const successPayload = {};
-              successPayload[logKey] = {
-                momento: 'pos_cadastro_assinante',
-                titulo: 'Confirmação de assinatura',
-                email: usuarioData?.email || mpData.payer?.email || "(email não informado)",
-                status: 'enviado',
-                criadoEm: admin.firestore.FieldValue.serverTimestamp(),
-                enviadoEm: admin.firestore.FieldValue.serverTimestamp()
-              };
-              await assinDocRef.set(successPayload, { merge: true });
-
-            } catch (err) {
-              console.error('Erro ao enviar e marcar envio no doc da assinatura:', err && err.message ? err.message : err);
-              // Marcar erro no doc para auditoria
-              const errPayload = {};
-              errPayload[logKey] = {
-                momento: 'pos_cadastro_assinante',
-                titulo: 'Confirmação de assinatura',
-                email: usuarioData?.email || mpData.payer?.email || "(email não informado)",
-                status: 'erro',
-                criadoEm: admin.firestore.FieldValue.serverTimestamp(),
-                erro: String(err && err.message ? err.message : err),
-                atualizadoEm: admin.firestore.FieldValue.serverTimestamp()
-              };
-              try { await assinRef.set(errPayload, { merge: true }); } catch (e2) { console.warn('Falha ao gravar erro no doc da assinatura:', e2 && e2.message ? e2.message : e2); }
-            }
-          } else {
-            if (logCompleto()) console.info('Envio já registrado em assinatura para pedidoId:', pedidoId);
-          }
-        } else if (novoStatusPedido === 'falha') {
-          await assinRef.set({
-            status: 'cancelada',   // assinatura cancelada
-            atualizadoEm: admin.firestore.FieldValue.serverTimestamp()
-          }, { merge: true });
-        } else if (novoStatusPedido === 'pendente') {
-          await assinRef.set({
-            status: 'pendente_pagamento',   // aguardando pagamento
-            atualizadoEm: admin.firestore.FieldValue.serverTimestamp()
-          }, { merge: true });
+          await batch.commit();
         }
       } else {
-        console.warn('Pedido não encontrado para external_reference:', externalRef);
+        const targetDocId = pedidoId ? String(pedidoId) : String(effectiveId);
+        await pagamentosRef.doc(targetDocId).set({
+          paymentId: effectiveId,
+          pedidoId: pedidoId || null,
+          status: novoStatusPedido,
+          mpPaymentMethod: mpData.payment_method_id || null,
+          mpInstallments: installments,
+          data_pagamento: admin.firestore.FieldValue.serverTimestamp(),
+          atualizadoEm: admin.firestore.FieldValue.serverTimestamp()
+        }, { merge: true });
       }
+
+      // fix #3: usar assinRef como única referência ao doc da assinatura
+      // fix #4: 'falha' → 'pagamento_recusado' (não confundir com cancelamento intencional)
+      const assinRef = db.collection('usuarios').doc(userId)
+        .collection('assinaturas').doc(assinaturaId);
+
+      if (novoStatusPedido === 'pago') {
+        await assinRef.set({
+          status: 'ativa',
+          paymentProvider: 'mercadopago',
+          orderId: pedidoId,
+          ativadoEm: admin.firestore.FieldValue.serverTimestamp(),
+          atualizadoEm: admin.firestore.FieldValue.serverTimestamp()
+        }, { merge: true });
+
+        // Buscar dados para e-mail de confirmação
+        const assinaturaDoc = await assinRef.get();
+        const assinaturaData = assinaturaDoc.exists ? assinaturaDoc.data() : {};
+        const usuarioDoc = await db.collection('usuarios').doc(userId).get();
+        const usuarioData = usuarioDoc.exists ? usuarioDoc.data() : {};
+
+        let nomePlano = '(plano não informado)';
+        if (assinaturaData.planId) {
+          try {
+            const planoDoc = await db.collection('planos').doc(assinaturaData.planId).get();
+            if (planoDoc.exists) nomePlano = planoDoc.data().nome || nomePlano;
+          } catch (e) { /* não fatal */ }
+        }
+
+        // fix #3: controle de idempotência de envio usando apenas assinRef
+        const logKey = `enviosAutomaticos.${String(pedidoId)}`;
+        let devoEnviar = false;
+        try {
+          devoEnviar = await db.runTransaction(async (tx) => {
+            const snap = await tx.get(assinRef);
+            const data = snap.exists ? snap.data() : {};
+            if (data?.enviosAutomaticos?.[String(pedidoId)]) return false;
+            const payload = {};
+            payload[logKey] = {
+              momento: 'pos_cadastro_assinante',
+              email: usuarioData?.email || mpData.payer?.email || '(email não informado)',
+              status: 'iniciado',
+              criadoEm: admin.firestore.FieldValue.serverTimestamp()
+            };
+            tx.set(assinRef, payload, { merge: true });
+            return true;
+          });
+        } catch (err) {
+          console.error('Erro na transação de marcação de envio:', err && err.message ? err.message : err);
+          devoEnviar = false;
+        }
+
+        if (devoEnviar) {
+          try {
+            await dispararMensagemAutomatica('pos_cadastro_assinante', {
+              userId,
+              assinaturaId,
+              nome: usuarioData?.nome || mpData.payer?.first_name || assinaturaData?.nome || '',
+              email: usuarioData?.email || mpData.payer?.email || '(email não informado)',
+              plano: nomePlano,
+              data_assinatura: new Date()
+            });
+
+            const successPayload = {};
+            successPayload[logKey] = {
+              momento: 'pos_cadastro_assinante',
+              email: usuarioData?.email || mpData.payer?.email || '(email não informado)',
+              status: 'enviado',
+              enviadoEm: admin.firestore.FieldValue.serverTimestamp()
+            };
+            await assinRef.set(successPayload, { merge: true });
+
+          } catch (err) {
+            console.error('Erro ao enviar e-mail de confirmação:', err && err.message ? err.message : err);
+            const errPayload = {};
+            errPayload[logKey] = {
+              momento: 'pos_cadastro_assinante',
+              email: usuarioData?.email || mpData.payer?.email || '(email não informado)',
+              status: 'erro',
+              erro: String(err && err.message ? err.message : err),
+              atualizadoEm: admin.firestore.FieldValue.serverTimestamp()
+            };
+            try { await assinRef.set(errPayload, { merge: true }); } catch (e2) {
+              console.warn('Falha ao gravar erro no doc da assinatura:', e2 && e2.message ? e2.message : e2);
+            }
+          }
+        } else {
+          if (logCompleto()) console.info('Envio já registrado para pedidoId:', pedidoId);
+        }
+
+      } else if (novoStatusPedido === 'falha') {
+        // fix #4: pagamento recusado ≠ cancelamento intencional
+        // usar 'pagamento_recusado' para que o usuário possa tentar novamente
+        await assinRef.set({
+          status: 'pagamento_recusado',
+          atualizadoEm: admin.firestore.FieldValue.serverTimestamp()
+        }, { merge: true });
+
+      } else if (novoStatusPedido === 'pendente') {
+        await assinRef.set({
+          status: 'pendente_pagamento',
+          atualizadoEm: admin.firestore.FieldValue.serverTimestamp()
+        }, { merge: true });
+      }
+
+      // Marcar notificação global como processada (fix #6)
+      await globalNotifRef.set({ processado: true }, { merge: true });
 
       return json(res, 200, { ok: true, message: 'processado' });
     }
 
-    // rota inválida
-    return json(res, 400, { ok: false, message: 'Rota inválida. Use ?acao=criar-pedido ou envie webhook do MP.' });
+    // Rota inválida
+    return json(res, 400, { ok: false, message: 'Rota inválida. Use ?acao=criar-pedido, ?acao=status-pedido ou envie webhook do MP.' });
+
   } catch (err) {
     console.error('Erro pagamentoMP:', err && err.message ? err.message : err);
     return json(res, 500, { ok: false, message: 'Erro interno', detail: String(err && err.message ? err.message : err) });
