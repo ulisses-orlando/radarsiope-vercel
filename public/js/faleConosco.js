@@ -358,8 +358,9 @@
         html += `<button class="rs-fc-tipo-btn${tipoAtivo === 'sugestao_tema' ? ' ativo' : ''}
           ${quotaEsgotada ? ' bloqueado' : ''}"
           onclick="${quotaEsgotada ? '' : "window._fcSelecionarTipo('sugestao_tema')"}">
-          💡 Sugerir tema
-          ${quotaEsgotada ? ' 🔒' : ''}
+          ${quotaEsgotada
+            ? '⛔ Cota de sugestões esgotada para este mês'
+            : '💡 Sugerir tema'}
         </button>`;
       } else {
         // Upsell — não tem feature
