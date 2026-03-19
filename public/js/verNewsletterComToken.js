@@ -165,22 +165,23 @@ function detectarAcesso(destinatario, newsletter, segmento, envio) {
   const plano_slug = destinatario.plano_slug || null;
   const features = destinatario.features || {};
 
-  // ── Acesso temporário para leads: valida janela de horas real ────────────
-  // Leva em conta o horário de abertura (envio.primeiro_acesso ou envio.criado_em)
-  // versus acesso_pro_horas da newsletter.
+  // ── Acesso temporário para leads: valida janela de horas a partir do envio ──
+  // Calcula: data_envio (criado_em) + acesso_pro_horas → se ainda dentro da janela, concede.
+  // NÃO usa expira_em (que é a expiração do link, não da janela pro).
   let acessoProTemp = false;
   if (!isAssinante
     && newsletter.acesso_pro_temporario === true
     && (newsletter.acesso_pro_horas || 0) > 0) {
 
-    // Tenta obter o timestamp de referência do envio (primeiro acesso ou data de criação)
-    const ref = envio?.primeiro_acesso || envio?.expira_em || null;
-    if (ref) {
-      // expira_em é mais direto: se existir e ainda não venceu, concede acesso
-      const expira = ref.toDate ? ref.toDate() : new Date(ref);
-      acessoProTemp = new Date() < expira;
+    // Referência: data real de envio ao lead (criado_em / data_envio do leads_envios)
+    const refRaw = envio?.criado_em || envio?.primeiro_acesso || null;
+    if (refRaw) {
+      const dataEnvio = refRaw.toDate ? refRaw.toDate() : new Date(refRaw);
+      const msJanela  = (newsletter.acesso_pro_horas) * 60 * 60 * 1000;
+      const expiraAcesso = new Date(dataEnvio.getTime() + msJanela);
+      acessoProTemp = new Date() < expiraAcesso;
     } else {
-      // fallback: sem timestamp de referência, nega o acesso temporário
+      // Sem data de envio: nega o acesso temporário por segurança
       acessoProTemp = false;
     }
   }
@@ -851,11 +852,13 @@ async function VerNewsletterComToken() {
         return;
       }
 
-      // Normaliza para o mesmo formato usado no restante do fluxo
+      // Normaliza para o mesmo formato usado no restante do fluxo.
+      // criado_em é a data de envio real — usada para calcular a janela de acesso pro temporário.
       envio = {
-        token_acesso: leRow.token_acesso,
-        expira_em: leRow.expira_em,
+        token_acesso:  leRow.token_acesso,
+        expira_em:     leRow.expira_em,
         acessos_totais: novoTotal,
+        criado_em:     leRow.criado_em || leRow.data_envio || null,
       };
     }
 
