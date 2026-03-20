@@ -562,7 +562,8 @@
     <button id="botaoEnvioNewsletterLeads">📮Enviar Newsletter</button>
     <button onclick="abrirTab('alertas-push')">🔔 Enviar Alertas Push</button>
     <button onclick="abrirModalVerificarLotes(event)">📮 Verificar lotes pendentes - atualizar status</button>
-    <button onclick="recalcularContadores()" title="Recalcula os contadores de solicitações, feedbacks e parcelas vencidas">🔄 Recalcular contadores</button>
+    <button onclick="recalcularContadores()"
+      title="Recalcula os contadores de solicitações, feedbacks e parcelas vencidas">🔄 Recalcular contadores</button>
     <button onclick="abrirPainelGestao()">🗞️ Painel</button>
 
     <div style="margin-top:12px">
@@ -624,7 +625,13 @@
 
         <!-- Campo "Tamanho do lote" -->
         <label for="tamanho-lote"><strong>Tamanho do lote:</strong></label>
-        <input type="number" id="tamanho-lote" value="100" min="1" max="200" style="width: 80px;" title="Máx. recomendado: 100" />
+        <input type="number" id="tamanho-lote" value="100" min="1" max="200" style="width: 80px;"
+          title="Máx. recomendado: 100" />
+
+        <!-- Token admin para envio via SES -->
+        <label for="campo-admin-token"><strong>🔑 Token admin:</strong></label>
+        <input type="password" id="campo-admin-token" placeholder="x-admin-token" style="width:180px"
+          oninput="sessionStorage.setItem('rs_admin_token', this.value)" />
 
         <!-- Info da newsletter -->
         <div id="dados-newsletter-selecionada" class="info-box"
@@ -837,15 +844,33 @@
           <label for="filtro-uf-lead">UF:</label>
           <select id="filtro-uf-lead">
             <option value="">Todas as UFs</option>
-            <option value="AC">AC</option><option value="AL">AL</option><option value="AP">AP</option>
-            <option value="AM">AM</option><option value="BA">BA</option><option value="CE">CE</option>
-            <option value="DF">DF</option><option value="ES">ES</option><option value="GO">GO</option>
-            <option value="MA">MA</option><option value="MT">MT</option><option value="MS">MS</option>
-            <option value="MG">MG</option><option value="PA">PA</option><option value="PB">PB</option>
-            <option value="PR">PR</option><option value="PE">PE</option><option value="PI">PI</option>
-            <option value="RJ">RJ</option><option value="RN">RN</option><option value="RS">RS</option>
-            <option value="RO">RO</option><option value="RR">RR</option><option value="SC">SC</option>
-            <option value="SP">SP</option><option value="SE">SE</option><option value="TO">TO</option>
+            <option value="AC">AC</option>
+            <option value="AL">AL</option>
+            <option value="AP">AP</option>
+            <option value="AM">AM</option>
+            <option value="BA">BA</option>
+            <option value="CE">CE</option>
+            <option value="DF">DF</option>
+            <option value="ES">ES</option>
+            <option value="GO">GO</option>
+            <option value="MA">MA</option>
+            <option value="MT">MT</option>
+            <option value="MS">MS</option>
+            <option value="MG">MG</option>
+            <option value="PA">PA</option>
+            <option value="PB">PB</option>
+            <option value="PR">PR</option>
+            <option value="PE">PE</option>
+            <option value="PI">PI</option>
+            <option value="RJ">RJ</option>
+            <option value="RN">RN</option>
+            <option value="RS">RS</option>
+            <option value="RO">RO</option>
+            <option value="RR">RR</option>
+            <option value="SC">SC</option>
+            <option value="SP">SP</option>
+            <option value="SE">SE</option>
+            <option value="TO">TO</option>
           </select>
 
           <label for="filtro-status-envio-lead">Envio da edição:</label>
@@ -856,7 +881,9 @@
             <option value="erro">Com erro</option>
           </select>
 
-          <button onclick="buscarLeadsFiltrados()" style="background:#007acc;color:#fff;padding:8px 14px;border:none;border-radius:4px;cursor:pointer;font-weight:600">🔎 Buscar Leads</button>
+          <button onclick="buscarLeadsFiltrados()"
+            style="background:#007acc;color:#fff;padding:8px 14px;border:none;border-radius:4px;cursor:pointer;font-weight:600">🔎
+            Buscar Leads</button>
         </div>
 
         <!-- Contador de resultados -->
@@ -907,15 +934,33 @@
           <label for="filtro-uf-usuario">UF:</label>
           <select id="filtro-uf-usuario">
             <option value="">Todas as UFs</option>
-            <option value="AC">AC</option><option value="AL">AL</option><option value="AP">AP</option>
-            <option value="AM">AM</option><option value="BA">BA</option><option value="CE">CE</option>
-            <option value="DF">DF</option><option value="ES">ES</option><option value="GO">GO</option>
-            <option value="MA">MA</option><option value="MT">MT</option><option value="MS">MS</option>
-            <option value="MG">MG</option><option value="PA">PA</option><option value="PB">PB</option>
-            <option value="PR">PR</option><option value="PE">PE</option><option value="PI">PI</option>
-            <option value="RJ">RJ</option><option value="RN">RN</option><option value="RS">RS</option>
-            <option value="RO">RO</option><option value="RR">RR</option><option value="SC">SC</option>
-            <option value="SP">SP</option><option value="SE">SE</option><option value="TO">TO</option>
+            <option value="AC">AC</option>
+            <option value="AL">AL</option>
+            <option value="AP">AP</option>
+            <option value="AM">AM</option>
+            <option value="BA">BA</option>
+            <option value="CE">CE</option>
+            <option value="DF">DF</option>
+            <option value="ES">ES</option>
+            <option value="GO">GO</option>
+            <option value="MA">MA</option>
+            <option value="MT">MT</option>
+            <option value="MS">MS</option>
+            <option value="MG">MG</option>
+            <option value="PA">PA</option>
+            <option value="PB">PB</option>
+            <option value="PR">PR</option>
+            <option value="PE">PE</option>
+            <option value="PI">PI</option>
+            <option value="RJ">RJ</option>
+            <option value="RN">RN</option>
+            <option value="RS">RS</option>
+            <option value="RO">RO</option>
+            <option value="RR">RR</option>
+            <option value="SC">SC</option>
+            <option value="SP">SP</option>
+            <option value="SE">SE</option>
+            <option value="TO">TO</option>
           </select>
 
           <label for="filtro-status-envio-usuario">Envio da edição:</label>
@@ -926,7 +971,9 @@
             <option value="erro">Com erro</option>
           </select>
 
-          <button onclick="filtrarUsuariosEnvio()" style="background:#007acc;color:#fff;padding:8px 14px;border:none;border-radius:4px;cursor:pointer;font-weight:600">🔎 Buscar Usuários</button>
+          <button onclick="filtrarUsuariosEnvio()"
+            style="background:#007acc;color:#fff;padding:8px 14px;border:none;border-radius:4px;cursor:pointer;font-weight:600">🔎
+            Buscar Usuários</button>
         </div>
 
         <!-- Ações -->
@@ -1121,8 +1168,7 @@
         </div>
 
         <!-- Área de log de progresso do envio -->
-        <div id="area-log-envio"
-          style="margin-top:12px; background:#1e1e1e; color:#d4d4d4; font-family:monospace;
+        <div id="area-log-envio" style="margin-top:12px; background:#1e1e1e; color:#d4d4d4; font-family:monospace;
                  font-size:12px; padding:10px 14px; border-radius:6px;
                  max-height:160px; overflow-y:auto; display:flex; flex-direction:column;
                  gap:2px; min-height:40px;">
@@ -1949,18 +1995,14 @@
             <label style="font-size:12px;font-weight:600;color:#475569;display:block;margin-bottom:6px">
               ✍️ Resposta:
             </label>
-            <textarea id="resposta-lead-txt" rows="3"
-              style="width:100%;padding:8px;border:1px solid #cbd5e1;border-radius:6px;
-                     font-size:13px;resize:vertical"
-              placeholder="Digite a resposta…" maxlength="500"></textarea>
+            <textarea id="resposta-lead-txt" rows="3" style="width:100%;padding:8px;border:1px solid #cbd5e1;border-radius:6px;
+                     font-size:13px;resize:vertical" placeholder="Digite a resposta…" maxlength="500"></textarea>
             <div style="display:flex;gap:8px;margin-top:8px">
-              <button onclick="enviarRespostaLeadMensagem()"
-                style="padding:8px 18px;background:#0A3D62;color:#fff;border:none;
+              <button onclick="enviarRespostaLeadMensagem()" style="padding:8px 18px;background:#0A3D62;color:#fff;border:none;
                        border-radius:6px;font-size:13px;font-weight:600;cursor:pointer">
                 ✅ Enviar resposta
               </button>
-              <button onclick="document.getElementById('form-resposta-lead').style.display='none'"
-                style="padding:8px 14px;background:#f1f5f9;color:#475569;border:none;
+              <button onclick="document.getElementById('form-resposta-lead').style.display='none'" style="padding:8px 14px;background:#f1f5f9;color:#475569;border:none;
                        border-radius:6px;font-size:13px;cursor:pointer">
                 Cancelar
               </button>
@@ -1972,7 +2014,9 @@
       <!-- Mantém modais legados ocultos para compatibilidade com funções existentes -->
       <div id="modal-contato-lead" style="display:none"></div>
       <div id="modal-historico-lead" style="display:none">
-        <div><div id="conteudo-historico-lead"></div></div>
+        <div>
+          <div id="conteudo-historico-lead"></div>
+        </div>
       </div>
       <div id="modal-vincular-lead" style="
         display:none;
@@ -2198,7 +2242,7 @@
 
     <!-- ── SEÇÃO: ALERTAS PUSH ──────────────────────────────────── -->
     <section id="alertas-push" class="card" style="display:none">
-      <!-- preenchido inteiramente por carregarSecaoAlertasPush() em alertas_push.js -->    
+      <!-- preenchido inteiramente por carregarSecaoAlertasPush() em alertas_push.js -->
     </section>
 
     <!-- ── SEÇÃO: FEEDBACKS ───────────────────────────────────────── -->
