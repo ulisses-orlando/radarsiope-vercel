@@ -624,7 +624,7 @@
 
         <!-- Campo "Tamanho do lote" -->
         <label for="tamanho-lote"><strong>Tamanho do lote:</strong></label>
-        <input type="number" id="tamanho-lote" value="50" min="1" style="width: 80px;" />
+        <input type="number" id="tamanho-lote" value="100" min="1" max="200" style="width: 80px;" title="Máx. recomendado: 100" />
 
         <!-- Info da newsletter -->
         <div id="dados-newsletter-selecionada" class="info-box"
@@ -829,16 +829,41 @@
             <option value="Descartado">Descartado</option>
           </select>
 
-          <label for="filtro-tipo-news-envio">Preferência:</label>
+          <label for="filtro-tipo-news-envio">Interesse:</label>
           <select id="filtro-tipo-news-envio">
-            <option value="">Todos os tipos</option>
+            <option value="">Todos os interesses</option>
           </select>
 
-          <button onclick="filtrarLeadsEnvio()">🔎 Aplicar Filtros</button>
+          <label for="filtro-uf-lead">UF:</label>
+          <select id="filtro-uf-lead">
+            <option value="">Todas as UFs</option>
+            <option value="AC">AC</option><option value="AL">AL</option><option value="AP">AP</option>
+            <option value="AM">AM</option><option value="BA">BA</option><option value="CE">CE</option>
+            <option value="DF">DF</option><option value="ES">ES</option><option value="GO">GO</option>
+            <option value="MA">MA</option><option value="MT">MT</option><option value="MS">MS</option>
+            <option value="MG">MG</option><option value="PA">PA</option><option value="PB">PB</option>
+            <option value="PR">PR</option><option value="PE">PE</option><option value="PI">PI</option>
+            <option value="RJ">RJ</option><option value="RN">RN</option><option value="RS">RS</option>
+            <option value="RO">RO</option><option value="RR">RR</option><option value="SC">SC</option>
+            <option value="SP">SP</option><option value="SE">SE</option><option value="TO">TO</option>
+          </select>
+
+          <label for="filtro-status-envio-lead">Envio da edição:</label>
+          <select id="filtro-status-envio-lead">
+            <option value="nao-enviado">Não enviado (padrão)</option>
+            <option value="">Todos</option>
+            <option value="enviado">Já enviado</option>
+            <option value="erro">Com erro</option>
+          </select>
+
+          <button onclick="buscarLeadsFiltrados()" style="background:#007acc;color:#fff;padding:8px 14px;border:none;border-radius:4px;cursor:pointer;font-weight:600">🔎 Buscar Leads</button>
         </div>
 
+        <!-- Contador de resultados -->
+        <div id="contador-leads-buscados" style="font-size:13px;color:#555;margin:6px 0;min-height:18px"></div>
+
         <!-- Ações -->
-        <div style="margin-top: 20px">
+        <div style="margin-top: 10px; display:flex; gap:8px; flex-wrap:wrap;">
           <button onclick="gerarPreviaEnvio()">📬 Gerar Prévia</button>
           <button onclick="mostrarAba('secao-newsletters-envio')">⬅️ Voltar para Newsletters</button>
         </div>
@@ -851,8 +876,9 @@
               <th>Nome</th>
               <th>Email</th>
               <th>Perfil</th>
-              <th>Preferências</th>
+              <th>Interesses</th>
               <th>Status</th>
+              <th>Envio</th>
             </tr>
           </thead>
           <tbody>
@@ -878,11 +904,33 @@
             <option value="cancelada">Cancelada</option>
           </select>
 
-          <button onclick="filtrarUsuariosEnvio()">🔎 Aplicar Filtros</button>
+          <label for="filtro-uf-usuario">UF:</label>
+          <select id="filtro-uf-usuario">
+            <option value="">Todas as UFs</option>
+            <option value="AC">AC</option><option value="AL">AL</option><option value="AP">AP</option>
+            <option value="AM">AM</option><option value="BA">BA</option><option value="CE">CE</option>
+            <option value="DF">DF</option><option value="ES">ES</option><option value="GO">GO</option>
+            <option value="MA">MA</option><option value="MT">MT</option><option value="MS">MS</option>
+            <option value="MG">MG</option><option value="PA">PA</option><option value="PB">PB</option>
+            <option value="PR">PR</option><option value="PE">PE</option><option value="PI">PI</option>
+            <option value="RJ">RJ</option><option value="RN">RN</option><option value="RS">RS</option>
+            <option value="RO">RO</option><option value="RR">RR</option><option value="SC">SC</option>
+            <option value="SP">SP</option><option value="SE">SE</option><option value="TO">TO</option>
+          </select>
+
+          <label for="filtro-status-envio-usuario">Envio da edição:</label>
+          <select id="filtro-status-envio-usuario">
+            <option value="nao-enviado">Não enviado (padrão)</option>
+            <option value="">Todos</option>
+            <option value="enviado">Já enviado</option>
+            <option value="erro">Com erro</option>
+          </select>
+
+          <button onclick="filtrarUsuariosEnvio()" style="background:#007acc;color:#fff;padding:8px 14px;border:none;border-radius:4px;cursor:pointer;font-weight:600">🔎 Buscar Usuários</button>
         </div>
 
         <!-- Ações -->
-        <div style="margin-top: 20px">
+        <div style="margin-top: 10px; display:flex; gap:8px; flex-wrap:wrap;">
           <button onclick="gerarPreviaEnvioUsuarios()">📬 Gerar Prévia</button>
           <button onclick="mostrarAba('secao-newsletters-envio')">⬅️ Voltar para Newsletters</button>
         </div>
@@ -896,7 +944,7 @@
               <th>Perfil</th>
               <th>Email</th>
               <th>Assinatura</th>
-              <th>Pagamentos em dia?</th> <!-- 🔹 nova coluna -->
+              <th>Envio</th>
             </tr>
           </thead>
           <tbody>
@@ -1068,10 +1116,17 @@
       <section id="secao-lotes-envio" style="display:none; margin-top:30px">
         <h2>📦 Lotes de Envio</h2>
 
-        <div style="margin-top: 20px">
-          <!-- Botão principal de envio -->
-          <!-- <button onclick="enviarLotes()">🚀 Enviar Newsletter</button> -->
+        <div style="margin-top: 20px; display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
           <button onclick="voltarParaPrevia()">⬅️ Voltar para prévia</button>
+        </div>
+
+        <!-- Área de log de progresso do envio -->
+        <div id="area-log-envio"
+          style="margin-top:12px; background:#1e1e1e; color:#d4d4d4; font-family:monospace;
+                 font-size:12px; padding:10px 14px; border-radius:6px;
+                 max-height:160px; overflow-y:auto; display:flex; flex-direction:column;
+                 gap:2px; min-height:40px;">
+          <span style="color:#666;font-style:italic">Aguardando envio...</span>
         </div>
 
         <!-- Tabela de lotes -->
