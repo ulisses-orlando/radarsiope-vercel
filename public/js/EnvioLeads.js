@@ -324,19 +324,20 @@ async function buscarLeadsFiltrados() {
         if (tipoNews)  query = query.contains('interesses', [tipoNews]);
 
         // Filtro por IDs de envio (quando status de envio foi selecionado)
-        if (statusEnvio === 'enviado' && idsEnviados?.size > 0) {
+        if (statusEnvio === 'enviado') {
+            if (!idsEnviados || idsEnviados.size === 0) {
+                corpo.innerHTML = "<tr><td colspan='7'>Nenhum lead recebeu esta newsletter ainda.</td></tr>";
+                return;
+            }
             query = query.in('id', [...idsEnviados]);
-        } else if (statusEnvio === 'erro' && idsErro?.size > 0) {
+        } else if (statusEnvio === 'erro') {
+            if (!idsErro || idsErro.size === 0) {
+                corpo.innerHTML = "<tr><td colspan='7'>Nenhum lead com erro de envio para esta newsletter.</td></tr>";
+                return;
+            }
             query = query.in('id', [...idsErro]);
-        } else if (statusEnvio === 'nao-enviado' && idsNaoEnviados?.size > 0) {
-            query = query.not('id', 'in', `(${[...idsNaoEnviados].join(',')})`);
-        } else if (statusEnvio === 'enviado' && idsEnviados?.size === 0) {
-            corpo.innerHTML = "<tr><td colspan='7'>Nenhum lead recebeu esta newsletter ainda.</td></tr>";
-            return;
-        } else if (statusEnvio === 'erro' && idsErro?.size === 0) {
-            corpo.innerHTML = "<tr><td colspan='7'>Nenhum lead com erro de envio para esta newsletter.</td></tr>";
-            return;
         }
+        // 'nao-enviado': busca normalmente e filtra depois com o mapaStatusEnvio
 
         const { data: leads, error } = await query;
 
@@ -363,9 +364,19 @@ async function buscarLeadsFiltrados() {
         const mapaStatusEnvio = {};
         (enviosLeads || []).forEach(r => { mapaStatusEnvio[String(r.lead_id)] = r.status; });
 
+        // ── Etapa 4: filtro "não enviado" aplicado no resultado (evita .not() do Supabase)
+        const leadsFiltrados = (statusEnvio === 'nao-enviado')
+            ? leads.filter(l => !mapaStatusEnvio[String(l.id)])
+            : leads;
+
+        if (leadsFiltrados.length === 0) {
+            corpo.innerHTML = "<tr><td colspan='7'>Nenhum lead encontrado sem envio para esta newsletter com os filtros aplicados.</td></tr>";
+            return;
+        }
+
         // ── Etapa 4: renderizar tabela ────────────────────────────────────────────
         let linhas = '';
-        for (const lead of leads) {
+        for (const lead of leadsFiltrados) {
             const interesses = Array.isArray(lead.interesses) ? lead.interesses.join(', ') : '-';
             const statusEnvioLead = mapaStatusEnvio[String(lead.id)] || 'nao-enviado';
             const badgeEnvio = statusEnvioLead === 'enviado'
@@ -388,14 +399,14 @@ async function buscarLeadsFiltrados() {
 
         corpo.innerHTML = linhas;
 
-        const aviso = leads.length >= LIMITE_BUSCA_LEADS
+        const aviso = leadsFiltrados.length >= LIMITE_BUSCA_LEADS
             ? `<div style="color:#92400e;padding:8px;background:#fef3c7;border-radius:4px;margin-top:8px">
                 ⚠️ Exibindo ${LIMITE_BUSCA_LEADS} resultados (limite atingido). Refine os filtros para ver mais.
                </div>`
             : '';
 
         const contador = document.getElementById('contador-leads-buscados');
-        if (contador) counter.textContent = `${leads.length} lead(s) encontrado(s)`;
+        if (contador) contador.textContent = `${leadsFiltrados.length} lead(s) encontrado(s)`;
 
         if (aviso) {
             const tabelaWrap = document.querySelector('#secao-envio-leads');
