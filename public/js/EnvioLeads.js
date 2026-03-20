@@ -1,2370 +1,1397 @@
-let tipoDestinatarioSelecionado = null;
-window.tipoDestinatarioSelecionado = tipoDestinatarioSelecionado; // para acesso global
+/* ==========================================================================
+   EnvioLeads.js — Radar SIOPE · Admin
+   Gerencia o fluxo completo de envio de newsletters:
+     1. Seleção da newsletter
+     2. Busca filtrada de leads/assinantes (server-side, sem carregar tudo)
+     3. Prévia com verificação de envio anterior (query única)
+     4. Geração de lotes
+     5. Envio em massa via sendBatchViaSES.js
+     6. Reenvio individual (somente 1 destinatário selecionado)
 
-let leadsFiltraveis = [];
-window.leadsFiltraveis = leadsFiltraveis; // para acesso global
+   Dependências globais (functions.js / main.js):
+     gerarTokenAcesso()
+     preencherFiltroTipoNewsletter(selectEl)
+     formatDateBR(date)
+     mostrarMensagem(msg)
+     aplicarPlaceholders(html, dados)
+   ========================================================================== */
 
-let envioSelecionadoId = null;
-window.envioSelecionadoId = envioSelecionadoId;
+'use strict';
 
-// Adicione isto no topo ou antes da função de listagem
+// ─── Estado global do módulo ──────────────────────────────────────────────────
+
+window.newsletterSelecionada   = null;
+window.tipoDestinatarioSelecionado = null;
+
+let _envioEmAndamento = false; // guard anti-duplo-clique
+
+// ─── Mapa de nomes dos tipos (cache por sessão) ───────────────────────────────
+
+let _mapaNomesTiposCache = null;
+
 async function obterMapaNomesTipos() {
+    if (_mapaNomesTiposCache) return _mapaNomesTiposCache;
     const mapa = {};
-    const snap = await db.collection("tipo_newsletters").get();
-    snap.forEach(doc => {
-        mapa[doc.id] = doc.data().nome;
-    });
+    const snap = await db.collection('tipo_newsletters').get();
+    snap.forEach(doc => { mapa[doc.id] = doc.data().nome; });
+    _mapaNomesTiposCache = mapa;
     return mapa;
 }
 
-async function listarLeadsComPreferencias() {
-    const corpo = document.querySelector("#tabela-leads-envio tbody");
-    corpo.innerHTML = "<tr><td colspan='6'>Carregando leads...</td></tr>";
+// ─── Helpers de UI ────────────────────────────────────────────────────────────
 
-    const { data: leads, error } = await window.supabase
-        .from("leads")
-        .select("*");
-
-    if (error) {
-        console.error("Erro ao buscar leads:", error);
-        corpo.innerHTML = "<tr><td colspan='6'>Erro ao carregar leads.</td></tr>";
-        return;
-    }
-
-    let linhas = "";
-    leadsFiltraveis = [];
-
-    for (const lead of leads) {
-        const leadId = lead.id;
-
-        if (!["Novo", "Em contato"].includes(lead.status)) continue;
-
-        const interesses = Array.isArray(lead.interesses)
-            ? lead.interesses.join(", ")
-            : "-";
-
-        leadsFiltraveis.push({
-            id: leadId,
-            nome: lead.nome || "",
-            email: lead.email || "",
-            perfil: lead.perfil || "",
-            interesses: Array.isArray(lead.interesses) ? lead.interesses : [],
-            status: lead.status || ""
-        });
-
-        linhas += `
-      <tr data-lead-id="${leadId}">
-        <td><input type="checkbox" class="chk-lead-envio" checked /></td>
-        <td>${lead.nome || ""}</td>
-        <td>${lead.email || ""}</td>
-        <td>${lead.perfil || ""}</td>
-        <td>${interesses}</td>
-        <td>${lead.status || ""}</td>
-      </tr>
-    `;
-    }
-
-    corpo.innerHTML =
-        linhas || "<tr><td colspan='6'>Nenhum lead disponível.</td></tr>";
+function _setBtnEnviando(btn, sim) {
+    if (!btn) return;
+    btn.disabled = sim;
+    btn.dataset.textoOriginal = btn.dataset.textoOriginal || btn.textContent;
+    btn.textContent = sim ? '⏳ Aguarde...' : btn.dataset.textoOriginal;
 }
 
-
-function renderizarTabelaLeads(lista) {
-    const corpo = document.querySelector("#tabela-leads-envio tbody");
-    corpo.innerHTML = "";
-
-    if (!lista || lista.length === 0) {
-        corpo.innerHTML = "<tr><td colspan='6'>Nenhum lead encontrado com os filtros aplicados.</td></tr>";
-        return;
-    }
-
-    for (const lead of lista) {
-        const interesses = Array.isArray(lead.interesses)
-            ? lead.interesses.join(", ")
-            : (lead.interesses || "-");
-
-        const linha = document.createElement("tr");
-        linha.dataset.leadId = lead.id;
-
-        linha.innerHTML = `
-      <td><input type="checkbox" class="chk-lead-envio" checked /></td>
-      <td>${lead.nome || ""}</td>
-      <td>${lead.email || ""}</td>
-      <td>${lead.perfil || ""}</td>
-      <td>${interesses}</td>
-      <td>${lead.status || ""}</td>
-    `;
-
-        corpo.appendChild(linha);
-    }
+/** Atualiza a área de log de progresso sem sobrescrever as linhas anteriores */
+function _logProgresso(msg, tipo = 'info') {
+    const area = document.getElementById('area-log-envio');
+    if (!area) { mostrarMensagem(msg); return; }
+    const cores = { info: '#555', ok: '#166534', erro: '#991b1b', aviso: '#92400e' };
+    const linha = document.createElement('div');
+    linha.style.cssText = `color:${cores[tipo] || '#555'};padding:2px 0;font-size:13px`;
+    linha.textContent = `[${new Date().toLocaleTimeString('pt-BR')}] ${msg}`;
+    area.appendChild(linha);
+    area.scrollTop = area.scrollHeight;
 }
 
-function filtrarLeadsEnvio() {
-    const nomeFiltro = document.getElementById("filtro-nome").value.trim().toLowerCase();
-    const emailFiltro = document.getElementById("filtro-email").value.trim().toLowerCase();
-    const perfilFiltro = document.getElementById("filtro-perfil").value.trim().toLowerCase();
-    const preferenciasFiltro = document.getElementById("filtro-tipo-news-envio").value.trim().toLowerCase();
-    const statusFiltro = document.getElementById("filtro-status-lead").value.trim().toLowerCase();
-
-    const filtrados = leadsFiltraveis.filter(lead => {
-        const nome = (lead.nome || "").trim().toLowerCase();
-        const email = (lead.email || "").trim().toLowerCase();
-        const perfil = (lead.perfil || "").trim().toLowerCase();
-        const status = (lead.status || "").trim().toLowerCase();
-
-        const interesses = Array.isArray(lead.interesses)
-            ? lead.interesses.map(i => i.trim().toLowerCase())
-            : (lead.interesses || "").split(",").map(i => i.trim().toLowerCase());
-
-        const nomeOk = !nomeFiltro || nome.includes(nomeFiltro);
-        const emailOk = !emailFiltro || email.includes(emailFiltro);
-        const perfilOk = !perfilFiltro || perfil === perfilFiltro;
-        const preferenciasOk = !preferenciasFiltro || interesses.includes(preferenciasFiltro);
-        const statusOk = !statusFiltro || status === statusFiltro;
-
-        return nomeOk && emailOk && perfilOk && preferenciasOk && statusOk;
-    });
-
-    renderizarTabelaLeads(filtrados);
+function _limparLogProgresso() {
+    const area = document.getElementById('area-log-envio');
+    if (area) area.innerHTML = '';
 }
 
-document.addEventListener("DOMContentLoaded", () => {
-    const botao = document.querySelector("#botaoEnvioNewsletterLeads");
-    if (botao) {
-        botao.addEventListener("click", abrirEnvioNewsletterLeads);
-    }
-});
-
-function abrirEnvioNewsletterLeads() {
-    // Oculta todas as seções
-    document.querySelectorAll("section").forEach(sec => sec.style.display = "none");
-
-    // Exibe a seção principal de envio de newsletters
-    document.getElementById("secao-envio-newsletters").style.display = "block";
-
-    // Exibe a aba inicial
-    mostrarAba("secao-newsletters-envio");
-    document.querySelectorAll("#dados-newsletter-selecionada").forEach(div => {
-        div.innerHTML = 'A newsletter selecionada aparecerá aqui ...';
-    });
-    // Carrega os dados
-    //listarLeadsComPreferencias();
-    listarNewslettersDisponiveis();
-}
+// ─── Dados da newsletter selecionada ─────────────────────────────────────────
 
 async function mostrarDadosNewsletterSelecionada() {
-    if (!newsletterSelecionada) {
-        document.querySelectorAll("#dados-newsletter-selecionada").forEach(div => div.innerHTML = "");
+    const divs = document.querySelectorAll('#dados-newsletter-selecionada');
+    if (!window.newsletterSelecionada) {
+        divs.forEach(d => { d.innerHTML = 'A newsletter selecionada aparecerá aqui...'; });
         return;
     }
-
-    // 1. Carrega o mapa de nomes (ID -> Nome)
-    // Se já tiver esta variável global de outra função, pode reutilizar
-    const mapaNomesTipos = await obterMapaNomesTipos();
-
-    // 2. Busca o nome usando o ID que está em .tipo
-    const nomeTipo = mapaNomesTipos[newsletterSelecionada.tipo] || newsletterSelecionada.tipo || "-";
-
+    const mapa = await obterMapaNomesTipos();
+    const nomeTipo = mapa[window.newsletterSelecionada.tipo] || window.newsletterSelecionada.tipo || '-';
     const html = `
-        <strong>📰 Newsletter Selecionada: </strong>
-        <b>Título: </b> ${newsletterSelecionada.titulo || "-"}
-        <b>Tipo: </b> <span style="color: #007acc;">${nomeTipo}</span>
-        <b>Edição: </b> ${newsletterSelecionada.edicao || "-"}
-        <b>Data: </b> ${formatDateBR(newsletterSelecionada.data_publicacao?.toDate?.()) || "-"}
+        <strong>📰 Newsletter Selecionada:</strong>
+        <b>Título:</b> ${window.newsletterSelecionada.titulo || '-'} &nbsp;
+        <b>Tipo:</b> <span style="color:#007acc">${nomeTipo}</span> &nbsp;
+        <b>Edição:</b> ${window.newsletterSelecionada.edicao || '-'} &nbsp;
+        <b>Data:</b> ${formatDateBR(window.newsletterSelecionada.data_publicacao?.toDate?.()) || '-'}
     `;
+    divs.forEach(d => { d.innerHTML = html; });
+}
 
-    document.querySelectorAll("#dados-newsletter-selecionada").forEach(div => {
-        div.innerHTML = html;
+// ─── Abrir módulo de envio ────────────────────────────────────────────────────
+
+function abrirEnvioNewsletterLeads() {
+    document.querySelectorAll('section').forEach(s => { s.style.display = 'none'; });
+    document.getElementById('secao-envio-newsletters').style.display = 'block';
+    mostrarAba('secao-newsletters-envio');
+    document.querySelectorAll('#dados-newsletter-selecionada').forEach(d => {
+        d.innerHTML = 'A newsletter selecionada aparecerá aqui...';
     });
+    listarNewslettersDisponiveis();
 }
+window.abrirEnvioNewsletterLeads = abrirEnvioNewsletterLeads;
 
-async function visualizarNewsletterHtml(newsletterId) {
-    const snap = await db.collection("newsletters").doc(newsletterId).get();
-    if (!snap.exists) return mostrarMensagem("Newsletter não encontrada.");
-
-    const dados = snap.data();
-
-    // ✅ Determina o segmento com base no seletor
-    let segmento = null;
-    if (window.tipoDestinatarioSelecionado === "leads") segmento = "leads";
-    if (window.tipoDestinatarioSelecionado === "usuarios") segmento = "assinantes";
-
-    // ✅ HTML base da edição
-    let htmlBase = dados.html_conteudo || "";
-
-    // ✅ Blocos da edição
-    const blocos = dados.blocos || [];
-
-    let htmlBlocos = "";
-
-    // ✅ Monta blocos filtrados pelo segmento
-    blocos.forEach(b => {
-        if (segmento && b.acesso !== "todos" && b.acesso !== segmento) return;
-        htmlBlocos += b.html || "";
-    });
-
-    let htmlFinal = "";
-
-    if (blocos.length === 0) {
-        // ✅ Sem blocos → usa só o HTML base
-        htmlFinal = htmlBase;
-    } else {
-        // ✅ Com blocos → insere no {{blocos}} ou no final
-        if (htmlBase.includes("{{blocos}}")) {
-            htmlFinal = htmlBase.replace("{{blocos}}", htmlBlocos);
-        } else {
-            htmlFinal = htmlBase + "\n" + htmlBlocos;
-        }
-    }
-
-    // ✅ Aplica placeholders usando os dados da newsletter
-    htmlFinal = aplicarPlaceholders(htmlFinal, dados);
-
-    // ✅ Exibe no modal
-    const modal = document.getElementById("modal-preview-html");
-    const content = document.getElementById("preview-html-content");
-    content.innerHTML = htmlFinal;
-    modal.style.display = "flex";
-}
-
-
-function selecionarTodosEnvios(chk) {
-    const todos = document.querySelectorAll(".chk-envio-final");
-    todos.forEach(c => c.checked = chk.checked);
-}
-
-async function carregarRelatorioEnvios() {
-    const emailFiltro = document.getElementById("filtro-relatorio-email").value.trim().toLowerCase();
-    const corpo = document.querySelector("#tabela-relatorio-envios tbody");
-    corpo.innerHTML = "<tr><td colspan='5'>Carregando envios...</td></tr>";
-
-    const leadsSnap = await db.collection("leads").get();
-    let linhas = "";
-
-    for (const leadDoc of leadsSnap.docs) {
-        const lead = leadDoc.data();
-        const leadId = leadDoc.id;
-        const email = (lead.email || "").toLowerCase();
-
-        if (emailFiltro && !email.includes(emailFiltro)) continue;
-
-        const enviosSnap = await db.collection("leads").doc(leadId).collection("envios").orderBy("data_envio", "desc").get();
-
-        for (const envioDoc of enviosSnap.docs) {
-            const envio = envioDoc.data();
-            const nlSnap = await db.collection("newsletters").doc(envio.newsletter_id).get();
-            const newsletter = nlSnap.exists ? nlSnap.data() : {};
-
-            const data = envio.data_envio?.toDate?.() || envio.data_envio;
-            const dataFormatada = data ? formatDateBR(data) : "-";
-
-            linhas += `
-        <tr>
-          <td>${lead.nome || ""}</td>
-          <td>${lead.email || ""}</td>
-          <td>${newsletter.titulo || "(sem título)"}</td>
-          <td>${dataFormatada}</td>
-          <td>${envio.status || "enviado"}</td>
-        </tr>
-      `;
-        }
-    }
-
-    corpo.innerHTML = linhas || "<tr><td colspan='5'>Nenhum envio encontrado.</td></tr>";
-}
+// ─── Controle de abas ─────────────────────────────────────────────────────────
 
 function mostrarAba(id) {
-    preencherFiltroTipoNewsletter(document.getElementById("filtro-tipo-news-envio"));
+    preencherFiltroTipoNewsletter(document.getElementById('filtro-tipo-news-envio'));
 
     const todas = [
-        "secao-newsletters-envio",
-        "secao-envio-leads",
-        "secao-envio-usuarios",
-        "secao-preview-envio",
-        "secao-lotes-envio",
-        "secao-relatorio-envios",
-        "secao-descadastramentos",
-        "secao-todos-os-lotes",
-        "secao-orientacoes"
+        'secao-newsletters-envio', 'secao-envio-leads', 'secao-envio-usuarios',
+        'secao-preview-envio', 'secao-lotes-envio', 'secao-relatorio-envios',
+        'secao-descadastramentos', 'secao-todos-os-lotes', 'secao-orientacoes',
+        'secao-historico-reenvios'
     ];
-
     todas.forEach(sec => {
         const el = document.getElementById(sec);
-        if (!el) {
-            console.warn("⚠️ Seção não encontrada no DOM:", sec);
-            return;
-        }
-        el.style.display = sec === id ? "block" : "none";
+        if (el) el.style.display = sec === id ? 'block' : 'none';
+        else console.warn('⚠️ Seção não encontrada:', sec);
     });
 
-    if (id === "secao-newsletters-envio") {
-        document.querySelectorAll("#dados-newsletter-selecionada").forEach(div => {
-            div.innerHTML = 'A newsletter selecionada aparecerá aqui ...';
+    if (id === 'secao-newsletters-envio') {
+        document.querySelectorAll('#dados-newsletter-selecionada').forEach(d => {
+            d.innerHTML = 'A newsletter selecionada aparecerá aqui...';
         });
     } else {
         mostrarDadosNewsletterSelecionada();
     }
 }
-window.mostrarAba = mostrarAba; // para acesso global
+window.mostrarAba = mostrarAba;
 
-window.newsletterSelecionada = null;
+// ─── Tipo de destinatário ─────────────────────────────────────────────────────
 
-async function prepararEnvioParaLeads(newsletterId) {
-    const snap = await db.collection("newsletters").doc(newsletterId).get();
-    if (!snap.exists) {
-        mostrarMensagem("Newsletter não encontrada.");
-        return;
-    }
-
-    newsletterSelecionada = snap.data();
-    newsletterSelecionada.id = newsletterId;
-
-    // Esconde a tabela de destinatários
-    const tabelaDest = document.querySelector("#tabela-preview-envio-destinatario");
-    if (tabelaDest) {
-        tabelaDest.style.display = "none";
-    }
-
-    // Mostra a tabela de prévia
-    const tabelaPrevio = document.querySelector("#tabela-preview-envio");
-    if (tabelaPrevio) {
-        tabelaPrevio.style.display = "table";
-    }
-
-    await listarLeadsComPreferencias(); // carrega os dados
-    await gerarPreviaEnvio();           // monta a prévia
+function alterarTipoDestinatario(tipo) {
+    window.tipoDestinatarioSelecionado = tipo || null;
+    const botoes = document.querySelectorAll('.btn-preparar-envio');
+    botoes.forEach(btn => { btn.disabled = !tipo; });
 }
+window.alterarTipoDestinatario = alterarTipoDestinatario;
 
-
-async function prepararEnvioParaUsuarios(newsletterId) {
-    const snap = await db.collection("newsletters").doc(newsletterId).get();
-    if (!snap.exists) {
-        mostrarMensagem("Newsletter não encontrada.");
-        return;
-    }
-
-    newsletterSelecionada = snap.data();
-    newsletterSelecionada.id = newsletterId;
-
-    // Esconde a tabela de destinatários
-    const tabelaDest = document.querySelector("#tabela-preview-envio-destinatario");
-    if (tabelaDest) {
-        tabelaDest.style.display = "none";
-    }
-
-    // Mostra a tabela de prévia
-    const tabelaPrevio = document.querySelector("#tabela-preview-envio");
-    if (tabelaPrevio) {
-        tabelaPrevio.style.display = "table";
-    }
-
-    await listarUsuariosComAssinaturas(newsletterId);
-    await gerarPreviaEnvioUsuarios(); // ✅ monta a prévia com base nos usuários
-}
+// ─── Lista de newsletters ─────────────────────────────────────────────────────
 
 async function listarNewslettersDisponiveis() {
-    const corpo = document.querySelector("#tabela-newsletters-envio tbody");
-    corpo.innerHTML = "<tr><td colspan='5'>Carregando newsletters...</td></tr>";
+    const corpo = document.querySelector('#tabela-newsletters-envio tbody');
+    corpo.innerHTML = "<tr><td colspan='6'>Carregando newsletters...</td></tr>";
 
-    // Carrega o mapa de nomes (ID -> Nome) antes do loop
-    const mapaNomesTipos = await obterMapaNomesTipos();
-
-    const snap = await db.collection("newsletters").orderBy("data_publicacao", "desc").get();
-    let linhas = "";
+    const mapa = await obterMapaNomesTipos();
+    const snap = await db.collection('newsletters').orderBy('data_publicacao', 'desc').get();
+    let linhas = '';
 
     for (const doc of snap.docs) {
-        const n = doc.data();
-        const id = doc.id;
-        const data = n.data_publicacao?.toDate?.() || n.data_publicacao;
-        const dataFormatada = data ? formatDateBR(data) : "-";
-
-        // Busca o nome amigável usando o ID guardado no campo 'tipo'
-        const nomeTipo = mapaNomesTipos[n.tipo] || n.tipo || "-";
+        const n   = doc.data();
+        const id  = doc.id;
+        const dt  = n.data_publicacao?.toDate?.() || n.data_publicacao;
+        const dtF = dt ? formatDateBR(dt) : '-';
+        const nomeTipo = mapa[n.tipo] || n.tipo || '-';
 
         linhas += `
             <tr>
-                <td>${n.titulo || "(sem título)"}</td>
-                <td>${n.edicao || "-"}</td>
+                <td>${n.titulo || '(sem título)'}</td>
+                <td>${n.edicao || '-'}</td>
                 <td><span class="badge-tipo">${nomeTipo}</span></td>
-                <td>${n.classificacao || "-"}</td>
-                <td>${dataFormatada}</td>
+                <td>${n.classificacao || '-'}</td>
+                <td>${dtF}</td>
                 <td>
-                <button class="btn-visualizar-newsletter" data-id="${id}">👁️ Visualizar</button>
-                <button class="btn-preparar-envio" data-id="${id}" disabled>
-                📬 Preparar envio
-                </button>
+                    <button class="btn-visualizar-newsletter" data-id="${id}">👁️ Visualizar</button>
+                    <button class="btn-preparar-envio" data-id="${id}" disabled>📬 Preparar envio</button>
                 </td>
-            </tr>
-            `;
+            </tr>`;
     }
 
-    corpo.innerHTML = linhas || "<tr><td colspan='5'>Nenhuma newsletter encontrada.</td></tr>";
+    corpo.innerHTML = linhas || "<tr><td colspan='6'>Nenhuma newsletter encontrada.</td></tr>";
 
-    // Agora que os botões existem, adicionamos os listeners
-    corpo.querySelectorAll(".btn-preparar-envio").forEach(btn => {
-        btn.addEventListener("click", () => {
-            prepararEnvioNewsletter(btn.dataset.id);
-        });
+    corpo.querySelectorAll('.btn-preparar-envio').forEach(btn => {
+        btn.addEventListener('click', () => prepararEnvioNewsletter(btn.dataset.id));
     });
-
-    corpo.querySelectorAll(".btn-visualizar-newsletter").forEach(btn => {
-        btn.addEventListener("click", () => {
-            visualizarNewsletterHtml(btn.dataset.id);
-        });
+    corpo.querySelectorAll('.btn-visualizar-newsletter').forEach(btn => {
+        btn.addEventListener('click', () => visualizarNewsletterHtml(btn.dataset.id));
     });
-
 }
+window.listarNewslettersDisponiveis = listarNewslettersDisponiveis;
+
+// ─── Visualizar HTML da newsletter ───────────────────────────────────────────
+
+async function visualizarNewsletterHtml(newsletterId) {
+    const snap = await db.collection('newsletters').doc(newsletterId).get();
+    if (!snap.exists) return mostrarMensagem('Newsletter não encontrada.');
+
+    const dados = snap.data();
+    const segmento = window.tipoDestinatarioSelecionado === 'usuarios' ? 'assinantes' : 'leads';
+
+    let htmlBase  = dados.html_conteudo || '';
+    const blocos  = dados.blocos || [];
+    let htmlBlocos = '';
+
+    blocos.forEach(b => {
+        if (segmento && b.acesso !== 'todos' && b.acesso !== segmento) return;
+        if (b.destino === 'app') return;
+        htmlBlocos += b.html || '';
+    });
+
+    let htmlFinal = blocos.length === 0
+        ? htmlBase
+        : (htmlBase.includes('{{blocos}}')
+            ? htmlBase.replace('{{blocos}}', htmlBlocos)
+            : htmlBase + '\n' + htmlBlocos);
+
+    htmlFinal = aplicarPlaceholders(htmlFinal, dados);
+
+    const modal   = document.getElementById('modal-preview-html');
+    const content = document.getElementById('preview-html-content');
+    if (content) content.innerHTML = htmlFinal;
+    if (modal)   modal.style.display = 'flex';
+}
+window.visualizarNewsletterHtml = visualizarNewsletterHtml;
+
+// ─── Preparar envio ───────────────────────────────────────────────────────────
 
 function prepararEnvioNewsletter(newsletterId) {
     if (!window.tipoDestinatarioSelecionado) {
-        mostrarMensagem("Selecione primeiro se deseja enviar para Leads ou Usuários.");
+        mostrarMensagem('Selecione primeiro se deseja enviar para Leads ou Usuários.');
         return;
     }
-    configurarBotoesPrevia("envio");
-    if (window.tipoDestinatarioSelecionado === "leads") {
+    configurarBotoesPrevia('envio');
+    if (window.tipoDestinatarioSelecionado === 'leads') {
         prepararEnvioParaLeads(newsletterId);
-    } else if (window.tipoDestinatarioSelecionado === "usuarios") {
+    } else {
         prepararEnvioParaUsuarios(newsletterId);
     }
 }
+window.prepararEnvioNewsletter = prepararEnvioNewsletter;
 
-function selecionarTodosEnvioFinalLeads(chkMaster) {
-    const todos = document.querySelectorAll("#tabela-preview-envio .chk-envio-final");
-    for (const chk of todos) {
-        chk.checked = chkMaster.checked;
-    }
+async function prepararEnvioParaLeads(newsletterId) {
+    const snap = await db.collection('newsletters').doc(newsletterId).get();
+    if (!snap.exists) { mostrarMensagem('Newsletter não encontrada.'); return; }
+
+    window.newsletterSelecionada    = { id: newsletterId, ...snap.data() };
+    // Limpa tabela de leads — o operador precisará aplicar filtros para carregar
+    const corpo = document.querySelector('#tabela-leads-envio tbody');
+    if (corpo) corpo.innerHTML = "<tr><td colspan='6' style='color:#888;text-align:center;padding:20px'>Aplique ao menos um filtro e clique em <strong>🔎 Buscar Leads</strong> para carregar os destinatários.</td></tr>";
+
+    document.querySelector('#tabela-preview-envio')?.style.setProperty('display', 'none');
+    document.querySelector('#tabela-preview-envio-destinatario')?.style.setProperty('display', 'none');
+
+    mostrarAba('secao-envio-leads');
 }
-window.selecionarTodosEnvioFinalLeads = selecionarTodosEnvioFinalLeads;
 
-async function gerarPreviaEnvio() {
-    const corpo = document.querySelector("#tabela-preview-envio tbody");
-    const cabecalho = document.querySelector("#tabela-preview-envio thead tr");
+async function prepararEnvioParaUsuarios(newsletterId) {
+    const snap = await db.collection('newsletters').doc(newsletterId).get();
+    if (!snap.exists) { mostrarMensagem('Newsletter não encontrada.'); return; }
 
-    corpo.innerHTML = "";
-    // Cabeçalho consistente com checkbox master
-    cabecalho.innerHTML = `
-        <th>
-            <input type="checkbox" id="chk-master-preview-leads"
-                title="Selecionar todos"
-                onclick="selecionarTodosEnvioFinalLeads(this)" />
-            Enviar?
-        </th>
-        <th>Nome</th>
-        <th>Perfil</th>
-        <th>Email</th>
-        <th>Newsletter</th>
-        <th>Interesses</th>
-        <th class="col-compativel">Compatível</th>
-        <th class="col-enviado">Newsletter enviada?</th>
-        `;
+    window.newsletterSelecionada    = { id: newsletterId, ...snap.data() };
+    await listarUsuariosComAssinaturas(newsletterId);
+}
 
-    const linhasLeads = document.querySelectorAll("#tabela-leads-envio tbody tr");
-    if (linhasLeads.length === 0) {
-        mostrarMensagem("Nenhum lead disponível para gerar prévia.");
+// ─── BUSCA DE LEADS — server-side com filtros ─────────────────────────────────
+//
+// Nunca carrega todos os leads. Requer ao menos 1 filtro aplicado.
+// Faz query no Supabase com todos os filtros combinados.
+// Cruza com leads_envios para exibir status de envio desta newsletter.
+// Limite: 500 resultados por busca.
+// ─────────────────────────────────────────────────────────────────────────────
+
+const LIMITE_BUSCA_LEADS = 500;
+
+async function buscarLeadsFiltrados() {
+    if (!window.newsletterSelecionada) {
+        mostrarMensagem('Selecione uma newsletter antes de buscar leads.');
         return;
     }
 
-    const enviadosMap = {};
+    const newsletterId = window.newsletterSelecionada.id;
+
+    // Coleta filtros
+    const nome           = document.getElementById('filtro-nome')?.value.trim()             || '';
+    const email          = document.getElementById('filtro-email')?.value.trim()            || '';
+    const perfil         = document.getElementById('filtro-perfil')?.value                  || '';
+    const statusLead     = document.getElementById('filtro-status-lead')?.value             || '';
+    const tipoNews       = document.getElementById('filtro-tipo-news-envio')?.value         || '';
+    const uf             = document.getElementById('filtro-uf-lead')?.value                 || '';
+    const statusEnvio    = document.getElementById('filtro-status-envio-lead')?.value       || '';
+
+    // Exige pelo menos um critério
+    const temFiltro = nome || email || perfil || statusLead || tipoNews || uf || statusEnvio;
+    if (!temFiltro) {
+        mostrarMensagem('Informe ao menos um filtro antes de buscar (UF, perfil, interesse, nome, e-mail ou status de envio).');
+        return;
+    }
+
+    const corpo = document.querySelector('#tabela-leads-envio tbody');
+    corpo.innerHTML = "<tr><td colspan='7'>Buscando leads...</td></tr>";
 
     try {
-        const promessasEnvio = Array.from(linhasLeads)
-            .filter(linha => linha.querySelector("input[type='checkbox']")?.checked)
-            .map(async linha => {
-                const leadId = linha.dataset.leadId;
-                try {
-                    const snap = await db
-                        .collection("leads")
-                        .doc(leadId)
-                        .collection("envios")
-                        .where("newsletter_id", "==", newsletterSelecionada.id)
-                        .limit(1)
-                        .get();
+        // ── Etapa 1: resolver IDs por status de envio (se filtro de envio ativo) ──
+        let idsEnviados    = null; // Set de lead_ids que já receberam (status=enviado)
+        let idsErro        = null; // Set de lead_ids com erro
+        let idsNaoEnviados = null; // Set de lead_ids que NÃO receberam
 
-                    if (!snap.empty) {
-                        const envio = snap.docs[0].data();
-                        enviadosMap[leadId] = envio.status === "enviado" ? "enviado" : "erro";
-                    } else {
-                        enviadosMap[leadId] = "nao-enviado";
-                    }
-                } catch (e) {
-                    console.warn("Erro ao verificar envios para lead:", leadId, e);
-                    enviadosMap[leadId] = false;
-                }
+        if (statusEnvio) {
+            const { data: enviosData } = await window.supabase
+                .from('leads_envios')
+                .select('lead_id, status')
+                .eq('newsletter_id', newsletterId);
+
+            const enviados = new Set();
+            const comErro  = new Set();
+            (enviosData || []).forEach(r => {
+                if (r.status === 'enviado') enviados.add(String(r.lead_id));
+                else comErro.add(String(r.lead_id));
             });
 
-        await Promise.all(promessasEnvio);
-    } catch (e) {
-        console.warn("Erro ao carregar envios da newsletter:", e);
-    }
-
-    for (const linha of linhasLeads) {
-        const checkbox = linha.querySelector("input[type='checkbox']");
-        if (!checkbox || !checkbox.checked) continue;
-
-        const leadId = linha.dataset.leadId;
-        const nome = linha.cells[1].textContent.trim();
-        const email = linha.cells[2].textContent.trim();
-        const perfil = linha.cells[3].textContent.trim();   // 🔹 pega perfil da tabela original
-        const interesses = linha.cells[4].textContent.trim();
-        const status = linha.cells[5].textContent.trim();
-
-        const tipoNewsletter = newsletterSelecionada?.tipo?.toLowerCase() || "";
-        const interessesArray = interesses.toLowerCase().split(",").map(i => i.trim());
-        const compativel = interessesArray.includes(tipoNewsletter);
-
-        const statusEnvio = enviadosMap[leadId];
-        const enviada = statusEnvio === "enviado";
-        const erroEnvio = statusEnvio === "erro";
-        const precisaEnviar = compativel && !enviada;
-
-        const statusTexto = enviada
-            ? "Sim"
-            : erroEnvio
-                ? "Erro ao enviar"
-                : "Não";
-
-        const tr = document.createElement("tr");
-        tr.dataset.leadId = leadId;
-        tr.dataset.newsletterId = newsletterSelecionada.id;
-        tr.dataset.perfil = perfil;
-        tr.dataset.compativel = compativel ? "true" : "false";
-        tr.dataset.statusEnvio = statusEnvio;
-
-        tr.innerHTML = `
-            <td><input type="checkbox" class="chk-envio-final" ${precisaEnviar ? "checked" : ""} /></td>
-            <td>${nome}</td>
-            <td>${perfil}</td>
-            <td>${email}</td>
-            <td>${newsletterSelecionada.titulo || "(sem título)"}</td>
-            <td>${interesses}</td>
-            <td class="col-compativel">${compativel ? "✅" : "❌"}</td>
-            <td class="col-enviado">${statusTexto}</td>
-        `;
-
-        if (enviada) {
-            tr.classList.add("tr-enviado");
+            if (statusEnvio === 'enviado')    idsEnviados    = enviados;
+            if (statusEnvio === 'erro')        idsErro        = comErro;
+            if (statusEnvio === 'nao-enviado') idsNaoEnviados = enviados; // usamos para excluir
         }
 
-        corpo.appendChild(tr);
-    }
+        // ── Etapa 2: query principal de leads com filtros ─────────────────────────
+        let query = window.supabase
+            .from('leads')
+            .select('id, nome, email, perfil, interesses, status, cod_uf')
+            .in('status', ['Novo', 'Em contato'])
+            .limit(LIMITE_BUSCA_LEADS);
 
-    if (corpo.children.length === 0) {
-        corpo.innerHTML = "<tr><td colspan='8'>Nenhum lead selecionado para prévia.</td></tr>";
-    }
+        if (nome)      query = query.ilike('nome', `%${nome}%`);
+        if (email)     query = query.ilike('email', `%${email}%`);
+        if (perfil)    query = query.eq('perfil', perfil);
+        if (statusLead) query = query.eq('status', statusLead);
+        if (uf)        query = query.eq('cod_uf', uf);
+        if (tipoNews)  query = query.contains('interesses', [tipoNews]);
 
-    aplicarFiltroPreviewEnvio();
-
-    document.querySelectorAll(".filtro-preview").forEach(chk => {
-        if (!chk.dataset.listenerAdicionado) {
-            chk.addEventListener("change", aplicarFiltroPreviewEnvio);
-            chk.dataset.listenerAdicionado = "true";
-        }
-    });
-
-    // 🔹 também registra listener para o select de perfil
-    const perfilSelect = document.getElementById("filtro-perfil-lead");
-    if (perfilSelect && !perfilSelect.dataset.listenerAdicionado) {
-        perfilSelect.addEventListener("change", aplicarFiltroPreviewEnvio);
-        perfilSelect.dataset.listenerAdicionado = "true";
-    }
-
-    mostrarAba("secao-preview-envio");
-}
-window.prepararEnvioNewsletter = prepararEnvioNewsletter; // para acesso global
-
-function aplicarFiltroPreviewEnvio() {
-    const filtros = Array.from(document.querySelectorAll(".filtro-preview:checked")).map(f => f.value);
-    const perfilSelecionado = document.getElementById("filtro-perfil-lead")?.value || "";
-    const linhas = document.querySelectorAll("#tabela-preview-envio tbody tr");
-
-    const aplicarFiltro = filtros.length > 0 || perfilSelecionado;
-
-    let totalVisiveis = 0;
-    let totalCompativeis = 0;
-    let totalNaoEnviados = 0;
-    let totalEnviados = 0;
-    let totalNaoCompativeis = 0;
-    let totalErroEnvio = 0;
-
-    for (const linha of linhas) {
-        const compativel = linha.dataset.compativel === "true";
-        const statusEnvio = linha.dataset.statusEnvio; // "enviado", "nao-enviado", "erro"
-        const perfilLead = linha.dataset.perfil || "";
-
-        const enviada = statusEnvio === "enviado";
-        const erroEnvio = statusEnvio === "erro";
-        const naoEnviado = statusEnvio === "nao-enviado";
-
-        let mostrar = true;
-
-        if (aplicarFiltro) {
-            if (filtros.includes("compativeis") && !compativel) mostrar = false;
-            if (filtros.includes("nao-compativeis") && compativel) mostrar = false;
-            if (filtros.includes("enviados") && !enviada) mostrar = false;
-            if (filtros.includes("nao-enviados") && !naoEnviado) mostrar = false;
-            if (filtros.includes("erro-envio") && !erroEnvio) mostrar = false;
-
-            if (perfilSelecionado && perfilLead !== perfilSelecionado) mostrar = false;
+        // Filtro por IDs de envio (quando status de envio foi selecionado)
+        if (statusEnvio === 'enviado' && idsEnviados?.size > 0) {
+            query = query.in('id', [...idsEnviados]);
+        } else if (statusEnvio === 'erro' && idsErro?.size > 0) {
+            query = query.in('id', [...idsErro]);
+        } else if (statusEnvio === 'nao-enviado' && idsNaoEnviados?.size > 0) {
+            query = query.not('id', 'in', `(${[...idsNaoEnviados].join(',')})`);
+        } else if (statusEnvio === 'enviado' && idsEnviados?.size === 0) {
+            corpo.innerHTML = "<tr><td colspan='7'>Nenhum lead recebeu esta newsletter ainda.</td></tr>";
+            return;
+        } else if (statusEnvio === 'erro' && idsErro?.size === 0) {
+            corpo.innerHTML = "<tr><td colspan='7'>Nenhum lead com erro de envio para esta newsletter.</td></tr>";
+            return;
         }
 
-        linha.style.display = mostrar ? "table-row" : "none";
+        const { data: leads, error } = await query;
 
-        if (compativel) totalCompativeis++;
-        else totalNaoCompativeis++;
-
-        if (enviada) totalEnviados++;
-        if (naoEnviado) totalNaoEnviados++;
-        if (erroEnvio) totalErroEnvio++;
-        if (mostrar) totalVisiveis++;
-    }
-
-    document.getElementById("contador-compativeis").textContent = totalCompativeis;
-    document.getElementById("contador-nao-enviados").textContent = totalNaoEnviados;
-    document.getElementById("contador-enviados").textContent = totalEnviados;
-    document.getElementById("contador-nao-compativeis").textContent = totalNaoCompativeis;
-    document.getElementById("contador-erro-envio").textContent = totalErroEnvio;
-    document.getElementById("contador-visiveis").textContent = totalVisiveis;
-}
-window.aplicarFiltroPreviewEnvio = aplicarFiltroPreviewEnvio; // para acesso global
-
-function limparFiltrosPreview() {
-    document.querySelectorAll(".filtro-preview").forEach(chk => chk.checked = false);
-    const perfilSelect = document.getElementById("filtro-perfil-lead");
-    if (perfilSelect) perfilSelect.value = ""; // volta para "Todos"
-    aplicarFiltroPreviewEnvio();
-}
-window.limparFiltrosPreview = limparFiltrosPreview; // para acesso global
-
-function selecionarTodosLeads(chkMaster) {
-    const todos = document.querySelectorAll(".chk-lead-envio");
-    for (const chk of todos) {
-        chk.checked = chkMaster.checked;
-    }
-}
-window.selecionarTodosLeads = selecionarTodosLeads; // para acesso global
-
-function exportarCSVPrevia() {
-    const linhas = document.querySelectorAll("#tabela-preview-envio tbody tr");
-    const visiveis = Array.from(linhas).filter(l => l.style.display !== "none");
-
-    if (visiveis.length === 0) {
-        mostrarMensagem("Nenhum dado visível para exportar.");
-        return;
-    }
-
-    const csv = [];
-    csv.push("Nome;Email;Newsletter;Interesses;Compatível;Newsletter enviada?");
-
-    for (const linha of visiveis) {
-        const nome = linha.cells[1]?.textContent.trim();
-        const email = linha.cells[2]?.textContent.trim();
-        const newsletter = linha.cells[3]?.textContent.trim();
-        const interesses = linha.cells[4]?.textContent.trim();
-        const compativel = linha.cells[5]?.textContent.trim();
-        const status = linha.cells[6]?.textContent.trim();
-
-        csv.push(`${nome};${email};${newsletter};${interesses};${compativel};${status}`);
-    }
-
-    const blob = new Blob([csv.join("\n")], { type: "text/csv;charset=utf-8;" });
-    const link = document.createElement("a");
-    link.href = URL.createObjectURL(blob);
-    link.download = "previa_envio.csv";
-    link.click();
-}
-window.exportarCSVPrevia = exportarCSVPrevia; // para acesso global
-
-async function listarDescadastramentos() {
-
-    const corpo = document.querySelector("#tabela-descadastramentos tbody");
-    corpo.innerHTML = "<tr><td colspan='5'>Carregando...</td></tr>";
-
-    const leadsSnap = await db.collection("leads").where("status", "==", "Descartado").get();
-    let linhas = "";
-
-    for (const leadDoc of leadsSnap.docs) {
-        const lead = leadDoc.data();
-        const leadId = leadDoc.id;
-
-        if (!leadId) {
-            console.warn("Lead sem ID:", lead);
-            continue;
+        if (error) {
+            console.error('Erro ao buscar leads:', error);
+            corpo.innerHTML = "<tr><td colspan='7'>Erro ao buscar leads.</td></tr>";
+            return;
         }
 
-        const descSnap = await db.collection("leads").doc(leadId).collection("descadastramentos").orderBy("data", "desc").get();
+        if (!leads || leads.length === 0) {
+            corpo.innerHTML = "<tr><td colspan='7'>Nenhum lead encontrado com os filtros aplicados.</td></tr>";
+            return;
+        }
 
-        if (descSnap.empty) {
-            // Lead descartado manualmente, sem registro
+        // ── Etapa 3: busca status de envio para os leads retornados ───────────────
+        // (uma única query, não N queries)
+        const idsRetornados = leads.map(l => String(l.id));
+        const { data: enviosLeads } = await window.supabase
+            .from('leads_envios')
+            .select('lead_id, status')
+            .eq('newsletter_id', newsletterId)
+            .in('lead_id', idsRetornados);
+
+        const mapaStatusEnvio = {};
+        (enviosLeads || []).forEach(r => { mapaStatusEnvio[String(r.lead_id)] = r.status; });
+
+        // ── Etapa 4: renderizar tabela ────────────────────────────────────────────
+        let linhas = '';
+        for (const lead of leads) {
+            const interesses = Array.isArray(lead.interesses) ? lead.interesses.join(', ') : '-';
+            const statusEnvioLead = mapaStatusEnvio[String(lead.id)] || 'nao-enviado';
+            const badgeEnvio = statusEnvioLead === 'enviado'
+                ? '<span style="color:#166534;font-weight:700">✅ Enviado</span>'
+                : statusEnvioLead === 'erro'
+                    ? '<span style="color:#991b1b;font-weight:700">❌ Erro</span>'
+                    : '<span style="color:#92400e">➖ Não enviado</span>';
+
             linhas += `
-        <tr>
-          <td>${lead.nome || ""}</td>
-          <td>${lead.email || ""}</td>
-          <td>-</td>
-          <td>-</td>
-          <td><em>Descartado manualmente (sem motivo registrado)</em></td>
-        </tr>
-      `;
-        } else {
-            for (const descDoc of descSnap.docs) {
-                const desc = descDoc.data();
-
-                let newsletter = {};
-                if (desc.newsletter_id) {
-                    try {
-                        const nlSnap = await db.collection("newsletters").doc(desc.newsletter_id).get();
-                        newsletter = nlSnap.exists ? nlSnap.data() : {};
-                    } catch (e) {
-                        console.warn("Erro ao buscar newsletter:", desc.newsletter_id, e);
-                    }
-                }
-
-                const data = desc.data?.toDate?.() || desc.data;
-                const dataFormatada = data ? formatDateBR(data) : "-";
-
-                linhas += `
-                    <tr>
-                    <td>${lead.nome || ""}</td>
-                    <td>${lead.email || ""}</td>
-                    <td>${newsletter.titulo || "(Sem Newsletter)"}</td>
-                    <td>${dataFormatada}</td>
-                    <td>${desc.motivo || "-"}</td>
-                    </tr>
-                `;
-            }
-
+                <tr data-lead-id="${lead.id}">
+                    <td><input type="checkbox" class="chk-lead-envio" ${statusEnvioLead !== 'enviado' ? 'checked' : ''} /></td>
+                    <td>${lead.nome || ''}</td>
+                    <td>${lead.email || ''}</td>
+                    <td>${lead.perfil || ''}</td>
+                    <td>${interesses}</td>
+                    <td>${lead.status || ''}</td>
+                    <td>${badgeEnvio}</td>
+                </tr>`;
         }
+
+        corpo.innerHTML = linhas;
+
+        const aviso = leads.length >= LIMITE_BUSCA_LEADS
+            ? `<div style="color:#92400e;padding:8px;background:#fef3c7;border-radius:4px;margin-top:8px">
+                ⚠️ Exibindo ${LIMITE_BUSCA_LEADS} resultados (limite atingido). Refine os filtros para ver mais.
+               </div>`
+            : '';
+
+        const contador = document.getElementById('contador-leads-buscados');
+        if (contador) counter.textContent = `${leads.length} lead(s) encontrado(s)`;
+
+        if (aviso) {
+            const tabelaWrap = document.querySelector('#secao-envio-leads');
+            if (tabelaWrap) tabelaWrap.insertAdjacentHTML('beforeend', aviso);
+        }
+
+    } catch (err) {
+        console.error('Erro em buscarLeadsFiltrados:', err);
+        corpo.innerHTML = `<tr><td colspan='7'>Erro: ${err.message}</td></tr>`;
     }
-
-    corpo.innerHTML = linhas || "<tr><td colspan='5'>Nenhum descadastramento encontrado.</td></tr>";
 }
-window.listarDescadastramentos = listarDescadastramentos; // para acesso global
+window.buscarLeadsFiltrados = buscarLeadsFiltrados;
 
-function abrirAbaDescadastramentos() {
-    mostrarAba("secao-descadastramentos");
-    listarDescadastramentos();
-}
-window.abrirAbaDescadastramentos = abrirAbaDescadastramentos; // acesso global
-
-function abrirTelaTodosOsLotes() {
-    preencherFiltroNewsletters(); // ✅ só uma vez
-    listarTodosOsLotes();         // ✅ com filtros aplicados
-}
-window.abrirTelaTodosOsLotes = abrirTelaTodosOsLotes; // para acesso global 
-
-function abrirAbaOrientacoes() {
-    mostrarAba("secao-orientacoes");
-}
-window.abrirAbaOrientacoes = abrirAbaOrientacoes; // acesso global
-
-function alterarTipoDestinatario(tipo) {
-    const botoes = document.querySelectorAll(".btn-preparar-envio");
-
-    if (!tipo) {
-        window.tipoDestinatarioSelecionado = null;
-        botoes.forEach(btn => btn.disabled = true); // desabilita todos
-        return;
-    }
-
-    window.tipoDestinatarioSelecionado = tipo;
-    botoes.forEach(btn => btn.disabled = false); // habilita todos
-}
-window.alterarTipoDestinatario = alterarTipoDestinatario; // para acesso global
-
-document.addEventListener("DOMContentLoaded", () => {
-    const selectDestinatario = document.getElementById("tipo-destinatario");
-    if (selectDestinatario) {
-        selectDestinatario.addEventListener("change", e => {
-            alterarTipoDestinatario(e.target.value);
-        });
-    }
-});
+// ─── Listar usuários com assinaturas ─────────────────────────────────────────
+// fix #I9: removida verificação de pagamentos em loop — usa só status da assinatura
 
 let usuariosFiltraveis = [];
-window.usuariosFiltraveis = usuariosFiltraveis; // para acesso global
+window.usuariosFiltraveis = usuariosFiltraveis;
 
-// Listar usuários com suas assinaturas
 async function listarUsuariosComAssinaturas(newsletterId) {
-    const corpo = document.querySelector("#tabela-usuarios-envio tbody");
+    const corpo = document.querySelector('#tabela-usuarios-envio tbody');
     corpo.innerHTML = "<tr><td colspan='5'>Carregando usuários...</td></tr>";
+    usuariosFiltraveis = [];
 
-    if (!newsletterSelecionada) {
+    if (!window.newsletterSelecionada) {
         corpo.innerHTML = "<tr><td colspan='5'>Selecione primeiro uma newsletter.</td></tr>";
         return;
     }
 
-    // 🔹 ID do tipo da newsletter 
-    const tipoId = newsletterSelecionada.tipo || null;
+    const tipoId = window.newsletterSelecionada.tipo;
     if (!tipoId) {
         corpo.innerHTML = "<tr><td colspan='5'>⚠️ Newsletter sem tipo definido.</td></tr>";
         return;
     }
 
-    // 🔹 Busca apenas assinaturas ativas da newsletter selecionada
-    const snapAssinaturas = await db.collectionGroup("assinaturas")
-        .where("status", "==", "ativa")
-        .where("tipos_selecionados", "array-contains", tipoId)
+    const statusEnvio = document.getElementById('filtro-status-envio-usuario')?.value || '';
+    const ufFiltro    = document.getElementById('filtro-uf-usuario')?.value           || '';
+    const nomeFiltro  = document.getElementById('filtro-usuario-nome')?.value.toLowerCase() || '';
+    const emailFiltro = document.getElementById('filtro-usuario-email')?.value.toLowerCase() || '';
+
+    const snapAss = await db.collectionGroup('assinaturas')
+        .where('status', 'in', ['ativa', 'aprovada'])
+        .where('tipos_selecionados', 'array-contains', tipoId)
         .get();
 
-    let linhas = "";
+    // Coleta IDs de envio para esta newsletter (uma única query)
+    const userIds = snapAss.docs.map(d => d.ref.parent.parent.id);
+    const mapaStatusEnvio = {};
 
-    for (const doc of snapAssinaturas.docs) {
-        const assinatura = doc.data();
-        const assinaturaId = doc.id;
-        const usuarioId = doc.ref.parent.parent.id;
-
-        const usuarioSnap = await db.collection("usuarios").doc(usuarioId).get();
-        if (!usuarioSnap.exists) continue;
-
-        const usuario = usuarioSnap.data();
-
-        // 🔹 Busca todos os pagamentos do usuário
-        const pagamentosSnap = await db.collection("usuarios")
-            .doc(usuarioId)
-            .collection("assinaturas")
-            .doc(assinaturaId)
-            .collection("pagamentos")
-            .get();
-
-        let emDia = true;
-        pagamentosSnap.forEach(p => {
-            const dados = p.data();
-            const venc = dados?.data_vencimento?.toMillis?.() ??
-                (typeof dados?.data_vencimento === "number" ? dados.data_vencimento : NaN);
-            if (dados?.status === "pendente" && Number.isFinite(venc) && venc < Date.now()) {
-                emDia = false;
-            }
-        });
-
-        usuariosFiltraveis.push({
-            id: usuarioId,
-            nome: usuario.nome || "",
-            perfil: usuario.tipo_perfil || "",
-            email: usuario.email || "",
-            assinaturaId,
-            assinatura_status: assinatura.status,
-            emDia
-        });
-
-        linhas += `
-                <tr data-usuario-id="${usuarioId}" 
-                    data-assinatura-id="${assinaturaId}" 
-                    data-perfil="${usuario.tipo_perfil || ""}"
-                    data-em-dia="${emDia ? "true" : "false"}"
-                    class="${emDia ? "" : "linha-vencida"}">
-                    <td><input type="checkbox" class="chk-usuario-envio" checked /></td>
-                    <td>${usuario.nome || ""}</td>
-                    <td>${usuario.tipo_perfil || ""}</td>
-                    <td>${usuario.email || ""}</td>
-                    <td>${assinatura.status}</td>
-                    <td>${emDia ? "✅ Sim" : "❌ Não"}</td>
-                </tr>
-                `;
-    }
-
-    if (usuariosFiltraveis.length === 0) {
-        corpo.innerHTML = `<tr><td colspan='5'>⚠️ Nenhum usuário possui assinatura ativa para a newsletter selecionada.</td></tr>`;
-        mostrarMensagem("Nenhum usuário com assinatura ativa foi encontrado para esta newsletter.");
-    } else {
-        corpo.innerHTML = linhas;
-    }
-}
-window.listarUsuariosComAssinaturas = listarUsuariosComAssinaturas; // para acesso global
-
-// Filtro de usuários
-function filtrarUsuariosEnvio() {
-    const nomeFiltro = document.getElementById("filtro-usuario-nome").value.toLowerCase();
-    const emailFiltro = document.getElementById("filtro-usuario-email").value.toLowerCase();
-    const assinaturaFiltro = document.getElementById("filtro-assinatura").value;
-
-    const corpo = document.querySelector("#tabela-usuarios-envio tbody");
-    let linhas = "";
-
-    for (const usuario of usuariosFiltraveis) {
-        const matchNome = usuario.nome.toLowerCase().includes(nomeFiltro);
-        const matchEmail = usuario.email.toLowerCase().includes(emailFiltro);
-        const matchAssinatura = !assinaturaFiltro || usuario.assinatura_status === assinaturaFiltro;
-
-        if (matchNome && matchEmail && matchAssinatura) {
-            linhas += `
-          <tr data-usuario-id="${usuario.id}" data-perfil="${usuario.perfil || ""}">
-            <td><input type="checkbox" class="chk-usuario-envio" checked /></td>
-            <td>${usuario.nome}</td>
-            <td>${usuario.perfil || ""}</td>
-            <td>${usuario.email}</td>
-            <td>${usuario.assinatura_status}</td>
-          </tr>
-        `;
+    if (statusEnvio || userIds.length > 0) {
+        // Para assinantes os envios ficam no Firestore
+        // Fazemos uma única collectionGroup query filtrada por newsletter_id
+        try {
+            const snapEnvios = await db.collectionGroup('envios')
+                .where('newsletter_id', '==', newsletterId)
+                .get();
+            snapEnvios.forEach(d => {
+                const uid = d.ref.parent.parent?.parent?.parent?.id;
+                if (uid) mapaStatusEnvio[uid] = d.data().status || 'enviado';
+            });
+        } catch (e) {
+            console.warn('Falha ao carregar envios de assinantes:', e);
         }
     }
 
-    corpo.innerHTML = linhas || "<tr><td colspan='5'>Nenhum usuário encontrado com os filtros.</td></tr>";
-}
-window.filtrarUsuariosEnvio = filtrarUsuariosEnvio; // para acesso global
+    let linhas = '';
+    const frag = document.createDocumentFragment();
 
-function selecionarTodosEnvioFinal(chkMaster) {
-    const todos = document.querySelectorAll("#tabela-preview-envio .chk-envio-final");
-    for (const chk of todos) {
-        chk.checked = chkMaster.checked;
+    for (const doc of snapAss.docs) {
+        const assinatura    = doc.data();
+        const assinaturaId  = doc.id;
+        const usuarioId     = doc.ref.parent.parent.id;
+
+        const usuarioSnap = await db.collection('usuarios').doc(usuarioId).get();
+        if (!usuarioSnap.exists) continue;
+
+        const usuario  = usuarioSnap.data();
+        const statusEn = mapaStatusEnvio[usuarioId] || 'nao-enviado';
+
+        // Filtros opcionais
+        if (ufFiltro && usuario.cod_uf !== ufFiltro) continue;
+        if (nomeFiltro && !(usuario.nome || '').toLowerCase().includes(nomeFiltro)) continue;
+        if (emailFiltro && !(usuario.email || '').toLowerCase().includes(emailFiltro)) continue;
+        if (statusEnvio && statusEn !== statusEnvio) continue;
+
+        const badgeEnvio = statusEn === 'enviado'
+            ? '<span style="color:#166534;font-weight:700">✅ Enviado</span>'
+            : statusEn === 'erro'
+                ? '<span style="color:#991b1b;font-weight:700">❌ Erro</span>'
+                : '<span style="color:#92400e">➖ Não enviado</span>';
+
+        usuariosFiltraveis.push({
+            id: usuarioId, nome: usuario.nome || '', perfil: usuario.tipo_perfil || '',
+            email: usuario.email || '', assinaturaId, assinatura_status: assinatura.status,
+            statusEnvio: statusEn
+        });
+
+        linhas += `
+            <tr data-usuario-id="${usuarioId}"
+                data-assinatura-id="${assinaturaId}"
+                data-perfil="${usuario.tipo_perfil || ''}"
+                data-status-envio="${statusEn}">
+                <td><input type="checkbox" class="chk-usuario-envio" ${statusEn !== 'enviado' ? 'checked' : ''} /></td>
+                <td>${usuario.nome || ''}</td>
+                <td>${usuario.tipo_perfil || ''}</td>
+                <td>${usuario.email || ''}</td>
+                <td>${assinatura.status}</td>
+                <td>${badgeEnvio}</td>
+            </tr>`;
     }
-}
-window.selecionarTodosEnvioFinal = selecionarTodosEnvioFinal;
 
-// Preparar prévia de envio para usuários
-async function gerarPreviaEnvioUsuarios() {
-    if (!newsletterSelecionada) {
-        mostrarMensagem("Selecione uma newsletter primeiro.");
+    if (!usuariosFiltraveis.length) {
+        corpo.innerHTML = "<tr><td colspan='6'>Nenhum usuário encontrado com os filtros aplicados.</td></tr>";
+        mostrarMensagem('Nenhum usuário com assinatura ativa encontrado para esta newsletter.');
+    } else {
+        corpo.innerHTML = linhas;
+    }
+
+    mostrarAba('secao-envio-usuarios');
+}
+window.listarUsuariosComAssinaturas = listarUsuariosComAssinaturas;
+
+function filtrarUsuariosEnvio() {
+    if (!window.newsletterSelecionada) {
+        mostrarMensagem('Selecione uma newsletter primeiro.');
+        return;
+    }
+    listarUsuariosComAssinaturas(window.newsletterSelecionada.id);
+}
+window.filtrarUsuariosEnvio = filtrarUsuariosEnvio;
+
+// ─── Checkboxes master ────────────────────────────────────────────────────────
+
+function selecionarTodosLeads(chkMaster) {
+    document.querySelectorAll('.chk-lead-envio').forEach(c => { c.checked = chkMaster.checked; });
+}
+function selecionarTodosUsuarios(chkMaster) {
+    document.querySelectorAll('.chk-usuario-envio').forEach(c => { c.checked = chkMaster.checked; });
+}
+function selecionarTodosEnvios(chkMaster) {
+    document.querySelectorAll('.chk-envio-final').forEach(c => { c.checked = chkMaster.checked; });
+}
+function selecionarTodosEnvioFinalLeads(chkMaster) {
+    document.querySelectorAll('#tabela-preview-envio .chk-envio-final').forEach(c => { c.checked = chkMaster.checked; });
+}
+function selecionarTodosEnvioFinal(chkMaster) {
+    document.querySelectorAll('#tabela-preview-envio .chk-envio-final').forEach(c => { c.checked = chkMaster.checked; });
+}
+window.selecionarTodosLeads         = selecionarTodosLeads;
+window.selecionarTodosUsuarios      = selecionarTodosUsuarios;
+window.selecionarTodosEnvios        = selecionarTodosEnvios;
+window.selecionarTodosEnvioFinalLeads = selecionarTodosEnvioFinalLeads;
+window.selecionarTodosEnvioFinal    = selecionarTodosEnvioFinal;
+
+// ─── Gérar Prévia — Leads ─────────────────────────────────────────────────────
+// fix #C4: verifica envios em UMA query (não N queries)
+
+async function gerarPreviaEnvio() {
+    if (!window.newsletterSelecionada) {
+        mostrarMensagem('Selecione uma newsletter primeiro.');
         return;
     }
 
-    const corpo = document.querySelector("#tabela-preview-envio tbody");
-    const cabecalho = document.querySelector("#tabela-preview-envio thead tr");
+    const corpo     = document.querySelector('#tabela-preview-envio tbody');
+    const cabecalho = document.querySelector('#tabela-preview-envio thead tr');
 
-    // Cabeçalho consistente
-    // Cabeçalho consistente com checkbox master
     cabecalho.innerHTML = `
-        <th>
-            <input type="checkbox" id="chk-master-preview"
-                title="Selecionar todos"
-                onclick="selecionarTodosEnvioFinal(this)" />
-            Enviar?
-        </th>
-        <th>Nome</th>
-        <th>Perfil</th>
-        <th>Email</th>
-        <th>Newsletter</th>
-        <th>Interesses</th>
-        <th class="col-pagamento">Em dia?</th>
-        <th class="col-enviado">Newsletter enviada?</th>
-        `;
+        <th><input type="checkbox" id="chk-master-preview-leads"
+            onclick="selecionarTodosEnvioFinalLeads(this)" title="Selecionar todos" /> Enviar?</th>
+        <th>Nome</th><th>Perfil</th><th>Email</th>
+        <th>Newsletter</th><th>Interesses</th>
+        <th class="col-compativel">Compatível</th>
+        <th class="col-enviado">Já enviado?</th>`;
 
     corpo.innerHTML = "<tr><td colspan='8'>Gerando prévia...</td></tr>";
 
-    // Coleta os usuários selecionados na tabela de usuários
-    const selecionados = Array.from(document.querySelectorAll(".chk-usuario-envio:checked"))
+    const linhasLeads = Array.from(document.querySelectorAll('#tabela-leads-envio tbody tr'));
+    const selecionados = linhasLeads.filter(tr => tr.querySelector('.chk-lead-envio')?.checked);
+
+    if (selecionados.length === 0) {
+        mostrarMensagem('Nenhum lead selecionado. Aplique os filtros e selecione os destinatários.');
+        corpo.innerHTML = "<tr><td colspan='8'>Nenhum lead selecionado.</td></tr>";
+        return;
+    }
+
+    // ── Query única para status de envio de todos os leads selecionados ────────
+    const ids = selecionados.map(tr => tr.dataset.leadId).filter(Boolean);
+    const { data: enviosData } = await window.supabase
+        .from('leads_envios')
+        .select('lead_id, status')
+        .eq('newsletter_id', window.newsletterSelecionada.id)
+        .in('lead_id', ids);
+
+    const enviadosMap = {};
+    (enviosData || []).forEach(r => { enviadosMap[String(r.lead_id)] = r.status; });
+
+    const frag = document.createDocumentFragment();
+
+    for (const tr of selecionados) {
+        const leadId     = tr.dataset.leadId;
+        const nome       = tr.children[1].textContent.trim();
+        const email      = tr.children[2].textContent.trim();
+        const perfil     = tr.children[3].textContent.trim();
+        const interesses = tr.children[4].textContent.trim();
+
+        const tipoNL  = (window.newsletterSelecionada?.tipo || '').toLowerCase();
+        const intArr  = interesses.toLowerCase().split(',').map(i => i.trim());
+        const compativel = intArr.includes(tipoNL);
+
+        const statusEnvio = enviadosMap[String(leadId)] || 'nao-enviado';
+        const enviada     = statusEnvio === 'enviado';
+        const erroEnvio   = statusEnvio === 'erro';
+        const precisaEnviar = compativel && !enviada;
+
+        const statusTexto = enviada ? 'Sim' : erroEnvio ? 'Erro ao enviar' : 'Não';
+
+        const row = document.createElement('tr');
+        row.dataset.leadId     = leadId;
+        row.dataset.newsletterId = window.newsletterSelecionada.id;
+        row.dataset.perfil     = perfil;
+        row.dataset.compativel = compativel ? 'true' : 'false';
+        row.dataset.statusEnvio = statusEnvio;
+        if (enviada) row.classList.add('tr-enviado');
+        if (erroEnvio) row.classList.add('tr-erro');
+
+        row.innerHTML = `
+            <td><input type="checkbox" class="chk-envio-final" ${precisaEnviar ? 'checked' : ''} /></td>
+            <td>${nome}</td><td>${perfil}</td><td>${email}</td>
+            <td>${window.newsletterSelecionada.titulo || ''}</td>
+            <td>${interesses}</td>
+            <td class="col-compativel">${compativel ? '✅' : '❌'}</td>
+            <td class="col-enviado">${statusTexto}</td>`;
+
+        frag.appendChild(row);
+    }
+
+    corpo.innerHTML = '';
+    corpo.appendChild(frag);
+
+    aplicarFiltroPreviewEnvio();
+    _bindFiltrosPreview();
+    mostrarAba('secao-preview-envio');
+    document.querySelector('#tabela-preview-envio').style.display = 'table';
+    document.querySelector('#tabela-preview-envio-destinatario').style.display = 'none';
+}
+window.gerarPreviaEnvio = gerarPreviaEnvio;
+
+// ─── Gerar Prévia — Usuários ──────────────────────────────────────────────────
+// fix: queries agrupadas em vez de N queries individuais
+
+async function gerarPreviaEnvioUsuarios() {
+    if (!window.newsletterSelecionada) {
+        mostrarMensagem('Selecione uma newsletter primeiro.');
+        return;
+    }
+
+    const corpo     = document.querySelector('#tabela-preview-envio tbody');
+    const cabecalho = document.querySelector('#tabela-preview-envio thead tr');
+
+    cabecalho.innerHTML = `
+        <th><input type="checkbox" id="chk-master-preview"
+            onclick="selecionarTodosEnvioFinal(this)" title="Selecionar todos" /> Enviar?</th>
+        <th>Nome</th><th>Perfil</th><th>Email</th>
+        <th>Newsletter</th><th>Tipos selecionados</th>
+        <th class="col-pagamento">Assinatura</th>
+        <th class="col-enviado">Já enviado?</th>`;
+
+    corpo.innerHTML = "<tr><td colspan='8'>Gerando prévia...</td></tr>";
+
+    const selecionados = Array.from(document.querySelectorAll('.chk-usuario-envio:checked'))
         .map(chk => {
-            const tr = chk.closest("tr");
+            const tr = chk.closest('tr');
             return {
-                usuarioId: tr.dataset.usuarioId,
+                usuarioId:   tr.dataset.usuarioId,
                 assinaturaId: tr.dataset.assinaturaId,
-                nome: tr.children[1]?.innerText.trim() || "",
-                perfil: tr.dataset.perfil || tr.children[2]?.innerText.trim() || "",
-                email: tr.children[3]?.innerText.trim() || "",
-                emDia: tr.dataset.emDia === "true"
+                nome:  tr.children[1]?.innerText.trim() || '',
+                perfil: tr.dataset.perfil || '',
+                email: tr.children[3]?.innerText.trim() || '',
             };
         });
 
     if (selecionados.length === 0) {
         corpo.innerHTML = "<tr><td colspan='8'>Nenhum usuário selecionado para prévia.</td></tr>";
-        aplicarFiltroPreviewEnvio();
         return;
     }
 
-    // Verifica status de envio para cada usuário/assinatura em paralelo
-    const enviadosMap = {};
-    const interessesMap = {}; // Novo mapa para guardar os nomes dos interesses
-    const mapaNomesTipos = await obterMapaNomesTipos(); // Carrega os nomes (ID -> Nome)
+    // ── Query única para status de envio ──────────────────────────────────────
+    // Busca os envios desta newsletter para todos os usuários selecionados
+    const enviadosMap  = {};
+    try {
+        const snapEnvios = await db.collectionGroup('envios')
+            .where('newsletter_id', '==', window.newsletterSelecionada.id)
+            .get();
+        snapEnvios.forEach(d => {
+            const uid = d.ref.parent?.parent?.parent?.parent?.id;
+            if (uid) enviadosMap[uid] = d.data().status || 'enviado';
+        });
+    } catch (e) {
+        console.warn('Falha ao carregar envios:', e);
+    }
 
-    await Promise.all(selecionados.map(async (u) => {
+    // ── Tipos selecionados por assinatura (batch) ─────────────────────────────
+    const mapa          = await obterMapaNomesTipos();
+    const interessesMap = {};
+    const interessesIds = {};
+
+    await Promise.all(selecionados.map(async u => {
         try {
-            const snapEnvio = await db
-                .collection("usuarios")
-                .doc(u.usuarioId)
-                .collection("assinaturas")
-                .doc(u.assinaturaId)
-                .collection("envios")
-                .where("newsletter_id", "==", newsletterSelecionada.id)
-                .limit(1)
-                .get();
-
-            if (!snapEnvio.empty) {
-                const status = snapEnvio.docs[0].data()?.status;
-                enviadosMap[`${u.usuarioId}|${u.assinaturaId}`] = status === "enviado" ? "enviado" : "erro";
-            } else {
-                enviadosMap[`${u.usuarioId}|${u.assinaturaId}`] = "nao-enviado";
+            const docAss = await db.collection('usuarios').doc(u.usuarioId)
+                .collection('assinaturas').doc(u.assinaturaId).get();
+            if (docAss.exists) {
+                const ids = docAss.data().tipos_selecionados || [];
+                interessesIds[`${u.usuarioId}|${u.assinaturaId}`] = ids;
+                interessesMap[`${u.usuarioId}|${u.assinaturaId}`] = ids.map(id => mapa[id] || id).join(', ') || 'Nenhum';
             }
-            // BUSCA OS INTERESSES 
-            const docAssinatura = await db
-                .collection("usuarios")
-                .doc(u.usuarioId)
-                .collection("assinaturas")
-                .doc(u.assinaturaId)
-                .get();
-
-            if (docAssinatura.exists) {
-                const ids = docAssinatura.data().tipos_selecionados || [];
-                u.interessesIds = ids; // Guardamos os IDs para a comparação técnica
-
-                // Converte os IDs em nomes usando o mapa
-                const nomes = ids.map(id => mapaNomesTipos[id] || id).join(", ");
-                interessesMap[`${u.usuarioId}|${u.assinaturaId}`] = nomes || "Nenhum";
-            }
-        } catch (e) {
-            console.warn("Erro ao consultar envios de usuário:", u.usuarioId, e);
-            enviadosMap[`${u.usuarioId}|${u.assinaturaId}`] = "erro";
-        }
+        } catch (e) { /* não fatal */ }
     }));
 
-    const tipoNewsletter = (newsletterSelecionada?.tipo || "").toLowerCase();
-    const tituloNewsletter = newsletterSelecionada?.titulo || "(sem título)";
-
-    const frag = document.createDocumentFragment();
+    const tipoNLId     = window.newsletterSelecionada.tipo_id || window.newsletterSelecionada.tipo;
+    const tituloNL     = window.newsletterSelecionada.titulo  || '(sem título)';
+    const frag         = document.createDocumentFragment();
 
     for (const u of selecionados) {
+        const key         = `${u.usuarioId}|${u.assinaturaId}`;
+        const statusEnvio = enviadosMap[u.usuarioId] || 'nao-enviado';
+        const enviada     = statusEnvio === 'enviado';
+        const erroEnvio   = statusEnvio === 'erro';
+        const compativel  = (interessesIds[key] || []).includes(tipoNLId);
+        const precisaEnviar = !enviada;
+        const statusTexto = enviada ? 'Sim' : erroEnvio ? 'Erro ao enviar' : 'Não';
 
-        const key = `${u.usuarioId}|${u.assinaturaId}`;
-        const statusEnvio = enviadosMap[key];
-        const enviada = statusEnvio === "enviado";
-        const erroEnvio = statusEnvio === "erro";
-        const precisaEnviar = u.emDia && !enviada;
-        const statusTexto = enviada ? "Sim" : (erroEnvio ? "Erro ao enviar" : "Não");
-
-        // Pega o ID do tipo da newsletter selecionada
-        const tipoNewsletterId = newsletterSelecionada.tipo_id || newsletterSelecionada.tipo;
-
-        // Verifica se o ID da newsletter está nos interesses do usuário (IDs que guardamos no Promise.all)
-        const ehCompativel = u.interessesIds && u.interessesIds.includes(tipoNewsletterId);
-
-        const tr = document.createElement("tr");
-        tr.dataset.usuarioId = u.usuarioId;
+        const tr = document.createElement('tr');
+        tr.dataset.usuarioId    = u.usuarioId;
         tr.dataset.assinaturaId = u.assinaturaId;
-        tr.dataset.newsletterId = newsletterSelecionada.id;
-        tr.dataset.perfil = u.perfil || "";
-
-        tr.dataset.statusEnvio = statusEnvio;
-        const interesses = interessesMap[key] || "Não carregado";
-        tr.dataset.compativel = ehCompativel ? "true" : "false";
+        tr.dataset.newsletterId = window.newsletterSelecionada.id;
+        tr.dataset.perfil       = u.perfil;
+        tr.dataset.statusEnvio  = statusEnvio;
+        tr.dataset.compativel   = compativel ? 'true' : 'false';
+        if (enviada) tr.classList.add('tr-enviado');
+        if (erroEnvio) tr.classList.add('tr-erro');
 
         tr.innerHTML = `
-            <td><input type="checkbox" class="chk-envio-final" ${precisaEnviar ? "checked" : ""} /></td>
-            <td>${u.nome}</td>
-            <td>${u.perfil || ""}</td>
-            <td>${u.email}</td>
-            <td>${tituloNewsletter}</td>
-            <td>${interessesMap[key] || "-"}</td>
-            <td class="col-pagamento">${u.emDia ? "✅ Sim" : "❌ Não"}</td>
-            <td class="col-enviado">${statusTexto}</td>
-        `;
-
-        if (enviada) tr.classList.add("tr-enviado");
-        if (erroEnvio) tr.classList.add("tr-erro");
+            <td><input type="checkbox" class="chk-envio-final" ${precisaEnviar ? 'checked' : ''} /></td>
+            <td>${u.nome}</td><td>${u.perfil}</td><td>${u.email}</td>
+            <td>${tituloNL}</td>
+            <td>${interessesMap[key] || '-'}</td>
+            <td>${compativel ? '✅ Sim' : '❌ Não'}</td>
+            <td class="col-enviado">${statusTexto}</td>`;
 
         frag.appendChild(tr);
     }
 
-    corpo.innerHTML = "";
+    corpo.innerHTML = '';
     corpo.appendChild(frag);
 
     aplicarFiltroPreviewEnvio();
+    _bindFiltrosPreview();
+    mostrarAba('secao-preview-envio');
+    document.querySelector('#tabela-preview-envio').style.display = 'table';
+    document.querySelector('#tabela-preview-envio-destinatario').style.display = 'none';
+}
+window.gerarPreviaEnvioUsuarios = gerarPreviaEnvioUsuarios;
 
-    document.querySelectorAll(".filtro-preview").forEach(chk => {
+// ─── Filtros da prévia ────────────────────────────────────────────────────────
+
+function _bindFiltrosPreview() {
+    document.querySelectorAll('.filtro-preview').forEach(chk => {
         if (!chk.dataset.listenerAdicionado) {
-            chk.addEventListener("change", aplicarFiltroPreviewEnvio);
-            chk.dataset.listenerAdicionado = "true";
+            chk.addEventListener('change', aplicarFiltroPreviewEnvio);
+            chk.dataset.listenerAdicionado = 'true';
         }
     });
-
-    const perfilSelect = document.getElementById("filtro-perfil-lead");
-    if (perfilSelect && !perfilSelect.dataset.listenerAdicionado) {
-        perfilSelect.addEventListener("change", aplicarFiltroPreviewEnvio);
-        perfilSelect.dataset.listenerAdicionado = "true";
+    const perfilSel = document.getElementById('filtro-perfil-lead');
+    if (perfilSel && !perfilSel.dataset.listenerAdicionado) {
+        perfilSel.addEventListener('change', aplicarFiltroPreviewEnvio);
+        perfilSel.dataset.listenerAdicionado = 'true';
     }
-
-    mostrarAba("secao-preview-envio");
 }
-window.gerarPreviaEnvioUsuarios = gerarPreviaEnvioUsuarios; // para acesso global   
 
-document.addEventListener("DOMContentLoaded", () => {
-    const selectDestinatario = document.getElementById("tipo-destinatario");
-    if (selectDestinatario) {
-        selectDestinatario.addEventListener("change", e => {
-            alterarTipoDestinatario(e.target.value);
-        });
+function aplicarFiltroPreviewEnvio() {
+    const filtros = Array.from(document.querySelectorAll('.filtro-preview:checked')).map(f => f.value);
+    const perfilSel = document.getElementById('filtro-perfil-lead')?.value || '';
+    const linhas    = document.querySelectorAll('#tabela-preview-envio tbody tr');
+
+    const usarFiltro = filtros.length > 0 || perfilSel;
+    let tot = { visiveis:0, compativeis:0, naoCompativeis:0, enviados:0, naoEnviados:0, erros:0 };
+
+    for (const linha of linhas) {
+        const compativel  = linha.dataset.compativel === 'true';
+        const statusEnvio = linha.dataset.statusEnvio;
+        const perfilLead  = linha.dataset.perfil || '';
+        const enviada     = statusEnvio === 'enviado';
+        const erroEnvio   = statusEnvio === 'erro';
+        const naoEnviado  = statusEnvio === 'nao-enviado';
+
+        let mostrar = true;
+        if (usarFiltro) {
+            if (filtros.includes('compativeis')     && !compativel)  mostrar = false;
+            if (filtros.includes('nao-compativeis') && compativel)   mostrar = false;
+            if (filtros.includes('enviados')        && !enviada)     mostrar = false;
+            if (filtros.includes('nao-enviados')    && !naoEnviado)  mostrar = false;
+            if (filtros.includes('erro-envio')      && !erroEnvio)   mostrar = false;
+            if (perfilSel && perfilLead !== perfilSel) mostrar = false;
+        }
+
+        linha.style.display = mostrar ? 'table-row' : 'none';
+        if (compativel) tot.compativeis++; else tot.naoCompativeis++;
+        if (enviada)    tot.enviados++;
+        if (naoEnviado) tot.naoEnviados++;
+        if (erroEnvio)  tot.erros++;
+        if (mostrar)    tot.visiveis++;
     }
-});
 
-async function gerarPreviaEnvioLeads() {
-    if (!newsletterSelecionada) {
-        mostrarMensagem("Selecione uma newsletter primeiro.");
+    const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+    set('contador-compativeis',    tot.compativeis);
+    set('contador-nao-enviados',   tot.naoEnviados);
+    set('contador-enviados',       tot.enviados);
+    set('contador-nao-compativeis', tot.naoCompativeis);
+    set('contador-erro-envio',     tot.erros);
+    set('contador-visiveis',       tot.visiveis);
+}
+window.aplicarFiltroPreviewEnvio = aplicarFiltroPreviewEnvio;
+
+function limparFiltrosPreview() {
+    document.querySelectorAll('.filtro-preview').forEach(c => { c.checked = false; });
+    const p = document.getElementById('filtro-perfil-lead');
+    if (p) p.value = '';
+    aplicarFiltroPreviewEnvio();
+}
+window.limparFiltrosPreview = limparFiltrosPreview;
+
+// ─── Exportar CSV da prévia ───────────────────────────────────────────────────
+
+function exportarCSVPrevia() {
+    const linhas   = document.querySelectorAll('#tabela-preview-envio tbody tr');
+    const visiveis = Array.from(linhas).filter(l => l.style.display !== 'none');
+    if (visiveis.length === 0) { mostrarMensagem('Nenhum dado visível para exportar.'); return; }
+
+    const csv = ['Nome;Email;Newsletter;Interesses;Compatível;Enviado?'];
+    for (const l of visiveis) {
+        csv.push([
+            l.cells[1]?.textContent.trim(),
+            l.cells[3]?.textContent.trim(),
+            l.cells[4]?.textContent.trim(),
+            l.cells[5]?.textContent.trim(),
+            l.cells[6]?.textContent.trim(),
+            l.cells[7]?.textContent.trim(),
+        ].join(';'));
+    }
+
+    const blob = new Blob([csv.join('\n')], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href     = URL.createObjectURL(blob);
+    link.download = `previa_envio_${Date.now()}.csv`;
+    link.click();
+}
+window.exportarCSVPrevia = exportarCSVPrevia;
+
+// ─── Compatibilidade ──────────────────────────────────────────────────────────
+
+function verificarCompatibilidadeNewsletter(destinatario, newsletter) {
+    if (destinatario.assinatura_status) {
+        if (newsletter.classificacao === 'premium' && destinatario.assinatura_status !== 'ativo') return false;
+        if (['cancelada', 'expirada'].includes(destinatario.assinatura_status)) return false;
+        return true;
+    }
+    if (newsletter.classificacao === 'premium') return false;
+    if (destinatario.receber_newsletter === false) return false;
+    return true;
+}
+window.verificarCompatibilidadeNewsletter = verificarCompatibilidadeNewsletter;
+
+// ─── Configurar botões da prévia ──────────────────────────────────────────────
+
+function configurarBotoesPrevia(contexto) {
+    const div = document.getElementById('botoes-envio-padrao');
+    if (div) div.style.display = contexto === 'envio' ? 'flex' : 'none';
+}
+window.configurarBotoesPrevia = configurarBotoesPrevia;
+
+function voltarParaEnvio() {
+    if (window.tipoDestinatarioSelecionado === 'leads')    mostrarAba('secao-envio-leads');
+    else if (window.tipoDestinatarioSelecionado === 'usuarios') mostrarAba('secao-envio-usuarios');
+    else mostrarAba('secao-newsletters-envio');
+}
+window.voltarParaEnvio = voltarParaEnvio;
+
+function voltarParaPrevia() {
+    mostrarAba('secao-preview-envio');
+    document.querySelector('#tabela-preview-envio').style.display = 'table';
+    document.querySelector('#tabela-preview-envio-destinatario').style.display = 'none';
+}
+window.voltarParaPrevia = voltarParaPrevia;
+
+// ─── Modal de confirmação de geração de lotes ─────────────────────────────────
+
+let dadosCampanha = null;
+
+function abrirModalConfirmacao(newsletter, filtros, totalSelecionados, haReenvio) {
+    dadosCampanha = { newsletterId: newsletter.id, filtros };
+    const tipo    = filtros.tipo === 'leads' ? 'Leads' : 'Usuários';
+    const avisoReenvio = haReenvio
+        ? '\n⚠️ ATENÇÃO: Um ou mais destinatários já receberam esta newsletter. O envio será feito assim mesmo.'
+        : '';
+
+    const info = `📰 Newsletter: ${newsletter.titulo} (${newsletter.edicao || newsletter.id})\n` +
+                 `👥 Tipo: ${tipo}\n` +
+                 `📬 Destinatários selecionados: ${totalSelecionados}` +
+                 avisoReenvio;
+
+    const infoEl = document.getElementById('info-campanha');
+    if (infoEl) infoEl.innerText = info;
+
+    const modal = document.getElementById('modal-confirmacao');
+    if (modal) modal.style.display = 'flex';
+}
+
+function fecharModal() {
+    const modal = document.getElementById('modal-confirmacao');
+    if (modal) modal.style.display = 'none';
+    dadosCampanha = null;
+}
+
+function fecharModalErrosEncontrados() {
+    const m = document.getElementById('alert-modal');
+    if (m) m.style.display = 'none';
+    dadosCampanha = null;
+}
+
+async function prosseguirGeracao() {
+    const modal = document.getElementById('modal-confirmacao');
+    if (modal) modal.style.display = 'none';
+    if (dadosCampanha && typeof window.confirmarPrevia === 'function') {
+        try {
+            await window.confirmarPrevia(dadosCampanha.newsletterId, dadosCampanha.filtros);
+        } finally {
+            dadosCampanha = null;
+        }
+    }
+}
+
+window.fecharModal                = fecharModal;
+window.fecharModalErrosEncontrados = fecharModalErrosEncontrados;
+window.prosseguirGeracao          = prosseguirGeracao;
+
+// ─── Coletar filtros ativos ───────────────────────────────────────────────────
+
+function coletarFiltros() {
+    if (window.tipoDestinatarioSelecionado === 'leads') {
+        return {
+            tipo:       'leads',
+            nome:       document.getElementById('filtro-nome')?.value.trim().toLowerCase()          || '',
+            email:      document.getElementById('filtro-email')?.value.trim().toLowerCase()         || '',
+            perfil:     document.getElementById('filtro-perfil')?.value.trim().toLowerCase()        || '',
+            preferencias: document.getElementById('filtro-tipo-news-envio')?.value.trim().toLowerCase() || '',
+            status:     document.getElementById('filtro-status-lead')?.value.trim().toLowerCase()   || '',
+            uf:         document.getElementById('filtro-uf-lead')?.value                            || '',
+            statusEnvio: document.getElementById('filtro-status-envio-lead')?.value                 || '',
+        };
+    }
+    if (window.tipoDestinatarioSelecionado === 'usuarios') {
+        return {
+            tipo:       'usuarios',
+            nome:       document.getElementById('filtro-usuario-nome')?.value.trim().toLowerCase()  || '',
+            email:      document.getElementById('filtro-usuario-email')?.value.trim().toLowerCase() || '',
+            assinatura: document.getElementById('filtro-assinatura')?.value.trim().toLowerCase()    || '',
+            uf:         document.getElementById('filtro-uf-usuario')?.value                         || '',
+            statusEnvio: document.getElementById('filtro-status-envio-usuario')?.value              || '',
+        };
+    }
+    return { tipo: null };
+}
+window.coletarFiltros = coletarFiltros;
+
+// ─── Botão Gerar Lotes ────────────────────────────────────────────────────────
+
+function onClickGerarLotes() {
+    const newsletter = window.newsletterSelecionada;
+    if (!newsletter) { mostrarMensagem('Nenhuma newsletter selecionada.'); return; }
+
+    const filtros = coletarFiltros();
+    if (!filtros) { mostrarMensagem('Erro ao coletar filtros.'); return; }
+
+    const linhasSelecionadas = Array.from(document.querySelectorAll('.chk-envio-final:checked'));
+    const totalSelecionados  = linhasSelecionadas.length;
+
+    if (totalSelecionados === 0) {
+        mostrarMensagem('Nenhum destinatário selecionado para envio.');
         return;
     }
 
-    const corpo = document.querySelector("#tabela-preview-envio tbody");
-    corpo.innerHTML = "<tr><td colspan='7'>Gerando prévia...</td></tr>";
+    // Verifica se há reenvios (destinatários que já receberam)
+    const haReenvio = linhasSelecionadas.some(chk => {
+        const tr = chk.closest('tr');
+        return tr?.dataset.statusEnvio === 'enviado';
+    });
 
-    let linhas = "";
+    // Reenvio em massa bloqueado — só 1 permitido
+    if (haReenvio && totalSelecionados > 1) {
+        mostrarMensagem('⚠️ Há destinatários que já receberam esta newsletter selecionados junto com outros. Reenvio em massa não é permitido. Para reenviar, selecione apenas 1 destinatário por vez.');
+        return;
+    }
 
-    // 🔑 Seleciona apenas os leads marcados
-    const selecionados = Array.from(document.querySelectorAll(".chk-lead-envio:checked"))
-        .map(chk => {
-            const tr = chk.closest("tr");
+    abrirModalConfirmacao(newsletter, filtros, totalSelecionados, haReenvio);
+}
+
+// ─── Confirmar Prévia — cria os lotes no Firestore ───────────────────────────
+// fix: numeração de lote usa contador atômico (sem race condition)
+// fix: data_publicacao NÃO é alterada aqui
+
+async function confirmarPrevia(newsletterId, filtros) {
+    const btn = document.getElementById('btn-gerar-lotes');
+    _setBtnEnviando(btn, true);
+
+    try {
+        const tamanhoLote = parseInt(document.getElementById('tamanho-lote')?.value) || 100;
+
+        const linhasSelecionadas = Array.from(document.querySelectorAll('.chk-envio-final:checked'))
+            .map(chk => chk.closest('tr'));
+
+        const destinatarios = linhasSelecionadas.map(tr => {
+            const tipo = window.tipoDestinatarioSelecionado;
             return {
-                leadId: tr.dataset.leadId,
-                nome: tr.children[1].innerText,
-                email: tr.children[2].innerText,
-                interesses: tr.children[4].innerText.split(",").map(i => i.trim()).filter(i => i)
+                id:    tipo === 'leads' ? tr.dataset.leadId : tr.dataset.usuarioId,
+                nome:  tr.children[1].innerText.trim(),
+                email: tr.children[3].innerText.trim(),
+                tipo,
+                ...(tipo === 'usuarios' && { assinaturaId: tr.dataset.assinaturaId }),
             };
         });
 
-    // 🔑 Monta prévia apenas com os selecionados
-    for (const lead of selecionados) {
-        const compativel = verificarCompatibilidadeNewsletter(lead, newsletterSelecionada);
-
-        linhas += `
-      <tr data-lead-id="${lead.leadId}" data-newsletter-id="${newsletterSelecionada.id}">
-        <td><input type="checkbox" class="chk-envio-final" checked /></td>
-        <td>${lead.nome}</td>
-        <td>${lead.email}</td>
-        <td>${newsletterSelecionada.titulo}</td>
-        <td>${lead.interesses.join(", ")}</td>
-        <td>${compativel ? "✅" : "❌"}</td>
-        <td>Não</td>
-      </tr>
-    `;
-    }
-
-    corpo.innerHTML = linhas || "<tr><td colspan='7'>Nenhum lead selecionado para prévia.</td></tr>";
-    mostrarAba("secao-preview-envio");
-}
-window.gerarPreviaEnvioLeads = gerarPreviaEnvioLeads; // para acesso global 
-
-function voltarParaEnvio() {
-
-    if (window.tipoDestinatarioSelecionado === "leads") {
-        mostrarAba("secao-envio-leads");
-    } else if (window.tipoDestinatarioSelecionado === "usuarios") {
-        mostrarAba("secao-envio-usuarios");
-    } else {
-        // fallback: volta para lista de newsletters
-        mostrarAba("secao-newsletters-envio");
-    }
-}
-window.voltarParaEnvio = voltarParaEnvio; // para acesso global
-
-function verificarCompatibilidadeNewsletter(destinatario, newsletter) {
-    // Caso seja Lead
-    if (destinatario.id && destinatario.status !== undefined && !destinatario.assinatura_status) {
-        // Leads só recebem newsletters básicas
-        if (newsletter.classificacao === "premium") return false;
-        if (destinatario.receber_newsletter === false) return false;
-        return true;
-    }
-
-    // Caso seja Usuário (com assinatura)
-    if (destinatario.assinatura_status) {
-        // Newsletter premium só para assinaturas com status "ativo"
-        if (newsletter.classificacao === "premium" && destinatario.assinatura_status !== "ativo") return false;
-        if (["cancelada", "expirada"].includes(destinatario.assinatura_status)) return false;
-        return true;
-    }
-
-    return false;
-}
-window.verificarCompatibilidadeNewsletter = verificarCompatibilidadeNewsletter; // para acesso global
-
-// Selecionar todos os usuários
-function selecionarTodosUsuarios(chkMaster) {
-    const todos = document.querySelectorAll(".chk-usuario-envio");
-    for (const chk of todos) {
-        chk.checked = chkMaster.checked;
-    }
-}
-window.selecionarTodosUsuarios = selecionarTodosUsuarios; // para acesso global
-
-// Configuração do provedor de envio
-// Troque para "ses" quando migrar para Amazon SES
-
-
-let EMAIL_PROVIDER = "vercel";
-window.EMAIL_PROVIDER = EMAIL_PROVIDER; // para acesso global
-
-// Função utilitária para pausar (controla taxa de envio)
-function sleep(ms) {
-    return new Promise(resolve => setTimeout(resolve, ms));
-}
-window.sleep = sleep; // para acesso global
-
-/**
- * Função genérica para processar tarefas em paralelo com limite de workers
- * @param {Array<Function>} tarefas - lista de funções async que fazem o envio
- * @param {number} limiteParalelo - quantos envios simultâneos
- * @param {number} delayMs - pausa entre cada envio (rate limiting)
- */
-async function processarEmLotes(tarefas, limiteParalelo = 5, delayMs = 600) {
-    const resultados = [];
-    const fila = [...tarefas]; // copia da lista de tarefas
-
-    // Worker: pega uma tarefa da fila, executa, pausa, repete
-    async function worker() {
-        while (fila.length) {
-            const tarefa = fila.shift();
-            try {
-                const resultado = await tarefa();
-                resultados.push(resultado);
-            } catch (err) {
-                resultados.push({ erro: err });
-            }
-            // pausa entre envios para respeitar limite de taxa
-            await sleep(delayMs);
+        if (destinatarios.length === 0) {
+            mostrarMensagem('Nenhum destinatário selecionado.');
+            return;
         }
-    }
 
-    // Cria N workers em paralelo
-    await Promise.all(Array.from({ length: limiteParalelo }, worker));
-    return resultados;
-}
-window.processarEmLotes = processarEmLotes; // para acesso global
+        // Cria o documento de envio (campanha)
+        const envioRef = db.collection('newsletters').doc(newsletterId)
+            .collection('envios').doc();
+        const envioId  = envioRef.id;
 
-async function confirmarPrevia(newsletterId, filtros) {
-    const tamanhoLote = parseInt(document.getElementById("tamanho-lote").value) || 100;
-
-    const linhasSelecionadas = Array.from(document.querySelectorAll(".chk-envio-final:checked"))
-        .map(chk => chk.closest("tr"));
-
-    const destinatarios = linhasSelecionadas.map(tr => {
-        const nome = tr.children[1].innerText;
-        const email = tr.children[3].innerText;
-        const tipo = window.tipoDestinatarioSelecionado;
-
-        return {
-            id: tipo === "leads" ? tr.dataset.leadId : tr.dataset.usuarioId,
-            nome,
-            email,
-            tipo,
-            ...(tipo === "usuarios" && { assinaturaId: tr.dataset.assinaturaId })
-        };
-    });
-
-    if (destinatarios.length === 0) {
-        mostrarMensagem("Nenhum destinatário selecionado para envio.");
-        return;
-    }
-
-    // Criação da campanha
-    const envioRef = db.collection("newsletters").doc(newsletterId).collection("envios").doc();
-    const envioId = envioRef.id;
-
-    await envioRef.set({
-        status: "pendente",
-        tipo: filtros.tipo,
-        total_destinatarios: destinatarios.length,
-        total_lotes: Math.ceil(destinatarios.length / tamanhoLote),
-        enviados: 0,
-        erros: 0,
-        abertos: 0,
-        //data_envio: firebase.firestore.Timestamp.now(),
-        tamanho_lote: destinatarios.length
-    });
-
-    // 🔎 Busca o último número de lote global
-    const ultimoLoteSnap = await db.collection("lotes_gerais")
-        .orderBy("numero_lote", "desc")
-        .limit(1)
-        .get();
-
-    let ultimoNumeroGlobal = 0;
-    if (!ultimoLoteSnap.empty) {
-        ultimoNumeroGlobal = ultimoLoteSnap.docs[0].data().numero_lote || 0;
-    }
-
-    // Criação dos lotes sequenciais
-    let numero = ultimoNumeroGlobal + 1;
-    for (let i = 0; i < destinatarios.length; i += tamanhoLote) {
-        const chunk = destinatarios.slice(i, i + tamanhoLote);
-
-        // Cria o lote dentro do envio
-        const loteRef = await envioRef.collection("lotes").add({
-            numero_lote: numero,
-            status: "pendente",
-            quantidade: chunk.length,
-            enviados: 0,
-            erros: 0,
-            abertos: 0,
-            destinatarios: chunk
+        await envioRef.set({
+            status:            'pendente',
+            tipo:              filtros.tipo,
+            total_destinatarios: destinatarios.length,
+            total_lotes:       Math.ceil(destinatarios.length / tamanhoLote),
+            tamanho_lote:      tamanhoLote,
+            enviados:          0,
+            erros:             0,
+            abertos:           0,
+            data_geracao:      firebase.firestore.Timestamp.now(),
         });
 
-        // Cria o índice global em lotes_gerais
-        await db.collection("lotes_gerais").add({
-            newsletterId: newsletterSelecionada.id,
-            envioId: envioId,
-            loteId: loteRef.id,
-            titulo: newsletterSelecionada.titulo,
-            edicao: newsletterSelecionada.edicao || newsletterSelecionada.id,
-            data_geracao: firebase.firestore.Timestamp.now(),
-            numero_lote: numero,
-            tipo: filtros.tipo,
-            status: "pendente",
-            quantidade: chunk.length,
-            enviados: 0,
-            erros: 0,
-            abertos: 0
-        });
+        // Numeração de lote com contador atômico (fix race condition)
+        const contadorRef   = db.collection('config_envios').doc('contador_lotes');
+        const totalLotes    = Math.ceil(destinatarios.length / tamanhoLote);
+        let primeiroNumero  = 1;
 
-        numero++;
+        try {
+            const resultado = await db.runTransaction(async tx => {
+                const snap = await tx.get(contadorRef);
+                const atual = snap.exists ? (snap.data().ultimo_numero || 0) : 0;
+                tx.set(contadorRef, { ultimo_numero: atual + totalLotes }, { merge: true });
+                return atual + 1; // primeiro número desta campanha
+            });
+            primeiroNumero = resultado;
+        } catch (e) {
+            // Fallback: usa timestamp para evitar conflito visual (não crítico)
+            primeiroNumero = Date.now();
+            console.warn('Falha no contador atômico, usando fallback:', e);
+        }
+
+        // Cria os lotes
+        let numero = primeiroNumero;
+        const batch = db.batch();
+
+        for (let i = 0; i < destinatarios.length; i += tamanhoLote) {
+            const chunk   = destinatarios.slice(i, i + tamanhoLote);
+            const loteRef = envioRef.collection('lotes').doc();
+
+            batch.set(loteRef, {
+                numero_lote:  numero,
+                status:       'pendente',
+                quantidade:   chunk.length,
+                enviados:     0,
+                erros:        0,
+                abertos:      0,
+                destinatarios: chunk,
+                data_geracao: firebase.firestore.Timestamp.now(),
+            });
+
+            batch.set(db.collection('lotes_gerais').doc(), {
+                newsletterId:  window.newsletterSelecionada.id,
+                envioId,
+                loteId:        loteRef.id,
+                titulo:        window.newsletterSelecionada.titulo,
+                edicao:        window.newsletterSelecionada.edicao || window.newsletterSelecionada.id,
+                data_geracao:  firebase.firestore.Timestamp.now(),
+                numero_lote:   numero,
+                tipo:          filtros.tipo,
+                status:        'pendente',
+                quantidade:    chunk.length,
+                enviados:      0,
+                erros:         0,
+            });
+
+            numero++;
+        }
+
+        await batch.commit();
+
+        const lotesGerados = numero - primeiroNumero;
+        mostrarMensagem(`✅ Campanha criada: ${destinatarios.length} destinatário(s) em ${lotesGerados} lote(s).`);
+        await listarLotesEnvio(newsletterId, envioId);
+        mostrarAba('secao-lotes-envio');
+
+    } catch (err) {
+        console.error('Erro em confirmarPrevia:', err);
+        mostrarMensagem('❌ Erro ao gerar lotes: ' + err.message);
+    } finally {
+        _setBtnEnviando(btn, false);
     }
-
-    mostrarMensagem(`Campanha criada com ${destinatarios.length} destinatários em ${numero - ultimoNumeroGlobal - 1} novos lotes.`);
-    await listarLotesEnvio(newsletterId, envioId);
-
-    mostrarAba("secao-lotes-envio");
 }
-window.confirmarPrevia = confirmarPrevia; // para acesso global
+window.confirmarPrevia = confirmarPrevia;
+
+// ─── Listar lotes de um envio ─────────────────────────────────────────────────
+
+let envioSelecionadoId = null;
+window.envioSelecionadoId = envioSelecionadoId;
 
 async function listarLotesEnvio(newsletterId, envioId) {
     envioSelecionadoId = envioId;
-    const corpo = document.getElementById("corpo-lotes-envio");
-    corpo.innerHTML = "<tr><td colspan='10'>Carregando lotes...</td></tr>";
+    const corpo = document.getElementById('corpo-lotes-envio');
+    corpo.innerHTML = "<tr><td colspan='9'>Carregando lotes...</td></tr>";
 
-    // Filtros de data (se existirem na tela)
-    const filtroDataTipo = document.getElementById("filtro-data-tipo")?.value || "envio";
-    const filtroDataInicio = document.getElementById("filtro-data-inicio")?.value;
-    const filtroDataFim = document.getElementById("filtro-data-fim")?.value;
-    const campoData = filtroDataTipo === "geracao" ? "data_geracao" : "data_envio";
+    const filtroDataTipo  = document.getElementById('filtro-data-tipo')?.value || 'geracao';
+    const filtroDataInicio = document.getElementById('filtro-data-inicio')?.value;
+    const filtroDataFim   = document.getElementById('filtro-data-fim')?.value;
+    const campoData       = filtroDataTipo === 'geracao' ? 'data_geracao' : 'data_envio';
 
-    let query = db.collection("newsletters")
-        .doc(newsletterId)
-        .collection("envios")
-        .doc(envioId)
-        .collection("lotes")
-        .orderBy("numero_lote");
+    let query = db.collection('newsletters').doc(newsletterId)
+        .collection('envios').doc(envioId)
+        .collection('lotes').orderBy('numero_lote');
 
     if (filtroDataInicio) {
-        const [ano, mes, dia] = filtroDataInicio.split("-");
-        const inicio = new Date(ano, mes - 1, dia, 0, 0, 0, 0);
-        query = query.where(campoData, ">=", inicio);
+        const [a, m, d] = filtroDataInicio.split('-');
+        query = query.where(campoData, '>=', new Date(a, m - 1, d, 0, 0, 0));
     }
     if (filtroDataFim) {
-        const [ano, mes, dia] = filtroDataFim.split("-");
-        const fim = new Date(ano, mes - 1, dia, 23, 59, 59, 999);
-        query = query.where(campoData, "<=", fim);
+        const [a, m, d] = filtroDataFim.split('-');
+        query = query.where(campoData, '<=', new Date(a, m - 1, d, 23, 59, 59));
     }
 
     const snap = await query.get();
-
-    // Busca logs de envio para identificar reenvios
-    const todosLogsSnap = await db.collectionGroup("envios_log").get();
-    const mapaReenvios = {};
-    const mapaUltimoEnvio = {};
-
-    todosLogsSnap.forEach(doc => {
-        const partes = doc.ref.path.split("/");
-        const loteId = partes[5];
-        const log = doc.data();
-        const data = log.data_envio.toDate();
-
-        if (!mapaReenvios[loteId]) {
-            mapaReenvios[loteId] = [];
-            mapaUltimoEnvio[loteId] = data;
-        } else {
-            mapaReenvios[loteId].push(log);
-            if (data > mapaUltimoEnvio[loteId]) mapaUltimoEnvio[loteId] = data;
-        }
-    });
-
-    let linhas = "";
+    let linhas = '';
 
     for (const doc of snap.docs) {
-        const lote = doc.data();
-        const loteId = doc.id;
-
-
-        const tipo = query.tipo;
-
-        const reenvios = mapaReenvios[loteId] || [];
-
-        const dataGeracao = lote.data_geracao?.toDate ? lote.data_geracao.toDate() : null;
-        const dataEnvio = lote.data_envio?.toDate ? lote.data_envio.toDate() : null;
-        const ultimoEnvio = mapaUltimoEnvio[loteId] || dataEnvio || dataGeracao;
-
+        const lote    = doc.data();
+        const loteId  = doc.id;
+        const dtGer   = lote.data_geracao?.toDate ? lote.data_geracao.toDate() : null;
+        const dtEnv   = lote.data_envio?.toDate   ? lote.data_envio.toDate()   : null;
         const progresso = lote.quantidade > 0 ? Math.round((lote.enviados / lote.quantidade) * 100) : 0;
-        const destaqueReenvio = reenvios.length > 1 ? "style='background-color:#fff3cd'" : "";
 
         linhas += `
-      <tr ${destaqueReenvio}>
-        <td>${lote.numero_lote}</td>
-        <td>${lote.status}</td>
-        <td>${lote.quantidade}</td>
-        <td>${lote.enviados}</td>
-        <td>${lote.erros}</td>
-        <td>${lote.abertos}</td>
-        <td>${dataGeracao ? dataGeracao.toLocaleString() : "-"}</td>
-        <td>${dataEnvio ? dataEnvio.toLocaleString() : "-"}</td>
-        <td>${ultimoEnvio ? ultimoEnvio.toLocaleString() : "-"}</td>
-        <td>
-            <button onclick="verDestinatariosLoteUnificado('${loteId}')">👥 Ver Destinatários</button>
-            <button onclick="enviarLoteIndividual('${newsletterId}', '${envioId}', '${loteId}')">📤 Enviar Newsletter</button>
-            <button onclick="enviarLoteEmMassa('${newsletterId}', '${envioId}', '${loteId}', '${window.tipoDestinatarioSelecionado}')">🚀 Enviar Newsletter em massa</button>
-            ${reenvios.length > 0
-                ? `<button onclick="verHistoricoEnvios('${newsletterId}', '${envioId}', '${loteId}')">📜 Ver Reenvios (${reenvios.length})</button>`
-                : `<button disabled title='Sem reenvios registrados'>📜 Ver Reenvios</button>`}
-        </td>
-      </tr>
-    `;
+            <tr>
+                <td>${lote.numero_lote}</td>
+                <td>${lote.status}</td>
+                <td>${lote.quantidade}</td>
+                <td>${lote.enviados}</td>
+                <td>${lote.erros || 0}</td>
+                <td>${dtGer ? dtGer.toLocaleString() : '-'}</td>
+                <td>${dtEnv ? dtEnv.toLocaleString() : '-'}</td>
+                <td>
+                    <div class="barra-progresso">
+                        <div class="preenchimento" style="width:${progresso}%">${progresso}%</div>
+                    </div>
+                </td>
+                <td>
+                    <button onclick="verDestinatariosLoteUnificado('${loteId}')">👥 Ver</button>
+                    <button onclick="enviarLoteEmMassa('${newsletterId}','${envioId}','${loteId}')"
+                            class="btn-enviar-lote">🚀 Enviar</button>
+                    <button onclick="verHistoricoEnvios('${newsletterId}','${envioId}','${loteId}')">📜 Log</button>
+                </td>
+            </tr>`;
     }
 
-    corpo.innerHTML = linhas || "<tr><td colspan='10'>Nenhum lote encontrado.</td></tr>";
+    corpo.innerHTML = linhas || "<tr><td colspan='9'>Nenhum lote encontrado.</td></tr>";
 }
-window.listarLotesEnvio = listarLotesEnvio; // para acesso global
+window.listarLotesEnvio = listarLotesEnvio;
 
-async function enviarLoteIndividual(newsletterId, envioDocId, loteId) {
-    try {
-        const loteRef = db.collection("newsletters")
-            .doc(newsletterId)
-            .collection("envios")
-            .doc(envioDocId)
-            .collection("lotes")
-            .doc(loteId);
-
-        const loteSnap = await loteRef.get();
-        if (!loteSnap.exists) { mostrarMensagem("❌ Lote não encontrado."); return; }
-
-        const lote = loteSnap.data();
-        const numeroLote = lote.numero_lote || loteId;
-
-        const newsletterSnap = await db.collection("newsletters").doc(newsletterId).get();
-        const newsletter = newsletterSnap.exists ? newsletterSnap.data() : {};
-        const titulo = newsletter.titulo || "Sem título";
-        const edicao = newsletter.edicao || newsletterId;
-
-        const jaEnviado = lote.enviados && lote.enviados >= lote.quantidade;
-        const confirmar = confirm(
-            jaEnviado
-                ? `⚠️ O lote nº ${numeroLote} da newsletter "${titulo}" (${edicao}) já foi enviado.\nDeseja enviar novamente?`
-                : `📤 Deseja enviar o lote nº ${numeroLote} da newsletter "${titulo}" (${edicao})?`
-        );
-        if (!confirmar) return;
-
-        const destinatarios = lote.destinatarios || [];
-        let enviados = 0;
-
-        for (const dest of destinatarios) {
-            const tipo = dest.tipo || (dest.assinaturaId ? "usuarios" : "leads");
-            const emailDest = (dest.email || "").trim();
-            const idDest = dest.id || "-";
-            const identificador = emailDest || `ID:${idDest}`;
-            const segmento = tipo === "leads" ? "leads" : "assinantes";
-
-            const htmlMontado = montarHtmlNewsletterParaEnvio(newsletter, {
-                nome: dest.nome,
-                email: emailDest,
-                edicao: newsletter.edicao,
-                tipo: newsletter.tipo,
-                titulo: newsletter.titulo,
-                data_publicacao: newsletter.data_publicacao,
-                newsletterId
-            }, segmento);
-
-            try {
-                const token = gerarTokenAcesso();
-                const expiraEm = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
-
-                let registroEnvioId; // ID do registro criado (Supabase ou Firestore)
-
-                if (tipo === "leads") {
-                    // ── Grava direto no Supabase via service_role (window.supabase no admin) ──
-                    const { data, error } = await window.supabase
-                        .from("leads_envios")
-                        .insert({
-                            lead_id: idDest,
-                            newsletter_id: newsletterId,
-                            data_envio: new Date().toISOString(),
-                            status: "enviado",
-                            token_acesso: token,
-                            expira_em: expiraEm.toISOString()
-                        })
-                        .select("id")
-                        .single();
-
-                    if (error) throw new Error("Supabase insert falhou: " + error.message);
-                    registroEnvioId = String(data.id); // garante string para a URL
-
-                } else {
-                    // ── Assinantes: Firestore ──────────────────────────────────────────────
-                    const envioRef = await db
-                        .collection("usuarios").doc(idDest)
-                        .collection("assinaturas").doc(dest.assinaturaId)
-                        .collection("envios")
-                        .add({
-                            newsletter_id: newsletterId,
-                            data_envio: firebase.firestore.Timestamp.now(),
-                            status: "enviado",
-                            destinatarioId: idDest,
-                            assinaturaId: dest.assinaturaId,
-                            token_acesso: token,
-                            expira_em: firebase.firestore.Timestamp.fromDate(expiraEm),
-                            ultimo_acesso: null,
-                            acessos_totais: 0
-                        });
-                    registroEnvioId = envioRef.id;
-                }
-
-                const htmlFinal = aplicarRastreamento(
-                    htmlMontado,
-                    registroEnvioId,
-                    idDest,
-                    newsletterId,
-                    dest.assinaturaId || null,
-                    token
-                );
-
-                const response = await fetch("https://api.radarsiope.com.br/api/sendViaSES", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                        nome: dest.nome,
-                        email: emailDest,
-                        mensagemHtml: htmlFinal,
-                        assunto: newsletter.titulo || "Newsletter Radar SIOPE"
-                    })
-                });
-
-                const text = await response.text();
-                let result;
-                try { result = JSON.parse(text); }
-                catch { throw new Error("Resposta inválida do backend: " + text); }
-
-                if (!response.ok || !result.ok) throw new Error(result.error || "Falha no SES");
-                enviados++;
-
-            } catch (err) {
-                console.error(`❌ Falha ao enviar para ${identificador}`, err);
-
-                // Registra erro no destino correto
-                if (tipo === "leads") {
-                    const { error } = await window.supabase
-                        .from("leads_envios")
-                        .insert({
-                            lead_id: idDest,
-                            newsletter_id: newsletterId,
-                            data_envio: new Date().toISOString(),
-                            status: "erro",
-                            token_acesso: null,
-                            expira_em: null
-                        });
-                    // fallback no Firestore se Supabase falhar
-                    if (error) {
-                        await db.collection("leads").doc(idDest).collection("envios").add({
-                            newsletter_id: newsletterId,
-                            data_envio: firebase.firestore.Timestamp.now(),
-                            status: "erro",
-                            erro: err.message
-                        });
-                    }
-                } else {
-                    await db.collection("usuarios").doc(idDest)
-                        .collection("assinaturas").doc(dest.assinaturaId)
-                        .collection("envios").add({
-                            newsletter_id: newsletterId,
-                            data_envio: firebase.firestore.Timestamp.now(),
-                            status: "erro",
-                            erro: err.message
-                        });
-                }
-                continue;
-            }
-        }
-
-        // Atualiza metadados do lote
-        const usuarioLogado = JSON.parse(localStorage.getItem("usuarioLogado"));
-        const feitoPor = usuarioLogado?.nome || usuarioLogado?.email || "Desconhecido";
-
-        await loteRef.collection("envios_log").add({
-            data_envio: firebase.firestore.Timestamp.now(),
-            quantidade: destinatarios.length,
-            enviados,
-            origem: "manual",
-            operador: feitoPor,
-            status: enviados === destinatarios.length ? "completo" : "parcial"
-        });
-
-        await loteRef.update({
-            enviados,
-            status: enviados === destinatarios.length ? "completo" : "parcial",
-            data_envio: firebase.firestore.Timestamp.now()
-        });
-
-        // ✅ usa envioDocId (parâmetro da função) — corrige o bug "envioId is not defined"
-        const loteGeralSnap = await db.collection("lotes_gerais")
-            .where("loteId", "==", loteId)
-            .where("envioId", "==", envioDocId)
-            .limit(1).get();
-
-        if (!loteGeralSnap.empty) {
-            await loteGeralSnap.docs[0].ref.update({
-                enviados,
-                status: enviados === destinatarios.length ? "completo" : "parcial",
-                data_envio: firebase.firestore.Timestamp.now()
-            });
-        }
-
-        await db.collection("newsletters").doc(newsletterId).update({
-            enviada: true,
-            data_publicacao: firebase.firestore.Timestamp.now()
-        });
-
-        mostrarMensagem(`✅ Lote nº ${numeroLote} enviado! (${enviados}/${destinatarios.length})`);
-
-    } catch (err) {
-        console.error("Erro ao enviar lote:", err);
-        mostrarMensagem("❌ Erro ao enviar lote: " + err.message);
-    }
-}
-window.enviarLoteIndividual = enviarLoteIndividual;
-
-function montarHtmlNewsletterParaEnvio(newsletter, dados, segmento = null) {
-    // ✅ HTML base da edição
-    let htmlBase = newsletter.html_conteudo || "";
-    const blocos = newsletter.blocos || [];
-
-    let htmlBlocos = "";
-
-    // ✅ Monta blocos filtrados por segmento
-    if (blocos.length > 0) {
-        blocos.forEach(b => {
-            // Filtra por segmento (lead/assinante)
-            if (segmento && b.acesso !== "todos" && b.acesso !== segmento) return;
-
-            // Filtra por destino: blocos "só app" não vão para o e-mail
-            if (b.destino === "app") return;
-
-            htmlBlocos += b.html || "";
-        });
-    }
-
-    let htmlFinal = "";
-
-    if (blocos.length === 0) {
-        // ✅ Sem blocos → usa apenas o HTML base
-        htmlFinal = htmlBase.replace(/\{\{blocos\}\}/g, '');
-    } else {
-        // ✅ Com blocos → insere no {{blocos}} ou no final
-        if (htmlBase.includes("{{blocos}}")) {
-            htmlFinal = htmlBase.replace(/\{\{blocos\}\}/g, htmlBlocos || "");
-        } else {
-            htmlFinal = htmlBase + "\n" + htmlBlocos;
-        }
-    }
-
-    // ✅ Aplica placeholders reais do destinatário
-    htmlFinal = aplicarPlaceholders(htmlFinal, dados);
-
-    return htmlFinal;
-}
-window.montarHtmlNewsletterParaEnvio = montarHtmlNewsletterParaEnvio; // para acesso global
-
-function aplicarRastreamento(htmlBase, envioId, destinatarioId, newsletterId, assinaturaId, token) {
-    // 1) Pixel de abertura
-    const pixelTag = `<img src="https://api.radarsiope.com.br/api/pixel?envioId=${encodeURIComponent(envioId)}&destinatarioId=${encodeURIComponent(destinatarioId)}&newsletterId=${encodeURIComponent(newsletterId)}" width="1" height="1" style="display:none;" alt="" />`;
-    let html = htmlBase + pixelTag;
-
-    // 2) Monta parâmetros e gera link ofuscado (Base64)
-    const parts = [
-        `nid=${newsletterId || ''}`,
-        `env=${envioId || ''}`,
-        `uid=${destinatarioId || ''}`
-    ];
-    if (assinaturaId) parts.push(`assinaturaId=${assinaturaId}`);
-    if (token) parts.push(`token=${token}`);
-    const qs = parts.join('&');
-
-    let b64;
-    try {
-        b64 = (typeof Buffer !== 'undefined' && typeof Buffer.from === 'function')
-            ? Buffer.from(qs).toString('base64')
-            : btoa(qs);
-    } catch (e) {
-        b64 = encodeURIComponent(qs);
-    }
-
-    // ✅ Domínio corrigido: app.radarsiope.com.br (web app), não api.radarsiope.com.br (backend)
-    const encodedD = encodeURIComponent(b64);
-    const hrefOfuscado = `https://app.radarsiope.com.br/verNewsletterComToken.html?d=${encodedD}`;
-
-    // 3) Substitui o link de visualização pelo link ofuscado
-    html = html.replace(
-        /href="([^"]*verNewsletterComToken\.html[^"]*)"/i,
-        () => `href="${hrefOfuscado}"`
-    );
-
-    // 4) Reescreve demais links pelo redirecionador de clique (rastreamento)
-    html = html.replace(/href="([^"]+)"/g, (m, href) => {
-        const u = String(href).trim();
-        const lower = u.toLowerCase();
-
-        // Preserva links especiais sem rastreamento
-        if (
-            lower.startsWith('mailto:') ||
-            lower.startsWith('tel:') ||
-            lower.startsWith('javascript:') ||
-            lower.startsWith('#') ||
-            /descadastramento\.html/i.test(u) ||
-            /vernewslettercomtoken\.html/i.test(u) ||
-            /\/api\/click/i.test(u)
-        ) {
-            return `href="${u}"`;
-        }
-
-        let destino = u;
-        try { destino = decodeURIComponent(u); } catch (e) { /* mantém u */ }
-
-        const track = `https://api.radarsiope.com.br/api/click` +
-            `?envioId=${encodeURIComponent(envioId)}` +
-            `&destinatarioId=${encodeURIComponent(destinatarioId)}` +
-            `&newsletterId=${encodeURIComponent(newsletterId)}` +
-            `&url=${encodeURIComponent(destino)}`;
-        return `href="${track}"`;
-    });
-
-    return html;
-}
-window.aplicarRastreamento = aplicarRastreamento; // para acesso global
-
-function voltarParaPrevia() {
-    // Esconde a section de lotes
-    document.getElementById("secao-lotes-envio").style.display = "none";
-    // Mostra novamente a section de prévia
-    document.getElementById("secao-preview-envio").style.display = "block";
-}
-window.voltarParaPrevia = voltarParaPrevia; // para acesso global
-
-function coletarFiltros() {
-    if (window.tipoDestinatarioSelecionado === "leads") {
-        return {
-            tipo: "leads",
-            nome: document.getElementById("filtro-nome").value.trim().toLowerCase(),
-            email: document.getElementById("filtro-email").value.trim().toLowerCase(),
-            perfil: document.getElementById("filtro-perfil").value.trim().toLowerCase(),
-            preferencias: document.getElementById("filtro-tipo-news-envio").value.trim().toLowerCase(),
-            status: document.getElementById("filtro-status-lead").value.trim().toLowerCase()
-        };
-    } else if (window.tipoDestinatarioSelecionado === "usuarios") {
-        return {
-            tipo: "usuarios",
-            nome: document.getElementById("filtro-usuario-nome").value.trim().toLowerCase(),
-            email: document.getElementById("filtro-usuario-email").value.trim().toLowerCase(),
-            assinatura: document.getElementById("filtro-assinatura").value.trim().toLowerCase()
-        };
-    } else {
-        return { tipo: null };
-    }
-}
-window.coletarFiltros = coletarFiltros; // para acesso global
-
-function abrirLotesGerados() {
-    if (!newsletterSelecionada || !newsletterSelecionada.id) {
-        mostrarMensagem("Nenhuma newsletter selecionada.");
-        return;
-    }
-
-    // 🔎 Primeiro tenta ordenar por data_geracao (para lotes novos)
-    db.collection("newsletters")
-        .doc(newsletterSelecionada.id)
-        .collection("envios")
-        .where("tipo", "==", window.tipoDestinatarioSelecionado)
-        .orderBy("data_geracao", "desc")
-        .limit(1)
-        .get()
-        .then(async snapshot => {
-            // Se não houver resultados (ou se os docs não tiverem data_geracao), cai para data_envio
-            if (snapshot.empty) {
-                snapshot = await db.collection("newsletters")
-                    .doc(newsletterSelecionada.id)
-                    .collection("envios")
-                    .where("tipo", "==", tipoDestinatarioSelecionado)
-                    .orderBy("data_envio", "desc")
-                    .limit(1)
-                    .get();
-            }
-
-            if (snapshot.empty) {
-                mostrarMensagem("Nenhum lote encontrado para esse tipo.");
-                return;
-            }
-
-            const envio = snapshot.docs[0];
-            envioSelecionadoId = envio.id;
-
-            // ✅ Ajusta cabeçalhos da tabela
-            const cabecalho = document.getElementById("cabecalho-lotes-envio");
-            cabecalho.innerHTML = `
-              <tr>
-                <th>Nº Lote</th>
-                <th>Status</th>
-                <th>Qtd</th>
-                <th>Enviados</th>
-                <th>Erros</th>
-                <th>Abertos</th>
-                <th>Data de Geração</th>
-                <th>Data de Envio</th>
-                <th>Último Envio/Reenvio</th>
-                <th>Ações</th>
-              </tr>
-            `;
-
-            listarLotesEnvio(newsletterSelecionada.id, envio.id);
-            mostrarAba("secao-lotes-envio");
-        })
-        .catch(err => {
-            console.error("Erro ao abrir lotes gerados:", err);
-            mostrarMensagem("❌ Erro ao carregar lotes.");
-        });
-}
-window.abrirLotesGerados = abrirLotesGerados; // para acesso global
-
-function verDestinatariosLote(loteId) {
-    const corpo = document.querySelector("#tabela-preview-envio tbody");
-    corpo.innerHTML = "<tr><td colspan='7'>Carregando destinatários...</td></tr>";
-
-    db.collection("newsletters")
-        .doc(newsletterSelecionada.id)
-        .collection("envios")
-        .doc(envioSelecionadoId)
-        .collection("lotes")
-        .doc(loteId)
-        .get()
-        .then(doc => {
-            if (!doc.exists) {
-                mostrarMensagem("Lote não encontrado.");
-                return;
-            }
-
-            const lote = doc.data();
-            let linhas = "";
-
-            for (const d of lote.destinatarios) {
-                linhas += `
-          <tr>
-            <td>✅</td>
-            <td>${d.nome}</td>
-            <td>${d.email}</td>
-            <td>${newsletterSelecionada.titulo}</td>
-            <td>-</td>
-            <td>✅</td>
-            <td>Não</td>
-          </tr>
-        `;
-            }
-
-            corpo.innerHTML = linhas;
-            mostrarAba("secao-preview-envio");
-        });
-}
-window.verDestinatariosLote = verDestinatariosLote; // para acesso global   
+// ─── Ver todos os lotes ───────────────────────────────────────────────────────
+// fix #I5: sem collectionGroup("envios_log") global — logs buscados por lote
 
 async function listarTodosOsLotes() {
-    const corpo = document.getElementById("corpo-todos-os-lotes");
-    corpo.innerHTML = "<tr><td colspan='12'>Carregando lotes...</td></tr>";
+    const corpo = document.getElementById('corpo-todos-os-lotes');
+    corpo.innerHTML = "<tr><td colspan='11'>Carregando lotes...</td></tr>";
 
-    const filtroNewsletter = document.getElementById("filtro-newsletter").value;
-    const filtroTipo = document.getElementById("filtro-tipo").value;
-    const filtroStatus = document.getElementById("filtro-status").value;
-    const filtroDataTipo = document.getElementById("filtro-data-tipo").value; // geracao ou envio
-    const filtroDataInicio = document.getElementById("filtro-data-inicio").value;
-    const filtroDataFim = document.getElementById("filtro-data-fim").value;
+    const filtroNewsletter = document.getElementById('filtro-newsletter')?.value || '';
+    const filtroTipo       = document.getElementById('filtro-tipo')?.value       || '';
+    const filtroStatus     = document.getElementById('filtro-status')?.value     || '';
+    const filtroDataTipo   = document.getElementById('filtro-data-tipo')?.value  || 'geracao';
+    const filtroDataInicio = document.getElementById('filtro-data-inicio')?.value;
+    const filtroDataFim    = document.getElementById('filtro-data-fim')?.value;
+    const campoData        = filtroDataTipo === 'geracao' ? 'data_geracao' : 'data_envio';
 
-    const campoData = filtroDataTipo === "geracao" ? "data_geracao" : "data_envio";
+    let query = db.collection('lotes_gerais').orderBy(campoData, 'desc').limit(200);
 
-    let query = db.collection("lotes_gerais").orderBy(campoData, "desc").limit(500);
-
-    if (filtroNewsletter) query = query.where("newsletterId", "==", filtroNewsletter);
-    if (filtroTipo) query = query.where("tipo", "==", filtroTipo);
-    if (filtroStatus) query = query.where("status", "==", filtroStatus);
-
+    if (filtroNewsletter) query = query.where('newsletterId', '==', filtroNewsletter);
+    if (filtroTipo)       query = query.where('tipo',          '==', filtroTipo);
+    if (filtroStatus)     query = query.where('status',        '==', filtroStatus);
     if (filtroDataInicio) {
-        const [ano, mes, dia] = filtroDataInicio.split("-");
-        const inicio = new Date(ano, mes - 1, dia, 0, 0, 0, 0);
-        query = query.where(campoData, ">=", inicio);
+        const [a, m, d] = filtroDataInicio.split('-');
+        query = query.where(campoData, '>=', new Date(a, m - 1, d, 0, 0, 0));
     }
     if (filtroDataFim) {
-        const [ano, mes, dia] = filtroDataFim.split("-");
-        const fim = new Date(ano, mes - 1, dia, 23, 59, 59, 999);
-        query = query.where(campoData, "<=", fim);
+        const [a, m, d] = filtroDataFim.split('-');
+        query = query.where(campoData, '<=', new Date(a, m - 1, d, 23, 59, 59));
     }
 
     const snap = await query.get();
 
-    const todosLogsSnap = await db.collectionGroup("envios_log").get();
-    const mapaReenvios = {};
-    const mapaUltimoEnvio = {};
-
-    todosLogsSnap.forEach(doc => {
-        const partes = doc.ref.path.split("/");
-        const loteId = partes[5];
-        const log = doc.data();
-        const data = log.data_envio.toDate();
-
-        if (!mapaReenvios[loteId]) {
-            mapaReenvios[loteId] = [];
-            mapaUltimoEnvio[loteId] = data;
-        } else {
-            mapaReenvios[loteId].push(log);
-            if (data > mapaUltimoEnvio[loteId]) mapaUltimoEnvio[loteId] = data;
-        }
-    });
-
-    const lotesComDados = snap.docs.map(doc => {
-        const lote = doc.data();
-        const loteId = doc.id;
-        const reenvios = mapaReenvios[loteId] || [];
-
-        const dataGeracao = lote.data_geracao?.toDate ? lote.data_geracao.toDate() : null;
-        const dataEnvio = lote.data_envio?.toDate ? lote.data_envio.toDate() : null;
-        const ultimoEnvio = mapaUltimoEnvio[loteId] || dataEnvio;
-
-        return { docId: loteId, lote, reenvios, dataGeracao, dataEnvio, ultimoEnvio };
-    });
-
-    if (filtroDataInicio || filtroDataFim) {
-        lotesComDados.sort((a, b) => b.ultimoEnvio - a.ultimoEnvio);
-    } else {
-        lotesComDados.sort((a, b) => b.lote.numero_lote - a.lote.numero_lote);
-    }
-
-    corpo.innerHTML = lotesComDados.length === 0
-        ? "<tr><td colspan='12'>Nenhum lote encontrado com os filtros aplicados.</td></tr>"
-        : lotesComDados.map(item => {
-            const { docId, lote, reenvios, dataGeracao, dataEnvio, ultimoEnvio } = item;
-            const progresso = lote.quantidade > 0 ? Math.round((lote.enviados / lote.quantidade) * 100) : 0;
-            const destaqueReenvio = reenvios.length > 1 ? "style='background-color:#fff3cd'" : "";
+    corpo.innerHTML = snap.empty
+        ? "<tr><td colspan='11'>Nenhum lote encontrado com os filtros aplicados.</td></tr>"
+        : snap.docs.map(doc => {
+            const lote = doc.data();
+            const dtGer = lote.data_geracao?.toDate ? lote.data_geracao.toDate() : null;
+            const dtEnv = lote.data_envio?.toDate   ? lote.data_envio.toDate()   : null;
+            const prog  = lote.quantidade > 0 ? Math.round((lote.enviados / lote.quantidade) * 100) : 0;
 
             return `
-              <tr ${destaqueReenvio}>
-                <td>${lote.titulo}</td>
-                <td>${lote.edicao}</td>
-                <td>${dataGeracao ? dataGeracao.toLocaleString() : "-"}</td>
-                <td>${dataEnvio ? dataEnvio.toLocaleString() : "-"}</td>
-                <td>${lote.numero_lote}</td>
-                <td>${lote.tipo}</td>
-                <td>${lote.status}</td>
-                <td>
-                  <div class="barra-progresso">
-                    <div class="preenchimento" style="width:${progresso}%">${progresso}%</div>
-                  </div>
-                </td>
-                <td>${lote.quantidade}</td>
-                <td>${lote.tamanho_lote || "-"}</td>
-                <td>${ultimoEnvio ? ultimoEnvio.toLocaleString() : "-"}</td>
-                <td>
-                    <button onclick="verDestinatariosLoteUnificado('${lote.loteId}')">👥 Ver Destinatários</button>
-                    <button onclick="enviarLoteIndividual('${lote.newsletterId}', '${lote.envioId}', '${lote.loteId}')">📤 Enviar Newsletter</button>
-                    <button onclick="enviarLoteEmMassa('${lote.newsletterId}', '${lote.envioId}', '${lote.loteId}', '${lote.tipo}')">🚀 Enviar Newsletter em massa</button>
-                  ${reenvios.length > 0
-                    ? `<button onclick="verHistoricoEnvios('${lote.newsletterId}', '${lote.envioId}', '${docId}')">📜 Ver Reenvios (${reenvios.length})</button>`
-                    : `<button disabled title='Sem reenvios registrados'>📜 Ver Reenvios</button>`}
-                </td>
-              </tr>
-            `;
-        }).join("");
-
-    mostrarAba("secao-todos-os-lotes");
-}
-window.listarTodosOsLotes = listarTodosOsLotes; // para acesso global
-
-async function verHistoricoEnvios(newsletterId, envioId, loteId) {
-    const corpo = document.getElementById("corpo-historico-reenvios");
-    corpo.innerHTML = "<tr><td colspan='5'>Carregando histórico...</td></tr>";
-
-    const logRef = db.collection("newsletters")
-        .doc(newsletterId)
-        .collection("envios")
-        .doc(envioId)
-        .collection("lotes")
-        .doc(loteId)
-        .collection("envios_log")
-        .orderBy("data_envio", "desc");
-
-    const snap = await logRef.get();
-    let linhas = "";
-
-    if (snap.empty) {
-        corpo.innerHTML = "<tr><td colspan='5'>Nenhum reenvio registrado.</td></tr>";
-    } else {
-        for (const doc of snap.docs) {
-            const loteId = doc.id;
-            const lote = doc.data();
-            const log = doc.data();
-            linhas += `
-        <tr>
-          <td>${new Date(log.data_envio.toDate())}</td>
-          <td>${log.quantidade}</td>
-          <td>${log.enviados}</td>
-          <td>${log.status}</td>
-          <td>${log.operador}</td>
-        </tr>
-      `;
-        }
-        corpo.innerHTML = linhas;
-    }
-
-    mostrarAba("secao-historico-reenvios");
-}
-window.verHistoricoEnvios = verHistoricoEnvios;
-
-function verDestinatariosLoteCompleto(newsletterId, envioId, loteId) {
-    const corpo = document.querySelector("#tabela-preview-envio tbody");
-    corpo.innerHTML = "<tr><td colspan='8'>Carregando destinatários...</td></tr>";
-
-    const loteRef = db.collection("newsletters")
-        .doc(newsletterId)
-        .collection("envios")
-        .doc(envioId)
-        .collection("lotes")
-        .doc(loteId);
-
-    loteRef.get().then(doc => {
-        if (!doc.exists) {
-            mostrarMensagem("Lote não encontrado.");
-            return;
-        }
-
-        const lote = doc.data();
-        const destinatarios = lote.destinatarios || [];
-
-        if (destinatarios.length === 0) {
-            corpo.innerHTML = "<tr><td colspan='8'>Nenhum destinatário encontrado.</td></tr>";
-            return;
-        }
-
-        let linhas = "";
-        destinatarios.forEach(d => {
-            linhas += `
                 <tr>
-                  <td><input type="checkbox" /></td>
-                  <td>${d.nome || "-"}</td>
-                  <td>${d.perfil || "-"}</td>
-                  <td>${d.email || "-"}</td>
-                  <td>${newsletterSelecionada?.titulo || "-"}</td>
-                  <td>${d.interesses || "-"}</td>
-                  <td>${d.compativel ? "✅" : "❌"}</td>
-                  <td>${d.enviado ? "Sim" : "Não"}</td>
-                </tr>
-            `;
-        });
+                    <td>${lote.titulo || '-'}</td>
+                    <td>${lote.edicao || '-'}</td>
+                    <td>${dtGer ? dtGer.toLocaleString() : '-'}</td>
+                    <td>${dtEnv ? dtEnv.toLocaleString() : '-'}</td>
+                    <td>${lote.numero_lote}</td>
+                    <td>${lote.tipo}</td>
+                    <td>${lote.status}</td>
+                    <td><div class="barra-progresso"><div class="preenchimento" style="width:${prog}%">${prog}%</div></div></td>
+                    <td>${lote.quantidade}</td>
+                    <td>${lote.enviados}</td>
+                    <td>
+                        <button onclick="verDestinatariosLoteUnificado('${lote.loteId}')">👥 Ver</button>
+                        <button onclick="enviarLoteEmMassa('${lote.newsletterId}','${lote.envioId}','${lote.loteId}')">🚀 Enviar</button>
+                        <button onclick="verHistoricoEnvios('${lote.newsletterId}','${lote.envioId}','${doc.id}')">📜 Log</button>
+                    </td>
+                </tr>`;
+        }).join('');
 
-        corpo.innerHTML = linhas;
-        mostrarAba("secao-preview-envio");
-    });
-
-    configurarBotoesPrevia("visualizacao");
+    mostrarAba('secao-todos-os-lotes');
 }
-window.verDestinatariosLoteCompleto = verDestinatariosLoteCompleto; // para acesso global
+window.listarTodosOsLotes = listarTodosOsLotes;
 
-async function enviarLote(newsletterId, envioId, loteId) {
-    const loteRef = db.collection("newsletters")
-        .doc(newsletterId)
-        .collection("envios")
-        .doc(envioId)
-        .collection("lotes")
-        .doc(loteId);
+function abrirTelaTodosOsLotes() {
+    preencherFiltroNewsletters();
+    listarTodosOsLotes();
+}
+window.abrirTelaTodosOsLotes = abrirTelaTodosOsLotes;
 
-    const loteSnap = await loteRef.get();
-    if (!loteSnap.exists) {
-        mostrarMensagem("Lote não encontrado.");
+// ─── Abrir lotes gerados da newsletter atual ──────────────────────────────────
+
+function abrirLotesGerados() {
+    if (!window.newsletterSelecionada?.id) {
+        mostrarMensagem('Nenhuma newsletter selecionada.');
         return;
     }
-
-    const lote = loteSnap.data();
-    const destinatarios = lote.destinatarios;
-
-    let enviados = 0;
-    let erros = 0;
-    let abertos = 0;
-
-    for (const d of destinatarios) {
-        try {
-            // Simula envio (substitua com lógica real)
-            await enviarEmailParaDestinatario(d);
-            enviados++;
-        } catch (e) {
-            erros++;
-        }
-    }
-
-    // Atualiza o lote original
-    await loteRef.update({
-        status: "finalizado",
-        enviados,
-        erros,
-        abertos // se tiver lógica de rastreamento
-    });
-
-    // Atualiza o índice global
-    const indexSnap = await db.collection("lotes_gerais")
-        .where("newsletterId", "==", newsletterId)
-        .where("envioId", "==", envioId)
-        .where("loteId", "==", loteId)
+    db.collection('newsletters').doc(window.newsletterSelecionada.id)
+        .collection('envios')
+        .where('tipo', '==', window.tipoDestinatarioSelecionado)
+        .orderBy('data_geracao', 'desc')
         .limit(1)
-        .get();
-
-    if (!indexSnap.empty) {
-        const indexRef = indexSnap.docs[0].ref;
-        await indexRef.update({
-            status: "finalizado",
-            enviados,
-            erros,
-            abertos
-        });
-    }
-
-    mostrarMensagem(`Lote ${lote.numero_lote} enviado: ${enviados} enviados, ${erros} erros.`);
-}
-window.enviarLote = enviarLote; // para acesso global
-
-async function preencherFiltroNewsletters() {
-    const select = document.getElementById("filtro-newsletter");
-
-    // ✅ Limpa todas as opções anteriores
-    select.innerHTML = "";
-
-    // ✅ Adiciona a opção padrão
-    const defaultOption = document.createElement("option");
-    defaultOption.value = "";
-    defaultOption.textContent = "Todas as newsletters";
-    select.appendChild(defaultOption);
-
-    // ✅ Preenche com os dados reais
-    const snap = await db.collection("newsletters").get();
-    for (const doc of snap.docs) {
-        const n = doc.data();
-        const option = document.createElement("option");
-        option.value = doc.id;
-        option.textContent = `${n.titulo} (${n.edicao || doc.id})`;
-        select.appendChild(option);
-    }
-}
-window.preencherFiltroNewsletters = preencherFiltroNewsletters; // para acesso global   
-
-function configurarBotoesPrevia(contexto) {
-    const botoesPadrao = document.getElementById("botoes-envio-padrao");
-
-    if (contexto === "envio") {
-        botoesPadrao.style.display = "block"; // mostra todos
-    } else if (contexto === "visualizacao") {
-        botoesPadrao.style.display = "none"; // esconde os extras
-    }
-}
-window.configurarBotoesPrevia = configurarBotoesPrevia; // para acesso global
-
-async function verDestinatariosLoteUnificado(loteId) {
-    const tabelaPrevio = document.querySelector("#tabela-preview-envio");
-    if (tabelaPrevio) tabelaPrevio.style.display = "none";
-
-    const tabelaDest = document.querySelector("#tabela-preview-envio-destinatario");
-    if (tabelaDest) tabelaDest.style.display = "table";
-
-    const corpo = document.querySelector("#tabela-preview-envio-destinatario tbody");
-    corpo.innerHTML = "<tr><td colspan='6'>Carregando destinatários...</td></tr>";
-
-    try {
-        const loteSnap = await db.collection("lotes_gerais")
-            .where("loteId", "==", loteId)
-            .limit(1)
-            .get();
-
-        if (loteSnap.empty) {
-            mostrarMensagem("❌ Lote não encontrado.");
-            return;
-        }
-
-        const loteData = loteSnap.docs[0].data();
-        const { newsletterId, envioId, titulo, numero_lote } = loteData;
-
-        const cabecalhoEl = document.querySelector("#cabecalho-newsletter-destinatario");
-        if (cabecalhoEl) {
-            cabecalhoEl.innerHTML = `
-              <h3>Destinatários da Newsletter: ${titulo || "-"} (Lote ${numero_lote || "-"})</h3>
-            `;
-        }
-
-        const doc = await db.collection("newsletters")
-            .doc(newsletterId)
-            .collection("envios")
-            .doc(envioId)
-            .collection("lotes")
-            .doc(loteId)
-            .get();
-
-        if (!doc.exists) {
-            mostrarMensagem("❌ Lote não encontrado dentro da newsletter.");
-            return;
-        }
-
-        const lote = doc.data();
-        const destinatarios = lote.destinatarios || [];
-
-        if (destinatarios.length === 0) {
-            corpo.innerHTML = "<tr><td colspan='6'>Nenhum destinatário encontrado.</td></tr>";
-            return;
-        }
-
-        const dadosPromises = destinatarios.map(async d => {
-            try {
-                if (d.tipo === "leads" || (!d.tipo && !d.assinaturaId)) {
-                    // 🔹 Leads: interesses vêm do array
-                    const leadDoc = await db.collection("leads").doc(d.id).get();
-                    if (leadDoc.exists) {
-                        const leadData = leadDoc.data();
-                        return {
-                            perfil: leadData.perfil || "-",
-                            email: leadData.email || d.email || "-",
-                            tipo: "lead"
-                        };
-                    }
-                } else {
-                    // 🔹 Usuários: interesses vêm da subcoleção preferencias_newsletter
-                    const usuarioDoc = await db.collection("usuarios").doc(d.id).get();
-                    if (usuarioDoc.exists) {
-                        const usuarioData = usuarioDoc.data();
-                        return {
-                            perfil: usuarioData.tipo_perfil || "-",
-                            email: usuarioData.email || d.email || "-",
-                            tipo: "usuario"
-                        };
-                    }
-                }
-            } catch (err) {
-                console.warn(`⚠️ Não foi possível obter dados para ${d.id}`, err);
+        .get()
+        .then(snap => {
+            if (snap.empty) {
+                mostrarMensagem('Nenhum lote encontrado para este tipo.');
+                return;
             }
-            return { perfil: "-", email: d.email || "-", tipo: "desconhecido" };
-        });
-
-        const dados = await Promise.all(dadosPromises);
-
-        let linhas = "";
-        destinatarios.forEach((d, i) => {
-            const info = dados[i];
-            let statusColuna = "-";
-
-            linhas += `
-                    <tr>
-                    <td>${d.nome || "-"}</td>
-                    <td>${info.perfil}</td>
-                    <td>${info.email}</td>
-                    <td>${d.enviado ? "Sim" : "Não"}</td>
-                    </tr>
-                `;
-        });
-
-
-        corpo.innerHTML = linhas;
-        mostrarAba("secao-preview-envio");
-        configurarBotoesPrevia("visualizacao");
-
-    } catch (err) {
-        console.error("Erro ao listar destinatários:", err);
-        corpo.innerHTML = "<tr><td colspan='6'>Erro ao carregar destinatários.</td></tr>";
-    }
+            const envio = snap.docs[0];
+            envioSelecionadoId = envio.id;
+            listarLotesEnvio(window.newsletterSelecionada.id, envio.id);
+            mostrarAba('secao-lotes-envio');
+        })
+        .catch(err => mostrarMensagem('❌ Erro ao carregar lotes: ' + err.message));
 }
-window.verDestinatariosLoteUnificado = verDestinatariosLoteUnificado; // para acesso global
+window.abrirLotesGerados = abrirLotesGerados;
 
-// ─────────────────────────────────────────────────────────────────────────────
-// enviarLoteEmMassa — versão com paralelismo total (chunks de 10)
+// ─── ENVIO EM MASSA (única função de envio) ───────────────────────────────────
 //
-// Responsabilidades do FRONTEND:
+// Responsabilidades do frontend:
 //   • Lê lote e newsletter do Firestore
-//   • Cria registros "pendente" em paralelo (chunks de 10)
-//     → Supabase para leads | Firestore para usuarios
-//   • Monta HTML completo por destinatário (substituições + rastreamento)
-//   • Envia único POST com o array completo para o backend
-//   • Exibe resultado recebido do backend (sem atualizações próprias)
-//
-// Responsabilidades do BACKEND (sendBatchViaSES.js):
-//   • Envia e-mails via SES em chunks paralelos de 10
-//   • Atualiza status de cada registro (Supabase / Firestore)
-//   • Atualiza lote, lotes_gerais e newsletter no Firestore
+//   • fix #C1: verifica duplicidade antes de inserir (ON CONFLICT)
+//   • fix #C2: envia apenas metadados — backend monta o HTML
+//   • fix #I4: desabilita botão durante o envio
+//   • Reenvio individual: permitido apenas quando lote tem 1 destinatário
+//     OU operador selecionou apenas 1 na prévia (via confirmarPrevia)
 // ─────────────────────────────────────────────────────────────────────────────
- 
+
 const CHUNK_SIZE = 10;
- 
+
 async function enviarLoteEmMassa(newsletterId, envioId, loteId) {
+    // Guard anti-duplo-clique
+    if (_envioEmAndamento) {
+        mostrarMensagem('⏳ Envio já em andamento. Aguarde a conclusão.');
+        return;
+    }
+    _envioEmAndamento = true;
+
+    // Desabilita todos os botões de envio na tela
+    document.querySelectorAll('.btn-enviar-lote').forEach(b => { b.disabled = true; });
+
+    _limparLogProgresso();
+
     try {
-        // ── 1. Carrega lote e newsletter em paralelo ──────────────────────────
-        const loteRef = db.collection("newsletters")
-            .doc(newsletterId)
-            .collection("envios").doc(envioId)
-            .collection("lotes").doc(loteId);
- 
         const [loteSnap, newsletterSnap] = await Promise.all([
-            loteRef.get(),
-            db.collection("newsletters").doc(newsletterId).get(),
+            db.collection('newsletters').doc(newsletterId)
+              .collection('envios').doc(envioId)
+              .collection('lotes').doc(loteId).get(),
+            db.collection('newsletters').doc(newsletterId).get(),
         ]);
- 
-        if (!loteSnap.exists) {
-            mostrarMensagem("❌ Lote não encontrado.");
-            return;
-        }
-        if (!newsletterSnap.exists) {
-            mostrarMensagem("❌ Newsletter não encontrada.");
-            return;
-        }
- 
+
+        if (!loteSnap.exists)      { mostrarMensagem('❌ Lote não encontrado.');      return; }
+        if (!newsletterSnap.exists){ mostrarMensagem('❌ Newsletter não encontrada.'); return; }
+
         const lote          = loteSnap.data();
-        const newsletter    = newsletterSnap.data();
         const destinatarios = lote.destinatarios || [];
- 
-        if (destinatarios.length === 0) {
-            mostrarMensagem("⚠️ Nenhum destinatário no lote.");
+
+        if (destinatarios.length === 0) { mostrarMensagem('⚠️ Nenhum destinatário no lote.'); return; }
+
+        const eReenvio      = lote.enviados > 0;
+        const numeroLote    = lote.numero_lote || loteId;
+        const usuarioLogado = JSON.parse(localStorage.getItem('usuarioLogado') || '{}');
+        const operador      = usuarioLogado?.nome || usuarioLogado?.email || 'Desconhecido';
+
+        // Reenvio: só permitido para lotes com 1 destinatário
+        if (eReenvio && destinatarios.length > 1) {
+            mostrarMensagem('⚠️ Reenvio em massa não permitido. Para reenviar, gere um novo lote com apenas 1 destinatário selecionado.');
             return;
         }
- 
-        const numeroLote    = lote.numero_lote || loteId;
-        const usuarioLogado = JSON.parse(localStorage.getItem("usuarioLogado") || "{}");
-        const operador      = usuarioLogado?.nome || usuarioLogado?.email || "Desconhecido";
- 
-        mostrarMensagem(`⏳ Preparando ${destinatarios.length} destinatários em paralelo...`);
- 
-        // ── 2. Cria registros "pendente" + monta payload em chunks paralelos ──
-        //
-        //  Cada destinatário no chunk roda em paralelo:
-        //    → insert Supabase (lead) ou add Firestore (usuario)
-        //    → monta HTML com placeholders e rastreamento
-        //    → retorna item pronto para o payload
-        //
-        //  Promise.allSettled garante que a falha de um não aborta o chunk.
- 
-        const payloadEmails  = [];
-        let totalIgnorados   = 0;
- 
+
+        if (eReenvio) {
+            const confirmar = confirm(`⚠️ Este lote já foi enviado antes.\n\nDestinatário: ${destinatarios[0].email}\n\nConfirma o REENVIO?`);
+            if (!confirmar) return;
+        }
+
+        _logProgresso(`Preparando ${destinatarios.length} destinatário(s) para o lote nº ${numeroLote}...`);
+
+        // ── Cria registros "pendente" e monta payload de metadados ────────────
+        // fix #C2: não monta HTML aqui — backend recebe apenas metadados
+        const payloadEmails = [];
+        let totalIgnorados  = 0;
+
         for (let i = 0; i < destinatarios.length; i += CHUNK_SIZE) {
             const chunk = destinatarios.slice(i, i + CHUNK_SIZE);
- 
+
             const settled = await Promise.allSettled(
                 chunk.map(async (dest) => {
-                    const tipo         = dest.tipo || (dest.assinaturaId ? "usuarios" : "leads");
-                    const emailDest    = (dest.email || "").trim();
-                    const idDest       = dest.id || "";
+                    const tipo         = dest.tipo || (dest.assinaturaId ? 'usuarios' : 'leads');
+                    const emailDest    = (dest.email || '').trim();
+                    const idDest       = dest.id || '';
                     const assinaturaId = dest.assinaturaId || null;
-                    const segmento     = tipo === "leads" ? "leads" : "assinantes";
                     const token        = gerarTokenAcesso();
                     const expiraEm     = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
- 
+
                     let registroEnvioId;
- 
-                    if (tipo === "leads") {
+
+                    if (tipo === 'leads') {
+                        // fix #C1: usa upsert para evitar duplicata
                         const { data, error } = await window.supabase
-                            .from("leads_envios")
-                            .insert({
+                            .from('leads_envios')
+                            .upsert({
                                 lead_id:       idDest,
                                 newsletter_id: newsletterId,
                                 data_envio:    new Date().toISOString(),
-                                status:        "pendente",
+                                status:        'pendente',
                                 token_acesso:  token,
                                 expira_em:     expiraEm.toISOString(),
+                            }, {
+                                onConflict:    'lead_id,newsletter_id',
+                                ignoreDuplicates: !eReenvio, // reenvio: atualiza; envio normal: ignora duplicata
                             })
-                            .select("id")
+                            .select('id')
                             .single();
- 
-                        if (error) throw new Error(`Supabase insert falhou para ${emailDest}: ${error.message}`);
+
+                        if (error) throw new Error(`Supabase upsert falhou para ${emailDest}: ${error.message}`);
+                        if (!data) throw new Error(`Sem retorno para ${emailDest} (possível duplicata ignorada)`);
                         registroEnvioId = String(data.id);
- 
+
                     } else {
                         const envioRef = await db
-                            .collection("usuarios").doc(idDest)
-                            .collection("assinaturas").doc(assinaturaId)
-                            .collection("envios")
+                            .collection('usuarios').doc(idDest)
+                            .collection('assinaturas').doc(assinaturaId)
+                            .collection('envios')
                             .add({
                                 newsletter_id:  newsletterId,
                                 data_envio:     firebase.firestore.Timestamp.now(),
-                                status:         "pendente",
+                                status:         'pendente',
                                 destinatarioId: idDest,
                                 assinaturaId,
                                 token_acesso:   token,
@@ -2374,290 +1401,394 @@ async function enviarLoteEmMassa(newsletterId, envioId, loteId) {
                             });
                         registroEnvioId = envioRef.id;
                     }
- 
-                    // Monta HTML completo já personalizado para este destinatário
-                    const htmlMontado = montarHtmlNewsletterParaEnvio(newsletter, {
-                        nome:            dest.nome,
-                        email:           emailDest,
-                        edicao:          newsletter.edicao,
-                        tipo:            newsletter.tipo,
-                        titulo:          newsletter.titulo,
-                        data_publicacao: newsletter.data_publicacao,
-                        newsletterId,
-                    }, segmento);
- 
-                    const htmlFinal = aplicarRastreamento(
-                        htmlMontado,
-                        registroEnvioId,
-                        idDest,
-                        newsletterId,
-                        assinaturaId,
-                        token
-                    );
- 
+
+                    // Payload de metadados apenas (sem HTML)
                     return {
                         envioId:        registroEnvioId,
                         destinatarioId: idDest,
                         tipo,
                         assinaturaId,
                         email:          emailDest,
-                        mensagemHtml:   htmlFinal,
-                        assunto:        newsletter.titulo || "Newsletter Radar SIOPE",
+                        nome:           dest.nome,
+                        token,
+                        assunto:        newsletterSnap.data().titulo || 'Newsletter Radar SIOPE',
                     };
                 })
             );
- 
-            // Coleta os que tiveram sucesso; loga os que falharam
+
             settled.forEach((s, idx) => {
-                if (s.status === "fulfilled") {
+                if (s.status === 'fulfilled' && s.value) {
                     payloadEmails.push(s.value);
                 } else {
                     totalIgnorados++;
-                    const emailFalhou = chunk[idx]?.email || `índice ${i + idx}`;
-                    console.error(`❌ Falha ao preparar ${emailFalhou}:`, s.reason?.message || s.reason);
+                    const email = chunk[idx]?.email || `índice ${i + idx}`;
+                    _logProgresso(`⚠️ Ignorado: ${email} — ${s.reason?.message || 'duplicata ou erro'}`, 'aviso');
                 }
             });
- 
-            // Feedback visual de progresso durante a preparação
-            mostrarMensagem(
-                `⏳ Preparados ${Math.min(i + CHUNK_SIZE, destinatarios.length)}/${destinatarios.length}...`
-            );
+
+            _logProgresso(`Preparados ${Math.min(i + CHUNK_SIZE, destinatarios.length)}/${destinatarios.length}...`);
         }
- 
+
         if (payloadEmails.length === 0) {
-            mostrarMensagem("⚠️ Nenhum destinatário pôde ser processado.");
+            _logProgresso('⚠️ Nenhum destinatário pôde ser processado.', 'aviso');
+            mostrarMensagem('⚠️ Nenhum destinatário processado. Verifique o log.');
             return;
         }
- 
-        if (totalIgnorados > 0) {
-            console.warn(`⚠️ ${totalIgnorados} destinatário(s) ignorado(s) por falha no registro.`);
-        }
- 
-        // ── 3. Envia payload completo para o backend em um único POST ─────────
-        mostrarMensagem(`📤 Enviando ${payloadEmails.length} e-mails via SES...`);
- 
-        const response = await fetch("https://api.radarsiope.com.br/api/sendBatchViaSES", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-                newsletterId,
-                envioId,
-                loteId,
-                operador,
-                emails: payloadEmails,
-            }),
+
+        // ── Envia para o backend ─────────────────────────────────────────────
+        _logProgresso(`📤 Enviando ${payloadEmails.length} e-mail(s) via SES...`);
+
+        const response = await fetch('https://api.radarsiope.com.br/api/sendBatchViaSES', {
+            method:  'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body:    JSON.stringify({ newsletterId, envioId, loteId, operador, emails: payloadEmails }),
         });
- 
+
         const result = await response.json().catch(() => ({}));
- 
-        if (!response.ok) {
-            throw new Error(result.error || `Erro backend: ${response.status}`);
-        }
- 
-        // ── 4. Exibe resultado real vindo do backend ───────────────────────────
-        const { enviados = 0, total = payloadEmails.length, status = "?" } = result;
- 
+        if (!response.ok) throw new Error(result.error || `Erro backend: ${response.status}`);
+
+        const { enviados = 0, total = payloadEmails.length, status = '?' } = result;
+
         const msgFinal = totalIgnorados > 0
-            ? `✅ Lote nº ${numeroLote}: ${enviados}/${total} enviados (${status}). ⚠️ ${totalIgnorados} ignorado(s) na preparação.`
+            ? `✅ Lote nº ${numeroLote}: ${enviados}/${total} enviados (${status}). ⚠️ ${totalIgnorados} ignorado(s).`
             : `✅ Lote nº ${numeroLote}: ${enviados}/${total} enviados (${status}).`;
- 
+
+        _logProgresso(msgFinal, 'ok');
         mostrarMensagem(msgFinal);
         return result;
- 
+
     } catch (err) {
-        console.error("Erro ao enviar lote em massa:", err);
-        mostrarMensagem("❌ Erro ao enviar lote em massa: " + err.message);
+        console.error('Erro ao enviar lote em massa:', err);
+        _logProgresso(`❌ ${err.message}`, 'erro');
+        mostrarMensagem('❌ Erro ao enviar lote: ' + err.message);
+    } finally {
+        _envioEmAndamento = false;
+        document.querySelectorAll('.btn-enviar-lote').forEach(b => { b.disabled = false; });
     }
 }
 window.enviarLoteEmMassa = enviarLoteEmMassa;
 
-async function atualizarRetornoSES(newsletterId, envioId, loteId, logResultados) {
+// ─── Ver destinatários do lote ────────────────────────────────────────────────
+
+async function verDestinatariosLoteUnificado(loteId) {
+    document.querySelector('#tabela-preview-envio')?.style.setProperty('display', 'none');
+    const tabelaDest = document.querySelector('#tabela-preview-envio-destinatario');
+    if (tabelaDest) tabelaDest.style.display = 'table';
+
+    const corpo = document.querySelector('#tabela-preview-envio-destinatario tbody');
+    corpo.innerHTML = "<tr><td colspan='4'>Carregando destinatários...</td></tr>";
+
     try {
-        const loteRef = db.collection("newsletters")
-            .doc(newsletterId).collection("envios")
-            .doc(envioId).collection("lotes").doc(loteId);
+        const loteSnap = await db.collection('lotes_gerais')
+            .where('loteId', '==', loteId).limit(1).get();
 
-        // Atualiza cada destinatário
-        let enviados = 0;
-        for (const r of logResultados) {
-            const { envioId: envioRegistroId, ok, error } = r;
-            const status = ok ? "enviado" : "erro";
+        if (loteSnap.empty) { mostrarMensagem('❌ Lote não encontrado.'); return; }
 
-            await loteRef.collection("envios").doc(envioRegistroId).update({
-                status,
-                erro: error || null,
-                data_envio: firebase.firestore.Timestamp.now()
-            });
+        const { newsletterId, envioId, titulo, numero_lote } = loteSnap.docs[0].data();
 
-            if (ok) enviados++;
+        const cabecalhoEl = document.querySelector('#cabecalho-newsletter-destinatario');
+        if (cabecalhoEl) cabecalhoEl.innerHTML = `<h3>Destinatários — ${titulo || '-'} (Lote ${numero_lote || '-'})</h3>`;
+
+        const doc = await db.collection('newsletters').doc(newsletterId)
+            .collection('envios').doc(envioId)
+            .collection('lotes').doc(loteId).get();
+
+        if (!doc.exists) { mostrarMensagem('❌ Lote não encontrado na newsletter.'); return; }
+
+        const destinatarios = doc.data().destinatarios || [];
+        if (destinatarios.length === 0) {
+            corpo.innerHTML = '<tr><td colspan="4">Nenhum destinatário.</td></tr>';
+            return;
         }
 
-        const total = logResultados.length;
-        const statusLote = enviados === total ? "completo" : "parcial";
-
-        // Atualiza o lote
-        await loteRef.update({
-            enviados,
-            status: statusLote,
-            data_envio: firebase.firestore.Timestamp.now()
-        });
-
-        // Atualiza envios_log
-        const usuarioLogado = JSON.parse(localStorage.getItem("usuarioLogado"));
-        const feitoPor = usuarioLogado?.nome || usuarioLogado?.email || "Desconhecido";
-
-        await loteRef.collection("envios_log").add({
-            data_envio: firebase.firestore.Timestamp.now(),
-            quantidade: total,
-            enviados,
-            origem: "manual",
-            operador: feitoPor,
-            status: statusLote
-        });
-
-        // Atualiza lotes_gerais
-        const loteGeralSnap = await db.collection("lotes_gerais")
-            .where("loteId", "==", loteId)
-            .where("envioId", "==", envioId)
-            .limit(1)
-            .get();
-
-        if (!loteGeralSnap.empty) {
-            const loteGeralRef = loteGeralSnap.docs[0].ref;
-            await loteGeralRef.update({
-                enviados,
-                status: statusLote,
-                data_envio: firebase.firestore.Timestamp.now()
-            });
+        // Busca status de envio em uma query
+        const idsLeads = destinatarios.filter(d => !d.assinaturaId).map(d => String(d.id));
+        let mapaEnvioLead = {};
+        if (idsLeads.length > 0) {
+            const { data } = await window.supabase
+                .from('leads_envios')
+                .select('lead_id, status')
+                .eq('newsletter_id', newsletterId)
+                .in('lead_id', idsLeads);
+            (data || []).forEach(r => { mapaEnvioLead[String(r.lead_id)] = r.status; });
         }
 
-        // Atualiza newsletter como enviada/publicada
-        await db.collection("newsletters").doc(newsletterId).update({
-            enviada: true,
-            data_publicacao: firebase.firestore.Timestamp.now()
+        let linhas = '';
+        destinatarios.forEach(d => {
+            const statusEnvio = d.assinaturaId
+                ? '-'
+                : (mapaEnvioLead[String(d.id)] || 'nao-enviado');
+            linhas += `
+                <tr>
+                    <td>${d.nome || '-'}</td>
+                    <td>${d.email || '-'}</td>
+                    <td>${d.tipo || (d.assinaturaId ? 'usuario' : 'lead')}</td>
+                    <td>${statusEnvio}</td>
+                </tr>`;
         });
 
-        mostrarMensagem(`✅ Lote ${loteId} atualizado: ${enviados}/${total} enviados (${statusLote}).`);
+        corpo.innerHTML = linhas;
+        mostrarAba('secao-preview-envio');
+        configurarBotoesPrevia('visualizacao');
+
     } catch (err) {
-        console.error("Erro ao atualizar retorno SES:", err);
-        mostrarMensagem("❌ Erro ao atualizar retorno SES.");
+        console.error('Erro ao listar destinatários:', err);
+        corpo.innerHTML = '<tr><td colspan="4">Erro ao carregar destinatários.</td></tr>';
     }
 }
-window.atualizarRetornoSES = atualizarRetornoSES; // para acesso global
+window.verDestinatariosLoteUnificado = verDestinatariosLoteUnificado;
 
-// variável de estado local ao módulo (ou exposta no window se precisar)
-let dadosCampanha = null;
-window.dadosCampanha = dadosCampanha; // para acesso global se necessário
+// ─── Histórico de envios do lote ──────────────────────────────────────────────
+// fix #I5: query scoped ao lote (não collectionGroup global)
 
-// função que abre o modal e prepara os dados
-function abrirModalConfirmacao(newsletter, filtros, totalSelecionados) {
-    dadosCampanha = { newsletterId: newsletter.id, filtros };
+async function verHistoricoEnvios(newsletterId, envioId, loteId) {
+    const corpo = document.getElementById('corpo-historico-reenvios');
+    corpo.innerHTML = "<tr><td colspan='5'>Carregando histórico...</td></tr>";
 
-    const tipo = filtros.tipo === "leads" ? "Leads" : "Usuários";
-    const titulo = newsletter.titulo;
-    const edicao = newsletter.edicao || newsletter.id;
+    const snap = await db.collection('newsletters').doc(newsletterId)
+        .collection('envios').doc(envioId)
+        .collection('lotes').doc(loteId)
+        .collection('envios_log')
+        .orderBy('data_envio', 'desc')
+        .get();
 
-    const info = `📰 Newsletter: ${titulo} (${edicao})\n` +
-        `👥 Tipo: ${tipo}\n` +
-        `📬 Destinatários selecionados: ${totalSelecionados}`;
+    if (snap.empty) {
+        corpo.innerHTML = "<tr><td colspan='5'>Nenhum envio registrado para este lote.</td></tr>";
+    } else {
+        corpo.innerHTML = snap.docs.map(doc => {
+            const log = doc.data();
+            const dt  = log.data_envio?.toDate ? log.data_envio.toDate() : null;
+            return `
+                <tr>
+                    <td>${dt ? dt.toLocaleString() : '-'}</td>
+                    <td>${log.quantidade}</td>
+                    <td>${log.enviados}</td>
+                    <td>${log.status}</td>
+                    <td>${log.operador}</td>
+                </tr>`;
+        }).join('');
+    }
 
-    const infoEl = document.getElementById("info-campanha");
-    if (infoEl) infoEl.innerText = info;
-
-    const modal = document.getElementById("modal-confirmacao");
-    if (modal) modal.style.display = "flex";
+    mostrarAba('secao-historico-reenvios');
 }
+window.verHistoricoEnvios = verHistoricoEnvios;
 
-// função que fecha modal
-function fecharModal() {
-    const modal = document.getElementById("modal-confirmacao");
-    if (modal) modal.style.display = "none";
-    dadosCampanha = null;
-}
+// ─── Relatório de envios ──────────────────────────────────────────────────────
 
-// função que fecha modal de erros
-function fecharModalErrosEncontrados() {
-    const alertModal = document.getElementById("alert-modal");
-    if (alertModal) alertModal.style.display = "none";
-    dadosCampanha = null;
-}
+async function carregarRelatorioEnvios() {
+    const emailFiltro = document.getElementById('filtro-relatorio-email')?.value.trim().toLowerCase() || '';
+    const corpo       = document.querySelector('#tabela-relatorio-envios tbody');
+    corpo.innerHTML   = "<tr><td colspan='5'>Buscando...</td></tr>";
 
-// prosseguir com a geração chamando confirmarPrevia (já exposta no window)
-async function prosseguirGeracao() {
-    const modal = document.getElementById("modal-confirmacao");
-    if (modal) modal.style.display = "none";
+    if (!emailFiltro) {
+        corpo.innerHTML = "<tr><td colspan='5'>Informe um e-mail para buscar.</td></tr>";
+        return;
+    }
 
-    if (dadosCampanha && typeof window.confirmarPrevia === "function") {
+    // Busca o lead pelo e-mail
+    const { data: leads } = await window.supabase
+        .from('leads')
+        .select('id, nome, email')
+        .ilike('email', `%${emailFiltro}%`)
+        .limit(10);
+
+    if (!leads || leads.length === 0) {
+        corpo.innerHTML = "<tr><td colspan='5'>Nenhum lead encontrado com este e-mail.</td></tr>";
+        return;
+    }
+
+    const leadIds  = leads.map(l => l.id);
+    const { data: envios } = await window.supabase
+        .from('leads_envios')
+        .select('lead_id, newsletter_id, data_envio, status')
+        .in('lead_id', leadIds)
+        .order('data_envio', { ascending: false })
+        .limit(100);
+
+    if (!envios || envios.length === 0) {
+        corpo.innerHTML = "<tr><td colspan='5'>Nenhum envio registrado para este e-mail.</td></tr>";
+        return;
+    }
+
+    const mapaLeads = {};
+    leads.forEach(l => { mapaLeads[l.id] = l; });
+
+    // Busca títulos das newsletters em lote
+    const nlIds  = [...new Set(envios.map(e => e.newsletter_id))];
+    const nlsMap = {};
+    await Promise.all(nlIds.map(async nid => {
         try {
-            await window.confirmarPrevia(dadosCampanha.newsletterId, dadosCampanha.filtros);
-        } finally {
-            dadosCampanha = null;
+            const s = await db.collection('newsletters').doc(nid).get();
+            if (s.exists) nlsMap[nid] = s.data().titulo || '(sem título)';
+        } catch (e) { /* não fatal */ }
+    }));
+
+    corpo.innerHTML = envios.map(e => {
+        const lead = mapaLeads[e.lead_id] || {};
+        const dt   = e.data_envio ? new Date(e.data_envio).toLocaleString('pt-BR') : '-';
+        return `
+            <tr>
+                <td>${lead.nome || '-'}</td>
+                <td>${lead.email || '-'}</td>
+                <td>${nlsMap[e.newsletter_id] || e.newsletter_id}</td>
+                <td>${dt}</td>
+                <td>${e.status || '-'}</td>
+            </tr>`;
+    }).join('');
+}
+window.carregarRelatorioEnvios = carregarRelatorioEnvios;
+
+// ─── Descadastramentos ────────────────────────────────────────────────────────
+
+async function listarDescadastramentos() {
+    const corpo = document.querySelector('#tabela-descadastramentos tbody');
+    corpo.innerHTML = "<tr><td colspan='5'>Carregando...</td></tr>";
+
+    const leadsSnap = await db.collection('leads').where('status', '==', 'Descartado').get();
+    let linhas = '';
+
+    for (const leadDoc of leadsSnap.docs) {
+        const lead   = leadDoc.data();
+        const leadId = leadDoc.id;
+        if (!leadId) continue;
+
+        const descSnap = await db.collection('leads').doc(leadId)
+            .collection('descadastramentos').orderBy('data', 'desc').get();
+
+        if (descSnap.empty) {
+            linhas += `<tr><td>${lead.nome||''}</td><td>${lead.email||''}</td><td>-</td><td>-</td><td><em>Descartado manualmente</em></td></tr>`;
+            continue;
         }
-    } else {
-        console.warn("confirmarPrevia não disponível ou dadosCampanha vazio");
+
+        for (const descDoc of descSnap.docs) {
+            const desc = descDoc.data();
+            let nlTitulo = '-';
+            if (desc.newsletter_id) {
+                try {
+                    const nlSnap = await db.collection('newsletters').doc(desc.newsletter_id).get();
+                    nlTitulo = nlSnap.exists ? (nlSnap.data().titulo || '-') : '-';
+                } catch (e) { /* não fatal */ }
+            }
+            const dt = desc.data?.toDate?.() || desc.data;
+            linhas += `<tr>
+                <td>${lead.nome||''}</td><td>${lead.email||''}</td>
+                <td>${nlTitulo}</td>
+                <td>${dt ? formatDateBR(dt) : '-'}</td>
+                <td>${desc.motivo||'-'}</td>
+            </tr>`;
+        }
     }
+
+    corpo.innerHTML = linhas || "<tr><td colspan='5'>Nenhum descadastramento encontrado.</td></tr>";
 }
+window.listarDescadastramentos = listarDescadastramentos;
 
-// função que será ligada ao botão Gerar Lotes
-function onClickGerarLotes() {
-    const newsletter = window.newsletterSelecionada;
-    if (!newsletter) {
-        return window.mostrarMensagem?.("Nenhuma newsletter selecionada.");
-    }
+function abrirAbaDescadastramentos() { mostrarAba('secao-descadastramentos'); listarDescadastramentos(); }
+function abrirAbaOrientacoes()        { mostrarAba('secao-orientacoes'); }
+window.abrirAbaDescadastramentos = abrirAbaDescadastramentos;
+window.abrirAbaOrientacoes       = abrirAbaOrientacoes;
 
-    const filtros = typeof window.coletarFiltros === "function"
-        ? window.coletarFiltros()
-        : null;
+// ─── Preenchimento de filtros ─────────────────────────────────────────────────
 
-    if (!filtros) {
-        return window.mostrarMensagem?.("Erro ao coletar filtros.");
-    }
-
-    const linhasSelecionadas = Array.from(document.querySelectorAll(".chk-envio-final:checked"));
-    const totalSelecionados = linhasSelecionadas.length;
-
-    if (totalSelecionados === 0) {
-        return window.mostrarMensagem?.("Nenhum destinatário selecionado para envio.");
-    }
-
-    abrirModalConfirmacao(newsletter, filtros, totalSelecionados);
+async function preencherFiltroNewsletters() {
+    const sel = document.getElementById('filtro-newsletter');
+    if (!sel) return;
+    sel.innerHTML = '<option value="">Todas as newsletters</option>';
+    const snap = await db.collection('newsletters').get();
+    snap.docs.forEach(doc => {
+        const n = doc.data();
+        const opt = document.createElement('option');
+        opt.value       = doc.id;
+        opt.textContent = `${n.titulo || '(sem título)'} (${n.edicao || doc.id})`;
+        sel.appendChild(opt);
+    });
 }
+window.preencherFiltroNewsletters = preencherFiltroNewsletters;
 
-// inicializador que registra listeners quando o DOM estiver pronto
-function initGeracaoLotes() {
-    // botão principal
-    const btn = document.getElementById("btn-gerar-lotes");
-    if (btn) {
-        btn.removeEventListener("click", onClickGerarLotes); // segurança
-        btn.addEventListener("click", onClickGerarLotes);
-    } else {
-        console.warn("btn-gerar-lotes não encontrado no DOM");
+// ─── Montagem de HTML da newsletter para envio ────────────────────────────────
+
+function montarHtmlNewsletterParaEnvio(newsletter, dados, segmento = null) {
+    let htmlBase   = newsletter.html_conteudo || '';
+    const blocos   = newsletter.blocos || [];
+    let htmlBlocos = '';
+
+    blocos.forEach(b => {
+        if (segmento && b.acesso !== 'todos' && b.acesso !== segmento) return;
+        if (b.destino === 'app') return;
+        htmlBlocos += b.html || '';
+    });
+
+    let htmlFinal = blocos.length === 0
+        ? htmlBase.replace(/\{\{blocos\}\}/g, '')
+        : (htmlBase.includes('{{blocos}}')
+            ? htmlBase.replace(/\{\{blocos\}\}/g, htmlBlocos || '')
+            : htmlBase + '\n' + htmlBlocos);
+
+    return aplicarPlaceholders(htmlFinal, dados);
+}
+window.montarHtmlNewsletterParaEnvio = montarHtmlNewsletterParaEnvio;
+
+// ─── Rastreamento de links e pixel ────────────────────────────────────────────
+
+function aplicarRastreamento(htmlBase, envioId, destinatarioId, newsletterId, assinaturaId, token) {
+    const pixelTag = `<img src="https://api.radarsiope.com.br/api/pixel?envioId=${encodeURIComponent(envioId)}&destinatarioId=${encodeURIComponent(destinatarioId)}&newsletterId=${encodeURIComponent(newsletterId)}" width="1" height="1" style="display:none" alt="" />`;
+    let html = htmlBase + pixelTag;
+
+    const parts = [
+        `nid=${newsletterId||''}`, `env=${envioId||''}`, `uid=${destinatarioId||''}`
+    ];
+    if (assinaturaId) parts.push(`assinaturaId=${assinaturaId}`);
+    if (token)        parts.push(`token=${token}`);
+    const b64      = btoa(parts.join('&'));
+    const linkApp  = `https://app.radarsiope.com.br/verNewsletterComToken.html?d=${encodeURIComponent(b64)}`;
+
+    html = html.replace(/href="([^"]*verNewsletterComToken\.html[^"]*)"/i, () => `href="${linkApp}"`);
+
+    html = html.replace(/href="([^"]+)"/g, (m, href) => {
+        const u = String(href).trim();
+        if (/^(mailto:|tel:|javascript:|#)|descadastramento\.html|vernewslettercomtoken\.html|\/api\/click/i.test(u)) return m;
+        let destino = u;
+        try { destino = decodeURIComponent(u); } catch (e) { /* mantém */ }
+        const track = `https://api.radarsiope.com.br/api/click?envioId=${encodeURIComponent(envioId)}&destinatarioId=${encodeURIComponent(destinatarioId)}&newsletterId=${encodeURIComponent(newsletterId)}&url=${encodeURIComponent(destino)}`;
+        return `href="${track}"`;
+    });
+
+    return html;
+}
+window.aplicarRastreamento = aplicarRastreamento;
+
+// ─── Inicialização (único DOMContentLoaded) ───────────────────────────────────
+
+function _initEventos() {
+    // Tipo de destinatário
+    const selDest = document.getElementById('tipo-destinatario');
+    if (selDest) selDest.addEventListener('change', e => alterarTipoDestinatario(e.target.value));
+
+    // Botão abrir envio
+    const btnAbrir = document.querySelector('#botaoEnvioNewsletterLeads');
+    if (btnAbrir) btnAbrir.addEventListener('click', abrirEnvioNewsletterLeads);
+
+    // Botão gerar lotes
+    const btnGerar = document.getElementById('btn-gerar-lotes');
+    if (btnGerar) {
+        btnGerar.removeEventListener('click', onClickGerarLotes);
+        btnGerar.addEventListener('click', onClickGerarLotes);
     }
 
-    // botão fechar modal (se for um botão com onclick="fecharModal()" no HTML,
-    // aqui ligamos ao mesmo comportamento sem depender do inline)
-    const btnFechar = document.querySelector("#modal-confirmacao button[onclick='fecharModal()']");
-    if (btnFechar) {
-        btnFechar.removeEventListener("click", fecharModal);
-        btnFechar.addEventListener("click", fecharModal);
-    }
-
-    // botão prosseguir (ex.: #btn-prosseguir-geracao)
-    const btnProsseguir = document.getElementById("btn-prosseguir-geracao");
+    // Modal de confirmação
+    const btnProsseguir = document.getElementById('btn-prosseguir-geracao');
     if (btnProsseguir) {
-        btnProsseguir.removeEventListener("click", prosseguirGeracao);
-        btnProsseguir.addEventListener("click", prosseguirGeracao);
+        btnProsseguir.removeEventListener('click', prosseguirGeracao);
+        btnProsseguir.addEventListener('click', prosseguirGeracao);
     }
 
-    // expor funções no window caso HTML use onclick inline em outros pontos
-    window.fecharModal = fecharModal;
+    window.fecharModal                 = fecharModal;
     window.fecharModalErrosEncontrados = fecharModalErrosEncontrados;
-    window.prosseguirGeracao = prosseguirGeracao;
+    window.prosseguirGeracao           = prosseguirGeracao;
 }
 
-// registra init no DOMContentLoaded para garantir que elementos existam
-if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", initGeracaoLotes);
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', _initEventos);
 } else {
-    initGeracaoLotes();
+    _initEventos();
 }
