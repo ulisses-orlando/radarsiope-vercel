@@ -1449,9 +1449,16 @@ async function enviarLoteEmMassa(newsletterId, envioId, loteId) {
         // ── Envia para o backend ─────────────────────────────────────────────
         _logProgresso(`📤 Enviando ${payloadEmails.length} e-mail(s) via SES...`);
 
-        // Lê o token admin salvo no localStorage após o login do admin
-        // (o mesmo token usado em outras rotas admin do projeto)
-        const adminToken = localStorage.getItem('rs_admin_token') || '';
+        // Lê o token admin salvo pelo campo #campo-admin-token
+        const adminToken = sessionStorage.getItem('rs_admin_token')
+            || document.getElementById('campo-admin-token')?.value?.trim()
+            || '';
+
+        if (!adminToken) {
+            _logProgresso('❌ Token admin não configurado. Informe o token no campo "🔑 Token admin" no topo da tela.', 'erro');
+            mostrarMensagem('❌ Informe o token de administrador antes de enviar.');
+            return;
+        }
 
         const response = await fetch('https://api.radarsiope.com.br/api/sendBatchViaSES', {
             method: 'POST',
