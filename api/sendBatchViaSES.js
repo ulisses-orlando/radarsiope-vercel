@@ -261,10 +261,28 @@ export default async function handler(req, res) {
   if (req.method === "OPTIONS") return res.status(200).end();
   if (req.method !== "POST")   return res.status(405).json({ ok: false, error: "Método não permitido" });
 
-  // fix B1: autenticação obrigatória
-  const adminToken = req.headers["x-admin-token"];
-  if (!adminToken || adminToken !== process.env.ADMIN_API_TOKEN) {
-    return res.status(401).json({ ok: false, error: "Não autorizado." });
+  // ── Autenticação via Firebase ID Token ──────────────────────────────────────
+  // O frontend (EnvioLeads.js) envia o token gerado automaticamente pelo Firebase Auth.
+  // Verificamos aqui se o token é válido E se o usuário é Admin no Firestore.
+  const firebaseToken = req.headers["x-firebase-token"];
+  if (!firebaseToken) {
+    return res.status(401).json({ ok: false, error: "Token de autenticação ausente." });
+  }
+
+  let uidAdmin;
+  try {
+    const decoded = await admin.auth().verifyIdToken(firebaseToken);
+    uidAdmin = decoded.uid;
+
+    // Confirma que o usuário tem tipo_perfil === 'Admin' no Firestore
+    const userSnap = await db.collection("usuarios").doc(uidAdmin).get();
+    const tipoPerfil = (userSnap.exists ? userSnap.data().tipo_perfil : "") || "";
+    if (tipoPerfil.toLowerCase() !== "admin") {
+      return res.status(403).json({ ok: false, error: "Acesso negado. Perfil insuficiente." });
+    }
+  } catch (authErr) {
+    console.warn("⚠️ Token Firebase inválido ou expirado:", authErr.message);
+    return res.status(401).json({ ok: false, error: "Token inválido ou expirado. Faça login novamente." });
   }
 
   const { newsletterId, envioId, loteId, emails, operador = "Sistema" } = req.body || {};
