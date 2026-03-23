@@ -1687,42 +1687,40 @@ async function listarDescadastramentos() {
     const corpo = document.querySelector('#tabela-descadastramentos tbody');
     corpo.innerHTML = "<tr><td colspan='5'>Carregando...</td></tr>";
 
-    const leadsSnap = await db.collection('leads').where('status', '==', 'Descartado').get();
-    let linhas = '';
+    // Leads ficam exclusivamente no Supabase — status 'Descartado' indica descadastro
+    // Campos gravados pelo unsubscribe.js: descadastrado_em e motivo_descadastro
+    const { data: leads, error } = await window.supabase
+        .from('leads')
+        .select('id, nome, email, descadastrado_em, motivo_descadastro')
+        .eq('status', 'Descartado')
+        .order('descadastrado_em', { ascending: false, nullsFirst: false })
+        .limit(200);
 
-    for (const leadDoc of leadsSnap.docs) {
-        const lead   = leadDoc.data();
-        const leadId = leadDoc.id;
-        if (!leadId) continue;
-
-        const descSnap = await db.collection('leads').doc(leadId)
-            .collection('descadastramentos').orderBy('data', 'desc').get();
-
-        if (descSnap.empty) {
-            linhas += `<tr><td>${lead.nome||''}</td><td>${lead.email||''}</td><td>-</td><td>-</td><td><em>Descartado manualmente</em></td></tr>`;
-            continue;
-        }
-
-        for (const descDoc of descSnap.docs) {
-            const desc = descDoc.data();
-            let nlTitulo = '-';
-            if (desc.newsletter_id) {
-                try {
-                    const nlSnap = await db.collection('newsletters').doc(desc.newsletter_id).get();
-                    nlTitulo = nlSnap.exists ? (nlSnap.data().titulo || '-') : '-';
-                } catch (e) { /* não fatal */ }
-            }
-            const dt = desc.data?.toDate?.() || desc.data;
-            linhas += `<tr>
-                <td>${lead.nome||''}</td><td>${lead.email||''}</td>
-                <td>${nlTitulo}</td>
-                <td>${dt ? formatDateBR(dt) : '-'}</td>
-                <td>${desc.motivo||'-'}</td>
-            </tr>`;
-        }
+    if (error) {
+        console.error('Erro ao buscar descadastramentos:', error.message);
+        corpo.innerHTML = "<tr><td colspan='5'>Erro ao carregar descadastramentos.</td></tr>";
+        return;
     }
 
-    corpo.innerHTML = linhas || "<tr><td colspan='5'>Nenhum descadastramento encontrado.</td></tr>";
+    if (!leads || leads.length === 0) {
+        corpo.innerHTML = "<tr><td colspan='5'>Nenhum descadastramento encontrado.</td></tr>";
+        return;
+    }
+
+    const linhas = leads.map(lead => {
+        const dt = lead.descadastrado_em
+            ? new Date(lead.descadastrado_em).toLocaleDateString('pt-BR')
+            : '-';
+        return `<tr>
+            <td>${lead.nome || ''}</td>
+            <td>${lead.email || ''}</td>
+            <td>-</td>
+            <td>${dt}</td>
+            <td>${lead.motivo_descadastro || '<em>Não informado</em>'}</td>
+        </tr>`;
+    }).join('');
+
+    corpo.innerHTML = linhas;
 }
 window.listarDescadastramentos = listarDescadastramentos;
 
