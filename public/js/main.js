@@ -11,7 +11,7 @@ let filtroPerfilAvaliacoes = "todos";
 let paginaAtual = 1;
 let historicoDocs = [];
 let totalUsuarios = 0;
-let totalPaginas  = 0;
+let totalPaginas = 0;
 let termoBuscaUsuario = "";
 const limitePorPagina = 10;
 const backlogRef = db.collection("backlog");
@@ -1007,8 +1007,9 @@ async function abrirModalNewsletter(docId = null, isEdit = false) {
     const ref = db.collection('newsletters');
     if (isEdit && docId) {
       await ref.doc(docId).set(payload, { merge: true });
+      await window.salvarVitrine(docId); 
     } else {
-      await ref.add(payload);
+      const novoDoc = await ref.add(payload);
     }
 
     closeModal('modal-newsletter-overlay');
@@ -1047,6 +1048,13 @@ async function abrirModalNewsletter(docId = null, isEdit = false) {
   // -----------------------------
   if (isEdit && docId) {
     _renderPainelAvaliacoes(body, data);
+
+    // ── VITRINE DE INDICADORES ──────────────────────────────
+    const vitrineContainer = document.createElement('div');
+    vitrineContainer.id = 'vitrine-container';
+    body.appendChild(vitrineContainer);
+    await window.inicializarVitrine(docId, vitrineContainer);
+    // ────────────────────────────────────────────────────────
   }
 }
 
@@ -1055,11 +1063,11 @@ function _renderPainelAvaliacoes(body, data) {
   const reactions = data.reactions || {};
 
   const niveis = [
-    { key: 'excelente',   emoji: '😍', label: 'Excelente'    },
-    { key: 'muito_bom',   emoji: '👍', label: 'Muito bom'    },
-    { key: 'bom',         emoji: '😊', label: 'Bom'          },
-    { key: 'regular',     emoji: '😐', label: 'Regular'      },
-    { key: 'decepcionou', emoji: '😞', label: 'Decepcionou'  },
+    { key: 'excelente', emoji: '😍', label: 'Excelente' },
+    { key: 'muito_bom', emoji: '👍', label: 'Muito bom' },
+    { key: 'bom', emoji: '😊', label: 'Bom' },
+    { key: 'regular', emoji: '😐', label: 'Regular' },
+    { key: 'decepcionou', emoji: '😞', label: 'Decepcionou' },
   ];
 
   const total = niveis.reduce((s, n) => s + (Number(reactions[n.key]) || 0), 0);
@@ -1075,7 +1083,7 @@ function _renderPainelAvaliacoes(body, data) {
 
   let barrasHtml = niveis.map(n => {
     const count = Number(reactions[n.key]) || 0;
-    const pct   = total > 0 ? Math.round((count / total) * 100) : 0;
+    const pct = total > 0 ? Math.round((count / total) * 100) : 0;
     const pctBar = total > 0 ? Math.round((count / total) * 100) : 0;
 
     return `
@@ -1117,10 +1125,10 @@ function _renderPainelAvaliacoes(body, data) {
 
 function _reactionCor(key) {
   const cores = {
-    excelente:   '#22c55e',
-    muito_bom:   '#84cc16',
-    bom:         '#facc15',
-    regular:     '#fb923c',
+    excelente: '#22c55e',
+    muito_bom: '#84cc16',
+    bom: '#facc15',
+    regular: '#fb923c',
     decepcionou: '#ef4444',
   };
   return cores[key] || '#94a3b8';
@@ -1131,7 +1139,7 @@ function _calcularMedia(reactions, niveis) {
   let soma = 0, total = 0;
   niveis.forEach(n => {
     const c = Number(reactions[n.key]) || 0;
-    soma  += c * (pesos[n.key] || 0);
+    soma += c * (pesos[n.key] || 0);
     total += c;
   });
   return total > 0 ? soma / total : 0;
@@ -1919,7 +1927,7 @@ async function carregarLeads(resetar = false) {
                   onclick="abrirModalResponderMensagem('${d.id}','${(d.mensagem || '').replace(/'/g, "\\'")}')">📧</span>`
           : ""}
             <span class="icon-btn" title="Mensagens"
-              onclick="abrirModalMensagensLead(this)" data-lead-id="${d.id}" data-lead-nome="${(d.nome||'').replace(/"/g,'&quot;')}">💬</span>
+              onclick="abrirModalMensagensLead(this)" data-lead-id="${d.id}" data-lead-nome="${(d.nome || '').replace(/"/g, '&quot;')}">💬</span>
             <span class="icon-btn" title="Prorrogar acesso"
               onclick="abrirModalProrrogarAcesso('${d.id}', '${(d.nome || '').replace(/'/g, "\\'")}')">⏰</span>
           </td>
@@ -1965,7 +1973,7 @@ async function atualizarStatusLeadSupabase(leadId, novoStatus) {
         await window.db.collection('admin_contadores').doc('pendencias')
           .set({ leads_novos: firebase.firestore.FieldValue.increment(-1) }, { merge: true });
       }
-    } catch(e) { console.warn('[leads] contador leads_novos:', e.message); }
+    } catch (e) { console.warn('[leads] contador leads_novos:', e.message); }
   }
   verificarPendenciasLeads();
 }
@@ -1977,17 +1985,17 @@ async function verificarPendenciasLeads() {
     const snap = await window.db.collection('admin_contadores').doc('pendencias').get();
     const d = snap.exists ? snap.data() : {};
 
-    const leadsNovos     = Math.max(0, d.leads_novos     || 0);
+    const leadsNovos = Math.max(0, d.leads_novos || 0);
     const leadsMensagens = Math.max(0, d.leads_mensagens || 0);
-    const feedbacks      = Math.max(0, d.feedbacks       || 0);
+    const feedbacks = Math.max(0, d.feedbacks || 0);
 
     const totalLeads = leadsNovos + leadsMensagens;
 
-    const badge   = document.getElementById("badge-leads");
+    const badge = document.getElementById("badge-leads");
     const badgeFb = document.getElementById("badge-feedbacks");
 
     if (badge) {
-      badge.textContent   = totalLeads > 99 ? '99+' : String(totalLeads);
+      badge.textContent = totalLeads > 99 ? '99+' : String(totalLeads);
       badge.style.display = totalLeads > 0 ? "inline" : "none";
       badge.title = [
         `🆕 Leads novos: ${leadsNovos}`,
@@ -1995,7 +2003,7 @@ async function verificarPendenciasLeads() {
       ].join('\n');
     }
     if (badgeFb) {
-      badgeFb.textContent   = feedbacks > 99 ? '99+' : String(feedbacks);
+      badgeFb.textContent = feedbacks > 99 ? '99+' : String(feedbacks);
       badgeFb.style.display = feedbacks > 0 ? "inline" : "none";
     }
   } catch (e) { console.warn("[pendências]", e); }
@@ -2049,7 +2057,7 @@ async function enviarRespostaMensagemLead() {
         await window.db.collection('admin_contadores').doc('pendencias')
           .set({ leads_mensagens: firebase.firestore.FieldValue.increment(-1) }, { merge: true });
       }
-    } catch(e) { console.warn('[leads] contador leads_mensagens:', e.message); }
+    } catch (e) { console.warn('[leads] contador leads_mensagens:', e.message); }
 
     // Dispara push ao lead (se tiver player_id)
     try {
@@ -2060,14 +2068,14 @@ async function enviarRespostaMensagemLead() {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'x-admin-token': window._adminToken || '' },
           body: JSON.stringify({
-            acao:     'resposta-mensagem',
+            acao: 'resposta-mensagem',
             playerId: leadPush.onesignal_player_id,
-            titulo:   '💬 Você tem uma resposta!',
-            corpo:    'A equipe Radar SIOPE respondeu sua mensagem. Acesse o Fale Conosco.',
+            titulo: '💬 Você tem uma resposta!',
+            corpo: 'A equipe Radar SIOPE respondeu sua mensagem. Acesse o Fale Conosco.',
           }),
         });
       }
-    } catch(e) { console.warn('[leads] push resposta:', e.message); }
+    } catch (e) { console.warn('[leads] push resposta:', e.message); }
 
     carregarLeads(true);
     verificarPendenciasLeads();
@@ -2197,17 +2205,17 @@ async function abrirModalMensagensLead(elOuId, nome) {
   let leadId = elOuId;
   if (elOuId && typeof elOuId === 'object') {
     leadId = elOuId.dataset.leadId;
-    nome   = elOuId.dataset.leadNome || leadId;
+    nome = elOuId.dataset.leadNome || leadId;
   }
   _msgLeadAtual = leadId;
-  const modal   = document.getElementById('modal-mensagens-lead');
-  const titulo  = document.getElementById('modal-mensagens-lead-titulo');
+  const modal = document.getElementById('modal-mensagens-lead');
+  const titulo = document.getElementById('modal-mensagens-lead-titulo');
   const conteudo = document.getElementById('conteudo-mensagens-lead');
   const formResp = document.getElementById('form-resposta-lead');
 
   if (!modal) return;
-  titulo.textContent  = `💬 Mensagens — ${nome || leadId}`;
-  conteudo.innerHTML  = '<p style="color:#94a3b8;font-size:13px">🔄 Carregando…</p>';
+  titulo.textContent = `💬 Mensagens — ${nome || leadId}`;
+  conteudo.innerHTML = '<p style="color:#94a3b8;font-size:13px">🔄 Carregando…</p>';
   formResp.style.display = 'none';
   modal.style.display = 'flex';
 
@@ -2235,13 +2243,13 @@ async function _carregarMensagensLead(leadId) {
       const dataCaptura = lead.data_criacao
         ? new Date(lead.data_criacao).toLocaleString('pt-BR') : '—';
       html += _renderMsgCard({
-        id:        'legado',
-        tipo:      'Mensagem inicial (formulário)',
-        texto:     lead.mensagem,
-        resposta:  lead.mensagem_resposta,
+        id: 'legado',
+        tipo: 'Mensagem inicial (formulário)',
+        texto: lead.mensagem,
+        resposta: lead.mensagem_resposta,
         respondido: !!lead.mensagem_respondida,
-        data:      dataCaptura,
-        origem:    'legado',
+        data: dataCaptura,
+        origem: 'legado',
       });
     }
 
@@ -2251,13 +2259,13 @@ async function _carregarMensagensLead(leadId) {
         const data = m.criado_em
           ? new Date(m.criado_em).toLocaleString('pt-BR') : '—';
         html += _renderMsgCard({
-          id:        m.id,
-          tipo:      m.tipo === 'sugestao_tema' ? '💡 Sugestão de tema' : '💬 Fale Conosco',
-          texto:     m.texto,
-          resposta:  m.resposta,
+          id: m.id,
+          tipo: m.tipo === 'sugestao_tema' ? '💡 Sugestão de tema' : '💬 Fale Conosco',
+          texto: m.texto,
+          resposta: m.resposta,
           respondido: m.respondido,
           data,
-          origem:    'leads_mensagens',
+          origem: 'leads_mensagens',
         });
       });
     }
@@ -2267,15 +2275,15 @@ async function _carregarMensagensLead(leadId) {
     }
 
     conteudo.innerHTML = html;
-  } catch(e) {
+  } catch (e) {
     conteudo.innerHTML = `<p style="color:#ef4444">Erro: ${e.message}</p>`;
   }
 }
 
 function _renderMsgCard({ id, tipo, texto, resposta, respondido, data, origem }) {
-  const corBorda  = respondido ? '#22c55e' : '#f59e0b';
-  const badgeCor  = respondido ? '#dcfce7' : '#fef3c7';
-  const badgeTxt  = respondido ? '#16a34a' : '#b45309';
+  const corBorda = respondido ? '#22c55e' : '#f59e0b';
+  const badgeCor = respondido ? '#dcfce7' : '#fef3c7';
+  const badgeTxt = respondido ? '#16a34a' : '#b45309';
   const badgeLabel = respondido ? 'Respondida' : 'Aguardando resposta';
 
   const respostaHtml = resposta ? `
@@ -2313,33 +2321,33 @@ function _renderMsgCard({ id, tipo, texto, resposta, respondido, data, origem })
 }
 
 function _abrirFormRespostaLead(msgId, origem) {
-  document.getElementById('resposta-lead-msg-id').value   = msgId;
+  document.getElementById('resposta-lead-msg-id').value = msgId;
   document.getElementById('resposta-lead-msg-tipo').value = origem;
-  document.getElementById('resposta-lead-txt').value      = '';
+  document.getElementById('resposta-lead-txt').value = '';
   document.getElementById('form-resposta-lead').style.display = 'block';
   document.getElementById('resposta-lead-txt').focus();
 }
 
 async function enviarRespostaLeadMensagem() {
-  const msgId  = document.getElementById('resposta-lead-msg-id').value;
+  const msgId = document.getElementById('resposta-lead-msg-id').value;
   const origem = document.getElementById('resposta-lead-msg-tipo').value;
-  const texto  = document.getElementById('resposta-lead-txt').value.trim();
+  const texto = document.getElementById('resposta-lead-txt').value.trim();
   if (!texto) return mostrarMensagem('Digite uma resposta.');
 
   try {
     if (origem === 'legado') {
       // Responde campo legado na tabela leads
       const { error } = await window.supabase.from('leads').update({
-        mensagem_respondida:    true,
-        mensagem_resposta:      texto,
+        mensagem_respondida: true,
+        mensagem_resposta: texto,
         mensagem_respondida_em: new Date().toISOString(),
       }).eq('id', _msgLeadAtual);
       if (error) throw error;
     } else {
       // Responde na tabela leads_mensagens
       const { error } = await window.supabase.from('leads_mensagens').update({
-        respondido:    true,
-        resposta:      texto,
+        respondido: true,
+        resposta: texto,
         respondido_em: new Date().toISOString(),
       }).eq('id', Number(msgId));
       if (error) throw error;
@@ -2348,7 +2356,7 @@ async function enviarRespostaLeadMensagem() {
       try {
         await window.db.collection('admin_contadores').doc('pendencias')
           .set({ leads_mensagens: firebase.firestore.FieldValue.increment(-1) }, { merge: true });
-      } catch(e) { console.warn('[leads] contador:', e.message); }
+      } catch (e) { console.warn('[leads] contador:', e.message); }
 
       // Dispara push ao lead
       try {
@@ -2359,14 +2367,14 @@ async function enviarRespostaLeadMensagem() {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'x-admin-token': window._adminToken || '' },
             body: JSON.stringify({
-              acao:     'resposta-mensagem',
+              acao: 'resposta-mensagem',
               playerId: leadPush.onesignal_player_id,
-              titulo:   '💬 Você tem uma resposta!',
-              corpo:    'A equipe Radar SIOPE respondeu sua mensagem. Acesse o Fale Conosco.',
+              titulo: '💬 Você tem uma resposta!',
+              corpo: 'A equipe Radar SIOPE respondeu sua mensagem. Acesse o Fale Conosco.',
             }),
           });
         }
-      } catch(e) { console.warn('[leads] push:', e.message); }
+      } catch (e) { console.warn('[leads] push:', e.message); }
     }
 
     document.getElementById('form-resposta-lead').style.display = 'none';
@@ -2374,7 +2382,7 @@ async function enviarRespostaLeadMensagem() {
     await _carregarMensagensLead(_msgLeadAtual);
     verificarPendenciasLeads();
 
-  } catch(e) {
+  } catch (e) {
     mostrarMensagem('Erro ao responder: ' + e.message);
   }
 }
