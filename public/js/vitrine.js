@@ -54,28 +54,24 @@ let _containerEl    = null;
 async function _buscarIndicadores() {
   if (_indicadores.length > 0) return _indicadores;
 
-  try {
-    const url  = window.SUPABASE_URL;
-    const key  = window.SUPABASE_ANON_KEY;
+  if (!window.supabase) {
+    console.warn('vitrine.js: window.supabase não disponível.');
+    return [];
+  }
 
-    if (!url || !key) {
-      console.warn('vitrine.js: SUPABASE_URL ou SUPABASE_ANON_KEY não definidos.');
+  try {
+    const { data, error } = await window.supabase
+      .from('indicadores')
+      .select('*')
+      .eq('ativo', true)
+      .order('ordem_exibicao', { ascending: true });
+
+    if (error) {
+      console.error('vitrine.js: Erro na query Supabase:', error);
       return [];
     }
 
-    const res = await fetch(
-      `${url}/rest/v1/indicadores?ativo=eq.true&order=ordem_exibicao.asc`,
-      {
-        headers: {
-          'apikey': key,
-          'Authorization': `Bearer ${key}`,
-          'Content-Type': 'application/json'
-        }
-      }
-    );
-
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    _indicadores = await res.json();
+    _indicadores = data || [];
     return _indicadores;
 
   } catch (e) {
@@ -219,18 +215,26 @@ function _renderSecao() {
         <p style="margin:0 0 8px; font-size:13px; font-weight:600; color:#334155;">
           Selecionar indicador:
         </p>
-        <input
-          id="vitrine-busca"
-          type="text"
-          placeholder="Buscar por nome ou categoria..."
-          oninput="window._vitrineFiltraBusca(this.value)"
-          style="
-            width: 100%; padding: 7px 10px; border: 1px solid #cbd5e1;
-            border-radius: 6px; font-size: 13px; margin-bottom: 8px;
-            box-sizing: border-box;
-          "
-        >
+        <div style="display:flex; gap:8px; align-items:center; margin-bottom:8px;">
+          <select
+            id="vitrine-select-indicador"
+            style="flex:1; min-width:0; border:1px solid #cbd5e1; border-radius:6px; padding:7px 9px; font-size:13px;"
+          >
+            <option value="">Selecione um indicador</option>
+          </select>
+          <button
+            id="vitrine-btn-add-indicador"
+            onclick="window._vitrineAdicionarSelecionado()"
+            style="
+              background: linear-gradient(135deg, #667eea, #764ba2);
+              color: #fff; border: none; border-radius: 6px;
+              padding: 7px 12px; cursor: pointer; font-size: 13px; font-weight: 600;
+              white-space: nowrap;
+            "
+          >Adicionar</button>
+        </div>
         <div id="vitrine-lista-disp" style="
+          display:none;
           max-height: 210px; overflow-y: auto;
           border: 1px solid #e2e8f0; border-radius: 6px; background: #fff;
         "></div>
@@ -344,51 +348,45 @@ function _renderLista() {
 /* ─────────────────────────────────────────
    RENDER — Lista de indicadores disponíveis (Supabase)
 ───────────────────────────────────────── */
-function _renderDisponíveis(filtro = '') {
-  const container = document.getElementById('vitrine-lista-disp');
-  if (!container) return;
+function _renderDisponíveis() {
+  const select = document.getElementById('vitrine-select-indicador');
+  if (!select) return;
 
   const jaAdicionados = new Set(_vitrineItems.map(i => i.cod_indicador));
 
-  const lista = _indicadores.filter(ind => {
-    if (jaAdicionados.has(ind.cod_indicador)) return false;
-    if (!filtro) return true;
-    const f = filtro.toLowerCase();
-    return (ind.nome || '').toLowerCase().includes(f) ||
-           (ind.categoria || '').toLowerCase().includes(f);
-  });
+  const opcoes = (_indicadores || [])
+    .filter(ind => !jaAdicionados.has(ind.cod_indicador))
+    .sort((a, b) => Number(a.ordem_exibicao || 0) - Number(b.ordem_exibicao || 0));
 
-  if (lista.length === 0) {
-    container.innerHTML = `<p style="padding:12px; color:#94a3b8; font-size:13px; text-align:center;">
-      Nenhum indicador encontrado.
-    </p>`;
+  select.innerHTML = `<option value="">Selecione um indicador</option>`;
+
+  if (opcoes.length === 0) {
+    const opt = document.createElement('option');
+    opt.value = '';
+    opt.textContent = 'Sem indicadores disponíveis';
+    opt.disabled = true;
+    select.appendChild(opt);
     return;
   }
 
-  container.innerHTML = lista.map(ind => `
-    <div
-      onclick="window._vitrineAdicionar('${ind.cod_indicador}')"
-      style="
-        padding: 9px 12px; cursor: pointer;
-        border-bottom: 1px solid #f1f5f9; font-size: 13px;
-        display: flex; justify-content: space-between; align-items: center;
-        transition: background 0.15s;
-      "
-      onmouseover="this.style.background='#f0f4ff'"
-      onmouseout="this.style.background=''"
-    >
-      <span style="color:#1e293b; font-weight:500;">${ind.nome}</span>
-      <span style="
-        font-size: 11px; color: #64748b;
-        background: #f1f5f9; padding: 2px 8px; border-radius: 10px;
-        white-space: nowrap; margin-left: 8px; flex-shrink:0;
-      ">
-        ${ind.unidade === 'percentual' ? '📊 %' : '💰 BRL'}
-        ${ind.categoria ? ' · ' + ind.categoria : ''}
-      </span>
-    </div>
-  `).join('');
+  opcoes.forEach(ind => {
+    const opt = document.createElement('option');
+    opt.value = ind.cod_indicador;
+    opt.textContent = `${ind.ordem_exibicao || ''} ${ind.nome || ''}`.trim();
+    select.appendChild(opt);
+  });
 }
+
+// ─────────────────────────────────────────
+//   AÇÃO do botão "Adicionar" no combo
+//─────────────────────────────────────────
+window._vitrineAdicionarSelecionado = function() {
+  const select = document.getElementById('vitrine-select-indicador');
+  if (!select) return;
+  const codIndicador = select.value;
+  if (!codIndicador) return;
+  window._vitrineAdicionar(codIndicador);
+};
 
 /* ─────────────────────────────────────────
    AÇÕES — expostas globalmente
@@ -406,14 +404,10 @@ window._vitrineTogglePainel = async function() {
       await _buscarIndicadores();
     }
     _renderDisponíveis();
-    document.getElementById('vitrine-busca')?.focus();
+    document.getElementById('vitrine-select-indicador')?.focus();
   } else {
     painel.style.display = 'none';
   }
-};
-
-window._vitrineFiltraBusca = function(termo) {
-  _renderDisponíveis(termo);
 };
 
 window._vitrineAdicionar = function(codIndicador) {
@@ -432,13 +426,15 @@ window._vitrineAdicionar = function(codIndicador) {
 
   _vitrineItems.push(novoItem);
 
-  // fecha painel e limpa busca
+  // fecha painel e limpa seleção
   const painel = document.getElementById('vitrine-painel-add');
   if (painel) painel.style.display = 'none';
-  const busca = document.getElementById('vitrine-busca');
-  if (busca) busca.value = '';
+
+  const select = document.getElementById('vitrine-select-indicador');
+  if (select) select.value = '';
 
   _renderLista();
+  _renderDisponíveis();
 };
 
 window._vitrineRemover = function(idx) {
