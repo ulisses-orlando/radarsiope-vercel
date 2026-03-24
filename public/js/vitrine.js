@@ -34,7 +34,7 @@ const VITRINE_TIPOS_GRAFICO = [
 ];
 
 const VITRINE_GRUPOS = [
-  { value: 'nenhum',  label: 'Sem grupo' },
+  { value: 'nenhum', label: 'Sem grupo' },
   { value: 'grupo_1', label: 'Grupo 1' },
   { value: 'grupo_2', label: 'Grupo 2' },
   { value: 'grupo_3', label: 'Grupo 3' }
@@ -43,10 +43,10 @@ const VITRINE_GRUPOS = [
 /* ─────────────────────────────────────────
    ESTADO INTERNO
 ───────────────────────────────────────── */
-let _newsletterId   = '';
-let _vitrineItems   = [];   // array de objetos do indicador configurado
-let _indicadores    = [];   // cache dos indicadores do Supabase
-let _containerEl    = null;
+let _newsletterId = '';
+let _vitrineItems = [];   // array de objetos do indicador configurado
+let _indicadores = [];   // cache dos indicadores do Supabase
+let _containerEl = null;
 
 /* ─────────────────────────────────────────
    SUPABASE — Busca indicadores
@@ -122,7 +122,7 @@ function _validarGrupo(candidato) {
 
   const colegas = _vitrineItems.filter(
     i => i.cod_indicador !== candidato.cod_indicador &&
-         i.grupo === grupo
+      i.grupo === grupo
   );
   if (colegas.length === 0) return null;
 
@@ -133,7 +133,7 @@ function _validarGrupo(candidato) {
   }
 
   if (ref.unidade !== candidato.unidade) {
-    const labelRef  = ref.unidade === 'valor_brl' ? 'valor monetário' : 'percentual';
+    const labelRef = ref.unidade === 'valor_brl' ? 'valor monetário' : 'percentual';
     const labelCand = candidato.unidade === 'valor_brl' ? 'valor monetário' : 'percentual';
     return `"${ref.nome}" é ${labelRef} e "${candidato.nome}" é ${labelCand}. Indicadores de unidades diferentes não podem ser agrupados.`;
   }
@@ -339,6 +339,18 @@ function _renderLista() {
             </div>
           </div>
 
+          <div style="display:flex;flex-direction:column;gap:3px;flex:1;min-width:140px;">
+            <label style="font-size:11px;color:#64748b;font-weight:600;">Título do gráfico</label>
+            <input
+              type="text"
+              placeholder="Ex: Evolução MDE 2020-2024"
+              value="${item.titulo || ''}"
+              oninput="window._vitrineAlterarCampo(${idx}, 'titulo', this.value)"
+              style="font-size:12px;border:1px solid #cbd5e1;border-radius:5px;
+                    padding:4px 8px;width:100%;box-sizing:border-box;"
+            >
+          </div>
+
         </div>
       </div>
     `;
@@ -380,7 +392,7 @@ function _renderDisponíveis() {
 // ─────────────────────────────────────────
 //   AÇÃO do botão "Adicionar" no combo
 //─────────────────────────────────────────
-window._vitrineAdicionarSelecionado = function() {
+window._vitrineAdicionarSelecionado = function () {
   const select = document.getElementById('vitrine-select-indicador');
   if (!select) return;
   const codIndicador = select.value;
@@ -392,7 +404,7 @@ window._vitrineAdicionarSelecionado = function() {
    AÇÕES — expostas globalmente
 ───────────────────────────────────────── */
 
-window._vitrineTogglePainel = async function() {
+window._vitrineTogglePainel = async function () {
   const painel = document.getElementById('vitrine-painel-add');
   if (!painel) return;
 
@@ -410,18 +422,19 @@ window._vitrineTogglePainel = async function() {
   }
 };
 
-window._vitrineAdicionar = function(codIndicador) {
+window._vitrineAdicionar = function (codIndicador) {
   const ind = _indicadores.find(i => i.cod_indicador === codIndicador);
   if (!ind) return;
 
   const novoItem = {
-    cod_indicador : ind.cod_indicador,
-    nome          : ind.nome,
-    unidade       : ind.unidade || 'valor_brl',
-    tipo_grafico  : 'barra',                         // padrão seguro para ambas as unidades
-    grupo         : 'nenhum',
-    cor           : _proximaCor(),
-    destaque      : _vitrineItems.length === 0        // primeiro item vira destaque
+    cod_indicador: ind.cod_indicador,
+    nome: ind.nome,
+    unidade: ind.unidade || 'valor_brl',
+    tipo_grafico: 'barra',
+    grupo: 'nenhum',
+    cor: _proximaCor(),
+    titulo: '',          // ← ADICIONAR
+    destaque: _vitrineItems.length === 0
   };
 
   _vitrineItems.push(novoItem);
@@ -437,7 +450,7 @@ window._vitrineAdicionar = function(codIndicador) {
   _renderDisponíveis();
 };
 
-window._vitrineRemover = function(idx) {
+window._vitrineRemover = function (idx) {
   const eraDestaque = _vitrineItems[idx]?.destaque === true;
   _vitrineItems.splice(idx, 1);
 
@@ -449,7 +462,7 @@ window._vitrineRemover = function(idx) {
   _renderLista();
 };
 
-window._vitrineAlterarCampo = function(idx, campo, valor) {
+window._vitrineAlterarCampo = function (idx, campo, valor) {
   const item = _vitrineItems[idx];
   if (!item) return;
 
@@ -486,10 +499,10 @@ window._vitrineAlterarCampo = function(idx, campo, valor) {
  *   const container = document.getElementById('vitrine-container');
  *   await window.inicializarVitrine(docId, container);
  */
-window.inicializarVitrine = async function(newsletterId, containerEl) {
+window.inicializarVitrine = async function (newsletterId, containerEl) {
   _newsletterId = newsletterId;
-  _containerEl  = containerEl;
-  _indicadores  = [];       // limpa cache a cada abertura do modal
+  _containerEl = containerEl;
+  _indicadores = [];       // limpa cache a cada abertura do modal
 
   await _carregarVitrine(newsletterId);
   _renderSecao();

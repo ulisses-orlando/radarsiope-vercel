@@ -430,9 +430,6 @@ function renderHistoricoCompleto(container, historico, nomeMunicipio, uf) {
         <div style="font-size:16px;font-weight:700;color:var(--azul)">
           ${_esc(nomeMunicipio)}/${_esc(uf)}
         </div>
-        <div style="font-size:12px;color:var(--subtexto)">
-          Série histórica ${anos[0]} - ${anos[anos.length - 1]}
-        </div>
       </div>
       <button onclick="voltarResumo()" 
               style="padding:8px 16px;background:var(--bg-page);border:1px solid var(--borda);
