@@ -312,27 +312,38 @@ async function renderMunicipio(destinatario, acesso, newsletter) {
     const resumo = cod ? await SM.getResumoMunicipio(cod) : null;
     SM.renderSecaoMunicipio({ container, blur: acesso.blurMunicipio, resumo, nomeMunicipio: nome, uf });
 
-    // Salvar dados do município para o histórico
     if (resumo && cod) {
-      dadosMunicipioAtual = {  // ⭐ SEM window.
+      dadosMunicipioAtual = {
         cod_municipio: cod,
         nome: nome,
         uf: uf
       };
-
-      // Mostrar botão de histórico
       const btnHistorico = document.getElementById('btn-ver-historico');
-      if (btnHistorico) {
-        btnHistorico.style.display = 'inline-block';
-      }
-      // ── VITRINE DE INDICADORES ──────────────────────────────
-      const vitrineContainer = document.getElementById('municipio-vitrine');
-      if (vitrineContainer && newsletter?.vitrine?.length) {
-        await window.SupabaseMunicipio.renderVitrine(
+      if (btnHistorico) btnHistorico.style.display = 'inline-block';
+    }
+
+    // ── VITRINE: fora do if(resumo) — só precisa de cod ──────────────
+    const vitrineContainer = document.getElementById('municipio-vitrine');
+
+    console.log('[VG] vitrine debug:', {
+      temContainer: !!vitrineContainer,
+      temNewsletter: !!newsletter,
+      vitrineLength: newsletter?.vitrine?.length ?? 0,
+      temRenderVitrine: !!SM.renderVitrine,
+      cod
+    });
+
+    if (vitrineContainer && newsletter?.vitrine?.length && cod) {
+      if (typeof SM.renderVitrine === 'function') {
+        await SM.renderVitrine(
           vitrineContainer, newsletter.vitrine, cod, acesso.blurMunicipio
         );
+      } else {
+        console.warn('[VG] SM.renderVitrine não disponível — vitrine-graficos.js carregado?');
       }
     }
+    // ─────────────────────────────────────────────────────────────────
+
   } catch (err) {
     console.warn('[verNL] Município falhou (não fatal):', err);
     container.innerHTML = '';
