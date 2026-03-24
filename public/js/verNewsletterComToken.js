@@ -13,7 +13,8 @@
 let dadosMunicipioAtual = {
   cod_municipio: null,
   nome: null,
-  uf: null
+  uf: null,
+  vitrine: null
 };
 
 // ─── Parâmetros da URL ────────────────────────────────────────────────────────
@@ -316,33 +317,12 @@ async function renderMunicipio(destinatario, acesso, newsletter) {
       dadosMunicipioAtual = {
         cod_municipio: cod,
         nome: nome,
-        uf: uf
+        uf: uf,
+        vitrine: newsletter?.vitrine || null
       };
       const btnHistorico = document.getElementById('btn-ver-historico');
       if (btnHistorico) btnHistorico.style.display = 'inline-block';
     }
-
-    // ── VITRINE: fora do if(resumo) — só precisa de cod ──────────────
-    const vitrineContainer = document.getElementById('municipio-vitrine');
-
-    console.log('[VG] vitrine debug:', {
-      temContainer: !!vitrineContainer,
-      temNewsletter: !!newsletter,
-      vitrineLength: newsletter?.vitrine?.length ?? 0,
-      temRenderVitrine: !!SM.renderVitrine,
-      cod
-    });
-
-    if (vitrineContainer && newsletter?.vitrine?.length && cod) {
-      if (typeof SM.renderVitrine === 'function') {
-        await SM.renderVitrine(
-          vitrineContainer, newsletter.vitrine, cod, acesso.blurMunicipio
-        );
-      } else {
-        console.warn('[VG] SM.renderVitrine não disponível — vitrine-graficos.js carregado?');
-      }
-    }
-    // ─────────────────────────────────────────────────────────────────
 
   } catch (err) {
     console.warn('[verNL] Município falhou (não fatal):', err);
@@ -1049,6 +1029,18 @@ async function verHistoricoCompleto() {
       dadosMunicipioAtual.nome,
       dadosMunicipioAtual.uf
     );
+
+    // ── Substitui o gráfico fixo pelo(s) gráfico(s) da vitrine ──
+    const vitrineGrafContainer = document.getElementById('vitrine-grafico-historico');
+    const SM2 = window.SupabaseMunicipio;
+    if (vitrineGrafContainer && dadosMunicipioAtual.vitrine?.length && typeof SM2.renderVitrine === 'function') {
+      await SM2.renderVitrine(
+        vitrineGrafContainer,
+        dadosMunicipioAtual.vitrine,
+        dadosMunicipioAtual.cod_municipio,
+        false   // sem blur — histórico só aparece para assinante
+      );
+    }
   } catch (err) {
     console.error('[verNL] Erro ao carregar histórico:', err);
     historico.innerHTML = `

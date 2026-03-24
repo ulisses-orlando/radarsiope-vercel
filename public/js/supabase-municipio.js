@@ -442,12 +442,15 @@ function renderHistoricoCompleto(container, historico, nomeMunicipio, uf) {
       </button>
     </div>
     
-    <!-- Gráfico MDE (SVG simples) -->
-    <div style="background:var(--bg-page);padding:16px;border-radius:12px;margin-bottom:16px">
+    <!-- Placeholder: preenchido pela vitrine da edição -->
+    <div id="vitrine-grafico-historico"
+         style="background:var(--bg-page);padding:16px;border-radius:12px;margin-bottom:16px">
       <div style="font-size:13px;font-weight:700;color:var(--texto);margin-bottom:12px">
-        📊 Evolução MDE e Fundeb
+        📊 Evolução dos Indicadores
       </div>
-      ${_renderGraficoLinhaMDE(anos, valoresMDE, valoresFundeb, maxValor)}
+      <div style="text-align:center;padding:20px;color:#94a3b8;font-size:13px">
+        ⏳ Carregando…
+      </div>
     </div>
     
     <!-- Tabela comparativa -->
