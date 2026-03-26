@@ -731,9 +731,120 @@ async function _tentarModoAlerta() {
 }
 
 // ─── FLUXO PRINCIPAL ──────────────────────────────────────────────────────────
+// ── Modo Preview ─────────────────────────────────────────────────────────────
+async function _executarPreview(params) {
+  mostrarLoading(true);
 
+  const nid = params.get('nid');
+  const mun = params.get('mun');
+
+  if (!nid) { mostrarErro('Parâmetro nid ausente.'); return; }
+  if (!mun) { mostrarErro('Código do município ausente.'); return; }
+
+  try {
+    // Busca newsletter
+    const snap = await db.collection('newsletters').doc(nid).get();
+    if (!snap.exists) { mostrarErro('Edição não encontrada.'); return; }
+    const newsletter = { id: snap.id, ...snap.data() };
+
+    // Tenta buscar nome do município via vw_municipio_resumo
+    let nomeMun = mun;
+    let ufMun   = '';
+    try {
+      const { data: mdata } = await window.supabase
+        .from('vw_municipio_resumo')
+        .select('uf')
+        .eq('cod_municipio', String(mun))
+        .limit(1)
+        .maybeSingle();
+      if (mdata) ufMun = mdata.uf || '';
+    } catch (e) { /* não fatal */ }
+
+    // Destinatário simulado — acesso total como assinante profissional
+    const destinatario = {
+      _uid          : 'preview',
+      nome          : 'Admin (Preview)',
+      email         : 'preview@radarsiope.com.br',
+      cod_municipio : mun,
+      cod_uf        : ufMun,
+      nome_municipio: nomeMun,
+      plano_slug    : 'profissional',
+      features      : {
+        newsletter_audio      : true,
+        newsletter_infografico: true,
+        newsletter_video      : true,
+        alertas_prioritarios  : true,
+      },
+    };
+
+    const segmento = 'assinantes';
+    const acesso   = detectarAcesso(destinatario, newsletter, segmento, null);
+    const dados    = {
+      nome           : destinatario.nome,
+      email          : destinatario.email,
+      edicao         : newsletter.numero || newsletter.edicao || '',
+      titulo         : newsletter.titulo || '',
+      data_publicacao: newsletter.data_publicacao || null,
+      cod_uf         : ufMun,
+      nome_municipio : nomeMun,
+      perfil         : 'preview',
+      plano          : 'profissional',
+    };
+
+    // Pipeline de render — idêntico ao fluxo normal
+    renderHeader(newsletter, destinatario);
+    trocarModo('completo');
+    renderModoRapido(newsletter, acesso);
+    await renderModoCompleto(newsletter, dados, segmento, acesso);
+    renderMunicipio(destinatario, acesso, newsletter);
+    renderMidia(newsletter, acesso);
+    renderFAQ(newsletter, acesso);
+    await renderReactions(nid, 'preview');
+    renderCTA(acesso, newsletter);
+
+    mostrarApp();
+
+    // Banner fixo de preview
+    const banner = document.createElement('div');
+    banner.style.cssText = `
+      position:fixed;top:0;left:0;right:0;z-index:9999;
+      background:linear-gradient(135deg,#667eea,#764ba2);
+      color:#fff;font-size:13px;font-weight:600;
+      padding:10px 16px;display:flex;gap:12px;
+      align-items:center;justify-content:space-between;
+      box-shadow:0 2px 12px rgba(0,0,0,.2)`;
+    banner.innerHTML = `
+      <span>
+        🔍 Modo Preview
+        · Município: <strong>${_esc(mun)}</strong>
+        · Edição: <strong>${_esc(newsletter.numero || newsletter.edicao || nid)}</strong>
+        · Acesso simulado: assinante profissional
+      </span>
+      <button onclick="window.close()"
+              style="background:rgba(255,255,255,.25);border:none;color:#fff;
+                     padding:4px 12px;border-radius:6px;cursor:pointer;
+                     font-size:12px;font-weight:700;white-space:nowrap">
+        ✕ Fechar
+      </button>`;
+    document.body.prepend(banner);
+
+    // Empurra o app para não ficar sob o banner
+    const app = document.getElementById('rs-app');
+    if (app) app.style.paddingTop = '48px';
+
+  } catch (err) {
+    mostrarErro('Erro no modo preview.', err.message);
+  }
+}
+// ─────────────────────────────────────────────────────────────────────────────
 async function VerNewsletterComToken() {
   const params = getParams();
+  // ── Detecta modo preview ─────────────────────────────────
+  if (params.get('preview') === '1') {
+    await _executarPreview(params);
+    return;
+  }
+  // ─────────────────────────────────────────────────────────
   const d_nid = normalizeParam(params.get('nid'));
   const env = normalizeParam(params.get('env'));
   const uid = normalizeParam(params.get('uid'));

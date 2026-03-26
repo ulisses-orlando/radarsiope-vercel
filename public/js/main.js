@@ -901,6 +901,162 @@ async function abrirModalNewsletter(docId = null, isEdit = false) {
   addPreviewButton('🧪 Visualizar HTML puro', "puro", null, false);
   addPreviewButton('📖 Visualizar HTML Completo', "completo_html", null, true);
 
+  // ── Simular no App ──────────────────────────────────────────────────────
+  if (isEdit && docId) {
+    const btnSim = document.createElement('button');
+    btnSim.type = 'button';
+    btnSim.innerText = '📱 Simular no App';
+    btnSim.style.cssText = `
+      background: linear-gradient(135deg,#667eea,#764ba2);
+      color:#fff;border:none;border-radius:6px;
+      padding:8px 16px;cursor:pointer;font-size:13px;font-weight:600`;
+
+    btnSim.onclick = () => {
+      const cod = prompt(
+        '📍 Informe o código IBGE do município para simulação:\n(ex: 3550308 = São Paulo / 2704302 = Maceió)',
+        ''
+      );
+      if (!cod?.trim()) return;
+      const codMun = cod.trim();
+
+      // Monta dados simulados para substituir placeholders no e-mail
+      const dadosSim = {
+        nome: 'Admin (Preview)',
+        email: 'preview@radarsiope.com.br',
+        municipio: codMun,
+        nome_municipio: codMun,
+        edicao: document.querySelector('[data-field-name="edicao"]')?.value || '',
+        titulo: document.querySelector('[data-field-name="titulo"]')?.value || '',
+        newsletterId: docId,
+        envioId: 'preview',
+        destinatarioId: 'preview',
+        assinaturaId: 'preview',
+        token: 'preview',
+      };
+
+      // Gera HTML do e-mail com placeholders substituídos
+      const htmlEmail = aplicarPlaceholders(
+        montarHtmlNewsletterPreview('segmentado', 'assinantes', false),
+        dadosSim
+      );
+
+      // Remove modal anterior se existir
+      document.getElementById('modal-simular-app')?.remove();
+
+      // Cria modal
+      const overlay = document.createElement('div');
+      overlay.id = 'modal-simular-app';
+      overlay.style.cssText = `
+        position:fixed;inset:0;background:rgba(0,0,0,.6);
+        z-index:99999;display:flex;align-items:center;justify-content:center`;
+
+      overlay.innerHTML = `
+        <div style="
+          background:#fff;border-radius:12px;
+          width:94%;max-width:720px;max-height:90vh;
+          display:flex;flex-direction:column;
+          box-shadow:0 8px 40px rgba(0,0,0,.3);overflow:hidden">
+
+          <!-- Cabeçalho -->
+          <div style="
+            padding:14px 18px;
+            background:linear-gradient(135deg,#667eea,#764ba2);
+            color:#fff;display:flex;align-items:center;
+            justify-content:space-between;flex-shrink:0">
+            <div>
+              <div style="font-size:14px;font-weight:700">
+                🔍 Preview da Edição
+              </div>
+              <div style="font-size:11px;opacity:.85;margin-top:2px">
+                Município: ${codMun} · Visualizando como assinante
+              </div>
+            </div>
+            <button onclick="document.getElementById('modal-simular-app').remove()"
+                    style="background:rgba(255,255,255,.25);border:none;color:#fff;
+                           padding:5px 12px;border-radius:6px;cursor:pointer;
+                           font-size:13px;font-weight:700">✕</button>
+          </div>
+
+          <!-- Abas -->
+          <div style="
+            display:flex;border-bottom:1px solid #e2e8f0;
+            background:#f8fafc;flex-shrink:0">
+            <button id="sim-tab-email"
+                    onclick="
+                      document.getElementById('sim-pane-email').style.display='block';
+                      document.getElementById('sim-pane-app').style.display='none';
+                      this.style.borderBottom='2px solid #667eea';
+                      this.style.color='#667eea';
+                      document.getElementById('sim-tab-app').style.borderBottom='none';
+                      document.getElementById('sim-tab-app').style.color='#64748b';"
+                    style="
+                      padding:10px 20px;border:none;background:none;
+                      cursor:pointer;font-size:13px;font-weight:600;
+                      color:#667eea;border-bottom:2px solid #667eea">
+              📧 E-mail
+            </button>
+            <button id="sim-tab-app"
+                    onclick="
+                      document.getElementById('sim-pane-email').style.display='none';
+                      document.getElementById('sim-pane-app').style.display='flex';
+                      this.style.borderBottom='2px solid #667eea';
+                      this.style.color='#667eea';
+                      document.getElementById('sim-tab-email').style.borderBottom='none';
+                      document.getElementById('sim-tab-email').style.color='#64748b';"
+                    style="
+                      padding:10px 20px;border:none;background:none;
+                      cursor:pointer;font-size:13px;font-weight:600;color:#64748b">
+              📱 Web App
+            </button>
+          </div>
+
+          <!-- Painel E-mail -->
+          <div id="sim-pane-email" style="flex:1;overflow:auto;min-height:0">
+            <iframe
+              id="sim-iframe-email"
+              style="width:100%;height:100%;min-height:500px;border:none"
+              sandbox="allow-same-origin"></iframe>
+          </div>
+
+          <!-- Painel App -->
+          <div id="sim-pane-app"
+               style="display:none;flex:1;flex-direction:column;align-items:center;
+                      justify-content:center;gap:16px;padding:32px;text-align:center">
+            <div style="font-size:40px">📱</div>
+            <div style="font-size:14px;font-weight:700;color:#1e293b">
+              Abrir simulação no Web App
+            </div>
+            <div style="font-size:13px;color:#64748b;max-width:400px;line-height:1.6">
+              Abre em nova aba renderizando a edição completa com os dados do município
+              <strong>${codMun}</strong>, incluindo os gráficos da vitrine configurados.
+            </div>
+            <a href="/verNewsletterComToken.html?preview=1&nid=${docId}&mun=${codMun}"
+               target="_blank"
+               style="
+                 display:inline-block;padding:12px 28px;
+                 background:linear-gradient(135deg,#667eea,#764ba2);
+                 color:#fff;border-radius:8px;font-size:14px;font-weight:700;
+                 text-decoration:none;box-shadow:0 4px 14px rgba(102,126,234,.4)">
+              Abrir no App →
+            </a>
+          </div>
+        </div>`;
+
+      // Fecha ao clicar fora
+      overlay.addEventListener('click', e => {
+        if (e.target === overlay) overlay.remove();
+      });
+
+      document.body.appendChild(overlay);
+
+      // Injeta HTML do e-mail no iframe
+      const iframe = document.getElementById('sim-iframe-email');
+      iframe.srcdoc = htmlEmail;
+    };
+
+    previewWrap.appendChild(btnSim);
+  }
+  // ────────────────────────────────────────────────────────────────────────
   htmlWrap.appendChild(previewWrap);
 
   // -----------------------------
@@ -1007,7 +1163,7 @@ async function abrirModalNewsletter(docId = null, isEdit = false) {
     const ref = db.collection('newsletters');
     if (isEdit && docId) {
       await ref.doc(docId).set(payload, { merge: true });
-      await window.salvarVitrine(docId); 
+      await window.salvarVitrine(docId);
     } else {
       const novoDoc = await ref.add(payload);
     }
