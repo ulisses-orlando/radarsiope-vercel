@@ -312,6 +312,11 @@ async function renderMunicipio(destinatario, acesso, newsletter) {
   const SM = window.SupabaseMunicipio;
   if (!SM || !container) return;
 
+  // Sempre esconde o botão de histórico antes de buscar — evita herdar estado
+  // de edição anterior caso esta não tenha dados de município
+  const btnHistorico = document.getElementById('btn-ver-historico');
+  if (btnHistorico) btnHistorico.style.display = 'none';
+
   SM.renderSkeleton(container);
 
   try {
@@ -325,13 +330,16 @@ async function renderMunicipio(destinatario, acesso, newsletter) {
         uf: uf,
         vitrine: newsletter?.vitrine || null
       };
-      const btnHistorico = document.getElementById('btn-ver-historico');
       if (btnHistorico) btnHistorico.style.display = 'inline-block';
+    } else {
+      // Sem dados — garante que dadosMunicipioAtual não fica com valores antigos
+      dadosMunicipioAtual = { cod_municipio: null, nome: null, uf: null };
     }
 
   } catch (err) {
     console.warn('[verNL] Município falhou (não fatal):', err);
     container.innerHTML = '';
+    if (btnHistorico) btnHistorico.style.display = 'none';
   }
 }
 
