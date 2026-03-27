@@ -1701,6 +1701,132 @@
         opacity: .5;
       }
     }
+
+    /* ── Melhorias visuais Fase 1 + 2 ──────────────────────────────────────
+       Adicionado em: [data de hoje]
+       Não altera nenhuma lógica de negócio.
+    ────────────────────────────────────────────────────────────────────── */
+
+    /* Fade de entrada ao ativar modo rápido ou completo
+       (display:none→block não anima; usamos animação na classe .visivel) */
+    #modo-rapido.visivel,
+    #modo-completo.visivel {
+      animation: rs-fade-in 0.22s ease both;
+    }
+
+    @keyframes rs-fade-in {
+      from { opacity: 0; }
+      to   { opacity: 1; }
+    }
+
+    /* Textarea de feedback — glow no foco (complementa o border-color já existente) */
+    .rs-feedback-textarea:focus {
+      box-shadow: 0 0 0 3px rgba(10, 61, 98, 0.14);
+    }
+    [data-theme="exito"] .rs-feedback-textarea:focus {
+      box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.2);
+    }
+    [data-theme="aurora"] .rs-feedback-textarea:focus {
+      box-shadow: 0 0 0 3px rgba(167, 139, 250, 0.2);
+    }
+
+    /* Contador de caracteres — aviso ao atingir o limite */
+    .rs-feedback-contador.rs-limit {
+      color: var(--vermelho);
+      font-weight: 700;
+    }
+
+    /* Pulse ao clicar em reação — adicionado via JS: btn.classList.add('rs-pulse') */
+    @keyframes rs-pulse-reacao {
+      0%   { transform: scale(1); }
+      40%  { transform: scale(1.3); }
+      70%  { transform: scale(0.92); }
+      100% { transform: scale(1); }
+    }
+    .rs-pulse {
+      animation: rs-pulse-reacao 0.32s ease forwards;
+    }
+
+    /* Botão flutuante de tema (requer <button id="rs-btn-tema"> no HTML) */
+    #rs-btn-tema {
+      position: fixed;
+      bottom: 24px;
+      right: 20px;
+      z-index: 9999;
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      background: var(--azul);
+      color: #fff;
+      font-size: 18px;
+      border: none;
+      cursor: pointer;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+    #rs-btn-tema:hover {
+      transform: scale(1.08);
+      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.32);
+    }
+    [data-theme="exito"] #rs-btn-tema { background: #22c55e; color: #021a0f; }
+    [data-theme="aurora"] #rs-btn-tema { background: #a78bfa; color: #0d0d1a; }
+
+    /* CTA — entrada suave e botão mais arredondado */
+    .rs-cta {
+      animation: rs-cta-entrada 0.35s ease both;
+    }
+    @keyframes rs-cta-entrada {
+      from { opacity: 0; transform: translateY(8px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    .rs-cta-btn {
+      border-radius: 24px;
+      transition: transform 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease;
+    }
+    .rs-cta-btn:hover {
+      transform: scale(1.03);
+      box-shadow: 0 4px 14px rgba(10, 61, 98, 0.22);
+    }
+
+    /* Grid de mídia responsivo */
+    #midia-conteudo {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 12px;
+    }
+    @media (min-width: 640px) {
+      #midia-conteudo {
+        grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      }
+    }
+
+    /* Focus visível em elementos interativos */
+    a:focus-visible,
+    button:focus-visible,
+    [tabindex]:focus-visible {
+      outline: 2px solid var(--azul);
+      outline-offset: 3px;
+      border-radius: 4px;
+    }
+    [data-theme="exito"] a:focus-visible,
+    [data-theme="exito"] button:focus-visible { outline-color: #22c55e; }
+    [data-theme="aurora"] a:focus-visible,
+    [data-theme="aurora"] button:focus-visible { outline-color: #a78bfa; }
+
+    /* Respeitar preferência por menos animação */
+    @media (prefers-reduced-motion: reduce) {
+      *,
+      *::before,
+      *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+      }
+    }
+
   </style>
 
 <body>
