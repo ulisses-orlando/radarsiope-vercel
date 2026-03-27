@@ -358,7 +358,7 @@ function renderMidia(newsletter, acesso) {
         <div class="rs-media-icon">🎧</div>
         <div class="rs-media-info">
           <div class="rs-media-titulo">Podcast desta edição</div>
-          <div class="rs-media-sub">Produzido com NotebookLM · Ouça enquanto trabalha</div>
+          <div class="rs-media-sub">Produzido pot ia · Ouça no trabalho, no trânsito ou em casa.</div>
           <audio controls src="${_esc(newsletter.audio_url)}" preload="none"
                  style="width:100%;margin-top:8px;border-radius:8px"></audio>
         </div>
@@ -402,7 +402,7 @@ function renderMidia(newsletter, acesso) {
         <div class="rs-media-icon">📊</div>
         <div class="rs-media-info">
           <div class="rs-media-titulo">Infográfico da edição</div>
-          <div class="rs-media-sub">Visualização dos principais indicadores</div>
+          <div class="rs-media-sub">Visualização gráfica do conteúdo desta edição</div>
         </div>
         <a href="${_esc(newsletter.infografico_url)}" target="_blank" rel="noopener noreferrer"
            class="rs-media-btn rs-media-btn-primary">Ver →</a>
