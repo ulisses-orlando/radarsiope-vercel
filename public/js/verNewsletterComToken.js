@@ -2148,9 +2148,8 @@ function _solicitarUpgrade(tipo, isAssinante) {
           <strong>${info.plano}</strong>. Como você já é assinante, basta
           solicitar o upgrade diretamente com a nossa equipe.
         </p>
-        <a href="/contato.html?assunto=upgrade&plano=${info.slug}"
-           class="rs-upgrade-btn-primario">
-          📩 Solicitar upgrade pelo Fale Conosco
+        <a 
+          📩 Acesse o Fale Conosco no Menu
         </a>
         <button class="rs-upgrade-btn-secundario" onclick="_fecharUpgradePanel()">
           Agora não
