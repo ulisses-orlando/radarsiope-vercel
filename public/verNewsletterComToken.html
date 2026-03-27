@@ -1817,6 +1817,125 @@
     [data-theme="aurora"] button:focus-visible { outline-color: #a78bfa; }
 
     /* Respeitar preferência por menos animação */
+    /* ── Painel de upgrade de mídia ────────────────────────────────────── */
+
+    /* Cursor correto no botão de bloqueio */
+    .rs-media-btn-lock {
+      cursor: pointer !important;
+    }
+
+    #rs-upgrade-panel {
+      position: fixed;
+      inset: 0;
+      z-index: 10000;
+      display: flex;
+      align-items: flex-end;
+      justify-content: center;
+      animation: rs-fade-in 0.18s ease both;
+    }
+
+    .rs-upgrade-backdrop {
+      position: absolute;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.5);
+      cursor: pointer;
+    }
+
+    .rs-upgrade-box {
+      position: relative;
+      background: var(--rs-card);
+      color: var(--rs-text);
+      border-radius: 20px 20px 0 0;
+      padding: 28px 24px 36px;
+      width: 100%;
+      max-width: 520px;
+      box-shadow: 0 -4px 32px rgba(0, 0, 0, 0.25);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      gap: 12px;
+      animation: rs-upgrade-slide 0.28s cubic-bezier(0.2, 0.9, 0.4, 1) both;
+    }
+
+    @keyframes rs-upgrade-slide {
+      from { transform: translateY(100%); }
+      to   { transform: translateY(0); }
+    }
+
+    .rs-upgrade-close {
+      position: absolute;
+      top: 14px;
+      right: 16px;
+      background: var(--rs-card2);
+      border: none;
+      border-radius: 50%;
+      width: 30px;
+      height: 30px;
+      cursor: pointer;
+      font-size: 14px;
+      color: var(--rs-muted);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      line-height: 1;
+    }
+
+    .rs-upgrade-icone {
+      font-size: 36px;
+      line-height: 1;
+    }
+
+    .rs-upgrade-titulo {
+      font-size: 17px;
+      font-weight: 700;
+      color: var(--rs-text);
+      margin: 0;
+    }
+
+    .rs-upgrade-texto {
+      font-size: 14px;
+      color: var(--rs-muted);
+      line-height: 1.6;
+      margin: 0;
+      max-width: 380px;
+    }
+
+    .rs-upgrade-btn-primario {
+      display: inline-block;
+      width: 100%;
+      max-width: 340px;
+      padding: 13px 20px;
+      background: var(--azul);
+      color: #fff;
+      border-radius: 12px;
+      font-size: 14px;
+      font-weight: 700;
+      text-decoration: none;
+      text-align: center;
+      cursor: pointer;
+      transition: opacity 0.15s ease, transform 0.15s ease;
+    }
+
+    .rs-upgrade-btn-primario:hover {
+      opacity: 0.88;
+      transform: scale(1.01);
+    }
+
+    [data-theme="exito"] .rs-upgrade-btn-primario { background: #22c55e; color: #021a0f; }
+    [data-theme="aurora"] .rs-upgrade-btn-primario { background: #a78bfa; color: #0d0d1a; }
+
+    .rs-upgrade-btn-secundario {
+      background: none;
+      border: none;
+      color: var(--rs-muted);
+      font-size: 13px;
+      cursor: pointer;
+      padding: 4px 8px;
+      text-decoration: underline;
+      text-underline-offset: 3px;
+    }
+
     @media (prefers-reduced-motion: reduce) {
       *,
       *::before,
