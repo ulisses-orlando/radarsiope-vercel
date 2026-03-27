@@ -2147,10 +2147,9 @@ function _solicitarUpgrade(tipo, isAssinante) {
           O <strong>${info.nome}</strong> está disponível a partir do plano
           <strong>${info.plano}</strong>. Como você já é assinante, basta
           solicitar o upgrade diretamente com a nossa equipe.
-        </p>
-        <a 
+          
           📩 Acesse o Fale Conosco no Menu
-        </a>
+        </p>
         <button class="rs-upgrade-btn-secundario" onclick="_fecharUpgradePanel()">
           Agora não
         </button>
