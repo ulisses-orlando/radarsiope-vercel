@@ -264,15 +264,10 @@ async function renderModoCompleto(newsletter, dados, segmento, acesso) {
     container.innerHTML = html;
     container.style.cssText = 'max-height:300px;overflow:hidden;position:relative';
 
-    // Fade overlay — lê --rs-card (variável de fundo real do projeto) para
-    // compatibilidade com todos os temas. Fallback para backgroundColor do body.
-    const _bgAtual = getComputedStyle(document.documentElement)
-      .getPropertyValue('--rs-card').trim() ||
-      getComputedStyle(document.body).backgroundColor ||
-      '#1e293b';
+    // Fade overlay
     const fade = document.createElement('div');
     fade.style.cssText = 'position:absolute;bottom:0;left:0;right:0;height:120px;' +
-      `background:linear-gradient(transparent,${_bgAtual});pointer-events:none`;
+      'background:linear-gradient(transparent,#fff);pointer-events:none';
     container.appendChild(fade);
 
     wrap.insertAdjacentHTML('afterend', `
