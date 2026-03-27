@@ -733,8 +733,7 @@ async function _tentarModoAlerta() {
         <div style="padding:20px;text-align:center;color:var(--rs-muted)">
           <div style="font-size:28px;margin-bottom:8px">📬</div>
           <div style="font-size:13px;line-height:1.6">
-            Você chegou via notificação.<br>
-            Use o botão <strong>📚 Edições</strong> para ler a newsletter,<br>
+            Selecione uma edição em <strong>📚 Edições</strong> para começar a leitura,<br>
             ou confira seus alertas em <strong>🔔 Alertas</strong>.
           </div>
         </div>`;
@@ -1913,6 +1912,14 @@ async function navegarParaEdicao(edicaoId) {
     // Atualizar edição atual no estado do drawer
     _drawer.edicaoAtual = edicaoId;
     _drawer.tipoAtual = newsletter.Tipo || newsletter.tipo || null;
+
+    // Limpar inline styles que possam ter sido aplicados pelo modo alerta
+    // (el.style.display = 'none' tem prioridade sobre classes CSS como .visivel)
+    ['rs-toggle-modo', 'rs-banner-recente', 'rs-watermark',
+     'rs-cta-wrap', 'modo-rapido', 'modo-completo'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.style.display = '';
+    });
 
     // Limpar e re-renderizar
     renderHeader(newsletter, destinatario);
