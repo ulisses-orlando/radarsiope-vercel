@@ -110,6 +110,42 @@
   <script>
     // ✅ Captura parâmetros da URL
     const params = new URLSearchParams(window.location.search);
+
+    // Se for assinante, substitui o conteúdo da página
+    if (seg === 'assinantes') {
+      document.addEventListener('DOMContentLoaded', () => {
+        // Substitui o container principal pelo aviso
+        // Ajuste o ID do container conforme o seu HTML
+        const container = document.getElementById('container-descadastro')
+          || document.querySelector('main')
+          || document.body;
+
+        container.innerHTML = `
+      <div style="
+        max-width:480px;margin:60px auto;padding:32px 24px;
+        font-family:sans-serif;text-align:center;
+        border:1px solid #e2e8f0;border-radius:12px;
+        background:#fff;box-shadow:0 4px 20px rgba(0,0,0,.08)">
+        <div style="font-size:40px;margin-bottom:16px">📋</div>
+        <h2 style="color:#0A3D62;font-size:18px;margin:0 0 12px">
+          Olá assinante do Radar SIOPE
+        </h2>
+        <p style="color:#64748b;font-size:14px;line-height:1.6;margin:0 0 24px">
+          Para gerenciar sua assinatura,
+          utilize o <strong>Fale Conosco</strong> dentro do app.
+          Nossa equipe responderá em até 1 dia útil.
+        </p>
+        <a href="https://app.radarsiope.com.br/verNewsletterComToken.html"
+           style="
+             display:inline-block;padding:12px 28px;
+             background:#0A3D62;color:#fff;border-radius:8px;
+             font-size:14px;font-weight:700;text-decoration:none">
+          Acessar o App →
+        </a>
+      </div>`;
+      });
+    }
+
     const email = params.get("email") || "";
     const newsletterId = params.get("newsletter") || "";
     const titulo = params.get("titulo") || "(sem título)";
