@@ -264,10 +264,15 @@ async function renderModoCompleto(newsletter, dados, segmento, acesso) {
     container.innerHTML = html;
     container.style.cssText = 'max-height:300px;overflow:hidden;position:relative';
 
-    // Fade overlay
+    // Fade overlay — lê --rs-card (variável de fundo real do projeto) para
+    // compatibilidade com todos os temas. Fallback para backgroundColor do body.
+    const _bgAtual = getComputedStyle(document.documentElement)
+      .getPropertyValue('--rs-card').trim() ||
+      getComputedStyle(document.body).backgroundColor ||
+      '#1e293b';
     const fade = document.createElement('div');
     fade.style.cssText = 'position:absolute;bottom:0;left:0;right:0;height:120px;' +
-      'background:linear-gradient(transparent,#fff);pointer-events:none';
+      `background:linear-gradient(transparent,${_bgAtual});pointer-events:none`;
     container.appendChild(fade);
 
     wrap.insertAdjacentHTML('afterend', `
@@ -402,7 +407,14 @@ function renderMidia(newsletter, acesso) {
       </div>`);
   }
 
-  if (itens.length) { secao.style.display = 'block'; wrap.innerHTML = itens.join(''); }
+  if (itens.length) {
+    secao.style.display = 'block';
+    wrap.innerHTML = itens.join('');
+  } else {
+    // Sem mídia nesta edição — limpa para não herdar conteúdo de edição anterior
+    secao.style.display = 'none';
+    wrap.innerHTML = '';
+  }
 }
 
 // ─── FAQ ──────────────────────────────────────────────────────────────────────
@@ -411,7 +423,14 @@ function renderFAQ(newsletter, acesso) {
   const secao = document.getElementById('secao-faq');
   const wrap = document.getElementById('faq-conteudo');
   const faq = newsletter.faq || [];
-  if (!faq.length || !secao || !wrap) return;
+  if (!secao || !wrap) return;
+
+  // Sem FAQ nesta edição — limpa para não herdar conteúdo de edição anterior
+  if (!faq.length) {
+    secao.style.display = 'none';
+    wrap.innerHTML = '';
+    return;
+  }
 
   const visiveis = (acesso.isAssinante || acesso.acessoProTemp) ? faq : faq.slice(0, 1);
   const temRestante = !acesso.isAssinante && !acesso.acessoProTemp && faq.length > 1;
