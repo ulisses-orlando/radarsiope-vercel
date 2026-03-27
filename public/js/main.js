@@ -934,11 +934,24 @@ async function abrirModalNewsletter(docId = null, isEdit = false) {
         token: 'preview',
       };
 
-      // Gera HTML do e-mail com placeholders substituídos
-      const htmlEmail = aplicarPlaceholders(
-        montarHtmlNewsletterPreview('segmentado', 'assinantes', false),
-        dadosSim
-      );
+      // ✅ Lê direto do data carregado pelo modal (html_conteudo = campo do e-mail)
+      const htmlEmailBase = data.html_conteudo || '';
+
+      // Aplica blocos se existirem (filtra só os de assinantes/todos)
+      const blocos = coletarBlocosEdicao();
+      let htmlBlocos = '';
+      blocos.forEach(b => {
+        if (b.destino === 'app') return; // ignora blocos exclusivos do app
+        if (b.acesso === 'todos' || b.acesso === 'assinantes') {
+          htmlBlocos += b.html || '';
+        }
+      });
+      
+      const htmlEmailComBlocos = htmlEmailBase.includes('{{blocos}}')
+        ? htmlEmailBase.replace('{{blocos}}', htmlBlocos)
+        : htmlEmailBase + '\n' + htmlBlocos;
+
+      const htmlEmail = aplicarPlaceholders(htmlEmailComBlocos, dadosSim);
 
       // Remove modal anterior se existir
       document.getElementById('modal-simular-app')?.remove();
