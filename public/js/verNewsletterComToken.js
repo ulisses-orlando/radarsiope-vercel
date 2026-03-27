@@ -369,7 +369,8 @@ function renderMidia(newsletter, acesso) {
           <div class="rs-media-titulo">Podcast desta edição</div>
           <div class="rs-media-sub">Disponível no plano Essence ou superior</div>
         </div>
-        <a href="/assinatura.html?plano=essence" class="rs-media-btn rs-media-btn-lock">🔒 Desbloquear</a>
+        <button class="rs-media-btn rs-media-btn-lock"
+                onclick="_solicitarUpgrade('audio', ${acesso.isAssinante})">🔒 Desbloquear</button>
       </div>`);
   }
 
@@ -390,7 +391,8 @@ function renderMidia(newsletter, acesso) {
         <div class="rs-media-titulo">Vídeo explicativo</div>
         <div class="rs-media-sub">Disponível no plano Profissional ou superior</div>
       </div>
-      <a href="/assinatura.html?plano=profissional" class="rs-media-btn rs-media-btn-lock">🔒 Desbloquear</a>
+      <button class="rs-media-btn rs-media-btn-lock"
+              onclick="_solicitarUpgrade('video', ${acesso.isAssinante})">🔒 Desbloquear</button>
     </div>`);
   }
 
@@ -411,7 +413,8 @@ function renderMidia(newsletter, acesso) {
           <div class="rs-media-titulo">Infográfico da edição</div>
           <div class="rs-media-sub">Disponível no plano Profissional ou superior</div>
         </div>
-        <a href="/assinatura.html?plano=profissional" class="rs-media-btn rs-media-btn-lock">🔒 Desbloquear</a>
+        <button class="rs-media-btn rs-media-btn-lock"
+                onclick="_solicitarUpgrade('infografico', ${acesso.isAssinante})">🔒 Desbloquear</button>
       </div>`);
   }
 
@@ -2108,6 +2111,92 @@ async function enviarFeedback(nid) {
 }
 
 window.enviarFeedback = enviarFeedback;
+
+// ─── Painel de upgrade de mídia ───────────────────────────────────────────────
+// Exibido ao clicar em "Desbloquear" em um item de mídia bloqueado.
+// Distingue assinante (upgrade de plano) de lead (nova assinatura).
+
+const _UPGRADE_INFO = {
+  audio:      { icone: '🎧', nome: 'Podcast', plano: 'Essence',      slug: 'essence' },
+  video:      { icone: '📺', nome: 'Vídeo',   plano: 'Profissional', slug: 'profissional' },
+  infografico:{ icone: '📊', nome: 'Infográfico', plano: 'Profissional', slug: 'profissional' },
+};
+
+function _solicitarUpgrade(tipo, isAssinante) {
+  // Remove painel anterior se existir
+  document.getElementById('rs-upgrade-panel')?.remove();
+
+  const info = _UPGRADE_INFO[tipo] || { icone: '🔒', nome: 'Recurso', plano: 'superior', slug: '' };
+
+  const panel = document.createElement('div');
+  panel.id = 'rs-upgrade-panel';
+  panel.setAttribute('role', 'dialog');
+  panel.setAttribute('aria-modal', 'true');
+  panel.setAttribute('aria-label', 'Informações sobre upgrade');
+
+  if (isAssinante) {
+    // ── Assinante: orientar para upgrade via contato ─────────────────────────
+    panel.innerHTML = `
+      <div class="rs-upgrade-backdrop" onclick="_fecharUpgradePanel()"></div>
+      <div class="rs-upgrade-box">
+        <button class="rs-upgrade-close" onclick="_fecharUpgradePanel()"
+                aria-label="Fechar">✕</button>
+        <div class="rs-upgrade-icone">${info.icone}</div>
+        <h3 class="rs-upgrade-titulo">Upgrade de plano</h3>
+        <p class="rs-upgrade-texto">
+          O <strong>${info.nome}</strong> está disponível a partir do plano
+          <strong>${info.plano}</strong>. Como você já é assinante, basta
+          solicitar o upgrade diretamente com a nossa equipe.
+        </p>
+        <a href="/contato.html?assunto=upgrade&plano=${info.slug}"
+           class="rs-upgrade-btn-primario">
+          📩 Solicitar upgrade pelo Fale Conosco
+        </a>
+        <button class="rs-upgrade-btn-secundario" onclick="_fecharUpgradePanel()">
+          Agora não
+        </button>
+      </div>`;
+  } else {
+    // ── Lead: direcionar para assinatura (nova aba — não sai do app) ─────────
+    panel.innerHTML = `
+      <div class="rs-upgrade-backdrop" onclick="_fecharUpgradePanel()"></div>
+      <div class="rs-upgrade-box">
+        <button class="rs-upgrade-close" onclick="_fecharUpgradePanel()"
+                aria-label="Fechar">✕</button>
+        <div class="rs-upgrade-icone">${info.icone}</div>
+        <h3 class="rs-upgrade-titulo">${info.nome} exclusivo para assinantes</h3>
+        <p class="rs-upgrade-texto">
+          Este recurso está disponível a partir do plano
+          <strong>${info.plano}</strong>. Assine agora e tenha acesso
+          permanente a todas as edições com ${info.nome.toLowerCase()}.
+        </p>
+        <a href="/assinatura.html?plano=${info.slug}" target="_blank" rel="noopener"
+           class="rs-upgrade-btn-primario">
+          Ver plano ${info.plano} →
+        </a>
+        <button class="rs-upgrade-btn-secundario" onclick="_fecharUpgradePanel()">
+          Continuar lendo
+        </button>
+      </div>`;
+  }
+
+  document.body.appendChild(panel);
+
+  // Foco no painel para acessibilidade
+  requestAnimationFrame(() => {
+    panel.querySelector('.rs-upgrade-box')?.focus?.();
+  });
+}
+
+function _fecharUpgradePanel() {
+  const panel = document.getElementById('rs-upgrade-panel');
+  if (!panel) return;
+  panel.style.opacity = '0';
+  setTimeout(() => panel.remove(), 200);
+}
+
+window._solicitarUpgrade = _solicitarUpgrade;
+window._fecharUpgradePanel = _fecharUpgradePanel;
 
 // ─── Inicia ───────────────────────────────────────────────────────────────────
 VerNewsletterComToken();
