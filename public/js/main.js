@@ -832,7 +832,7 @@ async function abrirModalNewsletter(docId = null, isEdit = false) {
     const texto = `
   <p style="font-size:12px; color:#888; margin-top:30px">
     Não deseja mais receber nossas newsletters?
-    <a href="https://api.radarsiope.com.br/descadastramento.html?email={{email}}&newsletter={{newsletterId}}&titulo={{titulo}}">
+    <a href="https://api.radarsiope.com.br/descadastramento.html?email={{email}}&newsletter={{newsletterId}}&titulo={{titulo}}&seg={{segmento}}">
       Clique aqui para se descadastrar
     </a>.
   </p>
