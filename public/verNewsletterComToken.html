@@ -2005,10 +2005,6 @@
 
     <!-- MUNICÍPIO -->
     <section class="rs-section">
-      <div class="rs-section-header">
-        <span>📍</span>
-        <h2 id="municipio-titulo">Seu Município</h2>
-      </div>
 
       <!-- Modo Resumo (padrão) -->
       <div id="municipio-resumo">
@@ -2021,17 +2017,19 @@
         </div>
 
         <!-- Botão para ver histórico -->
-        <div style="text-align:center;padding:12px">
-          <button id="btn-ver-historico" style="padding:10px 20px;background:var(--azul);color:#fff;
-                     border:none;border-radius:8px;font-size:13px;font-weight:600;
-                     cursor:pointer;display:none">
-            📈 Ver série histórica completa
-          </button>
-        </div>
       </div>
 
       <!-- Modo Histórico (oculto por padrão) -->
       <div id="municipio-historico" style="display:none;padding:14px"></div>
+
+      <!-- Botão para ver histórico -->
+      <div style="text-align:center;padding:12px">
+        <button id="btn-ver-historico" style="padding:10px 20px;background:var(--azul);color:#fff;
+                   border:none;border-radius:8px;font-size:13px;font-weight:600;
+                   cursor:pointer;display:none">
+          📈 Ver série histórica completa
+        </button>
+      </div>
 
       <!-- vitrine dinamica de graficos -->
       <div id="municipio-vitrine"></div>
