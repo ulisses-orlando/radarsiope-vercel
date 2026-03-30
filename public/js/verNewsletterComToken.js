@@ -737,7 +737,7 @@ async function _tentarModoAlerta() {
           <div style="font-size:28px;margin-bottom:8px">📬</div>
           <div style="font-size:13px;line-height:1.6">
             Selecione uma edição em <strong>📚 Edições</strong> para começar a leitura,<br>
-            ou confira seus alertas em <strong>🔔 Sentinela</strong>.
+            ou confira seus alertas em <strong>🔔 Alertas</strong>.
           </div>
         </div>`;
       const btnHist = document.getElementById('btn-ver-historico');
@@ -749,7 +749,7 @@ async function _tentarModoAlerta() {
 
     // Abre a Central de Mensagens automaticamente após um pequeno delay
     setTimeout(() => {
-      const btnAlertas = document.getElementById('rs-sentinela-btn');
+      const btnAlertas = document.getElementById('rs-alertas-btn');
       if (btnAlertas) btnAlertas.click();
     }, 600);
 
@@ -1181,11 +1181,6 @@ async function verHistoricoCompleto() {
         false   // sem blur — histórico só aparece para assinante
       );
     }
-
-    // Toggle button to back
-    const btn = document.getElementById('btn-ver-historico');
-    btn.innerHTML = '🔙 Resumo';
-    btn.onclick = voltarResumo;
   } catch (err) {
     console.error('[verNL] Erro ao carregar histórico:', err);
     historico.innerHTML = `
@@ -1193,6 +1188,10 @@ async function verHistoricoCompleto() {
         <div style="font-size:18px;margin-bottom:12px">❌</div>
         <div style="font-weight:600;margin-bottom:8px">Erro ao carregar histórico</div>
         <div style="font-size:13px;color:#94a3b8;margin-bottom:16px">${err.message}</div>
+        <button onclick="voltarResumo()" style="padding:8px 16px;background:var(--azul);
+                color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px">
+          ← Voltar ao resumo
+        </button>
       </div>
     `;
   }
@@ -1204,11 +1203,6 @@ function voltarResumo() {
 
   if (historico) historico.style.display = 'none';
   if (resumo) resumo.style.display = 'block';
-
-  // Toggle button back
-  const btn = document.getElementById('btn-ver-historico');
-  btn.innerHTML = '📈 Ver série histórica completa';
-  btn.onclick = verHistoricoCompleto;
 }
 
 // Inicializar listener do botão quando DOM estiver pronto
