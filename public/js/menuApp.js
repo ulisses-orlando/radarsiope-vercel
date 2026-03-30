@@ -201,7 +201,7 @@
         <button class="rs-menu-item" id="rs-menu-alertas"
           style="background:#1e4d78" role="menuitem">
           <span class="rs-menu-item-icon">🔔</span>
-          <span class="rs-menu-item-label">Alertas</span>
+          <span class="rs-menu-item-label">Sentinela</span>
           <span class="rs-menu-item-badge" id="rs-menu-badge-alertas" style="display:none">0</span>
         </button>
         <button class="rs-menu-item" id="rs-menu-fale"
