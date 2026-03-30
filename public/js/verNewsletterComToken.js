@@ -1211,14 +1211,18 @@ function voltarResumo() {
 }
 
 function toggleHistorico() {
+  const resumo = document.getElementById('municipio-resumo');
   const historico = document.getElementById('municipio-historico');
+  const btn = document.getElementById('btn-toggle-historico');
   
-  if (historico && historico.style.display === 'block') {
+  if (historico.style.display === 'block') {
     // Está no histórico, voltar para resumo
     voltarResumo();
+    btn.innerHTML = '📈 Ver série histórica completa';
   } else {
     // Está no resumo, ir para histórico
     verHistoricoCompleto();
+    btn.innerHTML = '🔙 Resumo';
   }
 }
 
