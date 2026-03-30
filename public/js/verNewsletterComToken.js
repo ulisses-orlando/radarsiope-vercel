@@ -737,7 +737,7 @@ async function _tentarModoAlerta() {
           <div style="font-size:28px;margin-bottom:8px">📬</div>
           <div style="font-size:13px;line-height:1.6">
             Selecione uma edição em <strong>📚 Edições</strong> para começar a leitura,<br>
-            ou confira seus alertas em <strong>🔔 Alertas</strong>.
+            ou confira seus alertas em <strong>🔔 Sentinela</strong>.
           </div>
         </div>`;
       const btnHist = document.getElementById('btn-ver-historico');
@@ -1139,9 +1139,12 @@ async function verHistoricoCompleto() {
     return;
   }
 
-  // Ocultar resumo, mostrar histórico
+// Ocultar resumo, mostrar histórico
   resumo.style.display = 'none';
   historico.style.display = 'block';
+  
+  const btn = document.getElementById('btn-toggle-historico');
+  if (btn) btn.innerHTML = '🔙 Resumo';
 
   // Loading
   historico.innerHTML = `
@@ -1200,22 +1203,37 @@ async function verHistoricoCompleto() {
 function voltarResumo() {
   const resumo = document.getElementById('municipio-resumo');
   const historico = document.getElementById('municipio-historico');
+  const btn = document.getElementById('btn-toggle-historico');
 
   if (historico) historico.style.display = 'none';
   if (resumo) resumo.style.display = 'block';
+  if (btn) btn.innerHTML = '📈 Ver série histórica completa';
+}
+
+function toggleHistorico() {
+  const historico = document.getElementById('municipio-historico');
+  
+  if (historico && historico.style.display === 'block') {
+    // Está no histórico, voltar para resumo
+    voltarResumo();
+  } else {
+    // Está no resumo, ir para histórico
+    verHistoricoCompleto();
+  }
 }
 
 // Inicializar listener do botão quando DOM estiver pronto
 function initHistoricoButton() {
-  const btn = document.getElementById('btn-ver-historico');
+  const btn = document.getElementById('btn-toggle-historico');
   if (btn) {
-    btn.addEventListener('click', verHistoricoCompleto);
+    btn.addEventListener('click', toggleHistorico);
   }
 }
 
 // Expor funções globalmente
 window.verHistoricoCompleto = verHistoricoCompleto;
 window.voltarResumo = voltarResumo;
+window.toggleHistorico = toggleHistorico;
 
 // Inicializar quando DOM carregar
 if (document.readyState === 'loading') {

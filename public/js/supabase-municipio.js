@@ -424,20 +424,8 @@ function renderHistoricoCompleto(container, historico, nomeMunicipio, uf) {
   const maxValor = Math.max(...valoresMDE, ...valoresFundeb, 70, 30);
 
   container.innerHTML = `
-    <!-- Cabeçalho -->
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;padding:0 4px">
-      <div>
-        <div style="font-size:16px;font-weight:700;color:var(--azul)">
-          ${_esc(nomeMunicipio)}/${_esc(uf)}
-        </div>
-      </div>
-      <button onclick="voltarResumo()" 
-              style="padding:8px 16px;background:var(--bg-page);border:1px solid var(--borda);
-                     border-radius:8px;cursor:pointer;font-size:13px;font-weight:600;
-                     color:var(--azul)">
-        ← Resumo
-      </button>
-    </div>
+    <!-- Cabeçalho (sem município duplicado e sem botão - agora está unificado) -->
+    <div style="margin-bottom:16px;padding:0 4px"></div>
     
     <!-- Placeholder: preenchido pela vitrine da edição -->
     <div id="vitrine-grafico-historico"
@@ -585,7 +573,7 @@ function _renderTabelaComparativa(historico) {
   // Já vem ordenado do mais recente
   const linhas = historico.map((h, idx) => {
     const sit = _sit(h.situacao);
-    
+
     // Calcular variação (se não for o último/primeiro ano)
     let variacaoMDE = null;
     if (idx < historico.length - 1) {
@@ -594,7 +582,7 @@ function _renderTabelaComparativa(historico) {
         variacaoMDE = calcularVariacao(h.pct_mde_aplicado, anterior.pct_mde_aplicado);
       }
     }
-    
+
     return `
       <tr style="border-bottom:1px solid var(--borda)">
         <!-- Ano -->
@@ -643,7 +631,7 @@ function _renderTabelaComparativa(historico) {
       </tr>
     `;
   }).join('');
-  
+
   return `
     <div style="overflow-x:auto">
       <table style="width:100%;border-collapse:collapse;font-size:13px;min-width:500px">
