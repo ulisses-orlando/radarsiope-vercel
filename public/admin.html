@@ -1490,7 +1490,10 @@
         <div>
           <h3 style="margin:0">📑 Planos</h3>
         </div>
-        <div><button onclick="abrirModalPlano()">➕ Novo Plano</button></div>
+        <div style="display:flex;gap:8px">
+          <button onclick="if(window.FeaturesManager) window.FeaturesManager.abrirModalFeatures(); else alert('FeaturesManager não carregado')">⚙️ Gerenciar Features</button>
+          <button onclick="abrirModalPlano()">➕ Novo Plano</button>
+        </div>
       </div>
       <div style="margin-top:10px">
         <input type="text" id="busca-planos" placeholder="Buscar plano..." onkeyup="filtrarPlanos()">
@@ -2445,6 +2448,8 @@
 
   <!-- seus scripts (main.js deve conter firebase.initializeApp e db) -->
   <script src="js/planos.js"></script>
+  <script src="js/features.js"></script>
+  <script src="js/migrar-features.js"></script>
   <script src="js/cupons.js"></script>
   <script src="js/vitrine.js"></script>
   <script src="js/main.js"></script>
