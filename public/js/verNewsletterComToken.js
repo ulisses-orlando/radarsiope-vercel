@@ -349,7 +349,7 @@ async function renderMunicipio(destinatario, acesso, newsletter) {
     const resumo = cod ? await SM.getResumoMunicipio(cod) : null;
     SM.renderSecaoMunicipio({ container, blur: acesso.blurMunicipio, resumo, nomeMunicipio: nome, uf });
 
-    if (resumo && cod) {
+    if (resumo && cod && (acesso.isAssinante || acesso.acessoProTemp)) {
       dadosMunicipioAtual = {
         cod_municipio: cod,
         nome: nome,
