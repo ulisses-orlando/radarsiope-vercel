@@ -28,16 +28,6 @@ let _planoAtual    = null;       // objeto completo do plano selecionado
 let _tiposMap      = {};         // id -> nome dos tipos de newsletter
 let _cupomAplicado = null;       // objeto cupom validado
 
-// ─── Features labels para renderizar nos cards ────────────────────────────────
-const FEATURES_CARD = [
-  { key: 'newsletter_texto',       label: 'Newsletter em texto'           },
-  { key: 'newsletter_audio',       label: 'Newsletter em áudio (podcast)' },
-  { key: 'newsletter_infografico', label: 'Infográfico por edição'        },
-  { key: 'alertas_prioritarios',   label: 'Alertas prioritários'          },
-  { key: 'grupo_whatsapp_vip',     label: 'Grupo VIP WhatsApp'            },
-  { key: 'biblioteca_acesso',      label: 'Biblioteca vitalícia'          },
-];
-
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function fmtBRL(v) {
@@ -118,6 +108,9 @@ async function carregarListaPlanos() {
   wrap.innerHTML = '<div style="color:#999;font-size:13px;padding:8px">Carregando planos...</div>';
 
   try {
+    // Carregar todas as features disponíveis
+    const allFeatures = await window.FeaturesManager.carregarFeatures() || [];
+
     const snap = await db.collection('planos')
       .where('tipo', '==', 'assinatura')
       .where('status', '==', 'ativo')
@@ -145,15 +138,15 @@ async function carregarListaPlanos() {
         ? (valM * 12) - Number(p.valor_anual)
         : 0;
 
-      // lista de features
-      const featuresHtml = FEATURES_CARD.map(f => {
-        const ativo = !!features[f.key];
+      // lista de features - usar todas as features disponíveis
+      const featuresHtml = allFeatures.map(f => {
+        const ativo = !!features[f.id];
         // sugestão de tema e consultoria — mostra quota
-        let label = f.label;
-        if (f.key === 'grupo_whatsapp_vip' && ativo && features.sugestao_tema_quota) {
+        let label = f.nome || f.id;
+        if (f.id === 'grupo_whatsapp_vip' && ativo && features.sugestao_tema_quota) {
           label += ` + ${features.sugestao_tema_quota} sugestão/mês`;
         }
-        if (f.key === 'grupo_whatsapp_vip' && features.consultoria_horas_mes) {
+        if (f.id === 'grupo_whatsapp_vip' && features.consultoria_horas_mes) {
           label = `Consultoria ${features.consultoria_horas_mes}h/mês`;
         }
         return `<li class="${ativo ? '' : 'inativo'}">${label}</li>`;
