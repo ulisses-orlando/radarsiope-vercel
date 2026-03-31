@@ -253,6 +253,48 @@
       }
       .rs-fc-badge-status.aberta { background: rgba(251,191,36,.15); color: #d97706; }
       .rs-fc-badge-status.respondida { background: rgba(34,197,94,.15); color: #16a34a; }
+
+      /* ── Sugestões Públicas ─────────────────────────────────────────────── */
+      .rs-sugestao-card {
+        background: var(--rs-card2, #162032);
+        border: 1px solid var(--rs-borda, rgba(148,163,184,.12));
+        border-radius: 10px; padding: 14px;
+        display: flex; flex-direction: column; gap: 8px;
+        margin-bottom: 12px;
+      }
+      .rs-sugestao-header {
+        display: flex; justify-content: space-between; align-items: center;
+        font-size: 12px; color: var(--rs-muted, #94a3b8);
+      }
+      .rs-sugestao-posicao {
+        font-weight: 700; color: #0e7490;
+      }
+      .rs-sugestao-votos {
+        font-weight: 600;
+      }
+      .rs-sugestao-texto {
+        font-size: 13px; color: var(--rs-text, #f8fafc);
+        line-height: 1.5; margin: 4px 0;
+      }
+      .rs-voto-btn {
+        align-self: flex-start;
+        padding: 6px 12px;
+        background: var(--rs-card2, #162032);
+        border: 2px solid var(--rs-borda, rgba(148,163,184,.12));
+        border-radius: 20px;
+        color: var(--rs-text, #f8fafc);
+        font-size: 12px; font-weight: 600;
+        cursor: pointer; transition: all .15s;
+      }
+      .rs-voto-btn:hover {
+        border-color: #0e7490;
+        background: rgba(14,116,144,.1);
+      }
+      .rs-voto-btn.votado {
+        border-color: #22c55e;
+        background: rgba(34,197,94,.15);
+        color: #22c55e;
+      }
     `;
     document.head.appendChild(style);
   }
@@ -273,7 +315,11 @@
     document.getElementById('rs-fc-overlay').classList.add('rs-fc-show');
     document.getElementById('rs-fc-panel').classList.add('rs-fc-show');
     document.body.style.overflow = 'hidden';
-    _renderDrawer();
+    
+    // Definir tipo padrão baseado no segmento do usuário
+    const user = window._radarUser;
+    const tipoPadrao = (user && user.segmento === 'assinante') ? 'sugestoes_publicas' : 'mensagem';
+    _renderDrawer(tipoPadrao);
   }
  
   function _fecharDrawer() {
@@ -368,31 +414,12 @@
           💡 Sugerir tema 🔒
         </button>`;
       }
-    }
-    html += `</div>`;
- 
-    // Quota info (sugestão de tema)
-    if (tipoAtivo === 'sugestao_tema' && temFeatureTema) {
-      const restante = quotaTema - usoTemaMes;
-      html += `<div class="rs-fc-quota${quotaEsgotada ? ' esgotada' : ''}">
-        ${quotaEsgotada
-          ? `Você atingiu o limite de ${quotaTema} sugestão(ões) este mês para o seu plano`
-          : `${restante} sugestão(ões) restante(s) este mês`}
-      </div>`;
-    }
- 
-    // Upsell para assinante sem feature
-    if (tipoAtivo === 'sugestao_tema' && isAssinante && !temFeatureTema) {
-      html += `<div class="rs-fc-upsell">
-        💡 A opção de sugerir temas para edições futuras está disponível nos planos
-        <strong>Premium</strong> e <strong>Supreme</strong>.
-        <br><a href="/assinatura.html">Ver planos →</a>
-      </div>`;
-    }
- 
-    // Form de envio (se pode enviar)
-    const podeEnviar = tipoAtivo === 'mensagem' || (temFeatureTema && !quotaEsgotada);
-    if (podeEnviar) {
+
+      // Nova aba: Sugestões Públicas (sempre disponível para assinantes)
+      html += `<button class="rs-fc-tipo-btn${tipoAtivo === 'sugestoes_publicas' ? ' ativo' : ''}"
+        onclick="window._fcSelecionarTipo('sugestoes_publicas')">
+        🗳️ Sugestões (Top 5)
+      </button>`;
       const placeholder = tipoAtivo === 'sugestao_tema'
         ? 'Descreva o tema que gostaria que fosse abordado em uma próxima edição…'
         : 'Digite sua mensagem ou dúvida…';
@@ -410,7 +437,12 @@
           Enviar
         </button>`;
     }
- 
+
+    // Renderizar sugestões públicas se for o tipo ativo
+    if (tipoAtivo === 'sugestoes_publicas') {
+      html += await _renderSugestoesPublicas(user, temFeatureTema);
+    }
+
     // Histórico
     if (historico.length > 0) {
       html += `<div class="rs-fc-sep">Histórico</div>`;
@@ -482,13 +514,30 @@
     try {
       if (user.segmento === 'assinante') {
         // Assinante → Firebase solicitacoes
-        await window.db.collection('usuarios').doc(user.uid)
+        const solicitacaoRef = await window.db.collection('usuarios').doc(user.uid)
           .collection('solicitacoes').add({
             tipo,
             descricao: texto,
             status: 'aberta',
             data_solicitacao: new Date().toISOString(),
           });
+
+        // Se for sugestão de tema, criar entrada pública para votos
+        if (tipo === 'sugestao_tema') {
+          await window.db.collection('sugestoes_publicas')
+            .doc(`sugestao_${solicitacaoRef.id}`)
+            .set({
+              solicitacao_ref: solicitacaoRef.path,
+              texto_preview: texto.substring(0, 100) + (texto.length > 100 ? '...' : ''),
+              autor_uid: user.uid,
+              votos: 0,
+              votantes: [],
+              status: 'ativa',
+              criado_em: new Date(),
+              atualizado_em: new Date()
+            });
+        }
+
         // Incrementa contador
         await window.db.collection('admin_contadores').doc('pendencias')
           .set({ solicitacoes: firebase.firestore.FieldValue.increment(1) }, { merge: true });
@@ -581,6 +630,143 @@
     } catch { /* ignora */ }
   }
  
+  // ── Renderizar sugestões públicas ─────────────────────────────────────────────
+  async function _renderSugestoesPublicas(user, temFeatureTema) {
+    try {
+      // Buscar top 5 sugestões públicas ativas ordenadas por votos
+      const snap = await window.db.collection('sugestoes_publicas')
+        .where('status', '==', 'ativa')
+        .orderBy('votos', 'desc')
+        .orderBy('criado_em', 'desc')
+        .limit(5)
+        .get();
+
+      if (snap.empty) {
+        return `<div class="rs-fc-vazio"><span>🗳️</span>Nenhuma sugestão pública ainda.<br>Seja o primeiro a sugerir um tema!</div>`;
+      }
+
+      const metadados = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+      // Buscar textos completos das solicitações originais
+      const sugestoesCompletas = await Promise.all(
+        metadados.map(async meta => {
+          const textoCompleto = await _buscarTextoSolicitacao(meta.solicitacao_ref);
+          return { ...meta, texto: textoCompleto };
+        })
+      );
+
+      // Verificar se usuário pode votar (assinante com feature de sugestão)
+      const podeVotar = user.segmento === 'assinante' && temFeatureTema;
+
+      let html = '<div class="rs-fc-sep">Top 5 Sugestões</div>';
+
+      sugestoesCompletas.forEach((sugestao, index) => {
+        const jaVotou = localStorage.getItem(`rs_voto_sugestao_${sugestao.id}`);
+        const posicao = index + 1;
+
+        html += `
+          <div class="rs-sugestao-card">
+            <div class="rs-sugestao-header">
+              <span class="rs-sugestao-posicao">#${posicao}</span>
+              <span class="rs-sugestao-votos">👍 ${sugestao.votos} voto${sugestao.votos !== 1 ? 's' : ''}</span>
+            </div>
+            <div class="rs-sugestao-texto">${_esc(sugestao.texto)}</div>
+            ${podeVotar ? `
+              <button class="rs-voto-btn ${jaVotou ? 'votado' : ''}"
+                onclick="votarSugestao('${_esc(sugestao.id)}', '${_esc(user.uid)}')">
+                ${jaVotou ? '✅ Votado' : '👍 Votar'}
+              </button>
+            ` : ''}
+          </div>`;
+      });
+
+      // Botão para enviar sugestão própria (se tem feature)
+      if (temFeatureTema) {
+        html += `
+          <div style="text-align: center; margin-top: 16px;">
+            <button class="rs-fc-enviar" onclick="window._fcSelecionarTipo('sugestao_tema')"
+              style="background: #0e7490; border: none; padding: 10px 16px; border-radius: 8px; color: white; cursor: pointer;">
+              💡 Enviar minha sugestão
+            </button>
+          </div>`;
+      }
+
+      return html;
+    } catch (err) {
+      console.error('[faleConosco] erro ao renderizar sugestões públicas:', err);
+      return `<div class="rs-fc-vazio"><span>⚠️</span>Erro ao carregar sugestões.</div>`;
+    }
+  }
+
+  // ── Buscar texto completo da solicitação ────────────────────────────────────
+  async function _buscarTextoSolicitacao(solicitacaoPath) {
+    try {
+      // solicitacaoPath = "usuarios/{uid}/solicitacoes/{id}"
+      const pathParts = solicitacaoPath.split('/');
+      const uid = pathParts[1];
+      const solicitacaoId = pathParts[3];
+
+      const doc = await window.db.collection('usuarios').doc(uid)
+        .collection('solicitacoes').doc(solicitacaoId).get();
+
+      return doc.exists ? (doc.data().descricao || doc.data().texto || '') : '';
+    } catch (err) {
+      console.warn('[faleConosco] erro ao buscar texto da solicitação:', err);
+      return '';
+    }
+  }
+
+  // ── Votar em sugestão ───────────────────────────────────────────────────────
+  window.votarSugestao = async function(sugestaoId, userId) {
+    try {
+      const lsKey = `rs_voto_sugestao_${sugestaoId}`;
+      const jaVotou = localStorage.getItem(lsKey);
+
+      if (jaVotou) {
+        // Desvotar
+        await window.db.collection('sugestoes_publicas').doc(sugestaoId).update({
+          votos: firebase.firestore.FieldValue.increment(-1),
+          votantes: firebase.firestore.FieldValue.arrayRemove(userId),
+          atualizado_em: new Date()
+        });
+        localStorage.removeItem(lsKey);
+      } else {
+        // Votar
+        await window.db.collection('sugestoes_publicas').doc(sugestaoId).update({
+          votos: firebase.firestore.FieldValue.increment(1),
+          votantes: firebase.firestore.FieldValue.arrayUnion(userId),
+          atualizado_em: new Date()
+        });
+        localStorage.setItem(lsKey, 'true');
+      }
+
+      // Re-renderizar para atualizar contadores
+      const user = window._radarUser;
+      if (user) {
+        const temFeatureTema = user.segmento === 'assinante';
+        const html = await _renderSugestoesPublicas(user, temFeatureTema);
+        const body = document.getElementById('rs-fc-body');
+        if (body) {
+          // Substituir apenas a seção de sugestões
+          const existingSep = body.querySelector('.rs-fc-sep');
+          if (existingSep) {
+            const nextElements = [];
+            let sibling = existingSep.nextElementSibling;
+            while (sibling && !sibling.classList.contains('rs-fc-sep')) {
+              nextElements.push(sibling);
+              sibling = sibling.nextElementSibling;
+            }
+            nextElements.forEach(el => el.remove());
+            existingSep.insertAdjacentHTML('afterend', html.replace('<div class="rs-fc-sep">Top 5 Sugestões</div>', ''));
+          }
+        }
+      }
+    } catch (err) {
+      console.error('[faleConosco] erro ao votar:', err);
+      alert('Erro ao registrar voto. Tente novamente.');
+    }
+  };
+
   // ── Boot ──────────────────────────────────────────────────────────────────
   function _boot() {
     if (window._radarUser && window.db) {
