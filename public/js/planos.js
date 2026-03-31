@@ -104,17 +104,7 @@ const PLANOS_CANON = {
   }
 };
 
-const FEATURES_LABELS = {
-  newsletter_texto:       '📝 Newsletter em texto',
-  newsletter_audio:       '🎧 Newsletter em áudio (podcast)',
-  newsletter_video:       '🎬 Newsletter em vídeo',
-  newsletter_infografico: '📊 Infográfico por edição',
-  alertas_prioritarios:   '🔔 Alertas prioritários',
-  grupo_whatsapp_vip:     '💬 Grupo VIP WhatsApp',
-  biblioteca_acesso:      '📚 Biblioteca vitalícia',
-  sugestao_tema_quota:    '💡 Sugestão de tema (por mês)',
-  consultoria_horas_mes:  '🎯 Consultoria direta (h/mês)',
-};
+const FEATURES_LABELS = {}; // Mantido por compatibilidade, será preenchido dinamicamente
 
 // ─── Utilitários ────────────────────────────────────────────────────────────
 
@@ -137,6 +127,12 @@ function fmtBRL(v) {
 }
 
 function fmtFeatureBadges(features) {
+  // Usar o sistema dinâmico de features se disponível
+  if (window.FeaturesManager && window.FeaturesManager.formatarFeaturesBadges) {
+    return window.FeaturesManager.formatarFeaturesBadges(features, window.featuresListCache);
+  }
+
+  // Fallback para o sistema antigo
   if (!features || typeof features !== 'object') return '—';
   const ativos = [];
   if (features.newsletter_audio)       ativos.push('🎧');
@@ -413,31 +409,69 @@ async function abrirModalPlano(id = null, editar = false) {
   `;
   body.appendChild(visualWrap);
 
+  // ── Carregar features dinâmicas ──
+  let featuresList = [];
+  try {
+    if (window.FeaturesManager) {
+      featuresList = await window.FeaturesManager.carregarFeatures();
+      window.featuresListCache = featuresList; // Cache para fmtFeatureBadges
+    } else {
+      // Fallback: usar features hardcoded se FeaturesManager não estiver disponível
+      featuresList = [
+        { id: 'newsletter_texto', nome: 'Newsletter em texto', tipo: 'boolean', icone: '📝' },
+        { id: 'newsletter_audio', nome: 'Newsletter em áudio (podcast)', tipo: 'boolean', icone: '🎧' },
+        { id: 'newsletter_video', nome: 'Newsletter em vídeo', tipo: 'boolean', icone: '🎬' },
+        { id: 'newsletter_infografico', nome: 'Infográfico por edição', tipo: 'boolean', icone: '📊' },
+        { id: 'alertas_prioritarios', nome: 'Alertas prioritários', tipo: 'boolean', icone: '🔔' },
+        { id: 'grupo_whatsapp_vip', nome: 'Grupo VIP WhatsApp', tipo: 'boolean', icone: '💬' },
+        { id: 'biblioteca_acesso', nome: 'Biblioteca vitalícia', tipo: 'boolean', icone: '📚' },
+        { id: 'sugestao_tema_quota', nome: 'Sugestão de tema (por mês)', tipo: 'number', unidade: '/mês', icone: '💡' },
+        { id: 'consultoria_horas_mes', nome: 'Consultoria direta (h/mês)', tipo: 'number', unidade: 'h', icone: '🎯' }
+      ];
+    }
+  } catch (e) {
+    console.warn('[planos] Erro ao carregar features dinâmicas:', e);
+    // Continuar com fallback
+  }
+
   // Seção: Features
   body.appendChild(_secLabel('⚙️ Features do Plano'));
   const featWrap = document.createElement('div');
   featWrap.id = 'pl-features-wrap';
   featWrap.style.cssText = 'display:grid;gap:8px;padding:12px;background:#f8fafc;border-radius:6px;border:1px solid #e2e8f0';
 
-  Object.entries(FEATURES_LABELS).forEach(([key, label]) => {
-    const val = d.features[key];
-    const isNumeric = key === 'sugestao_tema_quota' || key === 'consultoria_horas_mes';
+  featuresList.forEach(feature => {
+    const val = d.features[feature.id];
     const row = document.createElement('div');
-    row.style.cssText = 'display:flex;align-items:center;justify-content:space-between';
 
-    if (isNumeric) {
-      row.innerHTML = `
-        <span style="font-size:13px">${escapeHtml(label)}</span>
-        <input type="number" id="feat-${key}" value="${Number(val)||0}" min="0" max="100"
-          style="width:70px;padding:4px 6px;border:1px solid #ccc;border-radius:4px;font-size:13px">
-      `;
+    if (window.FeaturesManager && window.FeaturesManager.renderCampoFeature) {
+      row.innerHTML = window.FeaturesManager.renderCampoFeature(feature, val);
     } else {
-      row.innerHTML = `
-        <label for="feat-${key}" style="font-size:13px;cursor:pointer">${escapeHtml(label)}</label>
-        <input type="checkbox" id="feat-${key}" ${val ? 'checked' : ''}
-          style="width:16px;height:16px;cursor:pointer">
-      `;
+      // Fallback para renderização antiga
+      const label = `${feature.icone} ${feature.nome}`;
+      if (feature.tipo === 'boolean') {
+        row.innerHTML = `
+          <div style="display:flex;align-items:center;justify-content:space-between">
+            <label for="feat-${feature.id}" style="font-size:13px;cursor:pointer">${escapeHtml(label)}</label>
+            <input type="checkbox" id="feat-${feature.id}" ${val ? 'checked' : ''}
+              style="width:16px;height:16px;cursor:pointer">
+          </div>
+        `;
+      } else if (feature.tipo === 'number') {
+        const unidade = feature.unidade ? ` ${feature.unidade}` : '';
+        row.innerHTML = `
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+            <span style="font-size:13px">${escapeHtml(label)}</span>
+            <div style="display:flex;align-items:center;gap:4px">
+              <input type="number" id="feat-${feature.id}" value="${Number(val)||0}" min="0" max="999"
+                style="width:70px;padding:4px 6px;border:1px solid #ccc;border-radius:4px;font-size:13px">
+              <span style="font-size:12px;color:#666">${unidade}</span>
+            </div>
+          </div>
+        `;
+      }
     }
+
     featWrap.appendChild(row);
   });
   body.appendChild(featWrap);
@@ -561,12 +595,21 @@ async function _salvarPlano(id, editar) {
 
   // features
   const features = {};
-  Object.keys(FEATURES_LABELS).forEach(key => {
-    const el = document.getElementById(`feat-${key}`);
-    if (!el) return;
-    if (el.type === 'checkbox') features[key] = el.checked;
-    else features[key] = Number(el.value) || 0;
-  });
+  if (window.FeaturesManager && window.FeaturesManager.coletarValoresFeatures && window.featuresListCache) {
+    // Usar sistema dinâmico
+    Object.assign(features, window.FeaturesManager.coletarValoresFeatures(window.featuresListCache));
+  } else {
+    // Fallback: coletar features hardcoded
+    const hardcodedFeatures = ['newsletter_texto', 'newsletter_audio', 'newsletter_video', 'newsletter_infografico',
+                              'alertas_prioritarios', 'grupo_whatsapp_vip', 'biblioteca_acesso',
+                              'sugestao_tema_quota', 'consultoria_horas_mes'];
+    hardcodedFeatures.forEach(key => {
+      const el = document.getElementById(`feat-${key}`);
+      if (!el) return;
+      if (el.type === 'checkbox') features[key] = el.checked;
+      else features[key] = Number(el.value) || 0;
+    });
+  }
 
   // tipos inclusos
   const tipos_inclusos = Array.from(
