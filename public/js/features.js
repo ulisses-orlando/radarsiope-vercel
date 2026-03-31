@@ -63,9 +63,11 @@ async function salvarFeature(id, data) {
 
     let docRef;
     if (id) {
-      await db.collection('features').doc(id).update(docData);
+      // Para edição ou criação com ID personalizado
+      await db.collection('features').doc(id).set(docData, { merge: true });
       docRef = db.collection('features').doc(id);
     } else {
+      // Para criação sem ID específico (fallback)
       docRef = await db.collection('features').add(docData);
     }
 
@@ -283,6 +285,12 @@ async function abrirModalFeature(id = null) {
   body.innerHTML = `
     <div style="display:grid;gap:12px">
       <div>
+        <label style="font-size:12px;color:#555;display:block;margin-bottom:4px">ID da Feature</label>
+        <input id="feat-id" type="text" value="${escapeHtml(id || '')}" style="width:100%;padding:8px;border:1px solid #ccc;border-radius:4px" placeholder="Ex: biblioteca_acesso" ${id ? 'readonly' : ''}>
+        <div style="font-size:11px;color:#666;margin-top:2px">${id ? 'ID não pode ser alterado após criação' : 'Use apenas letras minúsculas, números e underscore (_)'}</div>
+      </div>
+
+      <div>
         <label style="font-size:12px;color:#555;display:block;margin-bottom:4px">Nome da Feature</label>
         <input id="feat-nome" type="text" value="${escapeHtml(d.nome)}" style="width:100%;padding:8px;border:1px solid #ccc;border-radius:4px" placeholder="Ex: Newsletter em áudio">
       </div>
@@ -360,6 +368,7 @@ function confirmarExclusaoFeature(id, nome) {
  * Salva feature do modal
  */
 async function _salvarFeatureModal(id) {
+  const customId = document.getElementById('feat-id').value.trim();
   const data = {
     nome: document.getElementById('feat-nome').value.trim(),
     descricao: document.getElementById('feat-descricao').value.trim(),
@@ -370,13 +379,26 @@ async function _salvarFeatureModal(id) {
     ativo: document.getElementById('feat-ativo').checked
   };
 
+  // Validações
+  if (!customId && !id) {
+    mostrarMensagem('ID da feature é obrigatório');
+    return;
+  }
+
+  if (!id && !/^[a-z0-9_]+$/.test(customId)) {
+    mostrarMensagem('ID deve conter apenas letras minúsculas, números e underscore (_)');
+    return;
+  }
+
   if (!data.nome) {
     mostrarMensagem('Nome da feature é obrigatório');
     return;
   }
 
   try {
-    await salvarFeature(id, data);
+    // Para nova feature, usar ID personalizado; para edição, manter o ID existente
+    const featureId = id || customId;
+    await salvarFeature(featureId, data);
     mostrarMensagem(id ? 'Feature atualizada!' : 'Feature criada!');
     closeModal && closeModal('modal-edit-overlay');
     abrirModalFeatures(); // Recarregar lista
