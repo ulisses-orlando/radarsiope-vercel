@@ -1,6 +1,6 @@
 // menuApp.js
 // Menu hamburger do app Radar SIOPE
-// Integra: Edições, Sentinela, Fale Conosco, Minha Área
+// Integra: Edições, Alertas, Fale Conosco, Minha Área
 // ─────────────────────────────────────────────────────────────────────────────
 
 (function () {
@@ -198,11 +198,11 @@
           <span class="rs-menu-item-icon">📚</span>
           <span class="rs-menu-item-label">Edições</span>
         </button>
-        <button class="rs-menu-item" id="rs-menu-sentinela"
+        <button class="rs-menu-item" id="rs-menu-alertas"
           style="background:#1e4d78" role="menuitem">
           <span class="rs-menu-item-icon">🔔</span>
           <span class="rs-menu-item-label">Sentinela</span>
-          <span class="rs-menu-item-badge" id="rs-menu-badge-sentinela" style="display:none">0</span>
+          <span class="rs-menu-item-badge" id="rs-menu-badge-alertas" style="display:none">0</span>
         </button>
         <button class="rs-menu-item" id="rs-menu-fale"
           style="background:#0e6a82" role="menuitem">
@@ -242,11 +242,11 @@
         window.dispatchEvent(new CustomEvent('rs:abrirEdicoes'));
       });
 
-    // Sentinela
-    document.getElementById('rs-menu-sentinela')
+    // Alertas
+    document.getElementById('rs-menu-alertas')
       ?.addEventListener('click', () => {
         _fecharMenu();
-        window._rsSentinelaAbrir?.();
+        window._rsAlertasAbrir?.();
       });
 
     // Fale Conosco
@@ -358,8 +358,8 @@
 
   // ── Badges ────────────────────────────────────────────────────────────────
   function _atualizarBadges() {
-    // Sentinela  — lê do badge da central
-    window._rsSentinelaBadgeAtualizar?.();
+    // Alertas — lê do badge da central
+    window._rsAlertasBadgeAtualizar?.();
     // Fale Conosco — lê do badge do fc
     window._rsFcBadgeAtualizar?.();
     // Após breve delay, lê os valores e atualiza o total
@@ -368,12 +368,12 @@
 
   function _atualizarTotalBadge() {
     // Lê badges individuais
-    const bSentinela = _getBadgeCount('rs-sentinela-badge');
+    const bAlertas = _getBadgeCount('rs-alertas-badge');
     const bFc      = _getBadgeCount('rs-fc-badge');
-    const total = bSentinela + bFc;
+    const total    = bAlertas + bFc;
 
     // Atualiza badges individuais no menu
-    _setBadge('rs-menu-badge-sentinela', bSentinela);
+    _setBadge('rs-menu-badge-alertas', bAlertas);
     _setBadge('rs-menu-badge-fc',      bFc, true);
 
     // Atualiza total no hamburger

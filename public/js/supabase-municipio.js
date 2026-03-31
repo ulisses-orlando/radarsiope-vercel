@@ -573,7 +573,7 @@ function _renderTabelaComparativa(historico) {
   // Já vem ordenado do mais recente
   const linhas = historico.map((h, idx) => {
     const sit = _sit(h.situacao);
-
+    
     // Calcular variação (se não for o último/primeiro ano)
     let variacaoMDE = null;
     if (idx < historico.length - 1) {
@@ -582,7 +582,7 @@ function _renderTabelaComparativa(historico) {
         variacaoMDE = calcularVariacao(h.pct_mde_aplicado, anterior.pct_mde_aplicado);
       }
     }
-
+    
     return `
       <tr style="border-bottom:1px solid var(--borda)">
         <!-- Ano -->
@@ -631,7 +631,7 @@ function _renderTabelaComparativa(historico) {
       </tr>
     `;
   }).join('');
-
+  
   return `
     <div style="overflow-x:auto">
       <table style="width:100%;border-collapse:collapse;font-size:13px;min-width:500px">

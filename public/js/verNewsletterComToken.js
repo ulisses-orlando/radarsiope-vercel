@@ -231,8 +231,34 @@ function renderModoRapido(newsletter, acesso) {
 
   const visiveis = (acesso.isAssinante || acesso.acessoProTemp) ? bullets : bullets.slice(0, 2);
   const temRestante = !acesso.isAssinante && !acesso.acessoProTemp && bullets.length > 2;
+  const temAcesso = acesso.isAssinante || acesso.acessoProTemp;
 
-  if (lista) lista.innerHTML = visiveis.map(b => `<li>${_esc(b)}</li>`).join('');
+  if (lista) {
+    // Renderiza bullets - clicáveis se usuário tem acesso
+    lista.innerHTML = visiveis.map((b, idx) => `
+      <li class="${temAcesso ? 'rs-bullet-clicavel' : ''}" 
+          ${temAcesso ? `data-bullet-idx="${idx}" style="cursor:pointer"` : ''}>
+        ${_esc(b)}
+      </li>
+    `).join('');
+
+    // Adiciona event listeners nos bullets clicáveis
+    if (temAcesso) {
+      lista.querySelectorAll('.rs-bullet-clicavel').forEach(bullet => {
+        bullet.addEventListener('click', () => {
+          // Troca para modo completo
+          trocarModo('completo');
+          // Scroll suave até o conteúdo completo
+          setTimeout(() => {
+            const modoCompleto = document.getElementById('modo-completo');
+            if (modoCompleto) {
+              modoCompleto.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+          }, 100);
+        });
+      });
+    }
+  }
 
   if (temRestante && lista) {
     lista.closest('.rs-section-body')?.classList.add('rs-bullets-truncado');
@@ -314,7 +340,7 @@ async function renderMunicipio(destinatario, acesso, newsletter) {
 
   // Sempre esconde o botão de histórico antes de buscar — evita herdar estado
   // de edição anterior caso esta não tenha dados de município
-  const btnHistorico = document.getElementById('btn-ver-historico');
+  const btnHistorico = document.getElementById('btn-toggle-historico');
   if (btnHistorico) btnHistorico.style.display = 'none';
 
   SM.renderSkeleton(container);
@@ -740,7 +766,7 @@ async function _tentarModoAlerta() {
             ou confira seus alertas em <strong>🔔 Sentinela</strong>.
           </div>
         </div>`;
-      const btnHist = document.getElementById('btn-ver-historico');
+      const btnHist = document.getElementById('btn-toggle-historico');
       if (btnHist) btnHist.style.display = 'none';
     }
 
@@ -1139,10 +1165,11 @@ async function verHistoricoCompleto() {
     return;
   }
 
-// Ocultar resumo, mostrar histórico
+  // Ocultar resumo, mostrar histórico
   resumo.style.display = 'none';
   historico.style.display = 'block';
   
+  // Atualizar botão toggle
   const btn = document.getElementById('btn-toggle-historico');
   if (btn) btn.innerHTML = '🔙 Resumo';
 
@@ -1211,18 +1238,14 @@ function voltarResumo() {
 }
 
 function toggleHistorico() {
-  const resumo = document.getElementById('municipio-resumo');
   const historico = document.getElementById('municipio-historico');
-  const btn = document.getElementById('btn-toggle-historico');
   
-  if (historico.style.display === 'block') {
+  if (historico && historico.style.display === 'block') {
     // Está no histórico, voltar para resumo
     voltarResumo();
-    btn.innerHTML = '📈 Ver série histórica completa';
   } else {
     // Está no resumo, ir para histórico
     verHistoricoCompleto();
-    btn.innerHTML = '🔙 Resumo';
   }
 }
 
