@@ -108,8 +108,42 @@ async function carregarListaPlanos() {
   wrap.innerHTML = '<div style="color:#999;font-size:13px;padding:8px">Carregando planos...</div>';
 
   try {
+    // Verificar se FeaturesManager está disponível
+    if (!window.FeaturesManager || !window.FeaturesManager.carregarFeatures) {
+      console.error('[assinatura] FeaturesManager não está disponível');
+      wrap.innerHTML = '<div style="color:#c00;font-size:13px">Erro: FeaturesManager não carregado.</div>';
+      return;
+    }
+
+    // Verificar se db está disponível
+    if (!window.db) {
+      console.error('[assinatura] Firebase db não está disponível');
+      wrap.innerHTML = '<div style="color:#c00;font-size:13px">Erro: Firebase não inicializado.</div>';
+      return;
+    }
+
     // Carregar todas as features disponíveis
-    const allFeatures = await window.FeaturesManager.carregarFeatures() || [];
+    let allFeatures = [];
+    try {
+      allFeatures = await window.FeaturesManager.carregarFeatures() || [];
+    } catch (err) {
+      console.error('[assinatura] Erro ao carregar features do Firestore:', err);
+    }
+
+    // Fallback se não conseguiu carregar do Firestore
+    if (allFeatures.length === 0) {
+      allFeatures = [
+        { id: 'newsletter_texto', nome: 'Newsletter em texto' },
+        { id: 'newsletter_audio', nome: 'Newsletter em áudio (podcast)' },
+        { id: 'newsletter_video', nome: 'Newsletter em vídeo' },
+        { id: 'newsletter_infografico', nome: 'Infográfico por edição' },
+        { id: 'alertas_prioritarios', nome: 'Alertas prioritários' },
+        { id: 'grupo_whatsapp_vip', nome: 'Grupo VIP WhatsApp' },
+        { id: 'biblioteca_acesso', nome: 'Biblioteca vitalícia' },
+        { id: 'sugestao_tema_quota', nome: 'Sugestão de tema' },
+        { id: 'consultoria_horas_mes', nome: 'Consultoria direta' },
+      ];
+    }
 
     const snap = await db.collection('planos')
       .where('tipo', '==', 'assinatura')
