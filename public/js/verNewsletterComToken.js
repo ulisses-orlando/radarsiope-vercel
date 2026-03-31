@@ -338,10 +338,10 @@ async function renderMunicipio(destinatario, acesso, newsletter) {
   const SM = window.SupabaseMunicipio;
   if (!SM || !container) return;
 
-  // Sempre esconde o wrapper do botão de histórico antes de buscar — evita herdar estado
+  // Sempre esconde o botão de histórico antes de buscar — evita herdar estado
   // de edição anterior caso esta não tenha dados de município
-  const btnWrapper = document.getElementById('btn-historico-wrapper');
-  if (btnWrapper) btnWrapper.style.display = 'none';
+  const btn = document.getElementById('btn-toggle-historico');
+  if (btn) btn.style.display = 'none';
 
   SM.renderSkeleton(container);
 
@@ -356,7 +356,7 @@ async function renderMunicipio(destinatario, acesso, newsletter) {
         uf: uf,
         vitrine: newsletter?.vitrine || null
       };
-      if (btnWrapper) btnWrapper.style.display = 'block';
+      if (btn) btn.style.display = 'block';
     } else {
       // Sem dados — garante que dadosMunicipioAtual não fica com valores antigos
       dadosMunicipioAtual = { cod_municipio: null, nome: null, uf: null };
@@ -365,7 +365,7 @@ async function renderMunicipio(destinatario, acesso, newsletter) {
   } catch (err) {
     console.warn('[verNL] Município falhou (não fatal):', err);
     container.innerHTML = '';
-    if (btnWrapper) btnWrapper.style.display = 'none';
+    if (btn) btn.style.display = 'none';
   }
 }
 
@@ -766,8 +766,8 @@ async function _tentarModoAlerta() {
             ou confira seus alertas em <strong>🔔 Sentinela</strong>.
           </div>
         </div>`;
-      const btnWrapper = document.getElementById('btn-historico-wrapper');
-      if (btnWrapper) btnWrapper.style.display = 'none';
+      const btn = document.getElementById('btn-toggle-historico');
+      if (btn) btn.style.display = 'none';
     }
 
     // Exibe o app
