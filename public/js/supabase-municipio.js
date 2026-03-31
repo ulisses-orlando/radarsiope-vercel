@@ -225,7 +225,6 @@ function renderSecaoMunicipio({ container, blur, resumo, nomeMunicipio, uf }) {
       <!-- Cabeçalho -->
       <div class="rs-mun-header">
         <div>
-          <span class="rs-mun-nome">${_esc(nomeMunicipio || '—')}/${_esc(uf || '—')}</span>
           <span class="rs-mun-ref">${_esc(bimRef)}</span>
         </div>
         <span class="rs-mun-status" style="background:${sit.cor}20;color:${sit.cor}">
