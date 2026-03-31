@@ -2027,6 +2027,15 @@
         <h2 id="municipio-titulo">Seu Município</h2>
       </div>
 
+      <!-- Botão toggle histórico/resumo (sempre visível, acima do conteúdo) -->
+      <div id="btn-historico-wrapper" style="text-align:center;padding:12px 14px 0;display:none">
+        <button id="btn-toggle-historico" style="padding:10px 20px;background:var(--azul);color:#fff;
+                   border:none;border-radius:8px;font-size:13px;font-weight:600;
+                   cursor:pointer">
+          📈 Ver série histórica completa
+        </button>
+      </div>
+
       <!-- Modo Resumo (padrão) -->
       <div id="municipio-resumo">
         <div id="municipio-conteudo">
@@ -2035,15 +2044,6 @@
             <div class="rs-skeleton rs-sk-bar" style="margin-top:10px"></div>
             <div class="rs-skeleton rs-sk-line" style="margin-top:8px"></div>
           </div>
-        </div>
-
-        <!-- Botão toggle histórico/resumo (unificado) -->
-        <div style="text-align:center;padding:12px">
-          <button id="btn-toggle-historico" style="padding:10px 20px;background:var(--azul);color:#fff;
-                     border:none;border-radius:8px;font-size:13px;font-weight:600;
-                     cursor:pointer;display:none">
-            📈 Ver série histórica completa
-          </button>
         </div>
       </div>
 
