@@ -346,14 +346,10 @@ async function abrirModalFeature(id = null) {
   openModal && openModal('modal-edit-overlay');
 }
 
-/**
- * Confirma exclusão de feature
- */
 function confirmarExclusaoFeature(id, nome) {
   abrirConfirmacao &&
   abrirConfirmacao(
-    `Excluir feature "${nome}"?`,
-    'Esta ação marcará a feature como inativa. Planos existentes não serão afetados.',
+    `Excluir feature "${nome}"?\n\nEsta ação marcará a feature como inativa. Planos existentes não serão afetados.`,
     () => excluirFeature(id).then(() => {
       mostrarMensagem('Feature excluída com sucesso');
       abrirModalFeatures(); // Recarregar lista
