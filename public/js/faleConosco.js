@@ -295,6 +295,13 @@
         background: rgba(34,197,94,.15);
         color: #22c55e;
       }
+      .rs-sugestao-card.encerrada {
+        opacity: 0.8;
+        border-color: #64748b;
+      }
+      .rs-sugestao-card.encerrada .rs-sugestao-posicao {
+        color: #64748b;
+      }
     `;
     document.head.appendChild(style);
   }
@@ -318,7 +325,7 @@
     
     // Definir tipo padrão baseado no segmento do usuário
     const user = window._radarUser;
-    const tipoPadrao = (user && user.segmento === 'assinante') ? 'sugestoes_publicas' : 'mensagem';
+    const tipoPadrao = (user && user.segmento === 'assinante') ? 'ranking_mensal' : 'mensagem';
     _renderDrawer(tipoPadrao);
   }
  
@@ -415,10 +422,10 @@
         </button>`;
       }
 
-      // Nova aba: Sugestões Públicas (sempre disponível para assinantes)
-      html += `<button class="rs-fc-tipo-btn${tipoAtivo === 'sugestoes_publicas' ? ' ativo' : ''}"
-        onclick="window._fcSelecionarTipo('sugestoes_publicas')">
-        🗳️ Sugestões (Top 5)
+      // Nova aba: Ranking Mensal (sempre disponível para assinantes)
+      html += `<button class="rs-fc-tipo-btn${tipoAtivo === 'ranking_mensal' ? ' ativo' : ''}"
+        onclick="window._fcSelecionarTipo('ranking_mensal')">
+        🏆 Ranking Mensal
       </button>`;
       const placeholder = tipoAtivo === 'sugestao_tema'
         ? 'Descreva o tema que gostaria que fosse abordado em uma próxima edição…'
@@ -438,9 +445,9 @@
         </button>`;
     }
 
-    // Renderizar sugestões públicas se for o tipo ativo
-    if (tipoAtivo === 'sugestoes_publicas') {
-      html += await _renderSugestoesPublicas(user, temFeatureTema);
+    // Renderizar ranking mensal se for o tipo ativo
+    if (tipoAtivo === 'ranking_mensal') {
+      html += await _renderRankingMensal(user, temFeatureTema);
     }
 
     // Histórico
@@ -524,6 +531,10 @@
 
         // Se for sugestão de tema, criar entrada pública para votos
         if (tipo === 'sugestao_tema') {
+          // Verificar e encerrar mês anterior se necessário
+          const periodoAtual = new Date().toISOString().slice(0, 7); // YYYY-MM
+          await _verificarEEncerrarMesAnterior(periodoAtual);
+
           await window.db.collection('sugestoes_publicas')
             .doc(`sugestao_${solicitacaoRef.id}`)
             .set({
@@ -533,6 +544,7 @@
               votos: 0,
               votantes: [],
               status: 'ativa',
+              periodo: periodoAtual,
               criado_em: new Date(),
               atualizado_em: new Date()
             });
@@ -630,45 +642,93 @@
     } catch { /* ignora */ }
   }
  
-  // ── Renderizar sugestões públicas ─────────────────────────────────────────────
-  async function _renderSugestoesPublicas(user, temFeatureTema) {
+  // ── Renderizar ranking mensal ─────────────────────────────────────────────
+  async function _renderRankingMensal(user, temFeatureTema) {
     try {
-      // Buscar top 5 sugestões públicas ativas ordenadas por votos
-      const snap = await window.db.collection('sugestoes_publicas')
-        .where('status', '==', 'ativa')
-        .orderBy('votos', 'desc')
-        .orderBy('criado_em', 'desc')
-        .limit(5)
-        .get();
+      const periodoAtual = new Date().toISOString().slice(0, 7); // YYYY-MM
+      const dataAtual = new Date();
+      const ano = dataAtual.getFullYear();
+      const mes = dataAtual.getMonth(); // 0-based
+      const periodoAnterior = mes === 0 ? `${ano - 1}-12` : `${ano}-${String(mes).padStart(2, '0')}`;
+
+      let html = '';
+
+      // Mês Atual (Ativo)
+      html += `<div class="rs-fc-sep">🏆 Mês Atual (${_formatarPeriodo(periodoAtual)})</div>`;
+      const htmlAtual = await _renderRankingPeriodo(user, temFeatureTema, periodoAtual, 'ativa', true);
+      html += htmlAtual;
+
+      // Mês Anterior (Encerrado)
+      html += `<div class="rs-fc-sep">🏅 Mês Anterior (${_formatarPeriodo(periodoAnterior)})</div>`;
+      const htmlAnterior = await _renderRankingPeriodo(user, temFeatureTema, periodoAnterior, 'encerrada', false);
+      html += htmlAnterior;
+
+      return html;
+    } catch (err) {
+      console.error('[faleConosco] erro ao renderizar ranking mensal:', err);
+      return `<div class="rs-fc-vazio"><span>⚠️</span>Erro ao carregar ranking.</div>`;
+    }
+  }
+
+  // ── Renderizar ranking de um período específico ───────────────────────────
+  async function _renderRankingPeriodo(user, temFeatureTema, periodo, status, permitirVoto) {
+    try {
+      let snap;
+      if (status === 'ativa') {
+        snap = await window.db.collection('sugestoes_publicas')
+          .where('status', '==', status)
+          .where('periodo', '==', periodo)
+          .orderBy('votos', 'desc')
+          .orderBy('criado_em', 'desc')
+          .limit(5)
+          .get();
+      } else {
+        // Para encerradas, buscar todas e usar ranking_final se disponível
+        snap = await window.db.collection('sugestoes_publicas')
+          .where('status', '==', status)
+          .where('periodo', '==', periodo)
+          .orderBy('votos', 'desc')
+          .orderBy('criado_em', 'desc')
+          .get();
+      }
 
       if (snap.empty) {
-        return `<div class="rs-fc-vazio"><span>🗳️</span>Nenhuma sugestão pública ainda.<br>Seja o primeiro a sugerir um tema!</div>`;
+        return `<div class="rs-fc-vazio"><span>${status === 'ativa' ? '🗳️' : '🏅'}</span>Nenhuma sugestão ${status === 'ativa' ? 'ativa' : 'encerrada'} neste período.</div>`;
       }
 
       const metadados = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
-      // Buscar textos completos das solicitações originais
+      // Para encerradas, usar ranking_final se disponível
+      let rankingOrdenado = metadados;
+      if (status === 'encerrada' && metadados[0].ranking_final) {
+        // Usar ranking_final salvo
+        rankingOrdenado = metadados[0].ranking_final.map(item => {
+          const original = metadados.find(m => m.solicitacao_ref === item.solicitacao_ref);
+          return original ? { ...original, posicao_fixa: item.posicao, votos_fixos: item.votos } : null;
+        }).filter(Boolean);
+      }
+
+      // Buscar textos completos
       const sugestoesCompletas = await Promise.all(
-        metadados.map(async meta => {
+        rankingOrdenado.slice(0, 5).map(async meta => {
           const textoCompleto = await _buscarTextoSolicitacao(meta.solicitacao_ref);
           return { ...meta, texto: textoCompleto };
         })
       );
 
-      // Verificar se usuário pode votar (assinante com feature de sugestão)
-      const podeVotar = user.segmento === 'assinante' && temFeatureTema;
+      const podeVotar = permitirVoto && user.segmento === 'assinante' && temFeatureTema;
 
-      let html = '<div class="rs-fc-sep">Top 5 Sugestões</div>';
-
+      let html = '';
       sugestoesCompletas.forEach((sugestao, index) => {
-        const jaVotou = localStorage.getItem(`rs_voto_sugestao_${sugestao.id}`);
-        const posicao = index + 1;
+        const jaVotou = permitirVoto ? localStorage.getItem(`rs_voto_sugestao_${sugestao.id}`) : null;
+        const posicao = status === 'encerrada' && sugestao.posicao_fixa ? sugestao.posicao_fixa : index + 1;
+        const votos = status === 'encerrada' && sugestao.votos_fixos !== undefined ? sugestao.votos_fixos : sugestao.votos;
 
         html += `
-          <div class="rs-sugestao-card">
+          <div class="rs-sugestao-card ${status === 'encerrada' ? 'encerrada' : ''}">
             <div class="rs-sugestao-header">
               <span class="rs-sugestao-posicao">#${posicao}</span>
-              <span class="rs-sugestao-votos">👍 ${sugestao.votos} voto${sugestao.votos !== 1 ? 's' : ''}</span>
+              <span class="rs-sugestao-votos">👍 ${votos} voto${votos !== 1 ? 's' : ''}</span>
             </div>
             <div class="rs-sugestao-texto">${_esc(sugestao.texto)}</div>
             ${podeVotar ? `
@@ -680,8 +740,8 @@
           </div>`;
       });
 
-      // Botão para enviar sugestão própria (se tem feature)
-      if (temFeatureTema) {
+      // Botão para enviar sugestão própria (apenas para mês atual)
+      if (permitirVoto && temFeatureTema) {
         html += `
           <div style="text-align: center; margin-top: 16px;">
             <button class="rs-fc-enviar" onclick="window._fcSelecionarTipo('sugestao_tema')"
@@ -693,9 +753,17 @@
 
       return html;
     } catch (err) {
-      console.error('[faleConosco] erro ao renderizar sugestões públicas:', err);
-      return `<div class="rs-fc-vazio"><span>⚠️</span>Erro ao carregar sugestões.</div>`;
+      console.error('[faleConosco] erro ao renderizar ranking período:', err);
+      return `<div class="rs-fc-vazio"><span>⚠️</span>Erro ao carregar ranking deste período.</div>`;
     }
+  }
+
+  // ── Formatar período para exibição ─────────────────────────────────────────
+  function _formatarPeriodo(periodo) {
+    const [ano, mes] = periodo.split('-');
+    const meses = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
+                   'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
+    return `${meses[parseInt(mes) - 1]} ${ano}`;
   }
 
   // ── Buscar texto completo da solicitação ────────────────────────────────────
@@ -713,6 +781,53 @@
     } catch (err) {
       console.warn('[faleConosco] erro ao buscar texto da solicitação:', err);
       return '';
+    }
+  }
+
+  // ── Verificar e encerrar mês anterior ──────────────────────────────────────
+  async function _verificarEEncerrarMesAnterior(periodoAtual) {
+    try {
+      // Calcular período anterior
+      const dataAtual = new Date();
+      const ano = dataAtual.getFullYear();
+      const mes = dataAtual.getMonth(); // 0-based
+      const periodoAnterior = mes === 0 ? `${ano - 1}-12` : `${ano}-${String(mes).padStart(2, '0')}`;
+
+      // Buscar sugestões ativas do período anterior
+      const snap = await window.db.collection('sugestoes_publicas')
+        .where('status', '==', 'ativa')
+        .where('periodo', '==', periodoAnterior)
+        .orderBy('votos', 'desc')
+        .orderBy('criado_em', 'desc')
+        .get();
+
+      if (!snap.empty) {
+        // Encerrar sugestões e salvar ranking final
+        const batch = window.db.batch();
+        const rankingFinal = [];
+
+        snap.docs.forEach((doc, index) => {
+          const data = doc.data();
+          rankingFinal.push({
+            posicao: index + 1,
+            votos: data.votos,
+            texto_preview: data.texto_preview,
+            solicitacao_ref: data.solicitacao_ref
+          });
+
+          // Atualizar documento para encerrado
+          batch.update(doc.ref, {
+            status: 'encerrada',
+            ranking_final: rankingFinal,
+            encerrado_em: new Date()
+          });
+        });
+
+        await batch.commit();
+        console.log(`[faleConosco] Mês ${periodoAnterior} encerrado com ${snap.docs.length} sugestões.`);
+      }
+    } catch (err) {
+      console.warn('[faleConosco] erro ao encerrar mês anterior:', err);
     }
   }
 
@@ -744,10 +859,10 @@
       const user = window._radarUser;
       if (user) {
         const temFeatureTema = user.segmento === 'assinante';
-        const html = await _renderSugestoesPublicas(user, temFeatureTema);
+        const html = await _renderRankingMensal(user, temFeatureTema);
         const body = document.getElementById('rs-fc-body');
         if (body) {
-          // Substituir apenas a seção de sugestões
+          // Substituir apenas a seção de ranking
           const existingSep = body.querySelector('.rs-fc-sep');
           if (existingSep) {
             const nextElements = [];
@@ -757,7 +872,7 @@
               sibling = sibling.nextElementSibling;
             }
             nextElements.forEach(el => el.remove());
-            existingSep.insertAdjacentHTML('afterend', html.replace('<div class="rs-fc-sep">Top 5 Sugestões</div>', ''));
+            existingSep.insertAdjacentHTML('afterend', html.replace(/<div class="rs-fc-sep">.*?<\/div>/g, ''));
           }
         }
       }
