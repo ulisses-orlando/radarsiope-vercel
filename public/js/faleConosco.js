@@ -6,7 +6,7 @@
 (function () {
   'use strict';
  
-  const MAX_CHARS = 500;
+  const MAX_CHARS = 250;
   const STORAGE_KEY_BADGE = 'rs_fc_respondidas_vistas';
  
   // ── Inicialização ─────────────────────────────────────────────────────────
@@ -72,7 +72,7 @@
       /* ── Painel ─────────────────────────────────────────────────────────── */
       #rs-fc-panel {
         position: fixed; top: 0; right: 0; bottom: 0;
-        width: min(420px, 96vw);
+        width: min(500px, 96vw);
         background: var(--rs-card, #1e293b);
         z-index: 700;
         display: flex; flex-direction: column;
@@ -427,22 +427,24 @@
         onclick="window._fcSelecionarTipo('ranking_mensal')">
         🏆 Ranking Mensal
       </button>`;
-      const placeholder = tipoAtivo === 'sugestao_tema'
-        ? 'Descreva o tema que gostaria que fosse abordado em uma próxima edição…'
-        : 'Digite sua mensagem ou dúvida…';
-      html += `
-        <div>
-          <label class="rs-fc-label" for="rs-fc-txt">
-            ${tipoAtivo === 'sugestao_tema' ? '💡 Sugestão de tema' : '💬 Nova mensagem'}
-          </label>
-          <textarea id="rs-fc-txt" class="rs-fc-textarea"
-            placeholder="${placeholder}" maxlength="${MAX_CHARS}"></textarea>
-          <div class="rs-fc-chars" id="rs-fc-chars">0/${MAX_CHARS}</div>
-        </div>
-        <button class="rs-fc-enviar" id="rs-fc-enviar" disabled
-          onclick="window._fcEnviar('${tipoAtivo}')">
-          Enviar
-        </button>`;
+      if (tipoAtivo !== 'ranking_mensal') {
+        const placeholder = tipoAtivo === 'sugestao_tema'
+          ? 'Descreva o tema que gostaria que fosse abordado em uma próxima edição…'
+          : 'Digite sua mensagem ou dúvida…';
+        html += `
+          <div>
+            <label class="rs-fc-label" for="rs-fc-txt">
+              ${tipoAtivo === 'sugestao_tema' ? '💡 Sugestão de tema' : '💬 Nova mensagem'}
+            </label>
+            <textarea id="rs-fc-txt" class="rs-fc-textarea"
+              placeholder="${placeholder}" maxlength="${MAX_CHARS}"></textarea>
+            <div class="rs-fc-chars" id="rs-fc-chars">0/${MAX_CHARS}</div>
+          </div>
+          <button class="rs-fc-enviar" id="rs-fc-enviar" disabled
+            onclick="window._fcEnviar('${tipoAtivo}')">
+            Enviar
+          </button>`;
+      }
     }
 
     // Renderizar ranking mensal se for o tipo ativo
@@ -450,15 +452,20 @@
       html += await _renderRankingMensal(user, temFeatureTema);
     }
 
+    // Filtrar histórico baseado no tipo ativo
+    let historicoFiltrado = historico;
+    if (tipoAtivo === 'mensagem') {
+      historicoFiltrado = historico.filter(m => m.tipo !== 'sugestao_tema');
+    } else if (tipoAtivo === 'sugestao_tema') {
+      historicoFiltrado = historico.filter(m => m.tipo === 'sugestao_tema');
+    } else if (tipoAtivo === 'ranking_mensal') {
+      historicoFiltrado = [];
+    }
+
     // Histórico
-    if (historico.length > 0) {
+    if (historicoFiltrado.length > 0) {
       html += `<div class="rs-fc-sep">Histórico</div>`;
-      historico.forEach(msg => {
-        const respondida = !!msg.resposta;
-        const data = msg.criado_em
-          ? new Date(msg.criado_em?.seconds ? msg.criado_em.seconds * 1000 : msg.criado_em)
-              .toLocaleDateString('pt-BR', { day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' })
-          : '—';
+      historicoFiltrado.forEach(msg => {
         const tipoLabel = msg.tipo === 'sugestao_tema' ? '💡 Sugestão de tema' : '💬 Mensagem';
         const respostaHtml = respondida ? `
           <div class="rs-fc-msg-resposta">
@@ -481,7 +488,7 @@
             ${respostaHtml}
           </div>`;
       });
-    } else if (!podeEnviar) {
+    } else if (tipoAtivo !== 'ranking_mensal') {
       html += `<div class="rs-fc-vazio"><span>💬</span>Nenhuma mensagem ainda.</div>`;
     }
  
