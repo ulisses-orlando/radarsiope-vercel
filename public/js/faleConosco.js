@@ -466,13 +466,18 @@
     if (historicoFiltrado.length > 0) {
       html += `<div class="rs-fc-sep">Histórico</div>`;
       historicoFiltrado.forEach(msg => {
+        const respondida = !!msg.resposta;
+        const data = msg.criado_em
+          ? new Date(msg.criado_em?.seconds ? msg.criado_em.seconds * 1000 : msg.criado_em)
+              .toLocaleDateString('pt-BR', { day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' })
+          : '—';
         const tipoLabel = msg.tipo === 'sugestao_tema' ? '💡 Sugestão de tema' : '💬 Mensagem';
         const respostaHtml = respondida ? `
           <div class="rs-fc-msg-resposta">
             <div class="rs-fc-msg-resposta-label">✅ Resposta da equipe</div>
             ${msg.resposta}
           </div>` : '';
- 
+
         html += `
           <div class="rs-fc-msg-card${respondida ? ' respondida' : ''}">
             <div class="rs-fc-msg-topo">
