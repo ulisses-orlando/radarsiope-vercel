@@ -72,7 +72,7 @@
       /* ── Painel ─────────────────────────────────────────────────────────── */
       #rs-fc-panel {
         position: fixed; top: 0; right: 0; bottom: 0;
-        width: min(500px, 96vw);
+        width: min(600px, 96vw);
         background: var(--rs-card, #1e293b);
         z-index: 700;
         display: flex; flex-direction: column;
@@ -491,7 +491,7 @@
               <span class="rs-fc-msg-tipo">${tipoLabel}</span>
               <div style="display:flex;gap:6px;align-items:center">
                 <span class="rs-fc-badge-status ${respondida ? 'respondida' : 'aberta'}">
-                  ${respondida ? 'Respondida' : 'Aguardando'}
+                  ${msg.tipo === 'sugestao_tema' ? 'Enviada' : (respondida ? 'Respondida' : 'Aguardando')}
                 </span>
                 <span class="rs-fc-msg-data">${data}</span>
               </div>
