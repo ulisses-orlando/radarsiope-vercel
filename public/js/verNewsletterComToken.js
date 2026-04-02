@@ -1120,6 +1120,9 @@ async function VerNewsletterComToken() {
     renderModoRapido(newsletter, acesso);
     await renderModoCompleto(newsletter, dados, segmento, acesso);
 
+    // Avaliação por seção (sem dependência de drawer)
+    await renderSecaoFeedbacks(newsletter);
+
     // Município em paralelo — não bloqueia o conteúdo principal
     renderMunicipio(destinatario, acesso, newsletter);
 
