@@ -72,7 +72,7 @@
       /* ── Painel ─────────────────────────────────────────────────────────── */
       #rs-fc-panel {
         position: fixed; top: 0; right: 0; bottom: 0;
-        width: min(600px, 96vw);
+        width: min(500px, 96vw);
         background: var(--rs-card, #1e293b);
         z-index: 700;
         display: flex; flex-direction: column;
@@ -106,7 +106,7 @@
  
       /* Body */
       #rs-fc-body {
-        flex: 1; overflow-y: auto; padding: 14px;
+        flex: 1; overflow-y: auto; padding: 14px 4px;
         display: flex; flex-direction: column; gap: 12px;
       }
  
