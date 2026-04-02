@@ -325,7 +325,7 @@
     
     // Definir tipo padrão baseado no segmento do usuário
     const user = window._radarUser;
-    const tipoPadrao = (user && user.segmento === 'assinante') ? 'ranking_mensal' : 'mensagem';
+    const tipoPadrao = 'mensagem';
     _renderDrawer(tipoPadrao);
   }
  
@@ -390,10 +390,17 @@
     let html = '';
  
     // Aviso/placeholder
+    let avisoTexto = '';
+    if (tipoAtivo === 'sugestao_tema') {
+      avisoTexto = 'Esta área é destinada apenas para sugestão de temas para as próximas edições.';
+    } else if (tipoAtivo === 'ranking_mensal') {
+      avisoTexto = 'Aqui você visualiza o ranking atual dos temas e os anteriores.';
+    } else {
+      avisoTexto = 'Este canal é para dúvidas sobre a sua assinatura e feedbacks. Para suporte técnico, consulte os planos disponíveis.';
+    }
     html += `
       <div class="rs-fc-aviso">
-        Este canal é para dúvidas sobre a sua assinatura e feedbacks.
-        Para suporte técnico, consulte os planos disponíveis.
+        ${avisoTexto}
       </div>`;
  
     // Abas de tipo
@@ -667,7 +674,7 @@
 
       // Mês Atual (Ativo)
       html += `<div class="rs-fc-sep">🏆 Mês Atual (${_formatarPeriodo(periodoAtual)})</div>`;
-      const htmlAtual = await _renderRankingPeriodo(user, temFeatureTema, periodoAtual, 'ativa', true);
+      const htmlAtual = await _renderRankingPeriodo(user, temFeatureTema, periodoAtual, 'ativa', false);
       html += htmlAtual;
 
       // Mês Anterior (Encerrado)
