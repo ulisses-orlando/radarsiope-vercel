@@ -217,7 +217,7 @@
         text-transform: uppercase; letter-spacing: .5px;
         border-bottom: 1px solid var(--rs-borda, rgba(148,163,184,.12));
         padding-bottom: 6px; margin-top: 4px;
-        display: block;
+        display: block; width: 100%;
       }
       .rs-fc-msg-card {
         background: var(--rs-card2, #162032);
