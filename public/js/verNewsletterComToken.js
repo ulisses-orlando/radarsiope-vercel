@@ -2259,8 +2259,35 @@ async function votarSecao(nid, secao, voto) {
 }
 
 async function renderSecaoFeedbacks(newsletter) {
-  const wrap = document.getElementById('secao-feedback-secoes');
-  const body = document.getElementById('secao-feedback-secoes-conteudo');
+  let wrap = document.getElementById('secao-feedback-secoes');
+  let body = document.getElementById('secao-feedback-secoes-conteudo');
+
+  if (!wrap || !body) {
+    const app = document.getElementById('rs-app');
+    if (app) {
+      wrap = document.createElement('section');
+      wrap.id = 'secao-feedback-secoes';
+      wrap.className = 'rs-section';
+      wrap.style.display = 'none';
+      wrap.innerHTML = `
+        <div class="rs-section-header">
+          <span>🧾</span>
+          <h2>Avaliação por seção</h2>
+        </div>
+        <div class="rs-section-body" id="secao-feedback-secoes-conteudo">
+          <p style="color:#999; margin:0;">Aguardando carregamento de avaliações...</p>
+        </div>`;
+
+      const mediaSection = document.getElementById('secao-midia');
+      if (mediaSection && mediaSection.parentElement) {
+        mediaSection.parentElement.insertBefore(wrap, mediaSection);
+      } else {
+        app.appendChild(wrap);
+      }
+
+      body = document.getElementById('secao-feedback-secoes-conteudo');
+    }
+  }
 
   if (!wrap || !body) return;
   wrap.style.display = 'block';
