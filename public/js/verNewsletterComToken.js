@@ -1975,6 +1975,7 @@ async function navegarParaEdicao(edicaoId) {
     trocarModo(modoPadrao);
     renderModoRapido(newsletter, acesso);
     await renderModoCompleto(newsletter, dados, segmento, acesso);
+    await renderSecaoFeedbacks(newsletter);
     renderMunicipio(destinatario, acesso, newsletter);
     renderMidia(newsletter, acesso);
     renderFAQ(newsletter, acesso);
@@ -2156,6 +2157,152 @@ async function enviarFeedback(nid) {
 }
 
 window.enviarFeedback = enviarFeedback;
+
+// ─── Avaliação por seção (👍 / 👎) ───────────────────────────────────────────
+
+function _secaoFeedbackLocalKey(nid, secao) {
+  return `rs_secao_feedback_${nid}_${secao}`;
+}
+
+function _getSecaoFeedbackLocal(nid, secao) {
+  return localStorage.getItem(_secaoFeedbackLocalKey(nid, secao));
+}
+
+function _setSecaoFeedbackLocal(nid, secao, voto) {
+  const key = _secaoFeedbackLocalKey(nid, secao);
+  if (!voto) {
+    localStorage.removeItem(key);
+  } else {
+    localStorage.setItem(key, voto);
+  }
+}
+
+async function carregarSecaoFeedbacks(nid) {
+  window._secaoFeedbackCurrentNid = nid;
+  window._secaoFeedbackData = {};
+
+  if (!nid) return {};
+  try {
+    const doc = await db.collection('newsletters').doc(nid).get();
+    if (!doc.exists) return {};
+    const data = doc.data().feedback_secoes || {};
+    window._secaoFeedbackData = data;
+    return data;
+  } catch (err) {
+    console.warn('[secao-feedback] erro ao carregar:', err);
+    return {};
+  }
+}
+
+function _formatarSecaoTipo(tipo) {
+  if (!tipo) return 'Conteúdo';
+  const labels = {
+    video: 'Vídeo',
+    audio: 'Áudio',
+    infografico: 'Infográfico',
+    dados: 'Dados',
+    resumo: 'Resumo',
+    conteudo: 'Conteúdo completo',
+    noticia: 'Notícia',
+    geral: 'Geral'
+  };
+  return labels[tipo] || tipo.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+}
+
+async function votarSecao(nid, secao, voto) {
+  if (!nid || !secao || !['like', 'dislike'].includes(voto)) return;
+
+  const atual = _getSecaoFeedbackLocal(nid, secao);
+  const mesma = atual === voto;
+  const proxima = mesma ? null : voto;
+
+  // Ajuste local
+  _setSecaoFeedbackLocal(nid, secao, proxima);
+
+  const delta = { like: 0, dislike: 0 };
+  if (mesma) {
+    // remover voto
+    delta[atual] = -1;
+  } else {
+    if (atual) delta[atual] = -1;
+    delta[voto] = 1;
+  }
+
+  // Atualiza em memória para UI imediata
+  const cache = window._secaoFeedbackData || {};
+  cache[secao] = cache[secao] || { like: 0, dislike: 0 };
+  cache[secao].like = Math.max(0, (cache[secao].like || 0) + delta.like);
+  cache[secao].dislike = Math.max(0, (cache[secao].dislike || 0) + delta.dislike);
+  window._secaoFeedbackData = cache;
+
+  // Atualiza UI instantânea
+  const buttonLike = document.querySelector(`#secao-feedback-${secao} .btn-like`);
+  const buttonDislike = document.querySelector(`#secao-feedback-${secao} .btn-dislike`);
+
+  if (buttonLike) buttonLike.classList.toggle('ativo', proxima === 'like');
+  if (buttonDislike) buttonDislike.classList.toggle('ativo', proxima === 'dislike');
+
+  // Persistência Firestore (incremento atômico)
+  try {
+    const update = {};
+    if (delta.like !== 0) update[`feedback_secoes.${secao}.like`] = firebase.firestore.FieldValue.increment(delta.like);
+    if (delta.dislike !== 0) update[`feedback_secoes.${secao}.dislike`] = firebase.firestore.FieldValue.increment(delta.dislike);
+    if (Object.keys(update).length > 0) {
+      await db.collection('newsletters').doc(nid).set(update, { merge: true });
+    }
+  } catch (err) {
+    console.warn('[secao-feedback] erro ao gravar voto:', err);
+  }
+
+  // Re-renderiza o resumo geral
+  await renderSecaoFeedbacks({ id: nid, blocos: (window._secaoFeedbackCurrentNewsletter?.blocos || []) });
+}
+
+async function renderSecaoFeedbacks(newsletter) {
+  const wrap = document.getElementById('secao-feedback-secoes');
+  const body = document.getElementById('secao-feedback-secoes-conteudo');
+
+  if (!wrap || !body) return;
+  wrap.style.display = 'block';
+
+  const nid = typeof newsletter === 'string' ? newsletter : (newsletter?.id || window._secaoFeedbackCurrentNid);
+  const blocos = (newsletter?.blocos || []) || (window._secaoFeedbackCurrentNewsletter?.blocos || []);
+
+  await carregarSecaoFeedbacks(nid);
+
+  const dados = window._secaoFeedbackData || {};
+  const tipos = Array.from(new Set([
+    ...Object.keys(dados),
+    ...blocos.map(b => (b.tipo || 'conteudo'))
+  ]));
+
+  if (!tipos.length) {
+    body.innerHTML = '<p style="color:#999;margin:0;">Nenhuma seção disponível para avaliação.</p>';
+    return;
+  }
+
+  body.innerHTML = tipos.map(tipo => {
+    const counts = dados[tipo] || { like: 0, dislike: 0 };
+    const usuario = _getSecaoFeedbackLocal(nid, tipo);
+    const total = (counts.like || 0) + (counts.dislike || 0);
+    const score = total > 0 ? `${Math.round((counts.like / total) * 100)}% 👍` : 'Sem votos';
+
+    return `
+      <div id="secao-feedback-${tipo}" style="margin-bottom:12px;padding:8px;border:1px solid #d4d4d4;border-radius:8px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+          <strong>${_formatarSecaoTipo(tipo)}</strong>
+          <small style="color:#666;font-size:12px;">${score}</small>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <button class="rs-btn-secao-feedback btn-like" style="border:1px solid #0e7490;background:${usuario==='like'?'#0e7490':'transparent'};color:${usuario==='like'?'#fff':'#0e7490'};padding:4px 8px;border-radius:6px;cursor:pointer;" onclick="votarSecao('${_esc(nid)}','${_esc(tipo)}','like')">👍 ${counts.like || 0}</button>
+          <button class="rs-btn-secao-feedback btn-dislike" style="border:1px solid #c026d3;background:${usuario==='dislike'?'#c026d3':'transparent'};color:${usuario==='dislike'?'#fff':'#c026d3'};padding:4px 8px;border-radius:6px;cursor:pointer;" onclick="votarSecao('${_esc(nid)}','${_esc(tipo)}','dislike')">👎 ${counts.dislike || 0}</button>
+          <span style="color:#555;font-size:12px;">${total} voto${total===1?'':'s'}</span>
+        </div>
+      </div>`;
+  }).join('');
+
+  window._secaoFeedbackCurrentNewsletter = newsletter;
+}
 
 // ─── Painel de upgrade de mídia ───────────────────────────────────────────────
 // Exibido ao clicar em "Desbloquear" em um item de mídia bloqueado.
