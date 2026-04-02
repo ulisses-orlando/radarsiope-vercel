@@ -564,6 +564,7 @@
     <button onclick="abrirModalVerificarLotes(event)">📮 Verificar lotes pendentes - atualizar status</button>
     <button onclick="recalcularContadores()"
       title="Recalcula os contadores de solicitações, feedbacks e parcelas vencidas">🔄 Recalcular contadores</button>
+    <button onclick="abrirTab('votacoes-temas')">🏆 Votações de Temas</button>
     <button onclick="abrirPainelGestao()">🗞️ Painel</button>
 
     <div style="margin-top:12px">
@@ -1889,6 +1890,16 @@
       </div>
     </section>
 
+    <!-- VOTAÇÕES DE TEMAS -->
+    <section id="votacoes-temas" class="card">
+      <div>
+        <h2>🏆 Votações de Temas</h2>
+        <div id="votacoes-temas-content">
+          <div style="text-align: center; padding: 40px; color: #999;">Carregando...</div>
+        </div>
+      </div>
+    </section>
+
     <!-- LEADS -->
     <section id="leads" class="card">
       <div style="display:flex;justify-content:space-between;align-items:center;margin:10px 0">
@@ -2455,6 +2466,7 @@
   <script src="js/main.js"></script>
   <script src="js/subcollections.js"></script>
   <script src="js/drawer-usuario.js"></script>
+  <script src="js/admin-votacoes.js"></script>
   <script src="js/feedbacks.js"></script>
   <script src="js/alertasPush.js"></script>
   <script src="js/site.js"></script>
@@ -2568,6 +2580,9 @@
       }
       else if (tabId === 'relatorio-avaliacoes') {
         carregarRelatorioAvaliacoes();
+      }
+      else if (tabId === 'votacoes-temas') {
+        carregarPainelVotacoesTemas();
       }
     }
 
@@ -2779,6 +2794,30 @@
     #modal-newsletter-overlay .modal-buttons button {
       padding: .5em 1.2em;
       margin-left: .4em;
+    }
+
+    /* ─── Estilos para o painel de votações ────────────────────────────── */
+    #votacoes-temas {
+      background: #fafafa;
+    }
+
+    #votacoes-temas h2 {
+      margin-top: 0;
+      color: #0a3d62;
+      font-size: 22px;
+    }
+
+    #votacoes-temas h3 {
+      margin-top: 0;
+      margin-bottom: 16px;
+      font-size: 16px;
+      font-weight: 700;
+    }
+
+    @media (max-width: 768px) {
+      #votacoes-temas-content {
+        font-size: 13px;
+      }
     }
   </style>
 
