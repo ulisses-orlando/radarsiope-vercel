@@ -2182,15 +2182,7 @@ function _setSecaoFeedbackLocal(nid, secao, voto) {
 
 function toggleSection(header) {
   const section = header.closest('.rs-section');
-  const body = section.querySelector('.rs-section-body');
-
-  const aberta = section.classList.toggle('aberta');
-
-  if (aberta) {
-    body.classList.remove('rs-collapsed');
-  } else {
-    body.classList.add('rs-collapsed');
-  }
+  section.classList.toggle('aberta');
 }
 
 async function carregarSecaoFeedbacks(nid) {
