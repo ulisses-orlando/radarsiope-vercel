@@ -2021,37 +2021,22 @@
       }
     }
 
-    .rs-collapsible .rs-section-header {
-      cursor: pointer;
-      justify-content: space-between;
-    }
-
-    .rs-collapse-icon {
-      font-size: 16px;
-      color: var(--rs-muted);
-      transition: transform .2s ease;
-    }
-
-    /* estado fechado */
-    .rs-collapsed {
-      max-height: 0;
+    .rs-section-body {
       overflow: hidden;
-      padding-top: 0 !important;
-      padding-bottom: 0 !important;
       transition: max-height .3s ease, padding .2s ease;
     }
 
-    /* estado aberto */
-    .rs-section.aberta .rs-section-body {
-      max-height: 500px;
-      /* suficiente pro conteúdo */
-      padding-top: 12px;
-      padding-bottom: 12px;
+    /* fechado */
+    .rs-collapsed {
+      max-height: 0 !important;
+      padding-top: 0 !important;
+      padding-bottom: 0 !important;
     }
 
-    /* gira o ícone */
-    .rs-section.aberta .rs-collapse-icon {
-      transform: rotate(45deg);
+    /* aberto */
+    .rs-section.aberta .rs-section-body {
+      max-height: 1000px;
+      /* grande o suficiente */
     }
   </style>
 
@@ -2181,9 +2166,8 @@
           <span class="rs-collapse-icon">+</span>
         </div>
 
-        <div class="rs-section-body rs-collapsed" id="reactions-wrap">
-          ...
-        </div>
+        <!-- ESSENCIAL -->
+        <div class="rs-section-body rs-collapsed" id="reactions-wrap"></div>
       </div>
     </section>
 
