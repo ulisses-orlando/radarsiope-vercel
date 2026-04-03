@@ -2038,6 +2038,18 @@
       max-height: 1000px;
       /* grande o suficiente */
     }
+
+    .rs-section-body {
+      overflow: hidden;
+      max-height: 0;
+      transition: max-height .35s ease;
+    }
+
+    /* aberto */
+    .rs-section.aberta .rs-section-body {
+      max-height: 800px;
+      /* ou maior */
+    }
   </style>
 
 <body>
@@ -2161,13 +2173,15 @@
     <!-- AVALIAÇÃO POR SEÇÃO -->
     <section class="rs-section" id="secao-feedback-secoes" style="display:none">
       <div class="rs-section rs-collapsible">
+
         <div class="rs-section-header" onclick="toggleSection(this)">
-          <h2>AVALIAÇÃO POR SEÇÃO</h2>
+          <h2>Qual sua opinião sobre nosso conteúdo?</h2>
           <span class="rs-collapse-icon">+</span>
         </div>
 
-        <!-- ESSENCIAL -->
+        <!-- ESTE CARA É O PROBLEMA -->
         <div class="rs-section-body rs-collapsed" id="reactions-wrap"></div>
+
       </div>
     </section>
 
