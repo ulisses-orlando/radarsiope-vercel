@@ -186,7 +186,7 @@ function detectarAcesso(destinatario, newsletter, segmento, envio) {
       acessoProTemp = false;
     }
   }
-
+console.log('features:', features);
   return {
     isAssinante,
     plano_slug,
@@ -1121,7 +1121,7 @@ async function VerNewsletterComToken() {
     await renderModoCompleto(newsletter, dados, segmento, acesso);
 
     // Avaliação por seção (sem dependência de drawer)
-    //await renderSecaoFeedbacks(newsletter);
+    await renderSecaoFeedbacks(newsletter);
 
     // Município em paralelo — não bloqueia o conteúdo principal
     renderMunicipio(destinatario, acesso, newsletter);
@@ -1978,7 +1978,7 @@ async function navegarParaEdicao(edicaoId) {
     trocarModo(modoPadrao);
     renderModoRapido(newsletter, acesso);
     await renderModoCompleto(newsletter, dados, segmento, acesso);
-    //await renderSecaoFeedbacks(newsletter);
+    await renderSecaoFeedbacks(newsletter);
     renderMunicipio(destinatario, acesso, newsletter);
     renderMidia(newsletter, acesso);
     renderFAQ(newsletter, acesso);
@@ -2258,7 +2258,7 @@ async function votarSecao(nid, secao, voto) {
   }
 
   // Re-renderiza o resumo geral
-  //await renderSecaoFeedbacks({ id: nid, blocos: (window._secaoFeedbackCurrentNewsletter?.blocos || []) });
+  await renderSecaoFeedbacks({ id: nid, blocos: (window._secaoFeedbackCurrentNewsletter?.blocos || []) });
 }
 
 async function renderSecaoFeedbacks(newsletter) {
