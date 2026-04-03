@@ -372,19 +372,13 @@ async function renderMunicipio(destinatario, acesso, newsletter) {
 // ─── Mídia ────────────────────────────────────────────────────────────────────
 
 function renderMidia(newsletter, acesso) {
-  console.log('renderMidia acesso:', acesso);
   const secao = document.getElementById('secao-midia');
   const wrap = document.getElementById('midia-conteudo');
   if (!secao || !wrap) return;
 
   const itens = [];
-  console.log('newsletter:', newsletter);
-  console.log('newsletter.audio_url:', newsletter.audio_url);
-  console.log('newsletter.video_url:', newsletter.video_url);
-  console.log('newsletter.infografico_url:', newsletter.infografico_url);
 
   if (newsletter.audio_url) {
-    console.log('Acesso tem áudio?', acesso.temAudio);
     itens.push(acesso.temAudio ? `
       <div class="rs-media-item">
         <div class="rs-media-icon">🎧</div>
@@ -407,7 +401,6 @@ function renderMidia(newsletter, acesso) {
   }
 
   if (newsletter.video_url) {
-    console.log('Acesso tem vídeo?', acesso.temVideo);
     itens.push(acesso.temVideo ? `
     <div class="rs-media-item">
       <div class="rs-media-icon">📺</div>
@@ -430,7 +423,6 @@ function renderMidia(newsletter, acesso) {
   }
 
   if (newsletter.infografico_url) {
-    console.log('Acesso tem infográfico?', acesso.temInfografico);
     itens.push(acesso.temInfografico ? `
       <div class="rs-media-item">
         <div class="rs-media-icon">📊</div>
@@ -2188,6 +2180,11 @@ function _setSecaoFeedbackLocal(nid, secao, voto) {
   }
 }
 
+function toggleSection(header) {
+  const section = header.closest('.rs-section');
+  section.classList.toggle('aberta');
+}
+
 async function carregarSecaoFeedbacks(nid) {
   window._secaoFeedbackCurrentNid = nid;
   window._secaoFeedbackData = {};
@@ -2283,7 +2280,7 @@ async function renderSecaoFeedbacks(newsletter) {
       wrap.innerHTML = `
         <div class="rs-section-header">
           <span>🧾</span>
-          <h2>Avaliação por seção</h2>
+          <h2>Qual sua opinião sobre nosso conteúdo ... clique aqui.</h2>
         </div>
         <div class="rs-section-body" id="secao-feedback-secoes-conteudo">
           <p style="color:#999; margin:0;">Aguardando carregamento de avaliações...</p>
