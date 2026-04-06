@@ -33,7 +33,7 @@
     drawer.setAttribute('aria-label', 'Fale Conosco');
     drawer.innerHTML = `
       <div id="rs-fc-header">
-        <span id="rs-fc-titulo">💬 Fale Conosco</span>
+        <span id="rs-fc-titulo">💬 Ações</span>
         <button id="rs-fc-fechar" type="button" aria-label="Fechar">×</button>
       </div>
       <div id="rs-fc-body">
