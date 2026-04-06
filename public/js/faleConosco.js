@@ -81,7 +81,6 @@ function _injetarCSS() {
   .rs-fc-badge-status.aberta { background: rgba(251,191,36,.15); color: #d97706; }
   .rs-fc-badge-status.respondida { background: rgba(34,197,94,.15); color: #16a34a; }
   
-  /* NOVOS ESTILOS PARA O LAYOUT SOLICITADO */
   .rs-sugestao-card { background: var(--rs-card2, #162032); border: 1px solid var(--rs-borda, rgba(148,163,184,.12)); border-radius: 10px; padding: 12px; display: flex; flex-direction: column; gap: 6px; margin-bottom: 8px; }
   .rs-sugestao-header { display: flex; justify-content: space-between; align-items: center; font-size: 11px; color: var(--rs-muted, #94a3b8); }
   .rs-sugestao-posicao { font-weight: 700; color: #0e7490; }
@@ -92,7 +91,6 @@ function _injetarCSS() {
   .rs-voto-btn:hover { border-color: #0e7490; background: rgba(14,116,144,.1); }
   .rs-voto-btn.votado { border-color: #22c55e; background: rgba(34,197,94,.15); color: #22c55e; }
 
-  /* CARD ÚNICO DO RESULTADO ANTERIOR */
   .rs-resultado-card { background: var(--rs-card2, #162032); border: 1px solid var(--rs-borda, rgba(148,163,184,.12)); border-radius: 10px; padding: 14px; display: flex; flex-direction: column; gap: 10px; margin: 8px 0; }
   .rs-resultado-header { font-size: 12px; font-weight: 700; color: #a78bfa; text-transform: uppercase; letter-spacing: .5px; border-bottom: 1px dashed var(--rs-borda); padding-bottom: 8px; margin-bottom: 2px; }
   .rs-res-item { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid rgba(148,163,184,.08); }
@@ -104,7 +102,6 @@ function _injetarCSS() {
   .rs-res-item.vencedor .rs-res-texto { font-weight: 700; color: #fbbf24; }
   .rs-res-meta { font-size: 10px; color: var(--rs-muted, #94a3b8); display: flex; gap: 8px; align-items: center; }
   .rs-res-votos { background: rgba(14,116,144,.15); color: #0e7490; padding: 2px 6px; border-radius: 4px; font-weight: 700; }
-  .rs-sugestao-card.encerrada { opacity: 0.7; }
   `;
   document.head.appendChild(style);
 }
@@ -186,12 +183,9 @@ async function _renderDrawer(tipoAtivo = 'mensagem') {
   }
   html += `</div>`;
 
-  // ── FLUXO SOLICITADO ───────────────────────────────────────────────────
+  // FLUXO SOLICITADO
   if (tipoAtivo === 'sugestao_tema') {
-    // 1. Votação Atual (Mês Atual)
     html += await _renderVotacaoAtual(user, temFeatureTema);
-
-    // 2. Formulário de Envio
     if (!quotaEsgotada) {
       html += `
         <div style="margin-top: 16px;">
@@ -202,8 +196,6 @@ async function _renderDrawer(tipoAtivo = 'mensagem') {
         <button class="rs-fc-enviar" id="rs-fc-enviar" disabled onclick="window._fcEnviar('sugestao_tema')">Enviar</button>
       `;
     }
-
-    // 3. Resultado do Mês Anterior (Após botão Enviar)
     html += await _renderResultadoAnterior(user, temFeatureTema);
   } else {
     html += `
@@ -216,7 +208,7 @@ async function _renderDrawer(tipoAtivo = 'mensagem') {
     `;
   }
 
-  // 4. Histórico (Sempre no final)
+  // HISTÓRICO
   const historicoFiltrado = tipoAtivo === 'mensagem'
     ? historico.filter(m => m.tipo !== 'sugestao_tema')
     : historico.filter(m => m.tipo === 'sugestao_tema');
@@ -344,7 +336,7 @@ function _marcarRespostasVistas(historico) {
   } catch {}
 }
 
-// ── UTILITÁRIO: Obter período atual ───────────────────────────────────────
+// ── UTILITÁRIOS ───────────────────────────────────────────────────────────
 function _getPeriodoAtual() { return new Date().toISOString().slice(0, 7); }
 function _getPeriodoAnterior() {
   const d = new Date(); return d.getMonth() === 0 ? `${d.getFullYear()-1}-12` : `${d.getFullYear()}-${String(d.getMonth()).padStart(2,'0')}`;
@@ -360,12 +352,15 @@ function _formatarPeriodo(periodo) {
   return `${meses[parseInt(mes)-1]} ${ano}`;
 }
 function _esc(str) { if (!str) return ''; const d = document.createElement('div'); d.textContent = str; return d.innerHTML; }
+
 async function _buscarTextoSolicitacao(solicitacaoPath) {
   try {
+    if (!solicitacaoPath || typeof solicitacaoPath !== 'string') return '';
     const parts = solicitacaoPath.split('/');
+    if (parts.length < 4) return '';
     const doc = await window.db.collection('usuarios').doc(parts[1]).collection('solicitacoes').doc(parts[3]).get();
     return doc.exists ? (doc.data().descricao || doc.data().texto || '') : '';
-  } catch { return ''; }
+  } catch (e) { console.warn('[faleConosco] erro texto:', e.message); return ''; }
 }
 
 // ── AUTOMATIZAÇÃO: Encerrar mês anterior ──────────────────────────────────
@@ -386,13 +381,40 @@ async function _autoEncerrarMesAnterior() {
   } catch (err) { console.warn('[faleConosco] auto-encerrar:', err); }
 }
 
-// ── RENDER: Votação Atual (Mês Atual) ─────────────────────────────────────
+// ── RENDER: Votação Atual (COM FALLBACK DE ÍNDICE) ────────────────────────
 async function _renderVotacaoAtual(user, temFeatureTema) {
   try {
-    const snap = await window.db.collection('sugestoes_publicas').where('status', '==', 'ativa').where('periodo', '==', _getPeriodoAtual()).orderBy('votos', 'desc').limit(5).get();
+    let snap;
+    try {
+      // Tenta usar índice composto do Firestore
+      snap = await window.db.collection('sugestoes_publicas')
+        .where('status', '==', 'ativa')
+        .where('periodo', '==', _getPeriodoAtual())
+        .orderBy('votos', 'desc')
+        .limit(50)
+        .get();
+    } catch (e) {
+      // Fallback se o índice não existir ou falhar
+      console.warn('[faleConosco] Índice composto indisponível. Ordenando no cliente.', e);
+      snap = await window.db.collection('sugestoes_publicas')
+        .where('status', '==', 'ativa')
+        .where('periodo', '==', _getPeriodoAtual())
+        .limit(50)
+        .get();
+    }
+
     if (snap.empty) return `<div class="rs-fc-sep">🗳️ Votação Atual</div><div class="rs-fc-vazio">Nenhuma sugestão ativa ainda.</div>`;
 
-    const sugestoes = await Promise.all(snap.docs.map(async d => ({ id: d.id, ...d.data(), texto: await _buscarTextoSolicitacao(d.data().solicitacao_ref) })));
+    // Ordenação segura no cliente
+    const docsArray = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    docsArray.sort((a, b) => (b.votos || 0) - (a.votos || 0));
+    const top5 = docsArray.slice(0, 5);
+
+    const sugestoes = await Promise.all(top5.map(async d => ({
+      ...d,
+      texto: await _buscarTextoSolicitacao(d.solicitacao_ref)
+    })));
+
     const podeVotar = user.segmento === 'assinante' && temFeatureTema;
     let html = `<div class="rs-fc-sep">🗳️ Votação Atual</div>`;
 
@@ -408,10 +430,13 @@ async function _renderVotacaoAtual(user, temFeatureTema) {
         </div>`;
     });
     return html;
-  } catch (err) { return `<div class="rs-fc-vazio"><span>⚠️</span>Erro ao carregar votação.</div>`; }
+  } catch (err) {
+    console.error('[faleConosco] Erro detalhado ao carregar votação:', err); // <-- Log visível no DevTools
+    return `<div class="rs-fc-vazio"><span>⚠️</span>Erro ao carregar votação. Verifique o console.</div>`;
+  }
 }
 
-// ── RENDER: Resultado Mês Anterior (Card Único + Top 5) ───────────────────
+// ── RENDER: Resultado Mês Anterior ────────────────────────────────────────
 async function _renderResultadoAnterior(user, temFeatureTema) {
   try {
     const periodoAnt = _getPeriodoAnterior();
