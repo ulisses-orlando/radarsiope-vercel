@@ -153,7 +153,7 @@ async function _renderDrawer(tipoAtivo = 'mensagem') {
 
   let html = '';
   const avisoTexto = tipoAtivo === 'sugestao_tema'
-    ? 'Esta área é destinada apenas para sugestão de temas para as próximas edições.'
+    ? 'Esta área é destinada para sugestões de temas para as próximas edições e para visualização do ranking mensal.'
     : 'Este canal é para dúvidas sobre a sua assinatura e feedbacks. Para suporte técnico, consulte os planos disponíveis.';
   html += `<div class="rs-fc-aviso">${avisoTexto}</div>`;
 
