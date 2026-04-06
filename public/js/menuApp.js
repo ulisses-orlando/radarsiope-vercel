@@ -188,7 +188,7 @@
         <div class="rs-ham">
           <span></span><span></span><span></span>
         </div>
-        Menu
+        Central
         <div id="rs-menu-total-badge" style="display:none">0</div>
       </button>
 
