@@ -161,8 +161,8 @@ async function _renderDrawer(tipoAtivo = 'mensagem') {
 
   let html = '';
   const avisoTexto = tipoAtivo === 'sugestao_tema'
-    ? 'Esta área é destinada apenas para sugestão de temas para as próximas edições.'
-    : 'Este canal é para dúvidas sobre a sua assinatura e feedbacks.';
+    ? 'Área destinada para sugestão de temas para as próximas edições e para visualização do resultado da votação.'
+    : 'Área destinada para dúvidas sobre a sua assinatura e feedbacks.';
   html += `<div class="rs-fc-aviso">${avisoTexto}</div>`;
 
   const quotaEsgotada = quotaTema > 0 && usoTemaMes >= quotaTema;
@@ -208,7 +208,7 @@ async function _renderDrawer(tipoAtivo = 'mensagem') {
     `;
   }
 
-  // HISTÓRICO
+  // HISTÓRICO COM DATA ROBUSTA
   const historicoFiltrado = tipoAtivo === 'mensagem'
     ? historico.filter(m => m.tipo !== 'sugestao_tema')
     : historico.filter(m => m.tipo === 'sugestao_tema');
@@ -217,16 +217,27 @@ async function _renderDrawer(tipoAtivo = 'mensagem') {
     html += `<div class="rs-fc-sep">Histórico</div>`;
     historicoFiltrado.forEach(msg => {
       const respondida = !!msg.resposta;
-      const data = msg.criado_em ? new Date(msg.criado_em?.seconds ? msg.criado_em.seconds * 1000 : msg.criado_em).toLocaleDateString('pt-BR', { day:'2-digit', month:'short', year:'numeric' }) : '—';
+      
+      // Extração segura da data (suporta Timestamp do Firestore e String ISO)
+      let dataFormatada = '—';
+      try {
+        const rawDate = msg.criado_em || msg.data_solicitacao;
+        if (rawDate) {
+          const d = rawDate.seconds ? new Date(rawDate.seconds * 1000) : new Date(rawDate);
+          if (!isNaN(d.getTime())) dataFormatada = `Enviada em ${d.toLocaleDateString('pt-BR')}`;
+        }
+      } catch(e) {}
+
       const tipoLabel = msg.tipo === 'sugestao_tema' ? '💡 Sugestão de tema' : '💬 Mensagem';
       const respostaHtml = respondida ? `<div class="rs-fc-msg-resposta"><div class="rs-fc-msg-resposta-label">✅ Resposta da equipe</div>${msg.resposta}</div>` : '';
+
       html += `
         <div class="rs-fc-msg-card ${respondida ? 'respondida' : ''}">
           <div class="rs-fc-msg-topo">
             <span class="rs-fc-msg-tipo">${tipoLabel}</span>
             <div style="display:flex;gap:6px;align-items:center">
               <span class="rs-fc-badge-status ${respondida ? 'respondida' : 'aberta'}">${msg.tipo === 'sugestao_tema' ? 'Enviada' : (respondida ? 'Respondida' : 'Aguardando')}</span>
-              <span class="rs-fc-msg-data">${data}</span>
+              <span class="rs-fc-msg-data">${dataFormatada}</span>
             </div>
           </div>
           <div class="rs-fc-msg-texto">${msg.texto || msg.descricao || ''}</div>
@@ -341,18 +352,12 @@ function _getPeriodoAtual() { return new Date().toISOString().slice(0, 7); }
 function _getPeriodoAnterior() {
   const d = new Date(); return d.getMonth() === 0 ? `${d.getFullYear()-1}-12` : `${d.getFullYear()}-${String(d.getMonth()).padStart(2,'0')}`;
 }
-function _formatarDataBr(dateInput) {
-  if (!dateInput) return '—';
-  const d = new Date(dateInput?.seconds ? dateInput.seconds * 1000 : dateInput);
-  return isNaN(d) ? '—' : d.toLocaleDateString('pt-BR');
-}
 function _formatarPeriodo(periodo) {
   const [ano, mes] = periodo.split('-');
   const meses = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
   return `${meses[parseInt(mes)-1]} ${ano}`;
 }
 function _esc(str) { if (!str) return ''; const d = document.createElement('div'); d.textContent = str; return d.innerHTML; }
-
 async function _buscarTextoSolicitacao(solicitacaoPath) {
   try {
     if (!solicitacaoPath || typeof solicitacaoPath !== 'string') return '';
@@ -381,58 +386,42 @@ async function _autoEncerrarMesAnterior() {
   } catch (err) { console.warn('[faleConosco] auto-encerrar:', err); }
 }
 
-// ── RENDER: Votação Atual (COM FALLBACK DE ÍNDICE) ────────────────────────
+// ── RENDER: Votação Atual ─────────────────────────────────────────────────
 async function _renderVotacaoAtual(user, temFeatureTema) {
   try {
     let snap;
     try {
-      // Tenta usar índice composto do Firestore
-      snap = await window.db.collection('sugestoes_publicas')
-        .where('status', '==', 'ativa')
-        .where('periodo', '==', _getPeriodoAtual())
-        .orderBy('votos', 'desc')
-        .limit(50)
-        .get();
+      snap = await window.db.collection('sugestoes_publicas').where('status', '==', 'ativa').where('periodo', '==', _getPeriodoAtual()).orderBy('votos', 'desc').limit(50).get();
     } catch (e) {
-      // Fallback se o índice não existir ou falhar
-      console.warn('[faleConosco] Índice composto indisponível. Ordenando no cliente.', e);
-      snap = await window.db.collection('sugestoes_publicas')
-        .where('status', '==', 'ativa')
-        .where('periodo', '==', _getPeriodoAtual())
-        .limit(50)
-        .get();
+      snap = await window.db.collection('sugestoes_publicas').where('status', '==', 'ativa').where('periodo', '==', _getPeriodoAtual()).limit(50).get();
     }
 
     if (snap.empty) return `<div class="rs-fc-sep">🗳️ Votação Atual</div><div class="rs-fc-vazio">Nenhuma sugestão ativa ainda.</div>`;
 
-    // Ordenação segura no cliente
     const docsArray = snap.docs.map(d => ({ id: d.id, ...d.data() }));
     docsArray.sort((a, b) => (b.votos || 0) - (a.votos || 0));
     const top5 = docsArray.slice(0, 5);
 
-    const sugestoes = await Promise.all(top5.map(async d => ({
-      ...d,
-      texto: await _buscarTextoSolicitacao(d.solicitacao_ref)
-    })));
-
+    const sugestoes = await Promise.all(top5.map(async d => ({ ...d, texto: await _buscarTextoSolicitacao(d.solicitacao_ref) })));
     const podeVotar = user.segmento === 'assinante' && temFeatureTema;
     let html = `<div class="rs-fc-sep">🗳️ Votação Atual</div>`;
 
     sugestoes.forEach((s, i) => {
       const jaVotou = podeVotar ? localStorage.getItem(`rs_voto_sugestao_${s.id}`) : null;
       const voteBtn = podeVotar ? `<button class="rs-voto-btn ${jaVotou ? 'votado' : ''}" onclick="window.votarSugestao('${_esc(s.id)}', '${_esc(user.uid)}')">${jaVotou ? '✅ Votado' : '👍 Votar'}</button>` : '';
+      const dataEnv = s.criado_em ? new Date(s.criado_em.seconds ? s.criado_em.seconds * 1000 : s.criado_em).toLocaleDateString('pt-BR') : '—';
       html += `
         <div class="rs-sugestao-card">
           <div class="rs-sugestao-header"><span class="rs-sugestao-posicao">#${i+1}</span><span class="rs-sugestao-votos">👍 ${s.votos || 0}</span></div>
           <div class="rs-sugestao-texto">${_esc(s.texto)}</div>
-          <div class="rs-sugestao-data">ENVIADA em ${_formatarDataBr(s.criado_em)}</div>
+          <div class="rs-sugestao-data">ENVIADA em ${dataEnv}</div>
           ${voteBtn}
         </div>`;
     });
     return html;
   } catch (err) {
-    console.error('[faleConosco] Erro detalhado ao carregar votação:', err); // <-- Log visível no DevTools
-    return `<div class="rs-fc-vazio"><span>⚠️</span>Erro ao carregar votação. Verifique o console.</div>`;
+    console.error('[faleConosco] Erro detalhado ao carregar votação:', err);
+    return `<div class="rs-fc-vazio"><span>⚠️</span>Erro ao carregar votação.</div>`;
   }
 }
 
@@ -462,6 +451,7 @@ async function _renderResultadoAnterior(user, temFeatureTema) {
       const isWinner = i === 0;
       const votos = s.votos_fixos !== undefined ? s.votos_fixos : (s.votos || 0);
       const pos = isWinner ? '🥇' : `#${i+1}`;
+      const dataEnv = s.criado_em ? new Date(s.criado_em.seconds ? s.criado_em.seconds * 1000 : s.criado_em).toLocaleDateString('pt-BR') : '—';
       html += `
         <div class="rs-res-item ${isWinner ? 'vencedor' : ''}">
           <div class="rs-res-pos">${pos}</div>
@@ -469,7 +459,7 @@ async function _renderResultadoAnterior(user, temFeatureTema) {
             <div class="rs-res-texto">${_esc(s.texto)}</div>
             <div class="rs-res-meta">
               <span class="rs-res-votos">👍 ${votos}</span>
-              <span>ENVIADA em ${_formatarDataBr(s.criado_em)}</span>
+              <span>ENVIADA em ${dataEnv}</span>
             </div>
           </div>
         </div>`;
