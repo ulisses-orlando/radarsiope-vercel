@@ -80,16 +80,31 @@ function _injetarCSS() {
   .rs-fc-badge-status { font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 99px; text-transform: uppercase; }
   .rs-fc-badge-status.aberta { background: rgba(251,191,36,.15); color: #d97706; }
   .rs-fc-badge-status.respondida { background: rgba(34,197,94,.15); color: #16a34a; }
-  .rs-sugestao-card { background: var(--rs-card2, #162032); border: 1px solid var(--rs-borda, rgba(148,163,184,.12)); border-radius: 10px; padding: 14px; display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
-  .rs-sugestao-header { display: flex; justify-content: space-between; align-items: center; font-size: 12px; color: var(--rs-muted, #94a3b8); }
+  
+  /* NOVOS ESTILOS PARA O LAYOUT SOLICITADO */
+  .rs-sugestao-card { background: var(--rs-card2, #162032); border: 1px solid var(--rs-borda, rgba(148,163,184,.12)); border-radius: 10px; padding: 12px; display: flex; flex-direction: column; gap: 6px; margin-bottom: 8px; }
+  .rs-sugestao-header { display: flex; justify-content: space-between; align-items: center; font-size: 11px; color: var(--rs-muted, #94a3b8); }
   .rs-sugestao-posicao { font-weight: 700; color: #0e7490; }
   .rs-sugestao-votos { font-weight: 600; }
-  .rs-sugestao-texto { font-size: 13px; color: var(--rs-text, #f8fafc); line-height: 1.5; margin: 4px 0; }
+  .rs-sugestao-texto { font-size: 13px; color: var(--rs-text, #f8fafc); line-height: 1.4; }
+  .rs-sugestao-data { font-size: 10px; color: var(--rs-muted, #94a3b8); text-transform: uppercase; letter-spacing: .5px; }
   .rs-voto-btn { align-self: flex-start; padding: 6px 12px; background: var(--rs-card2, #162032); border: 2px solid var(--rs-borda, rgba(148,163,184,.12)); border-radius: 20px; color: var(--rs-text, #f8fafc); font-size: 12px; font-weight: 600; cursor: pointer; transition: all .15s; }
   .rs-voto-btn:hover { border-color: #0e7490; background: rgba(14,116,144,.1); }
   .rs-voto-btn.votado { border-color: #22c55e; background: rgba(34,197,94,.15); color: #22c55e; }
-  .rs-sugestao-card.encerrada { opacity: 0.8; border-color: #64748b; }
-  .rs-sugestao-card.encerrada .rs-sugestao-posicao { color: #64748b; }
+
+  /* CARD ÚNICO DO RESULTADO ANTERIOR */
+  .rs-resultado-card { background: var(--rs-card2, #162032); border: 1px solid var(--rs-borda, rgba(148,163,184,.12)); border-radius: 10px; padding: 14px; display: flex; flex-direction: column; gap: 10px; margin: 8px 0; }
+  .rs-resultado-header { font-size: 12px; font-weight: 700; color: #a78bfa; text-transform: uppercase; letter-spacing: .5px; border-bottom: 1px dashed var(--rs-borda); padding-bottom: 8px; margin-bottom: 2px; }
+  .rs-res-item { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid rgba(148,163,184,.08); }
+  .rs-res-item:last-child { border-bottom: none; }
+  .rs-res-pos { font-weight: 800; font-size: 14px; min-width: 28px; color: var(--rs-muted, #94a3b8); }
+  .rs-res-item.vencedor .rs-res-pos { color: #fbbf24; font-size: 16px; }
+  .rs-res-info { flex: 1; display: flex; flex-direction: column; gap: 2px; }
+  .rs-res-texto { font-size: 13px; color: var(--rs-text, #f8fafc); line-height: 1.3; }
+  .rs-res-item.vencedor .rs-res-texto { font-weight: 700; color: #fbbf24; }
+  .rs-res-meta { font-size: 10px; color: var(--rs-muted, #94a3b8); display: flex; gap: 8px; align-items: center; }
+  .rs-res-votos { background: rgba(14,116,144,.15); color: #0e7490; padding: 2px 6px; border-radius: 4px; font-weight: 700; }
+  .rs-sugestao-card.encerrada { opacity: 0.7; }
   `;
   document.head.appendChild(style);
 }
@@ -137,13 +152,9 @@ async function _renderDrawer(tipoAtivo = 'mensagem') {
         quotaTema = feat.sugestao_tema_quota || 0;
       }
       if (quotaTema > 0) {
-        const inicioMes = new Date();
-        inicioMes.setDate(1); inicioMes.setHours(0, 0, 0, 0);
+        const inicioMes = new Date(); inicioMes.setDate(1); inicioMes.setHours(0, 0, 0, 0);
         const snap = await window.db.collection('usuarios').doc(user.uid).collection('solicitacoes').where('tipo', '==', 'sugestao_tema').get();
-        usoTemaMes = snap.docs.filter(d => {
-          const ds = d.data().data_solicitacao;
-          return ds && new Date(ds) >= inicioMes;
-        }).length;
+        usoTemaMes = snap.docs.filter(d => { const ds = d.data().data_solicitacao; return ds && new Date(ds) >= inicioMes; }).length;
       }
     } catch(e) { console.warn('[faleConosco] quota:', e.message); }
   }
@@ -154,7 +165,7 @@ async function _renderDrawer(tipoAtivo = 'mensagem') {
   let html = '';
   const avisoTexto = tipoAtivo === 'sugestao_tema'
     ? 'Esta área é destinada apenas para sugestão de temas para as próximas edições.'
-    : 'Este canal é para dúvidas sobre a sua assinatura e feedbacks. Para suporte técnico, consulte os planos disponíveis.';
+    : 'Este canal é para dúvidas sobre a sua assinatura e feedbacks.';
   html += `<div class="rs-fc-aviso">${avisoTexto}</div>`;
 
   const quotaEsgotada = quotaTema > 0 && usoTemaMes >= quotaTema;
@@ -163,7 +174,6 @@ async function _renderDrawer(tipoAtivo = 'mensagem') {
   // ABAS
   html += `<div class="rs-fc-tipos">`;
   html += `<button class="rs-fc-tipo-btn ${tipoAtivo === 'mensagem' ? 'ativo' : ''}" onclick="window._fcSelecionarTipo('mensagem')">💬 Mensagem</button>`;
-
   if (isAssinante) {
     if (temFeatureTema) {
       const btnClass = `rs-fc-tipo-btn ${tipoAtivo === 'sugestao_tema' ? 'ativo' : ''} ${quotaEsgotada ? 'bloqueado' : ''}`;
@@ -176,9 +186,12 @@ async function _renderDrawer(tipoAtivo = 'mensagem') {
   }
   html += `</div>`;
 
-  // CONTEÚDO PRINCIPAL
+  // ── FLUXO SOLICITADO ───────────────────────────────────────────────────
   if (tipoAtivo === 'sugestao_tema') {
-    html += await _renderRankingMensal(user, temFeatureTema);
+    // 1. Votação Atual (Mês Atual)
+    html += await _renderVotacaoAtual(user, temFeatureTema);
+
+    // 2. Formulário de Envio
     if (!quotaEsgotada) {
       html += `
         <div style="margin-top: 16px;">
@@ -189,6 +202,9 @@ async function _renderDrawer(tipoAtivo = 'mensagem') {
         <button class="rs-fc-enviar" id="rs-fc-enviar" disabled onclick="window._fcEnviar('sugestao_tema')">Enviar</button>
       `;
     }
+
+    // 3. Resultado do Mês Anterior (Após botão Enviar)
+    html += await _renderResultadoAnterior(user, temFeatureTema);
   } else {
     html += `
       <div>
@@ -200,7 +216,7 @@ async function _renderDrawer(tipoAtivo = 'mensagem') {
     `;
   }
 
-  // HISTÓRICO FILTRADO
+  // 4. Histórico (Sempre no final)
   const historicoFiltrado = tipoAtivo === 'mensagem'
     ? historico.filter(m => m.tipo !== 'sugestao_tema')
     : historico.filter(m => m.tipo === 'sugestao_tema');
@@ -209,7 +225,7 @@ async function _renderDrawer(tipoAtivo = 'mensagem') {
     html += `<div class="rs-fc-sep">Histórico</div>`;
     historicoFiltrado.forEach(msg => {
       const respondida = !!msg.resposta;
-      const data = msg.criado_em ? new Date(msg.criado_em?.seconds ? msg.criado_em.seconds * 1000 : msg.criado_em).toLocaleDateString('pt-BR', { day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' }) : '—';
+      const data = msg.criado_em ? new Date(msg.criado_em?.seconds ? msg.criado_em.seconds * 1000 : msg.criado_em).toLocaleDateString('pt-BR', { day:'2-digit', month:'short', year:'numeric' }) : '—';
       const tipoLabel = msg.tipo === 'sugestao_tema' ? '💡 Sugestão de tema' : '💬 Mensagem';
       const respostaHtml = respondida ? `<div class="rs-fc-msg-resposta"><div class="rs-fc-msg-resposta-label">✅ Resposta da equipe</div>${msg.resposta}</div>` : '';
       html += `
@@ -329,140 +345,21 @@ function _marcarRespostasVistas(historico) {
 }
 
 // ── UTILITÁRIO: Obter período atual ───────────────────────────────────────
-function _getPeriodoAtual() {
-  return new Date().toISOString().slice(0, 7);
+function _getPeriodoAtual() { return new Date().toISOString().slice(0, 7); }
+function _getPeriodoAnterior() {
+  const d = new Date(); return d.getMonth() === 0 ? `${d.getFullYear()-1}-12` : `${d.getFullYear()}-${String(d.getMonth()).padStart(2,'0')}`;
 }
-
-// ── AUTOMATIZAÇÃO: Encerrar mês anterior se estiver aberto ────────────────
-async function _autoEncerrarMesAnterior() {
-  try {
-    const periodoAtual = _getPeriodoAtual();
-    const dataAtual = new Date();
-    const periodoAnterior = dataAtual.getMonth() === 0
-      ? `${dataAtual.getFullYear() - 1}-12`
-      : `${dataAtual.getFullYear()}-${String(dataAtual.getMonth()).padStart(2, '0')}`;
-
-    const snap = await window.db.collection('sugestoes_publicas')
-      .where('status', '==', 'ativa')
-      .where('periodo', '==', periodoAnterior)
-      .get();
-
-    if (!snap.empty) {
-      console.log(`[faleConosco] Encerrando automaticamente mês ${periodoAnterior}...`);
-      const batch = window.db.batch();
-      const rankingFinal = [];
-      // Ordena localmente por votos para gerar o ranking
-      const docsSorted = snap.docs.sort((a, b) => (b.data().votos || 0) - (a.data().votos || 0));
-      
-      docsSorted.forEach((doc, index) => {
-        const d = doc.data();
-        rankingFinal.push({
-          posicao: index + 1,
-          votos: d.votos,
-          texto_preview: d.texto_preview,
-          solicitacao_ref: d.solicitacao_ref
-        });
-        batch.update(doc.ref, { status: 'encerrada', ranking_final: rankingFinal, encerrado_em: new Date() });
-      });
-      await batch.commit();
-    }
-  } catch (err) { console.warn('[faleConosco] erro ao auto-encerrar mês:', err); }
+function _formatarDataBr(dateInput) {
+  if (!dateInput) return '—';
+  const d = new Date(dateInput?.seconds ? dateInput.seconds * 1000 : dateInput);
+  return isNaN(d) ? '—' : d.toLocaleDateString('pt-BR');
 }
-
-// ── Renderizar ranking mensal ─────────────────────────────────────────────
-async function _renderRankingMensal(user, temFeatureTema) {
-  try {
-    await _autoEncerrarMesAnterior(); // Garante que o banco esteja atualizado
-    const periodoAtual = _getPeriodoAtual();
-    const dataAtual = new Date();
-    const periodoAnterior = dataAtual.getMonth() === 0
-      ? `${dataAtual.getFullYear() - 1}-12`
-      : `${dataAtual.getFullYear()}-${String(dataAtual.getMonth()).padStart(2, '0')}`;
-
-    let html = '';
-    html += `<div class="rs-fc-sep">🏆 Mês Atual (${_formatarPeriodo(periodoAtual)})</div>`;
-    html += await _renderRankingPeriodo(user, temFeatureTema, periodoAtual, true);
-    html += `<div class="rs-fc-sep">🏅 Mês Anterior (${_formatarPeriodo(periodoAnterior)})</div>`;
-    html += await _renderRankingPeriodo(user, temFeatureTema, periodoAnterior, false);
-    return html;
-  } catch (err) {
-    console.error('[faleConosco] ranking:', err);
-    return `<div class="rs-fc-vazio"><span>⚠️</span>Erro ao carregar ranking.</div>`;
-  }
-}
-
-async function _renderRankingPeriodo(user, temFeatureTema, periodo, permitirVoto) {
-  try {
-    let snap;
-    if (permitirVoto) {
-      snap = await window.db.collection('sugestoes_publicas')
-        .where('status', '==', 'ativa')
-        .where('periodo', '==', periodo)
-        .orderBy('votos', 'desc')
-        .orderBy('criado_em', 'desc')
-        .limit(5).get();
-    } else {
-      snap = await window.db.collection('sugestoes_publicas')
-        .where('periodo', '==', periodo)
-        .orderBy('votos', 'desc')
-        .orderBy('criado_em', 'desc')
-        .get();
-    }
-
-    if (snap.empty) return `<div class="rs-fc-vazio"><span>${permitirVoto ? '🗳️' : '🏅'}</span>Nenhuma sugestão neste período.</div>`;
-
-    const metadados = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-    let rankingOrdenado = metadados;
-
-    // Para meses encerrados, respeita o snapshot final salvo no primeiro doc
-    if (!permitirVoto && metadados.length > 0 && metadados[0].ranking_final) {
-      rankingOrdenado = metadados[0].ranking_final.map(item => {
-        const original = metadados.find(m => m.solicitacao_ref === item.solicitacao_ref);
-        return original ? { ...original, posicao_fixa: item.posicao, votos_fixos: item.votos } : null;
-      }).filter(Boolean);
-    }
-
-    const sugestoesCompletas = await Promise.all(rankingOrdenado.slice(0, 5).map(async meta => {
-      const textoCompleto = await _buscarTextoSolicitacao(meta.solicitacao_ref);
-      return { ...meta, texto: textoCompleto };
-    }));
-
-    // Votação só permitida se: tem feature + é mês atual
-    const podeVotar = permitirVoto && user.segmento === 'assinante' && temFeatureTema;
-    let html = '';
-
-    sugestoesCompletas.forEach((sug, index) => {
-      const jaVotou = podeVotar ? localStorage.getItem(`rs_voto_sugestao_${sug.id}`) : null;
-      const posicao = (!permitirVoto && sug.posicao_fixa) ? sug.posicao_fixa : index + 1;
-      const votos = (!permitirVoto && sug.votos_fixos !== undefined) ? sug.votos_fixos : (sug.votos || 0);
-      
-      const voteBtn = podeVotar 
-        ? `<button class="rs-voto-btn ${jaVotou ? 'votado' : ''}" onclick="window.votarSugestao('${_esc(sug.id)}', '${_esc(user.uid)}')">${jaVotou ? '✅ Votado' : '👍 Votar'}</button>` 
-        : '';
-
-      html += `
-        <div class="rs-sugestao-card ${!permitirVoto ? 'encerrada' : ''}">
-          <div class="rs-sugestao-header">
-            <span class="rs-sugestao-posicao">#${posicao}</span>
-            <span class="rs-sugestao-votos">👍 ${votos} voto${votos !== 1 ? 's' : ''}</span>
-          </div>
-          <div class="rs-sugestao-texto">${_esc(sug.texto)}</div>
-          ${voteBtn}
-        </div>`;
-    });
-    return html;
-  } catch (err) {
-    console.error('[faleConosco] ranking período:', err);
-    return `<div class="rs-fc-vazio"><span>⚠️</span>Erro ao carregar ranking.</div>`;
-  }
-}
-
-// ── Utilitários ───────────────────────────────────────────────────────────
 function _formatarPeriodo(periodo) {
   const [ano, mes] = periodo.split('-');
-  const meses = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
-  return `${meses[parseInt(mes) - 1]} ${ano}`;
+  const meses = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+  return `${meses[parseInt(mes)-1]} ${ano}`;
 }
+function _esc(str) { if (!str) return ''; const d = document.createElement('div'); d.textContent = str; return d.innerHTML; }
 async function _buscarTextoSolicitacao(solicitacaoPath) {
   try {
     const parts = solicitacaoPath.split('/');
@@ -470,8 +367,94 @@ async function _buscarTextoSolicitacao(solicitacaoPath) {
     return doc.exists ? (doc.data().descricao || doc.data().texto || '') : '';
   } catch { return ''; }
 }
-function _esc(str) { if (!str) return ''; const d = document.createElement('div'); d.textContent = str; return d.innerHTML; }
 
+// ── AUTOMATIZAÇÃO: Encerrar mês anterior ──────────────────────────────────
+async function _autoEncerrarMesAnterior() {
+  try {
+    const periodoAnterior = _getPeriodoAnterior();
+    const snap = await window.db.collection('sugestoes_publicas').where('status', '==', 'ativa').where('periodo', '==', periodoAnterior).get();
+    if (!snap.empty) {
+      const batch = window.db.batch();
+      const rankingFinal = [];
+      snap.docs.sort((a,b) => (b.data().votos||0)-(a.data().votos||0)).forEach((doc, i) => {
+        const d = doc.data();
+        rankingFinal.push({ posicao: i+1, votos: d.votos, texto_preview: d.texto_preview, solicitacao_ref: d.solicitacao_ref });
+        batch.update(doc.ref, { status: 'encerrada', ranking_final: rankingFinal, encerrado_em: new Date() });
+      });
+      await batch.commit();
+    }
+  } catch (err) { console.warn('[faleConosco] auto-encerrar:', err); }
+}
+
+// ── RENDER: Votação Atual (Mês Atual) ─────────────────────────────────────
+async function _renderVotacaoAtual(user, temFeatureTema) {
+  try {
+    const snap = await window.db.collection('sugestoes_publicas').where('status', '==', 'ativa').where('periodo', '==', _getPeriodoAtual()).orderBy('votos', 'desc').limit(5).get();
+    if (snap.empty) return `<div class="rs-fc-sep">🗳️ Votação Atual</div><div class="rs-fc-vazio">Nenhuma sugestão ativa ainda.</div>`;
+
+    const sugestoes = await Promise.all(snap.docs.map(async d => ({ id: d.id, ...d.data(), texto: await _buscarTextoSolicitacao(d.data().solicitacao_ref) })));
+    const podeVotar = user.segmento === 'assinante' && temFeatureTema;
+    let html = `<div class="rs-fc-sep">🗳️ Votação Atual</div>`;
+
+    sugestoes.forEach((s, i) => {
+      const jaVotou = podeVotar ? localStorage.getItem(`rs_voto_sugestao_${s.id}`) : null;
+      const voteBtn = podeVotar ? `<button class="rs-voto-btn ${jaVotou ? 'votado' : ''}" onclick="window.votarSugestao('${_esc(s.id)}', '${_esc(user.uid)}')">${jaVotou ? '✅ Votado' : '👍 Votar'}</button>` : '';
+      html += `
+        <div class="rs-sugestao-card">
+          <div class="rs-sugestao-header"><span class="rs-sugestao-posicao">#${i+1}</span><span class="rs-sugestao-votos">👍 ${s.votos || 0}</span></div>
+          <div class="rs-sugestao-texto">${_esc(s.texto)}</div>
+          <div class="rs-sugestao-data">ENVIADA em ${_formatarDataBr(s.criado_em)}</div>
+          ${voteBtn}
+        </div>`;
+    });
+    return html;
+  } catch (err) { return `<div class="rs-fc-vazio"><span>⚠️</span>Erro ao carregar votação.</div>`; }
+}
+
+// ── RENDER: Resultado Mês Anterior (Card Único + Top 5) ───────────────────
+async function _renderResultadoAnterior(user, temFeatureTema) {
+  try {
+    const periodoAnt = _getPeriodoAnterior();
+    const snap = await window.db.collection('sugestoes_publicas').where('periodo', '==', periodoAnt).orderBy('votos', 'desc').get();
+    if (snap.empty) return '';
+
+    const raw = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    let ordenado = raw;
+    if (raw[0]?.ranking_final) {
+      ordenado = raw[0].ranking_final.map(item => {
+        const orig = raw.find(r => r.solicitacao_ref === item.solicitacao_ref);
+        return orig ? { ...orig, posicao_fixa: item.posicao, votos_fixos: item.votos } : null;
+      }).filter(Boolean);
+    }
+
+    const top5 = await Promise.all(ordenado.slice(0, 5).map(async s => ({ ...s, texto: await _buscarTextoSolicitacao(s.solicitacao_ref) })));
+    if (top5.length === 0) return '';
+
+    let html = `<div class="rs-resultado-card">`;
+    html += `<div class="rs-resultado-header">🏁 VOTAÇÃO DE ${_formatarPeriodo(periodoAnt).toUpperCase()} ENCERRADA - Veja abaixo o resultado</div>`;
+    
+    top5.forEach((s, i) => {
+      const isWinner = i === 0;
+      const votos = s.votos_fixos !== undefined ? s.votos_fixos : (s.votos || 0);
+      const pos = isWinner ? '🥇' : `#${i+1}`;
+      html += `
+        <div class="rs-res-item ${isWinner ? 'vencedor' : ''}">
+          <div class="rs-res-pos">${pos}</div>
+          <div class="rs-res-info">
+            <div class="rs-res-texto">${_esc(s.texto)}</div>
+            <div class="rs-res-meta">
+              <span class="rs-res-votos">👍 ${votos}</span>
+              <span>ENVIADA em ${_formatarDataBr(s.criado_em)}</span>
+            </div>
+          </div>
+        </div>`;
+    });
+    html += `</div>`;
+    return html;
+  } catch (err) { console.error('[faleConosco] resultado ant:', err); return ''; }
+}
+
+// ── Votar ─────────────────────────────────────────────────────────────────
 window.votarSugestao = async function(sugestaoId, userId) {
   try {
     const lsKey = `rs_voto_sugestao_${sugestaoId}`;
