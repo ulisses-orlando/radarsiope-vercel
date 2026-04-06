@@ -1174,7 +1174,7 @@ async function verHistoricoCompleto() {
   
   // Atualizar botão toggle
   const btn = document.getElementById('btn-toggle-historico');
-  if (btn) btn.innerHTML = '🔙 Resumo';
+  if (btn) btn.innerHTML = '🔙 Voltar';
 
   // Loading
   historico.innerHTML = `
@@ -1237,7 +1237,7 @@ function voltarResumo() {
 
   if (historico) historico.style.display = 'none';
   if (resumo) resumo.style.display = 'block';
-  if (btn) btn.innerHTML = '📈 Ver série histórica completa';
+  if (btn) btn.innerHTML = '📈 Ver série histórica';
 }
 
 function toggleHistorico() {
