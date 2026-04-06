@@ -224,8 +224,7 @@ async function _renderDrawer(tipoAtivo = 'mensagem') {
         const rawDate = msg.criado_em || msg.data_solicitacao;
         if (rawDate) {
           const d = rawDate.seconds ? new Date(rawDate.seconds * 1000) : new Date(rawDate);
-          if (!isNaN(d.getTime())) dataFormatada = `Enviada em ${d.toLocaleDateString('pt-BR')}`;
-        }
+          if (!isNaN(d.getTime())) dataFormatada = `em ${d.toLocaleDateString('pt-BR')}`;        }
       } catch(e) {}
 
       const tipoLabel = msg.tipo === 'sugestao_tema' ? '💡 Sugestão de tema' : '💬 Mensagem';
