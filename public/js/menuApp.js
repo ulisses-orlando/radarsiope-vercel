@@ -184,7 +184,7 @@
 
     wrap.style.position = 'relative';
     wrap.innerHTML = `
-      <button id="rs-menu-btn" type="button" aria-label="Menu" aria-expanded="false">
+      <button id="rs-menu-btn" type="button" aria-label="Central" aria-expanded="false">
         <div class="rs-ham">
           <span></span><span></span><span></span>
         </div>
@@ -207,7 +207,7 @@
         <button class="rs-menu-item" id="rs-menu-fale"
           style="background:#0e6a82" role="menuitem">
           <span class="rs-menu-item-icon">💬</span>
-          <span class="rs-menu-item-label">Fale Conosco</span>
+          <span class="rs-menu-item-label">Ações</span>
           <span class="rs-menu-item-badge verde" id="rs-menu-badge-fc" style="display:none">0</span>
         </button>
         ${isAssinante ? `

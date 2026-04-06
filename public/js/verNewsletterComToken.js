@@ -186,7 +186,7 @@ function detectarAcesso(destinatario, newsletter, segmento, envio) {
       acessoProTemp = false;
     }
   }
-console.log('features:', features);
+
   return {
     isAssinante,
     plano_slug,
@@ -2180,11 +2180,6 @@ function _setSecaoFeedbackLocal(nid, secao, voto) {
   }
 }
 
-function toggleSection(header) {
-  const section = header.closest('.rs-section');
-  section.classList.toggle('aberta');
-}
-
 async function carregarSecaoFeedbacks(nid) {
   window._secaoFeedbackCurrentNid = nid;
   window._secaoFeedbackData = {};
@@ -2280,7 +2275,7 @@ async function renderSecaoFeedbacks(newsletter) {
       wrap.innerHTML = `
         <div class="rs-section-header">
           <span>🧾</span>
-          <h2>Qual sua opinião sobre nosso conteúdo ... clique aqui.</h2>
+          <h2>Avaliação por seção</h2>
         </div>
         <div class="rs-section-body" id="secao-feedback-secoes-conteudo">
           <p style="color:#999; margin:0;">Aguardando carregamento de avaliações...</p>
