@@ -153,14 +153,14 @@ async function _renderDrawer(tipoAtivo = 'mensagem') {
 
   let html = '';
   const avisoTexto = tipoAtivo === 'sugestao_tema'
-    ? 'Esta área é destinada para sugestões de temas para as próximas edições e para visualização do ranking mensal.'
+    ? 'Esta área é destinada apenas para sugestão de temas para as próximas edições.'
     : 'Este canal é para dúvidas sobre a sua assinatura e feedbacks. Para suporte técnico, consulte os planos disponíveis.';
   html += `<div class="rs-fc-aviso">${avisoTexto}</div>`;
 
   const quotaEsgotada = quotaTema > 0 && usoTemaMes >= quotaTema;
   const temFeatureTema = isAssinante && quotaTema > 0;
 
-  // ABAS (sem Ranking Mensal, conforme solicitado)
+  // ABAS
   html += `<div class="rs-fc-tipos">`;
   html += `<button class="rs-fc-tipo-btn ${tipoAtivo === 'mensagem' ? 'ativo' : ''}" onclick="window._fcSelecionarTipo('mensagem')">💬 Mensagem</button>`;
 
@@ -178,9 +178,7 @@ async function _renderDrawer(tipoAtivo = 'mensagem') {
 
   // CONTEÚDO PRINCIPAL
   if (tipoAtivo === 'sugestao_tema') {
-    // 1. Ranking no topo
     html += await _renderRankingMensal(user, temFeatureTema);
-    // 2. Formulário abaixo
     if (!quotaEsgotada) {
       html += `
         <div style="margin-top: 16px;">
@@ -233,7 +231,6 @@ async function _renderDrawer(tipoAtivo = 'mensagem') {
 
   body.innerHTML = html;
 
-  // Bind contador de caracteres
   const textarea = document.getElementById('rs-fc-txt');
   const chars = document.getElementById('rs-fc-chars');
   const btnEnv = document.getElementById('rs-fc-enviar');
@@ -268,8 +265,8 @@ window._fcEnviar = async function(tipo) {
       });
 
       if (tipo === 'sugestao_tema') {
+        await _autoEncerrarMesAnterior();
         const periodoAtual = new Date().toISOString().slice(0, 7);
-        await _verificarEEncerrarMesAnterior(periodoAtual);
         await window.db.collection('sugestoes_publicas').doc(`sugestao_${solicitacaoRef.id}`).set({
           solicitacao_ref: solicitacaoRef.path,
           texto_preview: texto.substring(0, 100) + (texto.length > 100 ? '...' : ''),
@@ -331,17 +328,62 @@ function _marcarRespostasVistas(historico) {
   } catch {}
 }
 
+// ── UTILITÁRIO: Obter período atual ───────────────────────────────────────
+function _getPeriodoAtual() {
+  return new Date().toISOString().slice(0, 7);
+}
+
+// ── AUTOMATIZAÇÃO: Encerrar mês anterior se estiver aberto ────────────────
+async function _autoEncerrarMesAnterior() {
+  try {
+    const periodoAtual = _getPeriodoAtual();
+    const dataAtual = new Date();
+    const periodoAnterior = dataAtual.getMonth() === 0
+      ? `${dataAtual.getFullYear() - 1}-12`
+      : `${dataAtual.getFullYear()}-${String(dataAtual.getMonth()).padStart(2, '0')}`;
+
+    const snap = await window.db.collection('sugestoes_publicas')
+      .where('status', '==', 'ativa')
+      .where('periodo', '==', periodoAnterior)
+      .get();
+
+    if (!snap.empty) {
+      console.log(`[faleConosco] Encerrando automaticamente mês ${periodoAnterior}...`);
+      const batch = window.db.batch();
+      const rankingFinal = [];
+      // Ordena localmente por votos para gerar o ranking
+      const docsSorted = snap.docs.sort((a, b) => (b.data().votos || 0) - (a.data().votos || 0));
+      
+      docsSorted.forEach((doc, index) => {
+        const d = doc.data();
+        rankingFinal.push({
+          posicao: index + 1,
+          votos: d.votos,
+          texto_preview: d.texto_preview,
+          solicitacao_ref: d.solicitacao_ref
+        });
+        batch.update(doc.ref, { status: 'encerrada', ranking_final: rankingFinal, encerrado_em: new Date() });
+      });
+      await batch.commit();
+    }
+  } catch (err) { console.warn('[faleConosco] erro ao auto-encerrar mês:', err); }
+}
+
 // ── Renderizar ranking mensal ─────────────────────────────────────────────
 async function _renderRankingMensal(user, temFeatureTema) {
   try {
-    const periodoAtual = new Date().toISOString().slice(0, 7);
+    await _autoEncerrarMesAnterior(); // Garante que o banco esteja atualizado
+    const periodoAtual = _getPeriodoAtual();
     const dataAtual = new Date();
-    const periodoAnterior = dataAtual.getMonth() === 0 ? `${dataAtual.getFullYear() - 1}-12` : `${dataAtual.getFullYear()}-${String(dataAtual.getMonth()).padStart(2, '0')}`;
+    const periodoAnterior = dataAtual.getMonth() === 0
+      ? `${dataAtual.getFullYear() - 1}-12`
+      : `${dataAtual.getFullYear()}-${String(dataAtual.getMonth()).padStart(2, '0')}`;
+
     let html = '';
     html += `<div class="rs-fc-sep">🏆 Mês Atual (${_formatarPeriodo(periodoAtual)})</div>`;
-    html += await _renderRankingPeriodo(user, temFeatureTema, periodoAtual, 'ativa');
+    html += await _renderRankingPeriodo(user, temFeatureTema, periodoAtual, true);
     html += `<div class="rs-fc-sep">🏅 Mês Anterior (${_formatarPeriodo(periodoAnterior)})</div>`;
-    html += await _renderRankingPeriodo(user, temFeatureTema, periodoAnterior, 'encerrada');
+    html += await _renderRankingPeriodo(user, temFeatureTema, periodoAnterior, false);
     return html;
   } catch (err) {
     console.error('[faleConosco] ranking:', err);
@@ -349,20 +391,31 @@ async function _renderRankingMensal(user, temFeatureTema) {
   }
 }
 
-async function _renderRankingPeriodo(user, temFeatureTema, periodo, status) {
+async function _renderRankingPeriodo(user, temFeatureTema, periodo, permitirVoto) {
   try {
     let snap;
-    if (status === 'ativa') {
-      snap = await window.db.collection('sugestoes_publicas').where('status', '==', status).where('periodo', '==', periodo).orderBy('votos', 'desc').orderBy('criado_em', 'desc').limit(5).get();
+    if (permitirVoto) {
+      snap = await window.db.collection('sugestoes_publicas')
+        .where('status', '==', 'ativa')
+        .where('periodo', '==', periodo)
+        .orderBy('votos', 'desc')
+        .orderBy('criado_em', 'desc')
+        .limit(5).get();
     } else {
-      snap = await window.db.collection('sugestoes_publicas').where('status', '==', status).where('periodo', '==', periodo).orderBy('votos', 'desc').orderBy('criado_em', 'desc').get();
+      snap = await window.db.collection('sugestoes_publicas')
+        .where('periodo', '==', periodo)
+        .orderBy('votos', 'desc')
+        .orderBy('criado_em', 'desc')
+        .get();
     }
 
-    if (snap.empty) return `<div class="rs-fc-vazio"><span>${status === 'ativa' ? '🗳️' : '🏅'}</span>Nenhuma sugestão ${status === 'ativa' ? 'ativa' : 'encerrada'} neste período.</div>`;
+    if (snap.empty) return `<div class="rs-fc-vazio"><span>${permitirVoto ? '🗳️' : '🏅'}</span>Nenhuma sugestão neste período.</div>`;
 
     const metadados = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
     let rankingOrdenado = metadados;
-    if (status === 'encerrada' && metadados[0]?.ranking_final) {
+
+    // Para meses encerrados, respeita o snapshot final salvo no primeiro doc
+    if (!permitirVoto && metadados.length > 0 && metadados[0].ranking_final) {
       rankingOrdenado = metadados[0].ranking_final.map(item => {
         const original = metadados.find(m => m.solicitacao_ref === item.solicitacao_ref);
         return original ? { ...original, posicao_fixa: item.posicao, votos_fixos: item.votos } : null;
@@ -374,19 +427,21 @@ async function _renderRankingPeriodo(user, temFeatureTema, periodo, status) {
       return { ...meta, texto: textoCompleto };
     }));
 
-    const podeVotar = user.segmento === 'assinante' && temFeatureTema;
+    // Votação só permitida se: tem feature + é mês atual
+    const podeVotar = permitirVoto && user.segmento === 'assinante' && temFeatureTema;
     let html = '';
+
     sugestoesCompletas.forEach((sug, index) => {
       const jaVotou = podeVotar ? localStorage.getItem(`rs_voto_sugestao_${sug.id}`) : null;
-      const posicao = status === 'encerrada' && sug.posicao_fixa ? sug.posicao_fixa : index + 1;
-      const votos = status === 'encerrada' && sug.votos_fixos !== undefined ? sug.votos_fixos : sug.votos;
+      const posicao = (!permitirVoto && sug.posicao_fixa) ? sug.posicao_fixa : index + 1;
+      const votos = (!permitirVoto && sug.votos_fixos !== undefined) ? sug.votos_fixos : (sug.votos || 0);
       
       const voteBtn = podeVotar 
         ? `<button class="rs-voto-btn ${jaVotou ? 'votado' : ''}" onclick="window.votarSugestao('${_esc(sug.id)}', '${_esc(user.uid)}')">${jaVotou ? '✅ Votado' : '👍 Votar'}</button>` 
         : '';
 
       html += `
-        <div class="rs-sugestao-card ${status === 'encerrada' ? 'encerrada' : ''}">
+        <div class="rs-sugestao-card ${!permitirVoto ? 'encerrada' : ''}">
           <div class="rs-sugestao-header">
             <span class="rs-sugestao-posicao">#${posicao}</span>
             <span class="rs-sugestao-votos">👍 ${votos} voto${votos !== 1 ? 's' : ''}</span>
@@ -417,24 +472,6 @@ async function _buscarTextoSolicitacao(solicitacaoPath) {
 }
 function _esc(str) { if (!str) return ''; const d = document.createElement('div'); d.textContent = str; return d.innerHTML; }
 
-async function _verificarEEncerrarMesAnterior(periodoAtual) {
-  try {
-    const dataAtual = new Date();
-    const periodoAnterior = dataAtual.getMonth() === 0 ? `${dataAtual.getFullYear() - 1}-12` : `${dataAtual.getFullYear()}-${String(dataAtual.getMonth()).padStart(2, '0')}`;
-    const snap = await window.db.collection('sugestoes_publicas').where('status', '==', 'ativa').where('periodo', '==', periodoAnterior).orderBy('votos', 'desc').get();
-    if (!snap.empty) {
-      const batch = window.db.batch();
-      const rankingFinal = [];
-      snap.docs.forEach((doc, index) => {
-        const d = doc.data();
-        rankingFinal.push({ posicao: index + 1, votos: d.votos, texto_preview: d.texto_preview, solicitacao_ref: d.solicitacao_ref });
-        batch.update(doc.ref, { status: 'encerrada', ranking_final: rankingFinal, encerrado_em: new Date() });
-      });
-      await batch.commit();
-    }
-  } catch (err) { console.warn('[faleConosco] encerrar mês:', err); }
-}
-
 window.votarSugestao = async function(sugestaoId, userId) {
   try {
     const lsKey = `rs_voto_sugestao_${sugestaoId}`;
@@ -447,8 +484,7 @@ window.votarSugestao = async function(sugestaoId, userId) {
       await ref.update({ votos: firebase.firestore.FieldValue.increment(1), votantes: firebase.firestore.FieldValue.arrayUnion(userId), atualizado_em: new Date() });
       localStorage.setItem(lsKey, 'true');
     }
-    const user = window._radarUser;
-    if (user) _renderDrawer('sugestao_tema');
+    _renderDrawer('sugestao_tema');
   } catch (err) { console.error('[faleConosco] voto:', err); alert('Erro ao registrar voto.'); }
 };
 
