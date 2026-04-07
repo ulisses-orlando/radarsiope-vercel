@@ -287,50 +287,46 @@ async function _renderResumo() {
   const body = document.getElementById('drawer-usuario-body');
   const d = _drawerDados, uid = _drawerUid;
   try {
-    const assinSnap = await db.collection('usuarios').doc(uid)
-      .collection('assinaturas').get();
+    // 1. Buscar features ativas dinamicamente
+    let featuresList = [];
+    if (window.FeaturesManager && typeof window.FeaturesManager.carregarFeatures === 'function') {
+      featuresList = await window.FeaturesManager.carregarFeatures();
+    } else {
+      // Fallback direto ao Firestore caso o manager não esteja carregado
+      const snap = await db.collection('features').where('ativo', '==', true).orderBy('ordem', 'asc').get();
+      featuresList = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    }
 
-    const featLabels = {
-      newsletter_texto:'📰 Newsletter', newsletter_audio:'🎧 Podcast',
-      newsletter_video:'🎬 Vídeo', newsletter_infografico:'📊 Infográfico',
-      biblioteca_acesso:'📚 Biblioteca', alertas_prioritarios:'🔔 Alertas',
-      grupo_whatsapp_vip:'💬 WhatsApp VIP',
-    };
-
-    let assinHtml = assinSnap.empty
-      ? '<p style="color:#94a3b8;font-size:13px">Nenhuma assinatura.</p>' : '';
+    const assinSnap = await db.collection('usuarios').doc(uid).collection('assinaturas').get();
+    let assinHtml = assinSnap.empty ? '<p style="color:#94a3b8;font-size:13px">Nenhuma assinatura.</p>' : '';
 
     for (const doc of assinSnap.docs) {
       const a = doc.data();
       const c = _stColor(a.status);
-      const feats = Object.entries(featLabels)
-        .filter(([k]) => (a.features_snapshot||{})[k])
-        .map(([,v]) => `<span style="background:#0284c720;color:#0284c7;
-          border:1px solid #0284c740;border-radius:20px;padding:2px 8px;
-          font-size:11px;font-weight:700">${v}</span>`).join('');
-
       const assinId = doc.id;
-      const featChecks = Object.entries(featLabels).map(([k, v]) => {
-        const ativo = !!(a.features_snapshot||{})[k];
+
+      // Exibição visual das features ativas na assinatura
+      const feats = featuresList
+        .filter(f => (a.features_snapshot || {})[f.id])
+        .map(f => `<span style="background:#0284c720;color:#0284c7;border:1px solid #0284c740;border-radius:20px;padding:2px 8px;font-size:11px;font-weight:700">${f.icone} ${f.nome}</span>`)
+        .join('');
+
+      // Checkboxes para edição (dinâmico, baseado na coleção features)
+      const featChecks = featuresList.map(f => {
+        const ativo = !!(a.features_snapshot || {})[f.id];
         return `
-          <label style="display:flex;align-items:center;gap:6px;font-size:12px;
-            cursor:pointer;padding:4px 6px;border-radius:6px;
-            background:${ativo?'#e0f2fe':'#f1f5f9'};border:1px solid ${ativo?'#0284c740':'#e2e8f0'}">
-            <input type="checkbox" data-feat="${k}" ${ativo?'checked':''}
-              style="width:14px;height:14px;cursor:pointer">
-            ${v}
+          <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;padding:4px 6px;border-radius:6px;background:${ativo?'#e0f2fe':'#f1f5f9'};border:1px solid ${ativo?'#0284c740':'#e2e8f0'}">
+            <input type="checkbox" data-feat="${f.id}" ${ativo ? 'checked' : ''} style="width:14px;height:14px;cursor:pointer">
+            ${f.icone} ${f.nome}
           </label>`;
       }).join('');
 
       assinHtml += `
-        <div style="border-left:4px solid ${c};border-radius:8px;background:#f8fafc;
-          padding:10px 12px;margin-bottom:10px">
+        <div style="border-left:4px solid ${c};border-radius:8px;background:#f8fafc;padding:10px 12px;margin-bottom:10px">
           <div style="display:flex;justify-content:space-between;align-items:flex-start">
             <div>
               <div style="font-weight:700;font-size:13px">${a.plano_nome||a.plano_slug||'Plano'}</div>
-              <div style="font-size:11px;color:#64748b">
-                ${a.ciclo||''} · ${_fmtBRL((a.valor_final||0)*100 || a.amountCentavos)}
-              </div>
+              <div style="font-size:11px;color:#64748b">${a.ciclo||''} · ${_fmtBRL((a.valor_final||0)*100 || a.amountCentavos)}</div>
             </div>
             ${_stBadge(a.status)}
           </div>
@@ -345,17 +341,14 @@ async function _renderResumo() {
               const aberto = p.style.display !== 'none';
               p.style.display = aberto ? 'none' : 'block';
               this.textContent = aberto ? '⚙️ Editar features' : '▲ Fechar';
-            " style="font-size:11px;padding:3px 10px;border-radius:6px;border:1px solid #cbd5e1;
-              background:#fff;cursor:pointer;color:#0A3D62;font-weight:600">
+            " style="font-size:11px;padding:3px 10px;border-radius:6px;border:1px solid #cbd5e1;background:#fff;cursor:pointer;color:#0A3D62;font-weight:600">
               ⚙️ Editar features
             </button>
             <div style="display:none;margin-top:8px" id="feat-panel-${assinId}">
               <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px">
                 ${featChecks}
               </div>
-              <button onclick="_salvarFeatures('${uid}','${assinId}',this)"
-                style="font-size:12px;padding:4px 14px;border-radius:6px;border:none;
-                  background:#0A3D62;color:#fff;cursor:pointer;font-weight:600">
+              <button onclick="_salvarFeatures('${uid}','${assinId}',this)" style="font-size:12px;padding:4px 14px;border-radius:6px;border:none;background:#0A3D62;color:#fff;cursor:pointer;font-weight:600">
                 💾 Salvar features
               </button>
               <span id="feat-status-${assinId}" style="font-size:11px;color:#64748b;margin-left:8px"></span>
@@ -372,8 +365,7 @@ async function _renderResumo() {
           <div><span style="color:#64748b;font-size:11px">E-mail</span><br><strong>${d.email||'—'}</strong></div>
           <div><span style="color:#64748b;font-size:11px">Perfil</span><br><strong>${d.tipo_perfil||'—'}</strong></div>
           <div><span style="color:#64748b;font-size:11px">Situação</span><br>${_stBadge(d.ativo?'ativo':'inativo')}</div>
-          <div><span style="color:#64748b;font-size:11px">UF / Município</span><br>
-            <strong>${d.cod_uf||'—'} / ${d.nome_municipio||'—'}</strong></div>
+          <div><span style="color:#64748b;font-size:11px">UF / Município</span><br><strong>${d.cod_uf||'—'} / ${d.nome_municipio||'—'}</strong></div>
           <div><span style="color:#64748b;font-size:11px">Telefone</span><br><strong>${d.telefone||'—'}</strong></div>
           <div><span style="color:#64748b;font-size:11px">Cadastro</span><br><strong>${_fmtData(d.data_cadastro)}</strong></div>
           <div><span style="color:#64748b;font-size:11px">Pref. contato</span><br><strong>${d.preferencia_contato||'—'}</strong></div>
