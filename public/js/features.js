@@ -23,7 +23,7 @@ async function carregarFeatures() {
 
   try {
     const snap = await db.collection('features')
-      .where('ativo', '==', true)
+      //.where('ativo', '==', true)
       .orderBy('ordem', 'asc')
       .orderBy('nome', 'asc')
       .get();
