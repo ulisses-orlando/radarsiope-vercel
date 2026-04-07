@@ -316,12 +316,38 @@ async function _renderResumo() {
 
       // Checkboxes para edição (dinâmico, baseado na coleção features)
       const featChecks = featuresList.map(f => {
-        const ativo = !!(a.features_snapshot || {})[f.id];
+        const valor = userFeats[f.id];
+
+        // Renderização condicional por tipo
+        if (f.tipo === 'number') {
+          const unidade = f.unidade ? ` ${f.unidade}` : '';
+          return `
+          <div style="display:flex;align-items:center;gap:8px;font-size:12px;padding:4px 6px;border-radius:6px;background:#f8fafc;border:1px solid #e2e8f0">
+            <span style="font-weight:600">${f.icone} ${f.nome}</span>
+            <input type="number" data-feat="${f.id}" value="${Number(valor) || 0}" min="0" max="999" 
+              style="width:70px;padding:4px 6px;border:1px solid #cbd5e1;border-radius:4px;font-size:12px">
+            ${unidade ? `<span style="color:#64748b;font-size:11px">${unidade}</span>` : ''}
+          </div>`;
+        }
+
+        if (f.tipo === 'text') {
+          return `
+          <div style="display:flex;flex-direction:column;gap:4px;font-size:12px;padding:4px 6px;border-radius:6px;background:#f8fafc;border:1px solid #e2e8f0">
+            <span style="font-weight:600">${f.icone} ${f.nome}</span>
+            <input type="text" data-feat="${f.id}" value="${(valor || '').toString().replace(/"/g, '&quot;')}" 
+              style="width:100%;padding:4px 6px;border:1px solid #cbd5e1;border-radius:4px;font-size:12px" placeholder="Digite o valor...">
+          </div>`;
+        }
+
+        // Boolean (padrão)
+        const isChecked = !!valor;
+        const bg = isChecked ? '#e0f2fe' : '#f1f5f9';
+        const border = isChecked ? '#0284c740' : '#e2e8f0';
         return `
-          <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;padding:4px 6px;border-radius:6px;background:${ativo ? '#e0f2fe' : '#f1f5f9'};border:1px solid ${ativo ? '#0284c740' : '#e2e8f0'}">
-            <input type="checkbox" data-feat="${f.id}" ${ativo ? 'checked' : ''} style="width:14px;height:14px;cursor:pointer">
-            ${f.icone} ${f.nome}
-          </label>`;
+        <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;padding:4px 6px;border-radius:6px;background:${bg};border:1px solid ${border}">
+          <input type="checkbox" data-feat="${f.id}" ${isChecked ? 'checked' : ''} style="width:14px;height:14px;cursor:pointer">
+          ${f.icone} ${f.nome}
+        </label>`;
       }).join('');
 
       assinHtml += `
@@ -391,26 +417,39 @@ async function _renderResumo() {
 async function _salvarFeatures(uid, assinId, btn) {
   const panel = document.getElementById(`feat-panel-${assinId}`);
   const status = document.getElementById(`feat-status-${assinId}`);
-  const checkboxes = panel.querySelectorAll('input[type=checkbox]');
-
+  
+  // Coleta valores de todos os inputs [data-feat], respeitando o tipo
+  const inputs = panel.querySelectorAll('[data-feat]');
   const novasFeatures = {};
-  checkboxes.forEach(cb => { novasFeatures[cb.dataset.feat] = cb.checked; });
+  
+  inputs.forEach(input => {
+    const featId = input.dataset.feat;
+    const tipo = input.type; // 'checkbox', 'number', 'text'
+    
+    if (tipo === 'checkbox') {
+      novasFeatures[featId] = input.checked;
+    } else if (tipo === 'number') {
+      const val = Number(input.value);
+      novasFeatures[featId] = isNaN(val) ? 0 : val;
+    } else if (tipo === 'text') {
+      novasFeatures[featId] = input.value.trim();
+    }
+  });
 
   btn.disabled = true;
   btn.textContent = '⏳ Salvando...';
   status.textContent = '';
-
+  
   try {
     await db.collection('usuarios').doc(uid)
       .collection('assinaturas').doc(assinId)
       .update({ features_snapshot: novasFeatures });
-
+    
     status.textContent = '✅ Salvo!';
     status.style.color = '#16a34a';
-
-    // Atualiza badges visuais no card
     setTimeout(() => { status.textContent = ''; }, 3000);
-  } catch (e) {
+    
+  } catch(e) {
     status.textContent = '❌ Erro: ' + e.message;
     status.style.color = '#dc2626';
   } finally {
