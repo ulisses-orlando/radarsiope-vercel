@@ -307,7 +307,8 @@ async function _renderResumo() {
       const a = doc.data();
       const c = _stColor(a.status);
       const assinId = doc.id;
-
+      const userFeats = a.features_snapshot || {};
+      
       // Exibição visual das features ativas na assinatura
       const feats = featuresList
         .filter(f => (a.features_snapshot || {})[f.id])
@@ -417,15 +418,15 @@ async function _renderResumo() {
 async function _salvarFeatures(uid, assinId, btn) {
   const panel = document.getElementById(`feat-panel-${assinId}`);
   const status = document.getElementById(`feat-status-${assinId}`);
-  
+
   // Coleta valores de todos os inputs [data-feat], respeitando o tipo
   const inputs = panel.querySelectorAll('[data-feat]');
   const novasFeatures = {};
-  
+
   inputs.forEach(input => {
     const featId = input.dataset.feat;
     const tipo = input.type; // 'checkbox', 'number', 'text'
-    
+
     if (tipo === 'checkbox') {
       novasFeatures[featId] = input.checked;
     } else if (tipo === 'number') {
@@ -439,17 +440,17 @@ async function _salvarFeatures(uid, assinId, btn) {
   btn.disabled = true;
   btn.textContent = '⏳ Salvando...';
   status.textContent = '';
-  
+
   try {
     await db.collection('usuarios').doc(uid)
       .collection('assinaturas').doc(assinId)
       .update({ features_snapshot: novasFeatures });
-    
+
     status.textContent = '✅ Salvo!';
     status.style.color = '#16a34a';
     setTimeout(() => { status.textContent = ''; }, 3000);
-    
-  } catch(e) {
+
+  } catch (e) {
     status.textContent = '❌ Erro: ' + e.message;
     status.style.color = '#dc2626';
   } finally {
