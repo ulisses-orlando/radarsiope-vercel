@@ -153,18 +153,18 @@
       let _destinoLogin = null;
       try {
         Object.defineProperty(window, 'location', {
-          get: function() { return window._locationProxy || window.document.location; },
+          get: function () { return window._locationProxy || window.document.location; },
           configurable: true
         });
-      } catch(e) { /* fallback: usa MutationObserver */ }
+      } catch (e) { /* fallback: usa MutationObserver */ }
 
       // Abordagem robusta: sobrescreve o setTimeout do site.js
       const _origSetTimeout = window.setTimeout;
-      window.setTimeout = function(fn, delay, ...args) {
+      window.setTimeout = function (fn, delay, ...args) {
         const fnStr = fn.toString();
         // Detecta o setTimeout do redirect pós-login (contém admin.html ou painel.html)
         if (fnStr.includes('admin.html') || fnStr.includes('painel.html')) {
-          return _origSetTimeout.call(window, function() {
+          return _origSetTimeout.call(window, function () {
             // Captura o destino antes de navegar
             const dados = JSON.parse(localStorage.getItem('usuarioLogado') || '{}');
             const destino = dados.tipo_perfil === 'Admin' ? 'admin.html' : 'painel.html';
@@ -173,8 +173,8 @@
               tipo: 'rs:loginSucesso',
               destino,
               usuario: {
-                nome:        dados.nome  || dados.email || '',
-                email:       dados.email || '',
+                nome: dados.nome || dados.email || '',
+                email: dados.email || '',
                 tipo_perfil: dados.tipo_perfil || 'usuario',
               }
             }, '*');
@@ -186,7 +186,7 @@
       // Preenche e-mail se veio como parâmetro na URL
       document.addEventListener('DOMContentLoaded', () => {
         const params = new URLSearchParams(window.location.search);
-        const email  = params.get('email');
+        const email = params.get('email');
         if (email) {
           const input = document.getElementById('email-login');
           if (input) {
@@ -216,6 +216,38 @@
       });
     }
   </script>
+
+  <script>
+    (function () {
+      'use strict';
+      document.addEventListener('DOMContentLoaded', () => {
+        // 1. Verifica se veio com o parâmetro de e-mail (abertura via PWA/menuApp)
+        const params = new URLSearchParams(window.location.search);
+        const emailPrePreenchido = params.get('email');
+
+        // 2. Localiza o input de e-mail (ajuste o seletor se o ID for diferente no seu HTML)
+        const emailInput = document.getElementById('email') ||
+          document.querySelector('input[type="email"]') ||
+          document.querySelector('input[name="email"]');
+
+        if (emailPrePreenchido && emailInput) {
+          // Preenche e bloqueia edição
+          emailInput.value = decodeURIComponent(emailPrePreenchido);
+          emailInput.setAttribute('readonly', true);
+
+          // Indicação visual de campo bloqueado
+          emailInput.style.backgroundColor = '#e2e8f0';
+          emailInput.style.cursor = 'not-allowed';
+          emailInput.title = 'E-mail pré-preenchido pelo sistema. Não é possível alterá-lo.';
+
+          // Opcional: Esconde link de "Esqueci minha senha" se o e-mail estiver travado
+          // const forgotLink = document.querySelector('a[href*="esqueci"], a:contains("Esqueci")');
+          // if (forgotLink) forgotLink.style.display = 'none';
+        }
+      });
+    })();
+  </script>
+</body>
 </body>
 
 </html>
