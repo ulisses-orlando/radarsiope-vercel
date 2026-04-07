@@ -184,20 +184,19 @@
     // FLUXO SOLICITADO
     if (tipoAtivo === 'sugestao_tema') {
       html += await _renderVotacaoAtual(user, temFeatureTema);
-      const placeholderTxt = quotaEsgotada ? 'Cota de sugestões esgotada para este mês.' : 'Descreva o tema que gostaria que fosse abordado…';
-      const isBlocked = quotaEsgotada;
-      const readonlyAttr = isBlocked ? 'readonly disabled style="opacity:0.6;cursor:not-allowed"' : '';
-      const btnDisabledAttr = isBlocked ? 'disabled' : '';
 
-      // Renderiza o campo (sempre visível, mas bloqueado se sem cota)
-      html += `
-          <div style="margin-top: 16px;">
-            <label class="rs-fc-label" for="rs-fc-txt">💡 Sugestão de tema</label>
-            <textarea id="rs-fc-txt" class="rs-fc-textarea" placeholder="${placeholderTxt}" maxlength="${MAX_CHARS}" ${readonlyAttr}></textarea>
-            <div class="rs-fc-chars" id="rs-fc-chars">0/${MAX_CHARS}</div>
-          </div>
-          <button class="rs-fc-enviar" id="rs-fc-enviar" disabled ${btnDisabledAttr} onclick="window._fcEnviar('sugestao_tema')">Enviar</button>
-        `;
+      if (!quotaEsgotada) {
+        // Calcula sugestões restantes
+        const restantes = Math.max(0, quotaTema - usoTemaMes);
+        const placeholder = `Descreva o tema que gostaria que fosse abordado. Você ainda tem direito a ${restantes} sugestão(ões).`;
+
+        html += `<div style="margin-top: 16px;">
+          <label class="rs-fc-label" for="rs-fc-txt">💡 Sugestão de tema</label>
+          <textarea id="rs-fc-txt" class="rs-fc-textarea" placeholder="${placeholder}" maxlength="${MAX_CHARS}"></textarea>
+          <div class="rs-fc-chars" id="rs-fc-chars">0/${MAX_CHARS}</div>
+        </div>
+        <button class="rs-fc-enviar" id="rs-fc-enviar" disabled onclick="window._fcEnviar('sugestao_tema')">Enviar</button>`;
+      }
       html += await _renderResultadoAnterior(user, temFeatureTema);
     } else {
       html += `
