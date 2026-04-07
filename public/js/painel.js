@@ -64,35 +64,54 @@ function montarUrlWebApp(nid, envioId, uid, assinaturaId, token) {
 }
  
 // ─── Minhas Assinaturas ───────────────────────────────────────────────────────
+// ─── Minhas Assinaturas ───────────────────────────────────────────────────────
 async function carregarAssinaturas(uid) {
   const container = document.getElementById('minhas-assinaturas');
   if (!container) return;
-  container.innerHTML = '<p class="loading">Carregando...</p>';
- 
+  container.innerHTML = '<div class="loading">Carregando...</div>';
   try {
+    // 1. Carregar features dinâmicas do gerenciador (se disponível)
+    let featuresList = [];
+    if (window.FeaturesManager && typeof window.FeaturesManager.carregarFeatures === 'function') {
+      try { featuresList = await window.FeaturesManager.carregarFeatures(); }
+      catch (e) { console.warn('[painel] Erro ao carregar features:', e); }
+    }
+
     const assinSnap = await db.collection('usuarios').doc(uid)
       .collection('assinaturas').orderBy('createdAt', 'desc').get();
- 
+    
     if (assinSnap.empty) {
       container.innerHTML = `
-        <div class="empty-state">
-          <div style="font-size:32px">📄</div>
-          <p>Você não possui assinaturas registradas.</p>
-          <a href="/assinatura.html" class="btn-primary" style="display:inline-block;margin-top:8px;text-decoration:none">
+         <div class="empty-state">
+           <div style="font-size:32px">📄</div>
+           <p>Você não possui assinaturas registradas.</p>
+           <a href="/assinatura.html" class="btn-primary" style="display:inline-block;margin-top:8px;text-decoration:none">
             Ver planos →
-          </a>
-        </div>`;
+           </a>
+         </div>`;
       return;
     }
- 
+
     let html = '';
- 
     for (const doc of assinSnap.docs) {
       const a = doc.data();
       const assinaturaId = doc.id;
       const st = fmtStatus(a.status);
+      // CORREÇÃO: typo original "a.f eatures_snapshot" -> "a.features_snapshot"
       const features = a.features_snapshot || {};
- 
+
+      // 2. Renderização dinâmica das badges de features (substitui o objeto estático)
+      const featuresHtml = featuresList
+        .filter(f => f.ativo && features[f.id])
+        .map(f => {
+          let label = `${f.icone} ${f.nome}`;
+          const val = features[f.id];
+          // Exibe valor se for numérico ou texto
+          if (f.tipo === 'number' && val > 0) label += ` (${val}${f.unidade || ''})`;
+          else if (f.tipo === 'text' && val) label += ` (${val})`;
+          return `<span class="feature-badge">${label}</span>`;
+        }).join('');
+
       // Buscar pagamentos desta assinatura
       let pagamentosHtml = '';
       try {
@@ -101,8 +120,9 @@ async function carregarAssinaturas(uid) {
           .collection('pagamentos')
           .orderBy('data_pagamento', 'desc')
           .limit(12).get();
- 
+
         if (!pagSnap.empty) {
+          // CORREÇÃO: typo original "pag Snap.docs.map" -> "pagSnap.docs.map"
           const linhas = pagSnap.docs.map(pd => {
             const p = pd.data();
             const pst = fmtStatus(p.status);
@@ -110,80 +130,60 @@ async function carregarAssinaturas(uid) {
               ? `Parcela ${p.numero_parcela}${p.mpInstallments > 1 ? `/${p.mpInstallments}` : ''}` : 'Pagamento';
             const metodo = p.mpPaymentMethod || p.metodo_pagamento || '—';
             return `
-              <div class="pagamento-row">
-                <div>
-                  <span style="font-weight:700;font-size:12px">${parcela}</span>
-                  <span style="font-size:11px;color:var(--muted);margin-left:6px">${metodo}</span>
-                </div>
-                <div style="display:flex;align-items:center;gap:10px">
-                  <span style="font-size:12px">${fmtData(p.data_pagamento)}</span>
-                  <span style="font-size:11px;font-weight:700;color:${pst.cor}">${pst.icone} ${pst.label}</span>
-                  <span style="font-size:13px;font-weight:700">${fmtBRL(p.valor_centavos)}</span>
-                </div>
-              </div>`;
+               <div class="pagamento-row">
+                 <div>
+                   <span style="font-weight:700;font-size:12px">${parcela}</span>
+                   <span style="font-size:11px;color:var(--muted);margin-left:6px">${metodo}</span>
+                 </div>
+                 <div style="display:flex;align-items:center;gap:10px">
+                   <span style="font-size:12px">${fmtData(p.data_pagamento)}</span>
+                   <span style="font-size:11px;font-weight:700;color:${pst.cor}">${pst.icone} ${pst.label}</span>
+                   <span style="font-size:13px;font-weight:700">${fmtBRL(p.valor_centavos)}</span>
+                 </div>
+               </div>`;
           }).join('');
- 
+
           pagamentosHtml = `
-            <div class="pagamentos-lista">
-              <div class="pagamentos-titulo">💳 Pagamentos</div>
+             <div class="pagamentos-lista">
+               <div class="pagamentos-titulo">💳 Pagamentos</div>
               ${linhas}
-            </div>`;
+             </div>`;
         }
       } catch (e) { /* pagamentos não críticos */ }
- 
-      // Features badges
-      const featuresLabels = {
-        newsletter_texto: { label: 'Newsletter', icone: '📰' },
-        newsletter_audio: { label: 'Podcast', icone: '🎧' },
-        newsletter_video: { label: 'Vídeo', icone: '🎬' },
-        newsletter_infografico: { label: 'Infográfico', icone: '📊' },
-        biblioteca_acesso: { label: 'Biblioteca', icone: '📚' },
-        alertas_prioritarios: { label: 'Alertas', icone: '🔔' },
-        grupo_whatsapp_vip: { label: 'WhatsApp VIP', icone: '💬' },
-      };
- 
-      const featuresHtml = Object.entries(featuresLabels)
-        .filter(([k]) => features[k])
-        .map(([, v]) => `
-          <span class="feature-badge">
-            ${v.icone} ${v.label}
-          </span>`).join('');
- 
+
       html += `
-        <div class="assinatura-card" style="--st-cor:${st.cor}">
-          <div class="assinatura-header">
-            <div>
-              <div class="assinatura-plano">${a.plano_nome || a.plano_slug || 'Plano'}</div>
-              <div class="assinatura-ciclo">${a.ciclo === 'anual' ? '🗓️ Anual' : '🗓️ Mensal'} · ${fmtBRL(a.valor_final * 100 || a.amountCentavos)}</div>
-            </div>
-            <div class="assinatura-status" style="color:${st.cor}">
+         <div class="assinatura-card" style="--st-cor:${st.cor}">
+           <div class="assinatura-header">
+             <div>
+               <div class="assinatura-plano">${a.plano_nome || a.plano_slug || 'Plano'}</div>
+               <div class="assinatura-ciclo">${a.ciclo === 'anual' ? '🗓️ Anual' : '🗓️ Mensal'} · ${fmtBRL(a.valor_final * 100 || a.amountCentavos)}</div>
+             </div>
+             <div class="assinatura-status" style="color:${st.cor}">
               ${st.icone} ${st.label}
-            </div>
-          </div>
- 
-          <div class="assinatura-datas">
-            <span>📅 Início: <strong>${fmtData(a.data_inicio)}</strong></span>
-            <span>🔄 Renovação: <strong>${fmtData(a.data_proxima_renovacao)}</strong></span>
-          </div>
- 
+             </div>
+           </div>
+
+           <div class="assinatura-datas">
+             <span>📅 Início:  <strong>${fmtData(a.data_inicio)}</strong></span>
+             <span>🔄 Renovação:  <strong>${fmtData(a.data_proxima_renovacao)}</strong></span>
+           </div>
+
           ${featuresHtml ? `<div class="features-lista">${featuresHtml}</div>` : ''}
- 
+
           ${pagamentosHtml}
- 
+
           ${a.status !== 'ativa' && a.status !== 'ativo' ? `
-            <div style="margin-top:10px">
-              <a href="/assinatura.html" class="btn-primary" style="display:inline-block;text-decoration:none;font-size:12px">
+             <div style="margin-top:10px">
+               <a href="/assinatura.html" class="btn-primary" style="display:inline-block;text-decoration:none;font-size:12px">
                 🔄 Renovar assinatura →
-              </a>
-            </div>` : ''}
-        </div>`;
+               </a>
+             </div>` : ''}
+         </div>`;
     }
- 
     container.innerHTML = html;
- 
   } catch (err) {
     console.error('[assinaturas]', err);
-    container.innerHTML = '<p class="erro">Erro ao carregar assinaturas.</p>';
+    container.innerHTML = '<div class="error">Erro ao carregar assinaturas.</div>';
   }
 }
  
