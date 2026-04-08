@@ -517,7 +517,7 @@ async function _handleRespostaMensagem(dados, res) {
   if (!playerId) return res.status(400).json({ ok: false, error: 'playerId obrigatório.' });
 
   const t = titulo || '💬 Você tem uma resposta!';
-  const c = corpo  || 'A equipe Radar SIOPE respondeu sua mensagem. Acesse o Fale Conosco.';
+  const c = corpo  || 'A equipe Radar SIOPE respondeu sua mensagem. Acesse Ações na Central do app.';
   const url = `${BASE_URL}/verNewsletterComToken.html`;
 
   try {
