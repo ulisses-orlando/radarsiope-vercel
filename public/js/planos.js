@@ -434,6 +434,8 @@ async function abrirModalPlano(id = null, editar = false) {
     // Continuar com fallback
   }
 
+  featuresList = featuresList.filter(f => f.ativo === true);
+
   // Seção: Features
   body.appendChild(_secLabel('⚙️ Features do Plano'));
   const featWrap = document.createElement('div');
