@@ -3378,7 +3378,6 @@ async function carregarrespostas_automaticas() {
 }
 
 async function editarResposta(id) {
-  console.log('123');
   const modal = document.getElementById("modalrespostaauto");
   const body = document.getElementById("modalrespostaauto-body");
 

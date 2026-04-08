@@ -36,7 +36,7 @@ async function initRadarPWA() {
 async function registrarServiceWorker() {
   // O OneSignal v16 registra o SW automaticamente via SDK.
   // Não registramos manualmente para evitar conflito de escopo.
-  console.log('[PWA] SW gerenciado pelo OneSignal SDK.');
+  //console.log('[PWA] SW gerenciado pelo OneSignal SDK.');
 }
 
 // ─── OneSignal ────────────────────────────────────────────────────────────────

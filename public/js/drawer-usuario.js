@@ -693,7 +693,7 @@ async function _salvarResposta(uid, solId, solSnap, novoStatus, resposta) {
             acao: 'resposta-mensagem',
             playerId,
             titulo: '💬 Você tem uma resposta!',
-            corpo: 'A equipe Radar SIOPE respondeu sua mensagem. Acesse o Fale Conosco.',
+            corpo: 'A equipe Radar SIOPE respondeu sua mensagem. Acesse Ações na Central do app.',
           }),
         });
       }
