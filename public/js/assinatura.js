@@ -130,6 +130,8 @@ async function carregarListaPlanos() {
       console.error('[assinatura] Erro ao carregar features do Firestore:', err);
     }
 
+    allFeatures = allFeatures.filter(f => f.ativo !== false);
+
     // Fallback se não conseguiu carregar do Firestore
     if (allFeatures.length === 0) {
       allFeatures = [
