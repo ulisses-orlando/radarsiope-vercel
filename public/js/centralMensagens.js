@@ -7,7 +7,7 @@
   'use strict';
  
   const STORAGE_KEY = 'rs_alertas_lidos';
-  const LIMITE      = 30;
+  const LIMITE      = 20;
  
   // Rótulos amigáveis por tipo de alerta
   const TIPO_LABEL = {
