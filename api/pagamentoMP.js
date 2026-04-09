@@ -115,53 +115,26 @@ function parseExternalReference(externalRef) {
   return { userId: parts[0], assinaturaId: parts[1], pedidoId: parts[2] };
 }
 
-// ─── Geração de parcelas ──────────────────────────────────────────────────────
+// ─── Registro de pagamento (doc único) ───────────────────────────────────────
 
-async function gerarParcelasAssinaturaBackend(userId, assinaturaId, amountCentavos, numParcelas = 1, metodoPagamento = null, dataPrimeiroVencimento = null, pedidoId = null) {
-  if (!userId || !assinaturaId) throw new Error('userId e assinaturaId são obrigatórios');
+async function registrarPagamentoPendente(userId, assinaturaId, amountCentavos, numParcelas = 1, metodoPagamento = null, pedidoId) {
+  if (!userId || !assinaturaId || !pedidoId) throw new Error('userId, assinaturaId e pedidoId são obrigatórios');
   const parcelas = Math.max(1, parseInt(numParcelas, 10) || 1);
-  if (parcelas > 500) throw new Error('parcelas > 500: divida em múltiplos batches');
-
   const total = Math.max(0, parseInt(amountCentavos, 10) || 0);
-  const base = Math.floor(total / parcelas);
-  let resto = total - base * parcelas;
+  const valorParcela = Math.floor(total / parcelas);
 
-  let primeiro;
-  if (dataPrimeiroVencimento) {
-    primeiro = new Date(dataPrimeiroVencimento);
-    if (isNaN(primeiro.getTime())) primeiro = new Date();
-  } else {
-    primeiro = new Date();
-  }
-
-  const pagamentosRef = db.collection('usuarios').doc(userId)
+  await db.collection('usuarios').doc(userId)
     .collection('assinaturas').doc(assinaturaId)
-    .collection('pagamentos');
-
-  const batch = db.batch();
-  for (let i = 0; i < parcelas; i++) {
-    const numero = i + 1;
-    const valorCentavos = base + (resto > 0 ? 1 : 0);
-    if (resto > 0) resto--;
-
-    const venc = new Date(primeiro);
-    venc.setMonth(venc.getMonth() + i);
-
-    const docId = pedidoId ? `${pedidoId}-${numero}` : pagamentosRef.doc().id;
-    const docRef = pagamentosRef.doc(docId);
-    batch.set(docRef, {
-      numero_parcela: numero,
-      valor_centavos: valorCentavos,
+    .collection('pagamentos').doc(pedidoId)
+    .set({
+      valor_total_centavos: total,
+      valor_parcela_centavos: valorParcela,
+      num_parcelas: parcelas,
       metodo_pagamento: metodoPagamento || null,
-      data_vencimento: admin.firestore.Timestamp.fromDate(venc),
       data_pagamento: null,
       status: 'pendente',
       criadoEm: admin.firestore.FieldValue.serverTimestamp()
-    }, { merge: true });
-  }
-
-  await batch.commit();
-  return true;
+    });
 }
 
 // ─── Resolver recurso MP (payment | merchant_order | search) ──────────────────
@@ -403,8 +376,8 @@ function aplicarPlaceholders(template, dados) {
   const plano = dados.plano || '(sem plano)';
   const data_assinatura = dados.data_assinatura
     ? (dados.data_assinatura instanceof Date
-      ? dados.data_assinatura.toLocaleDateString('pt-BR')
-      : String(dados.data_assinatura))
+        ? dados.data_assinatura.toLocaleDateString('pt-BR')
+        : String(dados.data_assinatura))
     : '(sem data de assinatura)';
 
   let dataFormatada = '';
@@ -463,7 +436,7 @@ export default async function handler(req, res) {
     // Parsear body JSON para rotas que recebem JSON
     try {
       if (rawBody && rawBody.length > 0 &&
-        req.headers['content-type']?.includes('application/json')) {
+          req.headers['content-type']?.includes('application/json')) {
         req.body = JSON.parse(rawBody);
       }
     } catch (e) { /* ok — manter rawBody para auditoria */ }
@@ -498,12 +471,12 @@ export default async function handler(req, res) {
       const body = req.body || {};
       const { userId, assinaturaId } = body;
       const amountCentavos = parseInt(body.amountCentavos, 10);
-      const descricao = body.descricao || 'Assinatura';
+      const descricao      = body.descricao || 'Assinatura';
       const installmentsMax = body.installmentsMax ? Math.max(1, parseInt(body.installmentsMax, 10)) : 1;
       const dataPrimeiroVencimento = body.dataPrimeiroVencimento || null;
-      const nome = body.nome || '';
-      const email = body.email || '';
-      const cpf = body.cpf || '';
+      const nome   = body.nome  || '';
+      const email  = body.email || '';
+      const cpf    = body.cpf   || '';
 
       // fix #14: validar parâmetros incluindo valor mínimo de R$ 0,50
       if (!userId || !assinaturaId) {
@@ -517,7 +490,7 @@ export default async function handler(req, res) {
       const backUrlSuccess = process.env.MP_BACK_URL_SUCCESS;
       const backUrlFailure = process.env.MP_BACK_URL_FAILURE;
       const backUrlPending = process.env.MP_BACK_URL_PENDING || '';
-      const notifUrl = process.env.MP_WEBHOOK_URL;
+      const notifUrl       = process.env.MP_WEBHOOK_URL;
 
       if (!backUrlSuccess || !backUrlFailure || !notifUrl) {
         console.error('Variáveis MP_BACK_URL_SUCCESS, MP_BACK_URL_FAILURE ou MP_WEBHOOK_URL não configuradas.');
@@ -556,9 +529,9 @@ export default async function handler(req, res) {
       const cpfNormalizado = (cpf || '').replace(/\D/g, '');
 
       // fix #12: extrair primeiro nome e sobrenome do nome completo
-      const nomePartes = nome.trim().split(' ');
+      const nomePartes   = nome.trim().split(' ');
       const primeiroNome = nomePartes[0] || nome;
-      const sobrenome = nomePartes.length > 1 ? nomePartes.slice(1).join(' ') : '';
+      const sobrenome    = nomePartes.length > 1 ? nomePartes.slice(1).join(' ') : '';
 
       const preferencePayload = {
         items: [{
@@ -613,14 +586,14 @@ export default async function handler(req, res) {
         atualizadoEm: admin.firestore.FieldValue.serverTimestamp()
       }, { merge: true });
 
-      // Gerar registro de pagamento — sempre gera parcelas individuais
+      // Gerar registro de pagamento — doc único com valor total e número de parcelas
       try {
-        await gerarParcelasAssinaturaBackend(
+        await registrarPagamentoPendente(
           userId, assinaturaId, amountCentavos,
-          installmentsMax, null, dataPrimeiroVencimento, novoPedidoRef.id
+          installmentsMax, null, novoPedidoRef.id
         );
       } catch (err) {
-        console.warn('Falha ao gerar parcelas no backend:', err.message || err);
+        console.warn('Falha ao registrar pagamento pendente:', err.message || err);
       }
 
       return json(res, 200, { ok: true, redirectUrl: initPoint, pedidoId: novoPedidoRef.id });
@@ -765,36 +738,22 @@ export default async function handler(req, res) {
 
       await pedidoRef.set(updateObj, { merge: true });
 
-      // Atualizar registros de pagamento
+      // Atualizar registro de pagamento — update direto no doc do pedido
       const pagamentosRef = db.collection('usuarios').doc(userId)
         .collection('assinaturas').doc(assinaturaId)
         .collection('pagamentos');
 
-      // Atualizar registros de pagamento — sempre marca parcelas individuais como pagas
       const installments = (mpData.installments && Number(mpData.installments)) ? Number(mpData.installments) : 1;
 
-      const pendentesSnap = await pagamentosRef
-        .where('status', '==', 'pendente')
-        .orderBy('numero_parcela', 'asc').get();
-
-      if (!pendentesSnap.empty) {
-        let toMark = installments;
-        const batch = db.batch();
-        for (const doc of pendentesSnap.docs) {
-          if (toMark <= 0) break;
-          batch.set(pagamentosRef.doc(doc.id), {
-            status: 'pago',
-            data_pagamento: admin.firestore.FieldValue.serverTimestamp(),
-            mpPaymentId: effectiveId,
-            mpPaymentMethod: mpData.payment_method_id || null,
-            mpInstallments: installments,
-            tipoNotificacao: resolved.tipo,
-            atualizadoEm: admin.firestore.FieldValue.serverTimestamp()
-          }, { merge: true });
-          toMark--;
-        }
-        await batch.commit();
-      }
+      await pagamentosRef.doc(pedidoId).set({
+        status: novoStatusPedido,
+        num_parcelas: installments,
+        data_pagamento: novoStatusPedido === 'pago' ? admin.firestore.FieldValue.serverTimestamp() : null,
+        mpPaymentId: effectiveId,
+        mpPaymentMethod: mpData.payment_method_id || null,
+        tipoNotificacao: resolved.tipo,
+        atualizadoEm: admin.firestore.FieldValue.serverTimestamp()
+      }, { merge: true });
 
       // fix #3: usar assinRef como única referência ao doc da assinatura
       // fix #4: 'falha' → 'pagamento_recusado' (não confundir com cancelamento intencional)
