@@ -403,8 +403,8 @@ function aplicarPlaceholders(template, dados) {
   const plano = dados.plano || '(sem plano)';
   const data_assinatura = dados.data_assinatura
     ? (dados.data_assinatura instanceof Date
-        ? dados.data_assinatura.toLocaleDateString('pt-BR')
-        : String(dados.data_assinatura))
+      ? dados.data_assinatura.toLocaleDateString('pt-BR')
+      : String(dados.data_assinatura))
     : '(sem data de assinatura)';
 
   let dataFormatada = '';
@@ -463,7 +463,7 @@ export default async function handler(req, res) {
     // Parsear body JSON para rotas que recebem JSON
     try {
       if (rawBody && rawBody.length > 0 &&
-          req.headers['content-type']?.includes('application/json')) {
+        req.headers['content-type']?.includes('application/json')) {
         req.body = JSON.parse(rawBody);
       }
     } catch (e) { /* ok — manter rawBody para auditoria */ }
@@ -498,12 +498,12 @@ export default async function handler(req, res) {
       const body = req.body || {};
       const { userId, assinaturaId } = body;
       const amountCentavos = parseInt(body.amountCentavos, 10);
-      const descricao      = body.descricao || 'Assinatura';
+      const descricao = body.descricao || 'Assinatura';
       const installmentsMax = body.installmentsMax ? Math.max(1, parseInt(body.installmentsMax, 10)) : 1;
       const dataPrimeiroVencimento = body.dataPrimeiroVencimento || null;
-      const nome   = body.nome  || '';
-      const email  = body.email || '';
-      const cpf    = body.cpf   || '';
+      const nome = body.nome || '';
+      const email = body.email || '';
+      const cpf = body.cpf || '';
 
       // fix #14: validar parâmetros incluindo valor mínimo de R$ 0,50
       if (!userId || !assinaturaId) {
@@ -517,7 +517,7 @@ export default async function handler(req, res) {
       const backUrlSuccess = process.env.MP_BACK_URL_SUCCESS;
       const backUrlFailure = process.env.MP_BACK_URL_FAILURE;
       const backUrlPending = process.env.MP_BACK_URL_PENDING || '';
-      const notifUrl       = process.env.MP_WEBHOOK_URL;
+      const notifUrl = process.env.MP_WEBHOOK_URL;
 
       if (!backUrlSuccess || !backUrlFailure || !notifUrl) {
         console.error('Variáveis MP_BACK_URL_SUCCESS, MP_BACK_URL_FAILURE ou MP_WEBHOOK_URL não configuradas.');
@@ -556,9 +556,9 @@ export default async function handler(req, res) {
       const cpfNormalizado = (cpf || '').replace(/\D/g, '');
 
       // fix #12: extrair primeiro nome e sobrenome do nome completo
-      const nomePartes   = nome.trim().split(' ');
+      const nomePartes = nome.trim().split(' ');
       const primeiroNome = nomePartes[0] || nome;
-      const sobrenome    = nomePartes.length > 1 ? nomePartes.slice(1).join(' ') : '';
+      const sobrenome = nomePartes.length > 1 ? nomePartes.slice(1).join(' ') : '';
 
       const preferencePayload = {
         items: [{
@@ -613,26 +613,14 @@ export default async function handler(req, res) {
         atualizadoEm: admin.firestore.FieldValue.serverTimestamp()
       }, { merge: true });
 
-      // Gerar registro de pagamento
-      if (logCompleto()) {
-        try {
-          await gerarParcelasAssinaturaBackend(
-            userId, assinaturaId, amountCentavos,
-            installmentsMax, null, dataPrimeiroVencimento, novoPedidoRef.id
-          );
-        } catch (err) {
-          console.warn('Falha ao gerar parcelas no backend:', err.message || err);
-        }
-      } else {
-        await db.collection('usuarios').doc(userId)
-          .collection('assinaturas').doc(assinaturaId)
-          .collection('pagamentos').doc(novoPedidoRef.id)
-          .set({
-            valor_centavos: amountCentavos,
-            numero_parcelas: installmentsMax,
-            status: 'pendente',
-            criadoEm: admin.firestore.FieldValue.serverTimestamp()
-          });
+      // Gerar registro de pagamento — sempre gera parcelas individuais
+      try {
+        await gerarParcelasAssinaturaBackend(
+          userId, assinaturaId, amountCentavos,
+          installmentsMax, null, dataPrimeiroVencimento, novoPedidoRef.id
+        );
+      } catch (err) {
+        console.warn('Falha ao gerar parcelas no backend:', err.message || err);
       }
 
       return json(res, 200, { ok: true, redirectUrl: initPoint, pedidoId: novoPedidoRef.id });
@@ -782,41 +770,30 @@ export default async function handler(req, res) {
         .collection('assinaturas').doc(assinaturaId)
         .collection('pagamentos');
 
+      // Atualizar registros de pagamento — sempre marca parcelas individuais como pagas
       const installments = (mpData.installments && Number(mpData.installments)) ? Number(mpData.installments) : 1;
 
-      if (logCompleto()) {
-        const pendentesSnap = await pagamentosRef
-          .where('status', '==', 'pendente')
-          .orderBy('numero_parcela', 'asc').get();
-        if (!pendentesSnap.empty) {
-          let toMark = installments;
-          const batch = db.batch();
-          for (const doc of pendentesSnap.docs) {
-            if (toMark <= 0) break;
-            batch.set(pagamentosRef.doc(doc.id), {
-              status: 'pago',
-              data_pagamento: admin.firestore.FieldValue.serverTimestamp(),
-              mpPaymentId: effectiveId,
-              mpPaymentMethod: mpData.payment_method_id || null,
-              mpInstallments: installments,
-              tipoNotificacao: resolved.tipo,
-              atualizadoEm: admin.firestore.FieldValue.serverTimestamp()
-            }, { merge: true });
-            toMark--;
-          }
-          await batch.commit();
+      const pendentesSnap = await pagamentosRef
+        .where('status', '==', 'pendente')
+        .orderBy('numero_parcela', 'asc').get();
+
+      if (!pendentesSnap.empty) {
+        let toMark = installments;
+        const batch = db.batch();
+        for (const doc of pendentesSnap.docs) {
+          if (toMark <= 0) break;
+          batch.set(pagamentosRef.doc(doc.id), {
+            status: 'pago',
+            data_pagamento: admin.firestore.FieldValue.serverTimestamp(),
+            mpPaymentId: effectiveId,
+            mpPaymentMethod: mpData.payment_method_id || null,
+            mpInstallments: installments,
+            tipoNotificacao: resolved.tipo,
+            atualizadoEm: admin.firestore.FieldValue.serverTimestamp()
+          }, { merge: true });
+          toMark--;
         }
-      } else {
-        const targetDocId = pedidoId ? String(pedidoId) : String(effectiveId);
-        await pagamentosRef.doc(targetDocId).set({
-          paymentId: effectiveId,
-          pedidoId: pedidoId || null,
-          status: novoStatusPedido,
-          mpPaymentMethod: mpData.payment_method_id || null,
-          mpInstallments: installments,
-          data_pagamento: admin.firestore.FieldValue.serverTimestamp(),
-          atualizadoEm: admin.firestore.FieldValue.serverTimestamp()
-        }, { merge: true });
+        await batch.commit();
       }
 
       // fix #3: usar assinRef como única referência ao doc da assinatura
