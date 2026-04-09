@@ -1367,36 +1367,16 @@ const _drawer = {
   contadores: [],         // refs dos setInterval dos contadores regressivos
 };
 
-// ─── Cache de tipos no localStorage (24h) ───────────────────────────────────
-const DRAWER_CACHE_KEY = 'rs_tipos_cache';
-const DRAWER_CACHE_TS_KEY = 'rs_tipos_cache_ts';
-const DRAWER_CACHE_TTL = 24 * 60 * 60 * 1000; // 24h em ms
-
 async function _getTipos() {
-  try {
-    const ts = parseInt(localStorage.getItem(DRAWER_CACHE_TS_KEY) || '0', 10);
-    const raw = localStorage.getItem(DRAWER_CACHE_KEY);
-    if (raw && (Date.now() - ts) < DRAWER_CACHE_TTL) {
-      return JSON.parse(raw);
-    }
-  } catch (e) { /* cache corrompido — vai buscar no Firestore */ }
-
   const snap = await db.collection('tipo_newsletters')
     .where('is_newsletter', '==', true)
     .get();
 
-  const tipos = snap.docs.map(d => ({
+  return snap.docs.map(d => ({
     id: d.id,
     nome: d.data().nome || d.id,
     icone: d.data().icone || '📰',
   }));
-
-  try {
-    localStorage.setItem(DRAWER_CACHE_KEY, JSON.stringify(tipos));
-    localStorage.setItem(DRAWER_CACHE_TS_KEY, String(Date.now()));
-  } catch (e) { /* quota excedida — ignora */ }
-
-  return tipos;
 }
 
 // ─── Verificar acesso do assinante a um tipo ─────────────────────────────────
