@@ -1,61 +1,57 @@
 /* ==========================================================================
-   sw.js — Service Worker · Radar SIOPE PWA
-   Responsabilidades:
-   1. Cache de assets estáticos (offline básico)
-   2. Receber e exibir push notifications via OneSignal
-   3. Tratar clique na notificação (abrir URL correta)
-   ========================================================================== */
-
+sw.js — Service Worker · Radar SIOPE PWA
+Versão: radar-siope-v2
+========================================================================== */
 'use strict';
 
-// ─── Configuração do Cache ────────────────────────────────────────────────────
-// Nota: o OneSignalSDK é importado via OneSignalSDKWorker.js (na raiz),
-// que chama importScripts deste arquivo. Não importar o SDK aqui para evitar
-// duplo registro.
-const CACHE_NAME   = 'radar-siope-v1';
+// 🔑 v2 força descarte do cache antigo e evita conflitos de caminhos
+const CACHE_NAME = 'radar-siope-v2';
+
+// Caminhos RELATIVOS À RAIZ DO SERVIDOR (dist/ após build)
 const CACHE_STATIC = [
   '/',
-  '/verNewsletterComToken.html',
+  '/index.html',
+  '/verNewsletterComToken.html',          // Está em public/ → serve como /
+  '/js/verNewsletterComToken.js',         // Está em public/js/ → serve como /js/
   '/painel.html',
   '/login.html',
   '/css/style.css',
   '/icons/icon-192x192.png',
   '/icons/icon-512x512.png',
   '/manifest.json',
-  // fontes e assets críticos
   'https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap',
 ];
 
-// ─── Install: pré-carrega cache estático ─────────────────────────────────────
-// Resiliente a falhas de rede — um asset inacessível não derruba a instalação
+// ─── Install ─────────────────────────────────────────────────────────────────
 self.addEventListener('install', event => {
+  console.log('[SW] Instalando v2...');
   event.waitUntil(
     caches.open(CACHE_NAME).then(cache => {
       const urls = CACHE_STATIC.filter(url => !url.startsWith('http') || url.includes('googleapis'));
-      // Tenta cachear cada asset individualmente — ignora falhas
       return Promise.allSettled(urls.map(url => cache.add(url)));
     }).then(() => self.skipWaiting())
   );
 });
 
-// ─── Activate: limpa caches antigos ──────────────────────────────────────────
+// ─── Activate ────────────────────────────────────────────────────────────────
 self.addEventListener('activate', event => {
   event.waitUntil(
     caches.keys().then(keys =>
       Promise.all(
-        keys
-          .filter(k => k !== CACHE_NAME)
-          .map(k => { console.log('[SW] Removendo cache antigo:', k); return caches.delete(k); })
+        keys.filter(k => k !== CACHE_NAME).map(k => {
+          console.log('[SW] Removendo:', k);
+          return caches.delete(k);
+        })
       )
     ).then(() => self.clients.claim())
   );
 });
 
-// ─── Fetch: Network First com fallback para cache ────────────────────────────
+// ─── Fetch ───────────────────────────────────────────────────────────────────
 self.addEventListener('fetch', event => {
-  // Ignora requests não-GET e requests de APIs (Firestore, Supabase, OneSignal)
   if (event.request.method !== 'GET') return;
   const url = new URL(event.request.url);
+
   if (
     url.hostname.includes('firestore.googleapis.com') ||
     url.hostname.includes('supabase.co') ||
@@ -67,7 +63,7 @@ self.addEventListener('fetch', event => {
   event.respondWith(
     fetch(event.request)
       .then(response => {
-        // Clona e armazena em cache se for resposta válida
+        // Mantive sua lógica original: só cacheia respostas locais (basic)
         if (response && response.status === 200 && response.type === 'basic') {
           const clone = response.clone();
           caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone));
@@ -78,63 +74,49 @@ self.addEventListener('fetch', event => {
   );
 });
 
-// ─── Push: recebe notificação do OneSignal ────────────────────────────────────
-// O OneSignal SDK cuida da maioria dos casos via importScripts acima.
-// Este handler é um fallback para notificações customizadas enviadas diretamente.
+// ─── Push ────────────────────────────────────────────────────────────────────
 self.addEventListener('push', event => {
   if (!event.data) return;
-
   let payload;
-  try {
-    payload = event.data.json();
-  } catch {
-    payload = { title: 'Radar SIOPE', body: event.data.text(), url: '/' };
-  }
+  try { payload = event.data.json(); } 
+  catch { payload = { title: 'Radar SIOPE', body: event.data.text(), url: '/' }; }
 
-  const title   = payload.title   || 'Radar SIOPE';
   const options = {
-    body:    payload.body    || 'Você tem uma nova notificação.',
-    icon:    payload.icon    || '/icons/icon-192x192.png',
-    badge:   '/icons/icon-192x192.png',
-    image:   payload.image   || null,
-    data:    { url: payload.url || payload.launch_url || '/' },
-    tag:     payload.tag     || 'radar-siope',
+    body: payload.body || 'Nova atualização.',
+    icon: payload.icon || '/icons/icon-192x199.png',
+    badge: '/icons/icon-192x192.png',
+    image: payload.image || null,
+    data: { url: payload.url || payload.launch_url || '/' },
+    tag: payload.tag || 'radar-siope',
     renotify: true,
     requireInteraction: payload.requireInteraction || false,
     actions: payload.actions || [],
     vibrate: [200, 100, 200],
   };
-
-  event.waitUntil(self.registration.showNotification(title, options));
+  event.waitUntil(self.registration.showNotification(payload.title || 'Radar SIOPE', options));
 });
 
-// ─── NotificationClick: abre URL da notificação ──────────────────────────────
+// ─── NotificationClick ───────────────────────────────────────────────────────
 self.addEventListener('notificationclick', event => {
   event.notification.close();
-
   const url = event.notification.data?.url || '/';
-
   event.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true })
       .then(clientList => {
-        // Se já tem uma janela aberta do app, foca ela
         for (const client of clientList) {
           if (client.url.includes(self.location.origin) && 'focus' in client) {
             client.navigate(url);
             return client.focus();
           }
         }
-        // Senão abre nova janela
-        if (clients.openWindow) return clients.openWindow(url);
+        return clients.openWindow ? clients.openWindow(url) : Promise.resolve();
       })
   );
 });
 
-// ─── Message: comunicação com o app principal ─────────────────────────────────
+// ─── Message ─────────────────────────────────────────────────────────────────
 self.addEventListener('message', event => {
-  if (event.data?.type === 'SKIP_WAITING') {
-    self.skipWaiting();
-  }
+  if (event.data?.type === 'SKIP_WAITING') self.skipWaiting();
   if (event.data?.type === 'GET_VERSION') {
     event.ports[0]?.postMessage({ version: CACHE_NAME });
   }
