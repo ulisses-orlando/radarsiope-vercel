@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Política de Privacidade — Radar SIOPE</title>
+  <meta name="description" content="Política de Privacidade do Radar SIOPE: coleta, uso, proteção de dados e direitos dos titulares segundo a LGPD." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&family=Lora:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --navy:    #07172e;
+      --navy2:   #0d2145;
+      --blue:    #1a5fd4;
+      --blue2:   #2e7cf6;
+      --sky:     #e8f1ff;
+      --gold:    #f5c842;
+      --white:   #ffffff;
+      --gray50:  #f7f9fc;
+      --gray100: #eef1f7;
+      --gray400: #8a96ac;
+      --gray700: #3d4a5c;
+      --text:    #1a2332;
+      --radius:  10px;
+      --shadow:  0 4px 24px rgba(7,23,46,.10);
+      --shadowM: 0 8px 40px rgba(7,23,46,.16);
+      --font-head: 'Sora', sans-serif;
+      --font-body: 'Lora', Georgia, serif;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+    body { font-family: var(--font-body); font-size: 16px; color: var(--text); background: var(--white); -webkit-font-smoothing: antialiased; }
+    a { color: var(--blue); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    .container { max-width: 1080px; margin: 0 auto; padding: 0 24px; }
+
+    /* NAV */
+    .nav { position: sticky; top: 0; z-index: 100; background: var(--navy); box-shadow: 0 2px 16px rgba(0,0,0,.25); }
+    .nav__inner { display: flex; align-items: center; justify-content: space-between; height: 60px; }
+    .nav__logo { display: flex; align-items: center; gap: 10px; font-family: var(--font-head); font-weight: 800; font-size: 1.15rem; color: var(--white); letter-spacing: -.01em; text-decoration: none; }
+    .nav__logo-icon { width: 34px; height: 34px; background: var(--blue2); border-radius: 8px; display: grid; place-items: center; font-size: 18px; }
+    .nav__logo span { color: var(--gold); }
+    .nav__toggle { display: none; background: none; border: none; cursor: pointer; padding: 6px; color: var(--white); font-size: 22px; }
+    .nav__menu { display: flex; align-items: center; gap: 4px; list-style: none; }
+    .nav__menu a { font-family: var(--font-head); font-size: .82rem; font-weight: 600; color: rgba(255,255,255,.78); padding: 6px 11px; border-radius: 6px; transition: color .18s, background .18s; white-space: nowrap; }
+    .nav__menu a:hover, .nav__menu a.active { color: var(--white); background: rgba(255,255,255,.10); text-decoration: none; }
+    .nav__menu .nav__cta a { background: var(--blue2); color: var(--white); padding: 7px 16px; }
+    .nav__menu .nav__cta a:hover { background: #4890ff; }
+    .nav__item--drop { position: relative; }
+    .nav__dropdown { display: none; position: absolute; top: calc(100% + 6px); left: 0; background: var(--white); border: 1px solid var(--gray100); border-radius: var(--radius); box-shadow: var(--shadowM); min-width: 200px; overflow: hidden; }
+    .nav__item--drop:hover .nav__dropdown { display: block; }
+    .nav__dropdown a { display: block; color: var(--gray700) !important; padding: 10px 16px !important; font-size: .83rem !important; border-radius: 0 !important; background: none !important; }
+    .nav__dropdown a:hover { background: var(--gray50) !important; color: var(--blue) !important; }
+    .nav__dropdown a.active { background: var(--sky) !important; color: var(--blue) !important; font-weight: 700; }
+
+    /* PAGE HEADER */
+    .page-header {
+      background: linear-gradient(135deg, var(--navy) 0%, var(--navy2) 55%, #0e3170 100%);
+      padding: 52px 0 44px;
+      position: relative; overflow: hidden;
+    }
+    .page-header::before {
+      content: '';
+      position: absolute; inset: 0;
+      background: radial-gradient(ellipse 50% 100% at 90% 50%, rgba(42,110,220,.18), transparent 70%);
+      pointer-events: none;
+    }
+    .page-header__inner { position: relative; }
+    .page-header__badge {
+      display: inline-flex; align-items: center; gap: 8px;
+      font-family: var(--font-head); font-size: .72rem; font-weight: 700;
+      letter-spacing: .12em; text-transform: uppercase;
+      color: var(--gold); background: rgba(245,200,66,.12);
+      border: 1px solid rgba(245,200,66,.28);
+      padding: 4px 12px; border-radius: 999px; margin-bottom: 16px;
+    }
+    .page-header h1 {
+      font-family: var(--font-head); font-weight: 800;
+      font-size: clamp(1.6rem, 3.5vw, 2.2rem);
+      color: var(--white); line-height: 1.2; margin-bottom: 10px;
+    }
+    .page-header__meta { font-family: var(--font-head); font-size: .82rem; color: rgba(255,255,255,.55); }
+
+    /* LAYOUT */
+    .page-body { display: grid; grid-template-columns: 240px 1fr; gap: 48px; padding: 56px 0 80px; align-items: start; }
+
+    /* SIDEBAR TOC */
+    .toc {
+      position: sticky; top: 80px;
+      background: var(--gray50);
+      border: 1px solid var(--gray100);
+      border-radius: 12px;
+      padding: 20px;
+    }
+    .toc__title { font-family: var(--font-head); font-weight: 700; font-size: .78rem; text-transform: uppercase; letter-spacing: .1em; color: var(--navy); margin-bottom: 14px; }
+    .toc__list { list-style: none; display: flex; flex-direction: column; gap: 2px; }
+    .toc__list a {
+      display: block; font-family: var(--font-head); font-size: .8rem;
+      color: var(--gray700); padding: 6px 10px; border-radius: 6px;
+      transition: background .15s, color .15s; text-decoration: none;
+    }
+    .toc__list a:hover { background: var(--sky); color: var(--blue); }
+
+    /* CONTENT */
+    .content { min-width: 0; }
+    .content section { margin-bottom: 44px; }
+    .content h2 {
+      font-family: var(--font-head); font-weight: 700;
+      font-size: 1.2rem; color: var(--navy);
+      border-left: 3px solid var(--blue2);
+      padding-left: 12px; margin-bottom: 14px;
+    }
+    .content h3 { font-family: var(--font-head); font-weight: 700; font-size: 1rem; color: var(--navy2); margin: 18px 0 8px; }
+    .content p { line-height: 1.72; color: var(--gray700); margin-bottom: 12px; }
+    .content ul, .content ol { padding-left: 20px; color: var(--gray700); line-height: 1.7; }
+    .content li { margin-bottom: 6px; }
+    .content strong { color: var(--navy); }
+
+    /* BANNER */
+    .privacy-banner {
+      background: linear-gradient(90deg, var(--blue) 0%, var(--blue2) 100%);
+      border-radius: 12px; padding: 28px 28px; color: var(--white);
+      margin-bottom: 40px;
+      display: flex; align-items: center; gap: 16px;
+    }
+    .privacy-banner__icon { font-size: 36px; flex-shrink: 0; }
+    .privacy-banner h2 { font-family: var(--font-head); font-weight: 800; font-size: 1.15rem; margin-bottom: 6px; border: none; padding: 0; color: var(--white); }
+    .privacy-banner p { color: rgba(255,255,255,.88); margin: 0; font-size: .92rem; }
+
+    /* FAQ */
+    .faq-section { background: var(--gray50); border-radius: 12px; padding: 32px 28px; margin-top: 48px; }
+    .faq-section h2 { font-family: var(--font-head); font-weight: 800; font-size: 1.1rem; color: var(--navy); margin-bottom: 6px; border: none; padding: 0; }
+    .faq-section .faq-lead { font-size: .88rem; color: var(--gray400); margin-bottom: 24px; }
+    .faq-item { border-bottom: 1px solid var(--gray100); padding: 16px 0; }
+    .faq-item:last-child { border-bottom: none; }
+    .faq-item h3 { font-family: var(--font-head); font-weight: 700; font-size: .92rem; color: var(--navy2); margin-bottom: 6px; }
+    .faq-item p { font-size: .88rem; color: var(--gray700); line-height: 1.6; margin: 0; }
+
+    /* FOOTER */
+    footer { background: var(--navy); padding: 48px 0 28px; color: rgba(255,255,255,.6); }
+    .footer__top { display: grid; grid-template-columns: 1.4fr 1fr 1fr 1fr; gap: 40px; margin-bottom: 40px; }
+    .footer__brand p { font-size: .85rem; line-height: 1.6; margin-top: 12px; max-width: 240px; }
+    .footer__col-title { font-family: var(--font-head); font-weight: 700; font-size: .78rem; text-transform: uppercase; letter-spacing: .1em; color: var(--white); margin-bottom: 14px; }
+    .footer__links { list-style: none; display: flex; flex-direction: column; gap: 8px; }
+    .footer__links a { font-size: .84rem; color: rgba(255,255,255,.55); transition: color .15s; text-decoration: none; }
+    .footer__links a:hover { color: var(--white); }
+    .footer__bottom { border-top: 1px solid rgba(255,255,255,.1); padding-top: 24px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; font-size: .8rem; }
+    .footer__bottom a { color: rgba(255,255,255,.5); }
+    .footer__bottom a:hover { color: var(--white); }
+
+    /* RESPONSIVE */
+    @media (max-width: 860px) {
+      .page-body { grid-template-columns: 1fr; }
+      .toc { position: static; }
+      .footer__top { grid-template-columns: 1fr 1fr; }
+    }
+    @media (max-width: 640px) {
+      .nav__toggle { display: block; }
+      .nav__menu { display: none; position: absolute; top: 60px; left: 0; right: 0; background: var(--navy2); flex-direction: column; align-items: stretch; padding: 12px 16px 16px; gap: 2px; border-bottom: 2px solid var(--blue); }
+      .nav__menu.open { display: flex; }
+      .nav__menu a { padding: 10px 12px; }
+      .nav__dropdown { position: static; box-shadow: none; border: none; background: rgba(255,255,255,.05); }
+      .nav__item--drop:hover .nav__dropdown { display: none; }
+      .nav__item--drop.open .nav__dropdown { display: block; }
+      .nav__dropdown a { color: rgba(255,255,255,.7) !important; }
+      .privacy-banner { flex-direction: column; gap: 10px; }
+      .footer__top { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+  <nav class="nav">
+    <div class="container nav__inner">
+      <a href="/" class="nav__logo">
+        <span class="nav__logo-icon">📡</span>
+        Radar <span>SIOPE</span>
+      </a>
+      <button class="nav__toggle" id="nav-toggle" aria-label="Abrir menu">☰</button>
+      <ul class="nav__menu" id="nav-menu">
+        <li><a href="/">Início</a></li>
+        <li><a href="newsletter.html">Newsletters</a></li>
+        <li><a href="noticias.html">Notícias</a></li>
+        <li class="nav__item--drop" id="drop-privacidade">
+          <a href="#" class="active">Privacidade e Termos ▾</a>
+          <ul class="nav__dropdown">
+            <li><a href="privacidade.html" class="active">Política de Privacidade</a></li>
+            <li><a href="termos.html">Termos de Uso</a></li>
+          </ul>
+        </li>
+        <li><a href="capturaLead.html">Entre em contato</a></li>
+        <li class="nav__cta"><a href="acesso.html">Área do assinante</a></li>
+      </ul>
+    </div>
+  </nav>
+
+  <header class="page-header">
+    <div class="container page-header__inner">
+      <div class="page-header__badge">🔒 LGPD · Lei nº 13.709/2018</div>
+      <h1>Política de Privacidade</h1>
+      <p class="page-header__meta">Última atualização: 01/01/2026 &nbsp;·&nbsp; Radar SIOPE</p>
+    </div>
+  </header>
+
+  <main>
+    <div class="container page-body">
+
+      <!-- SIDEBAR TOC -->
+      <aside>
+        <nav class="toc" aria-label="Índice">
+          <p class="toc__title">Nesta página</p>
+          <ul class="toc__list">
+            <li><a href="#quem-somos">Quem somos</a></li>
+            <li><a href="#dados-coletados">Dados coletados</a></li>
+            <li><a href="#finalidades-bases">Finalidades e bases legais</a></li>
+            <li><a href="#compartilhamento">Compartilhamento</a></li>
+            <li><a href="#cookies">Cookies</a></li>
+            <li><a href="#retencao">Retenção e eliminação</a></li>
+            <li><a href="#seguranca">Segurança</a></li>
+            <li><a href="#transferencias">Transferências internacionais</a></li>
+            <li><a href="#direitos">Seus direitos (LGPD)</a></li>
+            <li><a href="#criancas">Dados de menores</a></li>
+            <li><a href="#atualizacoes">Atualizações</a></li>
+            <li><a href="#contato">Contato e DPO</a></li>
+            <li><a href="#faq">FAQ Privacidade</a></li>
+          </ul>
+        </nav>
+      </aside>
+
+      <!-- CONTENT -->
+      <article class="content">
+
+        <div class="privacy-banner">
+          <div class="privacy-banner__icon">🔒</div>
+          <div>
+            <h2>Sua privacidade é prioridade no Radar SIOPE</h2>
+            <p>Estamos comprometidos em proteger seus dados pessoais e garantir transparência em todas as etapas da sua assinatura, em conformidade com a LGPD.</p>
+          </div>
+        </div>
+
+        <section id="quem-somos">
+          <h2>Quem somos</h2>
+          <p>
+            O <strong>Radar SIOPE</strong> é uma plataforma de revista eletrônica e central técnica voltada à gestão educacional municipal. Atuamos como <strong>controlador</strong> no tratamento de dados pessoais relacionados à contratação e ao uso dos nossos serviços. Quando empregamos prestadores de serviços (operadores), exigimos contratos com medidas de proteção equivalentes.
+          </p>
+        </section>
+
+        <section id="dados-coletados">
+          <h2>Dados pessoais coletados</h2>
+          <p>Coletamos dados para viabilizar sua assinatura, suporte e experiência na plataforma:</p>
+          <ul>
+            <li><strong>Identificação:</strong> nome, e-mail, telefone e perfil profissional.</li>
+            <li><strong>Preferências e mensagens:</strong> preferências de contato e observações informadas no formulário.</li>
+            <li><strong>Localização administrativa:</strong> UF e município (quando aplicável).</li>
+            <li><strong>Dados de assinatura:</strong> plano selecionado, cupons aplicados, valores e parcelas.</li>
+            <li><strong>Dados de pagamento:</strong> método escolhido, status de cobrança, vencimentos e confirmação de pagamento — processados via Mercado Pago.</li>
+            <li><strong>Dados técnicos:</strong> registros de acesso, logs de uso, cookies e identificadores de dispositivo/navegador.</li>
+          </ul>
+          <p>Alguns dados são fornecidos por você; outros são gerados durante a utilização (ex.: logs) ou obtidos por integrações (ex.: provedor de pagamento).</p>
+        </section>
+
+        <section id="finalidades-bases">
+          <h2>Finalidades e bases legais</h2>
+          <ul>
+            <li><strong>Contratação e execução do serviço:</strong> criar conta, registrar assinatura, processar pagamentos e enviar comunicações operacionais. <em>Base legal: execução de contrato.</em></li>
+            <li><strong>Atendimento e suporte:</strong> responder solicitações e manter a qualidade do serviço. <em>Base legal: legítimo interesse e execução de contrato.</em></li>
+            <li><strong>Comunicação e melhoria:</strong> enviar comunicações relevantes — newsletters, alertas e atualizações técnicas — e aprimorar funcionalidades da plataforma. <em>Base legal: legítimo interesse; quando exigido, consentimento.</em></li>
+            <li><strong>Cumprimento de obrigações legais:</strong> registros fiscais/contábeis e prevenção à fraude. <em>Base legal: cumprimento de obrigação legal/regulatória.</em></li>
+          </ul>
+          <p>Quando a base for <strong>consentimento</strong>, você poderá revogá-lo a qualquer momento, sem afetar tratamentos anteriores realizados sob essa base.</p>
+        </section>
+
+        <section id="compartilhamento">
+          <h2>Compartilhamento de dados</h2>
+          <p>Compartilhamos dados pessoais apenas com prestadores essenciais à operação do serviço, entre eles:</p>
+          <ul>
+            <li><strong>Mercado Pago</strong> — processamento de pagamentos;</li>
+            <li><strong>Firebase / Firestore</strong> — armazenamento e autenticação;</li>
+            <li><strong>AWS SES</strong> — envio de e-mails transacionais;</li>
+            <li><strong>OneSignal</strong> — notificações push;</li>
+            <li><strong>Vercel</strong> — hospedagem da plataforma.</li>
+          </ul>
+          <p>Todos os parceiros operam sob contratos com obrigações de confidencialidade e proteção de dados. Também poderemos compartilhar informações para cumprir determinações legais, judiciais ou regulatórias.</p>
+        </section>
+
+        <section id="cookies">
+          <h2>Cookies e tecnologias similares</h2>
+          <p>Utilizamos cookies para autenticação, preferências, análise de uso e melhoria de desempenho. Você pode gerenciar cookies nas configurações do seu navegador; a desativação pode impactar algumas funcionalidades.</p>
+          <ul>
+            <li><strong>Essenciais:</strong> necessários para login e funcionamento básico da plataforma.</li>
+            <li><strong>Desempenho/analíticos:</strong> ajudam a entender o uso e melhorar a experiência.</li>
+            <li><strong>Funcionais:</strong> lembram preferências e personalizações do usuário.</li>
+          </ul>
+        </section>
+
+        <section id="retencao">
+          <h2>Retenção e eliminação</h2>
+          <p>Mantemos seus dados pelo período necessário ao cumprimento das finalidades e obrigações legais e contratuais. Após esse período, os dados são eliminados ou anonimizados, salvo conservação exigida por lei.</p>
+        </section>
+
+        <section id="seguranca">
+          <h2>Segurança da informação</h2>
+          <p>Adotamos medidas técnicas e administrativas para proteger seus dados contra acessos não autorizados, perda, alteração ou divulgação indevida. A plataforma utiliza conexões criptografadas (HTTPS) e controles de acesso por perfil. Trabalhamos continuamente para aprimorar nossas práticas de segurança.</p>
+        </section>
+
+        <section id="transferencias">
+          <h2>Transferências internacionais</h2>
+          <p>Alguns de nossos prestadores de serviço (como Firebase, AWS e Vercel) possuem infraestrutura com servidores no exterior. Nesses casos, aplicamos salvaguardas adequadas e exigimos proteção compatível com a LGPD.</p>
+        </section>
+
+        <section id="direitos">
+          <h2>Seus direitos como titular (LGPD)</h2>
+          <p>Você pode exercer a qualquer momento os direitos previstos na LGPD:</p>
+          <ul>
+            <li><strong>Confirmação e acesso:</strong> saber se tratamos seus dados e solicitar cópia.</li>
+            <li><strong>Correção:</strong> solicitar atualização ou retificação de dados incompletos ou desatualizados.</li>
+            <li><strong>Anonimização, bloqueio ou eliminação:</strong> nas hipóteses legais aplicáveis.</li>
+            <li><strong>Portabilidade:</strong> conforme regulamentos aplicáveis.</li>
+            <li><strong>Informações sobre compartilhamento:</strong> com quais entidades realizamos uso compartilhado.</li>
+            <li><strong>Revogação do consentimento:</strong> quando o tratamento se basear em consentimento.</li>
+          </ul>
+          <p>Para exercer seus direitos, utilize os canais indicados na seção <a href="capturaLead.html">Entre em contato</a>.</p>
+        </section>
+
+        <section id="criancas">
+          <h2>Dados de crianças e adolescentes</h2>
+          <p>O Radar SIOPE não coleta intencionalmente dados pessoais de menores de 18 anos sem o consentimento dos responsáveis legais. Caso identifiquemos informações fornecidas por menores sem autorização, tomaremos medidas imediatas para eliminar tais dados.</p>
+        </section>
+
+        <section id="atualizacoes">
+          <h2>Atualizações desta política</h2>
+          <p>Esta Política de Privacidade pode ser atualizada periodicamente para refletir mudanças legais, regulatórias ou operacionais. A versão mais recente estará sempre disponível em <a href="https://www.radarsiope.com.br/privacidade" target="_blank" rel="noopener">www.radarsiope.com.br/privacidade</a>. Alterações relevantes serão comunicadas por e-mail aos assinantes ativos.</p>
+        </section>
+
+        <section id="contato">
+          <h2>Contato do controlador e DPO</h2>
+          <p>Para dúvidas, solicitações ou exercício de direitos, entre em contato com nosso Encarregado de Proteção de Dados (DPO):</p>
+          <ul>
+            <li><strong>E-mail:</strong> <a href="mailto:privacidade@radarsiope.com.br">privacidade@radarsiope.com.br</a></li>
+            <li><strong>Localização:</strong> Brasília/DF — Brasil</li>
+          </ul>
+        </section>
+
+        <!-- FAQ -->
+        <section id="faq" class="faq-section">
+          <h2>❓ FAQ — Privacidade no Radar SIOPE</h2>
+          <p class="faq-lead">Resumo em linguagem simples para facilitar sua consulta.</p>
+
+          <div class="faq-item">
+            <h3>Quais dados vocês coletam?</h3>
+            <p>Apenas o necessário para sua assinatura: nome, e-mail, telefone, perfil profissional, UF/município, plano escolhido e informações de pagamento.</p>
+          </div>
+          <div class="faq-item">
+            <h3>Para que meus dados são usados?</h3>
+            <p>Para criar sua conta, processar pagamentos, enviar newsletters, alertas técnicos e melhorar a experiência na plataforma.</p>
+          </div>
+          <div class="faq-item">
+            <h3>Vocês compartilham meus dados?</h3>
+            <p>Apenas com parceiros essenciais à operação (Mercado Pago, Firebase, AWS SES, OneSignal e Vercel), sempre sob contrato e proteção de dados.</p>
+          </div>
+          <div class="faq-item">
+            <h3>Meus dados estão seguros?</h3>
+            <p>Sim. A plataforma utiliza HTTPS, controle de acesso por perfil e medidas técnicas e administrativas para proteger seus dados.</p>
+          </div>
+          <div class="faq-item">
+            <h3>Posso pedir para excluir meus dados?</h3>
+            <p>Sim. Você pode solicitar exclusão, correção ou acesso aos seus dados a qualquer momento, conforme previsto na LGPD.</p>
+          </div>
+          <div class="faq-item">
+            <h3>Vocês usam cookies?</h3>
+            <p>Sim, para login, preferências e análise de uso. Você pode gerenciar cookies diretamente no seu navegador.</p>
+          </div>
+          <div class="faq-item">
+            <h3>Como entro em contato?</h3>
+            <p>Pelo e-mail <a href="mailto:privacidade@radarsiope.com.br">privacidade@radarsiope.com.br</a> ou pelo formulário de contato disponível no site.</p>
+          </div>
+        </section>
+
+      </article>
+    </div>
+  </main>
+
+  <footer>
+    <div class="container">
+      <div class="footer__top">
+        <div class="footer__brand">
+          <a href="/" class="nav__logo" style="color:#fff; text-decoration:none;">
+            <span class="nav__logo-icon">📡</span>
+            Radar <span style="color:var(--gold)">SIOPE</span>
+          </a>
+          <p>Revista eletrônica e central técnica para gestores e profissionais da educação pública municipal.</p>
+        </div>
+        <div>
+          <p class="footer__col-title">Plataforma</p>
+          <ul class="footer__links">
+            <li><a href="newsletter.html">Newsletters</a></li>
+            <li><a href="noticias.html">Notícias</a></li>
+            <li><a href="assinatura.html?origem=site">Assinar</a></li>
+            <li><a href="acesso.html">Área do assinante</a></li>
+          </ul>
+        </div>
+        <div>
+          <p class="footer__col-title">Temas</p>
+          <ul class="footer__links">
+            <li><a href="#">Fundeb</a></li>
+            <li><a href="#">SIOPE</a></li>
+            <li><a href="#">CACS-Fundeb</a></li>
+            <li><a href="#">Salário-Educação</a></li>
+          </ul>
+        </div>
+        <div>
+          <p class="footer__col-title">Legal</p>
+          <ul class="footer__links">
+            <li><a href="privacidade.html">Política de Privacidade</a></li>
+            <li><a href="termos.html">Termos de Uso</a></li>
+            <li><a href="capturaLead.html">Contato</a></li>
+          </ul>
+        </div>
+      </div>
+      <div class="footer__bottom">
+        <span>© 2026 Radar SIOPE. Todos os direitos reservados.</span>
+        <span>Brasília/DF — Brasil &nbsp;·&nbsp; <a href="privacidade.html">Privacidade</a> &nbsp;·&nbsp; <a href="termos.html">Termos</a></span>
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    const toggle = document.getElementById('nav-toggle');
+    const menu   = document.getElementById('nav-menu');
+    toggle.addEventListener('click', () => {
+      const open = menu.classList.toggle('open');
+      toggle.setAttribute('aria-expanded', open);
+      toggle.textContent = open ? '✕' : '☰';
+    });
+    document.querySelectorAll('.nav__item--drop').forEach(item => {
+      item.querySelector('a').addEventListener('click', e => {
+        if (window.innerWidth < 640) { e.preventDefault(); item.classList.toggle('open'); }
+      });
+    });
+  </script>
+</body>
+</html>
