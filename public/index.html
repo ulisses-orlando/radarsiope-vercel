@@ -1,0 +1,745 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Radar SIOPE — Revista eletrônica e central técnica para gestão educacional</title>
+  <meta name="description" content="Conteúdo técnico, alertas e orientações práticas sobre Fundeb, SIOPE, CACS-Fundeb e Salário-Educação para secretários, técnicos e contadores da educação pública." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&family=Lora:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet" />
+
+  <style>
+    /* ── TOKENS ─────────────────────────────────── */
+    :root {
+      --navy:    #07172e;
+      --navy2:   #0d2145;
+      --blue:    #1a5fd4;
+      --blue2:   #2e7cf6;
+      --sky:     #e8f1ff;
+      --gold:    #f5c842;
+      --white:   #ffffff;
+      --gray50:  #f7f9fc;
+      --gray100: #eef1f7;
+      --gray400: #8a96ac;
+      --gray700: #3d4a5c;
+      --text:    #1a2332;
+      --radius:  10px;
+      --shadow:  0 4px 24px rgba(7,23,46,.10);
+      --shadowM: 0 8px 40px rgba(7,23,46,.16);
+      --font-head: 'Sora', sans-serif;
+      --font-body: 'Lora', Georgia, serif;
+    }
+
+    /* ── RESET ──────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+    body {
+      font-family: var(--font-body);
+      font-size: 16px;
+      color: var(--text);
+      background: var(--white);
+      -webkit-font-smoothing: antialiased;
+    }
+    img { display: block; max-width: 100%; }
+    a { color: inherit; text-decoration: none; }
+
+    /* ── UTILITIES ──────────────────────────────── */
+    .container { max-width: 1080px; margin: 0 auto; padding: 0 24px; }
+    .sr-only { position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0); }
+
+    /* ── NAV ────────────────────────────────────── */
+    .nav {
+      position: sticky; top: 0; z-index: 100;
+      background: var(--navy);
+      box-shadow: 0 2px 16px rgba(0,0,0,.25);
+    }
+    .nav__inner {
+      display: flex; align-items: center; justify-content: space-between;
+      height: 60px;
+    }
+    .nav__logo {
+      display: flex; align-items: center; gap: 10px;
+      font-family: var(--font-head); font-weight: 800; font-size: 1.15rem;
+      color: var(--white); letter-spacing: -.01em;
+    }
+    .nav__logo-icon {
+      width: 34px; height: 34px;
+      background: var(--blue2);
+      border-radius: 8px;
+      display: grid; place-items: center;
+      font-size: 18px;
+    }
+    .nav__logo span { color: var(--gold); }
+
+    /* hamburger */
+    .nav__toggle {
+      display: none;
+      background: none; border: none; cursor: pointer; padding: 6px;
+      color: var(--white); font-size: 22px;
+    }
+
+    .nav__menu {
+      display: flex; align-items: center; gap: 4px;
+      list-style: none;
+    }
+    .nav__menu a {
+      font-family: var(--font-head); font-size: .82rem; font-weight: 600;
+      color: rgba(255,255,255,.78);
+      padding: 6px 11px; border-radius: 6px;
+      transition: color .18s, background .18s;
+      white-space: nowrap;
+    }
+    .nav__menu a:hover, .nav__menu a.active {
+      color: var(--white);
+      background: rgba(255,255,255,.10);
+    }
+    .nav__menu .nav__cta a {
+      background: var(--blue2);
+      color: var(--white);
+      padding: 7px 16px;
+    }
+    .nav__menu .nav__cta a:hover {
+      background: #4890ff;
+    }
+
+    /* dropdown */
+    .nav__item--drop { position: relative; }
+    .nav__dropdown {
+      display: none;
+      position: absolute; top: calc(100% + 6px); left: 0;
+      background: var(--white);
+      border: 1px solid var(--gray100);
+      border-radius: var(--radius);
+      box-shadow: var(--shadowM);
+      min-width: 180px;
+      overflow: hidden;
+    }
+    .nav__item--drop:hover .nav__dropdown { display: block; }
+    .nav__dropdown a {
+      display: block;
+      color: var(--gray700) !important;
+      padding: 10px 16px !important;
+      font-size: .83rem !important;
+      border-radius: 0 !important;
+      background: none !important;
+    }
+    .nav__dropdown a:hover { background: var(--gray50) !important; color: var(--blue) !important; }
+
+    /* ── HERO ───────────────────────────────────── */
+    .hero {
+      position: relative;
+      background: linear-gradient(135deg, var(--navy) 0%, var(--navy2) 55%, #0e3170 100%);
+      overflow: hidden;
+      padding: 80px 0 72px;
+    }
+    .hero::before {
+      content: '';
+      position: absolute; inset: 0;
+      background:
+        radial-gradient(ellipse 60% 80% at 80% 50%, rgba(42,110,220,.18) 0%, transparent 70%),
+        url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.025'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+      pointer-events: none;
+    }
+    .hero__inner {
+      position: relative;
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 48px;
+      align-items: center;
+    }
+    .hero__eyebrow {
+      display: inline-flex; align-items: center; gap: 8px;
+      font-family: var(--font-head); font-size: .72rem; font-weight: 700;
+      letter-spacing: .12em; text-transform: uppercase;
+      color: var(--gold);
+      background: rgba(245,200,66,.12);
+      border: 1px solid rgba(245,200,66,.28);
+      padding: 4px 12px; border-radius: 999px;
+      margin-bottom: 20px;
+    }
+    .hero__title {
+      font-family: var(--font-head); font-weight: 800;
+      font-size: clamp(1.75rem, 4vw, 2.6rem);
+      line-height: 1.18;
+      color: var(--white);
+      margin-bottom: 18px;
+    }
+    .hero__title em {
+      font-style: normal;
+      color: var(--gold);
+    }
+    .hero__subtitle {
+      font-size: 1.05rem; line-height: 1.65;
+      color: rgba(255,255,255,.78);
+      max-width: 560px;
+      margin-bottom: 32px;
+    }
+    .hero__tags {
+      display: flex; flex-wrap: wrap; gap: 8px;
+      margin-bottom: 36px;
+    }
+    .hero__tag {
+      font-family: var(--font-head); font-size: .75rem; font-weight: 600;
+      background: rgba(255,255,255,.10);
+      color: rgba(255,255,255,.85);
+      border: 1px solid rgba(255,255,255,.16);
+      padding: 4px 12px; border-radius: 999px;
+    }
+    .hero__actions { display: flex; gap: 12px; flex-wrap: wrap; }
+    .btn {
+      display: inline-flex; align-items: center; gap: 8px;
+      font-family: var(--font-head); font-weight: 700;
+      border-radius: var(--radius);
+      cursor: pointer; transition: all .18s; border: none;
+      text-decoration: none;
+    }
+    .btn--primary {
+      background: var(--blue2); color: var(--white);
+      padding: 13px 28px; font-size: .95rem;
+      box-shadow: 0 4px 18px rgba(30,100,230,.35);
+    }
+    .btn--primary:hover { background: #4890ff; transform: translateY(-2px); box-shadow: 0 8px 28px rgba(30,100,230,.40); }
+    .btn--ghost {
+      background: rgba(255,255,255,.10); color: var(--white);
+      padding: 13px 24px; font-size: .95rem;
+      border: 1px solid rgba(255,255,255,.22);
+    }
+    .btn--ghost:hover { background: rgba(255,255,255,.16); transform: translateY(-2px); }
+
+    .hero__card {
+      background: rgba(255,255,255,.07);
+      border: 1px solid rgba(255,255,255,.13);
+      border-radius: 14px;
+      padding: 28px 22px;
+      min-width: 220px;
+      backdrop-filter: blur(8px);
+    }
+    .hero__stat { text-align: center; padding: 14px 0; border-bottom: 1px solid rgba(255,255,255,.1); }
+    .hero__stat:last-child { border-bottom: none; padding-bottom: 0; }
+    .hero__stat-n {
+      font-family: var(--font-head); font-size: 1.9rem; font-weight: 800;
+      color: var(--gold); line-height: 1;
+    }
+    .hero__stat-l {
+      font-family: var(--font-head); font-size: .72rem; font-weight: 600;
+      color: rgba(255,255,255,.6);
+      text-transform: uppercase; letter-spacing: .08em;
+      margin-top: 4px;
+    }
+
+    /* ── FEATURES ───────────────────────────────── */
+    .features {
+      background: var(--gray50);
+      padding: 80px 0;
+    }
+    .section__label {
+      font-family: var(--font-head); font-size: .72rem; font-weight: 700;
+      letter-spacing: .12em; text-transform: uppercase;
+      color: var(--blue); margin-bottom: 10px;
+    }
+    .section__title {
+      font-family: var(--font-head); font-weight: 800;
+      font-size: clamp(1.4rem, 3vw, 2rem);
+      color: var(--navy); line-height: 1.25;
+      margin-bottom: 12px;
+    }
+    .section__lead {
+      font-size: 1.02rem; color: var(--gray700);
+      line-height: 1.65; max-width: 580px;
+      margin-bottom: 48px;
+    }
+    .features__grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 20px;
+    }
+    .feature-card {
+      background: var(--white);
+      border: 1px solid var(--gray100);
+      border-radius: 12px;
+      padding: 28px 22px;
+      transition: box-shadow .2s, transform .2s, border-color .2s;
+      position: relative; overflow: hidden;
+    }
+    .feature-card::before {
+      content: '';
+      position: absolute; top: 0; left: 0; right: 0;
+      height: 3px;
+      background: linear-gradient(90deg, var(--blue), var(--blue2));
+      transform: scaleX(0); transform-origin: left;
+      transition: transform .25s;
+    }
+    .feature-card:hover { box-shadow: var(--shadowM); transform: translateY(-4px); border-color: #d0dff7; }
+    .feature-card:hover::before { transform: scaleX(1); }
+    .feature-card__icon {
+      width: 46px; height: 46px; border-radius: 10px;
+      background: var(--sky);
+      display: grid; place-items: center;
+      font-size: 20px; margin-bottom: 16px;
+    }
+    .feature-card__title {
+      font-family: var(--font-head); font-weight: 700; font-size: .95rem;
+      color: var(--navy); margin-bottom: 8px;
+    }
+    .feature-card__text { font-size: .88rem; color: var(--gray700); line-height: 1.55; }
+
+    /* ── CTA STRIP ──────────────────────────────── */
+    .cta-strip {
+      background: linear-gradient(135deg, var(--navy2) 0%, #0e3170 100%);
+      padding: 72px 0;
+      position: relative; overflow: hidden;
+    }
+    .cta-strip::after {
+      content: '';
+      position: absolute; bottom: -60px; right: -60px;
+      width: 280px; height: 280px;
+      background: radial-gradient(circle, rgba(42,124,214,.3), transparent 70%);
+      pointer-events: none;
+    }
+    .cta-strip__inner {
+      position: relative;
+      display: grid; grid-template-columns: 1fr auto;
+      gap: 40px; align-items: center;
+    }
+    .cta-strip__label {
+      font-family: var(--font-head); font-size: .72rem; font-weight: 700;
+      letter-spacing: .12em; text-transform: uppercase;
+      color: var(--gold); margin-bottom: 10px;
+    }
+    .cta-strip__title {
+      font-family: var(--font-head); font-weight: 800;
+      font-size: clamp(1.3rem, 3vw, 1.9rem);
+      color: var(--white); line-height: 1.25; margin-bottom: 12px;
+    }
+    .cta-strip__text {
+      font-size: .97rem; color: rgba(255,255,255,.72);
+      line-height: 1.65; max-width: 520px;
+    }
+    .cta-strip__actions {
+      display: flex; flex-direction: column; gap: 12px;
+      align-items: flex-start; min-width: 200px;
+    }
+    .btn--cta {
+      width: 100%;
+      background: var(--gold); color: var(--navy);
+      padding: 14px 28px; font-size: .95rem;
+      justify-content: center;
+      box-shadow: 0 4px 20px rgba(245,200,66,.30);
+    }
+    .btn--cta:hover { background: #ffd733; transform: translateY(-2px); }
+    .btn--outline-white {
+      width: 100%;
+      background: transparent; color: var(--white);
+      padding: 12px 24px; font-size: .88rem;
+      border: 1px solid rgba(255,255,255,.3);
+      justify-content: center;
+    }
+    .btn--outline-white:hover { background: rgba(255,255,255,.08); }
+
+    /* ── ABOUT (área do assinante) ──────────────── */
+    .about {
+      padding: 80px 0;
+      background: var(--white);
+    }
+    .about__inner {
+      display: grid; grid-template-columns: 1fr 1fr;
+      gap: 64px; align-items: center;
+    }
+    .about__text p {
+      font-size: 1rem; color: var(--gray700);
+      line-height: 1.72; margin-bottom: 16px;
+    }
+    .about__text p:last-of-type { margin-bottom: 28px; }
+    .about__highlights {
+      display: grid; grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+    .about__hl {
+      background: var(--sky);
+      border-radius: var(--radius);
+      padding: 16px;
+    }
+    .about__hl-icon { font-size: 22px; margin-bottom: 6px; }
+    .about__hl-title {
+      font-family: var(--font-head); font-weight: 700;
+      font-size: .88rem; color: var(--navy);
+      margin-bottom: 4px;
+    }
+    .about__hl-text { font-size: .8rem; color: var(--gray700); line-height: 1.45; }
+
+    /* ── CONTACT BANNER ─────────────────────────── */
+    .contact-banner {
+      background: var(--gray50);
+      border-top: 1px solid var(--gray100);
+      border-bottom: 1px solid var(--gray100);
+      padding: 52px 0;
+    }
+    .contact-banner__inner {
+      display: flex; align-items: center;
+      justify-content: space-between; gap: 32px;
+      flex-wrap: wrap;
+    }
+    .contact-banner__title {
+      font-family: var(--font-head); font-weight: 700;
+      font-size: 1.25rem; color: var(--navy);
+      margin-bottom: 6px;
+    }
+    .contact-banner__text { font-size: .95rem; color: var(--gray700); }
+    .btn--blue {
+      background: var(--blue); color: var(--white);
+      padding: 13px 28px; font-size: .92rem;
+      white-space: nowrap;
+    }
+    .btn--blue:hover { background: var(--blue2); transform: translateY(-2px); box-shadow: 0 6px 20px rgba(26,95,212,.25); }
+
+    /* ── FOOTER ─────────────────────────────────── */
+    footer {
+      background: var(--navy);
+      padding: 48px 0 28px;
+      color: rgba(255,255,255,.6);
+    }
+    .footer__top {
+      display: grid; grid-template-columns: 1.4fr 1fr 1fr 1fr;
+      gap: 40px; margin-bottom: 40px;
+    }
+    .footer__brand p {
+      font-size: .85rem; line-height: 1.6;
+      margin-top: 12px; max-width: 240px;
+    }
+    .footer__col-title {
+      font-family: var(--font-head); font-weight: 700;
+      font-size: .78rem; text-transform: uppercase;
+      letter-spacing: .1em; color: var(--white);
+      margin-bottom: 14px;
+    }
+    .footer__links { list-style: none; display: flex; flex-direction: column; gap: 8px; }
+    .footer__links a {
+      font-size: .84rem; color: rgba(255,255,255,.55);
+      transition: color .15s;
+    }
+    .footer__links a:hover { color: var(--white); }
+    .footer__bottom {
+      border-top: 1px solid rgba(255,255,255,.1);
+      padding-top: 24px;
+      display: flex; justify-content: space-between; align-items: center;
+      flex-wrap: wrap; gap: 12px;
+      font-size: .8rem;
+    }
+    .footer__bottom a { color: rgba(255,255,255,.5); }
+    .footer__bottom a:hover { color: var(--white); }
+
+    /* ── ANIMATIONS ─────────────────────────────── */
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(24px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    .anim { opacity: 0; }
+    .anim.visible { animation: fadeUp .55s ease forwards; }
+    .anim-d1 { animation-delay: .05s; }
+    .anim-d2 { animation-delay: .12s; }
+    .anim-d3 { animation-delay: .19s; }
+    .anim-d4 { animation-delay: .26s; }
+    .anim-d5 { animation-delay: .33s; }
+
+    /* ── RESPONSIVE ─────────────────────────────── */
+    @media (max-width: 900px) {
+      .hero__inner { grid-template-columns: 1fr; }
+      .hero__card { display: none; }
+      .cta-strip__inner { grid-template-columns: 1fr; }
+      .cta-strip__actions { flex-direction: row; min-width: unset; }
+      .cta-strip__actions .btn { width: auto; }
+      .about__inner { grid-template-columns: 1fr; }
+      .footer__top { grid-template-columns: 1fr 1fr; }
+    }
+    @media (max-width: 640px) {
+      .nav__toggle { display: block; }
+      .nav__menu {
+        display: none;
+        position: absolute; top: 60px; left: 0; right: 0;
+        background: var(--navy2);
+        flex-direction: column;
+        align-items: stretch;
+        padding: 12px 16px 16px;
+        gap: 2px;
+        border-bottom: 2px solid var(--blue);
+      }
+      .nav__menu.open { display: flex; }
+      .nav__menu a { padding: 10px 12px; }
+      .nav__dropdown { position: static; box-shadow: none; border: none; background: rgba(255,255,255,.05); }
+      .nav__item--drop:hover .nav__dropdown { display: none; }
+      .nav__item--drop.open .nav__dropdown { display: block; }
+      .nav__dropdown a { color: rgba(255,255,255,.7) !important; }
+      .features__grid { grid-template-columns: 1fr 1fr; }
+      .about__highlights { grid-template-columns: 1fr; }
+      .footer__top { grid-template-columns: 1fr; }
+      .contact-banner__inner { flex-direction: column; align-items: flex-start; }
+    }
+    @media (max-width: 400px) {
+      .features__grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ── NAV ──────────────────────────────────────── -->
+  <nav class="nav" role="navigation" aria-label="Menu principal">
+    <div class="container nav__inner">
+      <a href="/" class="nav__logo" aria-label="Radar SIOPE — Página inicial">
+        <span class="nav__logo-icon">📡</span>
+        Radar <span>SIOPE</span>
+      </a>
+
+      <button class="nav__toggle" id="nav-toggle" aria-label="Abrir menu" aria-expanded="false">☰</button>
+
+      <ul class="nav__menu" id="nav-menu" role="list">
+        <li><a href="/" class="active">Início</a></li>
+        <li><a href="newsletter.html">Newsletters</a></li>
+        <li><a href="noticias.html">Notícias</a></li>
+        <li class="nav__item--drop" id="drop-privacidade">
+          <a href="#" aria-haspopup="true" aria-expanded="false">Privacidade e Termos ▾</a>
+          <ul class="nav__dropdown" role="list">
+            <li><a href="privacidade.html">Política de Privacidade</a></li>
+            <li><a href="termos.html">Termos de Uso</a></li>
+          </ul>
+        </li>
+        <li><a href="capturaLead.html">Entre em contato</a></li>
+        <li class="nav__cta"><a href="acesso.html">Área do assinante</a></li>
+      </ul>
+    </div>
+  </nav>
+
+  <!-- ── HERO ─────────────────────────────────────── -->
+  <section class="hero" aria-labelledby="hero-title">
+    <div class="container hero__inner">
+      <div>
+        <div class="hero__eyebrow">
+          <span>📡</span> Revista eletrônica · Central técnica
+        </div>
+        <h1 class="hero__title" id="hero-title">
+          Decisões certas para a<br>
+          <em>gestão dos recursos<br>da educação</em>
+        </h1>
+        <p class="hero__subtitle">
+          Conteúdo técnico, alertas e orientações práticas para quem precisa dominar o Fundeb e o SIOPE na linha de frente da educação pública municipal.
+        </p>
+        <div class="hero__tags">
+          <span class="hero__tag">Fundeb</span>
+          <span class="hero__tag">SIOPE</span>
+          <span class="hero__tag">CACS-Fundeb</span>
+          <span class="hero__tag">Salário-Educação</span>
+          <span class="hero__tag">sisCACS</span>
+        </div>
+        <div class="hero__actions">
+          <a href="assinatura.html?origem=site" class="btn btn--primary">🚀 Quero assinar</a>
+          <a href="capturaLead.html" class="btn btn--ghost">Fale conosco</a>
+        </div>
+      </div>
+
+      <div class="hero__card" aria-hidden="true">
+        <div class="hero__stat">
+          <div class="hero__stat-n">100%</div>
+          <div class="hero__stat-l">Foco em municípios</div>
+        </div>
+        <div class="hero__stat">
+          <div class="hero__stat-n">LGPD</div>
+          <div class="hero__stat-l">Dados protegidos</div>
+        </div>
+        <div class="hero__stat">
+          <div class="hero__stat-n">24h</div>
+          <div class="hero__stat-l">Alertas em tempo real</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── O QUE VOCÊ ENCONTRA ──────────────────────── -->
+  <section class="features" aria-labelledby="features-title">
+    <div class="container">
+      <p class="section__label anim">Recursos</p>
+      <h2 class="section__title anim anim-d1" id="features-title">O que você encontra no Radar SIOPE</h2>
+      <p class="section__lead anim anim-d2">
+        Conteúdo especializado, atualizações legislativas e ferramentas práticas para secretários, técnicos, contadores e conselheiros da educação pública.
+      </p>
+
+      <div class="features__grid">
+        <div class="feature-card anim anim-d1">
+          <div class="feature-card__icon">📚</div>
+          <h3 class="feature-card__title">Conteúdo Técnico</h3>
+          <p class="feature-card__text">Artigos e guias detalhados para entender e aplicar corretamente as regras do Fundeb e do SIOPE.</p>
+        </div>
+        <div class="feature-card anim anim-d2">
+          <div class="feature-card__icon">📰</div>
+          <h3 class="feature-card__title">Notícias Atualizadas</h3>
+          <p class="feature-card__text">Acompanhe mudanças na legislação e novidades que impactam a gestão educacional municipal.</p>
+        </div>
+        <div class="feature-card anim anim-d3">
+          <div class="feature-card__icon">🗂️</div>
+          <h3 class="feature-card__title">Orientações Práticas</h3>
+          <p class="feature-card__text">Passo a passo para resolver pendências, otimizar processos e garantir conformidade com os prazos.</p>
+        </div>
+        <div class="feature-card anim anim-d4">
+          <div class="feature-card__icon">🎓</div>
+          <h3 class="feature-card__title">Capacitação</h3>
+          <p class="feature-card__text">Treinamentos e workshops para equipes com foco em resultados e conformidade técnica.</p>
+        </div>
+        <div class="feature-card anim anim-d5">
+          <div class="feature-card__icon">🔔</div>
+          <h3 class="feature-card__title">Envio de Alertas</h3>
+          <p class="feature-card__text">Alertas personalizados sobre prazos críticos e mudanças legislativas diretamente no seu e-mail.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── SOBRE / ÁREA DO ASSINANTE ────────────────── -->
+  <section class="about" aria-labelledby="about-title">
+    <div class="container about__inner">
+      <div class="about__text">
+        <p class="section__label anim">Área exclusiva</p>
+        <h2 class="section__title anim anim-d1" id="about-title">Bem-vindo à sua área exclusiva</h2>
+        <p class="anim anim-d2">
+          Aqui você acessa com facilidade seus dados, assinaturas, suporte técnico e nossas publicações especializadas — conteúdos pensados para atender diretamente às suas demandas.
+        </p>
+        <p class="anim anim-d3">
+          Nosso compromisso é mantê-lo sempre bem informado sobre os temas que impactam a gestão educacional: Fundeb, SIOPE, CACS-Fundeb e Salário-Educação.
+        </p>
+        <a href="acesso.html" class="btn btn--blue anim anim-d4">Acessar minha conta →</a>
+      </div>
+
+      <div class="about__highlights">
+        <div class="about__hl anim anim-d1">
+          <div class="about__hl-icon">📖</div>
+          <div class="about__hl-title">Revista Eletrônica</div>
+          <div class="about__hl-text">Publicação objetiva com análises técnicas exclusivas por edição.</div>
+        </div>
+        <div class="about__hl anim anim-d2">
+          <div class="about__hl-icon">🛠️</div>
+          <div class="about__hl-title">Central Técnica</div>
+          <div class="about__hl-text">Suporte prático e confiável para dúvidas operacionais do dia a dia.</div>
+        </div>
+        <div class="about__hl anim anim-d3">
+          <div class="about__hl-icon">🔒</div>
+          <div class="about__hl-title">Dados Protegidos</div>
+          <div class="about__hl-text">Plataforma em conformidade com a LGPD.</div>
+        </div>
+        <div class="about__hl anim anim-d4">
+          <div class="about__hl-icon">🏫</div>
+          <div class="about__hl-title">Foco Municipal</div>
+          <div class="about__hl-text">Conteúdo pensado para a realidade dos municípios brasileiros.</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── CTA ASSINATURA ────────────────────────────── -->
+  <section class="cta-strip" aria-labelledby="cta-title">
+    <div class="container cta-strip__inner">
+      <div>
+        <p class="cta-strip__label">Assine agora</p>
+        <h2 class="cta-strip__title" id="cta-title">Transforme a gestão do Fundeb e do SIOPE</h2>
+        <p class="cta-strip__text">
+          Reúne conteúdo técnico, orientações práticas e alertas sobre prazos e mudanças na legislação. Normas complexas em ações claras — para reduzir riscos e agilizar decisões.
+        </p>
+      </div>
+      <div class="cta-strip__actions">
+        <a href="assinatura.html?origem=site" class="btn btn--cta">🚀 Quero assinar</a>
+        <a href="newsletter.html" class="btn btn--outline-white">Ver newsletters</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── CONTATO BANNER ────────────────────────────── -->
+  <div class="contact-banner">
+    <div class="container contact-banner__inner">
+      <div>
+        <p class="contact-banner__title">Ficou com alguma dúvida?</p>
+        <p class="contact-banner__text">Nossa equipe está pronta para orientar você antes e depois da assinatura.</p>
+      </div>
+      <a href="capturaLead.html" class="btn btn--blue">Entre em contato →</a>
+    </div>
+  </div>
+
+  <!-- ── FOOTER ────────────────────────────────────── -->
+  <footer>
+    <div class="container">
+      <div class="footer__top">
+        <div class="footer__brand">
+          <div class="nav__logo" style="color:#fff;">
+            <span class="nav__logo-icon">📡</span>
+            Radar <span style="color:var(--gold)">SIOPE</span>
+          </div>
+          <p>Revista eletrônica e central técnica para gestores e profissionais da educação pública municipal.</p>
+        </div>
+
+        <div>
+          <p class="footer__col-title">Plataforma</p>
+          <ul class="footer__links">
+            <li><a href="newsletter.html">Newsletters</a></li>
+            <li><a href="noticias.html">Notícias</a></li>
+            <li><a href="assinatura.html?origem=site">Assinar</a></li>
+            <li><a href="acesso.html">Área do assinante</a></li>
+          </ul>
+        </div>
+
+        <div>
+          <p class="footer__col-title">Temas</p>
+          <ul class="footer__links">
+            <li><a href="#">Fundeb</a></li>
+            <li><a href="#">SIOPE</a></li>
+            <li><a href="#">CACS-Fundeb</a></li>
+            <li><a href="#">Salário-Educação</a></li>
+          </ul>
+        </div>
+
+        <div>
+          <p class="footer__col-title">Legal</p>
+          <ul class="footer__links">
+            <li><a href="privacidade.html">Política de Privacidade</a></li>
+            <li><a href="termos.html">Termos de Uso</a></li>
+            <li><a href="capturaLead.html">Contato</a></li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="footer__bottom">
+        <span>© 2026 Radar SIOPE. Todos os direitos reservados.</span>
+        <span>Brasília/DF — Brasil &nbsp;·&nbsp; <a href="privacidade.html">Privacidade</a> &nbsp;·&nbsp; <a href="termos.html">Termos</a></span>
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    // ── Mobile nav toggle
+    const toggle = document.getElementById('nav-toggle');
+    const menu   = document.getElementById('nav-menu');
+    toggle.addEventListener('click', () => {
+      const open = menu.classList.toggle('open');
+      toggle.setAttribute('aria-expanded', open);
+      toggle.textContent = open ? '✕' : '☰';
+    });
+
+    // ── Mobile dropdown toggle
+    document.querySelectorAll('.nav__item--drop').forEach(item => {
+      item.querySelector('a').addEventListener('click', e => {
+        if (window.innerWidth < 640) {
+          e.preventDefault();
+          item.classList.toggle('open');
+        }
+      });
+    });
+
+    // ── Scroll animations
+    const observer = new IntersectionObserver(entries => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('visible');
+          observer.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.15 });
+
+    document.querySelectorAll('.anim').forEach(el => observer.observe(el));
+  </script>
+</body>
+</html>
