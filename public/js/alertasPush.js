@@ -221,6 +221,63 @@ function _renderHTML() {
     .mun-contador { font-size:12px; color:#64748b; margin-top:6px; }
     .mun-loading { padding:16px; text-align:center; color:#94a3b8; font-size:13px; }
     .mun-vazio   { padding:16px; text-align:center; color:#f59e0b;  font-size:13px; }
+
+    /* ── Seletor de canal ── */
+    .canal-tabs { display:flex; gap:8px; margin-bottom:16px; }
+    .canal-tab { flex:1; padding:10px 14px; border:2px solid #e2e8f0; border-radius:8px; background:#fff; font-size:13px; font-weight:600; cursor:pointer; color:#64748b; transition:all .15s; text-align:center; }
+    .canal-tab.ativo { border-color:#0A3D62; background:#0A3D62; color:#fff; }
+    .canal-tab:hover:not(.ativo) { border-color:#0A3D62; color:#0A3D62; background:#f0f7ff; }
+
+    /* ── WhatsApp card ── */
+    .wa-msg-area { margin-bottom:14px; }
+    .wa-msg-area label { font-size:12px; font-weight:600; color:#475569; display:block; margin-bottom:4px; }
+    .wa-msg-area textarea { width:100%; box-sizing:border-box; padding:10px; border:1px solid #cbd5e1; border-radius:8px; font-size:13px; min-height:80px; resize:vertical; font-family:inherit; color:#1e293b; }
+    .wa-msg-area textarea:focus { outline:none; border-color:#16a34a; box-shadow:0 0 0 3px rgba(22,163,74,.1); }
+    .wa-section-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; }
+    .wa-section-header span { font-size:12px; font-weight:700; color:#0A3D62; text-transform:uppercase; letter-spacing:.4px; }
+    .wa-section-header button { padding:4px 10px; border:1px solid #cbd5e1; border-radius:6px; font-size:11px; background:#fff; cursor:pointer; color:#64748b; }
+    .wa-section-header button:hover { background:#f1f5f9; }
+    .wa-toolbar { display:flex; gap:8px; margin-bottom:8px; flex-wrap:wrap; align-items:center; }
+    .wa-toolbar input[type=text] { flex:1; min-width:150px; padding:7px 10px; border:1px solid #cbd5e1; border-radius:6px; font-size:13px; box-sizing:border-box; }
+    .wa-toolbar button { padding:6px 12px; border:1px solid #cbd5e1; border-radius:6px; font-size:12px; background:#fff; cursor:pointer; color:#475569; white-space:nowrap; }
+    .wa-toolbar button:hover { background:#f1f5f9; }
+    .wa-lista { max-height:260px; overflow-y:auto; border:1px solid #e2e8f0; border-radius:8px; background:#fff; }
+    .wa-item { display:flex; align-items:center; gap:10px; padding:9px 14px; border-bottom:1px solid #f8fafc; cursor:pointer; }
+    .wa-item:last-child { border-bottom:none; }
+    .wa-item:hover { background:#f8fafc; }
+    .wa-item input[type=checkbox] { width:15px; height:15px; cursor:pointer; accent-color:#16a34a; flex-shrink:0; }
+    .wa-item .wa-nome { font-size:13px; font-weight:600; color:#1e293b; flex:1; }
+    .wa-item .wa-sub  { font-size:11px; color:#94a3b8; margin-top:1px; }
+    .wa-item .wa-fone { font-size:11px; color:#64748b; font-family:monospace; white-space:nowrap; }
+    .wa-vazio, .wa-loading { padding:24px; text-align:center; font-size:13px; color:#94a3b8; }
+    .wa-contador { font-size:12px; color:#64748b; margin-top:8px; }
+    .wa-btn-iniciar { width:100%; padding:13px; background:#16a34a; color:#fff; border:none; border-radius:8px; font-size:15px; font-weight:700; cursor:pointer; margin-top:12px; transition:.15s; }
+    .wa-btn-iniciar:hover:not(:disabled) { background:#15803d; }
+    .wa-btn-iniciar:disabled { opacity:.5; cursor:not-allowed; }
+
+    /* ── WA Overlay sequencial ── */
+    #wa-seq-overlay { position:fixed; inset:0; background:rgba(0,0,0,.55); z-index:9999; display:none; align-items:center; justify-content:center; }
+    .wa-seq-box { background:#fff; border-radius:14px; padding:28px 24px; max-width:460px; width:90%; box-shadow:0 20px 60px rgba(0,0,0,.3); }
+    .wa-seq-titulo { font-size:17px; font-weight:700; color:#0A3D62; margin:0 0 4px; }
+    .wa-seq-desc { font-size:13px; color:#64748b; margin:0 0 20px; }
+    .wa-seq-bar-wrap { height:6px; background:#e2e8f0; border-radius:10px; overflow:hidden; margin-bottom:5px; }
+    .wa-seq-bar-fill { height:100%; background:#16a34a; border-radius:10px; transition:width .3s ease; }
+    .wa-seq-bar-txt { font-size:12px; color:#64748b; text-align:right; margin-bottom:18px; }
+    .wa-seq-assinante { background:#f8fafc; border-radius:10px; padding:14px 16px; margin-bottom:18px; border-left:4px solid #16a34a; }
+    .wa-seq-nome { font-size:15px; font-weight:700; color:#1e293b; }
+    .wa-seq-info { font-size:12px; color:#64748b; margin-top:4px; }
+    .wa-seq-enviado { font-size:12px; color:#16a34a; margin-top:6px; font-weight:600; display:none; }
+    .wa-seq-btns { display:flex; gap:10px; margin-bottom:10px; }
+    .wa-seq-abrir { flex:2; padding:12px; background:#16a34a; color:#fff; border:none; border-radius:8px; font-size:14px; font-weight:700; cursor:pointer; }
+    .wa-seq-abrir:hover { background:#15803d; }
+    .wa-seq-proximo { flex:1; padding:12px; background:#0A3D62; color:#fff; border:none; border-radius:8px; font-size:14px; font-weight:600; cursor:pointer; }
+    .wa-seq-proximo:hover { background:#0d4f7c; }
+    .wa-seq-cancelar { width:100%; padding:9px; background:transparent; border:1px solid #e2e8f0; border-radius:8px; font-size:13px; color:#94a3b8; cursor:pointer; }
+    .wa-seq-cancelar:hover { background:#f8fafc; color:#475569; }
+
+    /* ── Histórico — badges de canal ── */
+    .push-badge.push     { background:#dbeafe; color:#1e40af; }
+    .push-badge.whatsapp { background:#dcfce7; color:#166534; }
   </style>
 
   <h2>🔔 Enviar Alertas Push</h2>
@@ -230,8 +287,14 @@ function _renderHTML() {
     ⏳ Verificando autenticação...
   </div>
 
-  <!-- Composição -->
-  <div class="push-card">
+  <!-- Seletor de canal -->
+  <div class="canal-tabs">
+    <button class="canal-tab ativo" id="tab-canal-push"     onclick="_waToggleCanal('push')">🔔 Push Notification</button>
+    <button class="canal-tab"       id="tab-canal-whatsapp" onclick="_waToggleCanal('whatsapp')">🟢 WhatsApp</button>
+  </div>
+
+  <!-- Composição Push -->
+  <div class="push-card" id="push-compose-card">
     <h3>✏️ Compor Alerta</h3>
     <div class="push-grid">
       <div class="push-field">
@@ -304,11 +367,68 @@ function _renderHTML() {
     <div class="push-resultado" id="push-resultado"></div>
   </div>
 
+  <!-- WhatsApp Compose Card -->
+  <div class="push-card" id="wa-card" style="display:none">
+    <h3>🟢 Envio via WhatsApp</h3>
+    <p style="font-size:12px;color:#64748b;margin:0 0 16px;line-height:1.6">
+      O sistema abrirá o WhatsApp Web com a mensagem pré-preenchida para cada assinante, um de cada vez.
+      Certifique-se de que o <strong>WhatsApp Web está aberto e logado com o número do Radar SIOPE</strong>.
+    </p>
+
+    <div class="wa-msg-area">
+      <label>✏️ Mensagem do alerta</label>
+      <textarea id="wa-mensagem" placeholder="Digite o texto do alerta a ser enviado via WhatsApp..." oninput="_waAtualizarBotao()"></textarea>
+    </div>
+
+    <div class="wa-section-header">
+      <span>📱 Assinantes autorizados</span>
+      <button onclick="_waCarregarAssinantes()">⟳ Recarregar lista</button>
+    </div>
+
+    <div class="wa-toolbar">
+      <input type="text" id="wa-busca" placeholder="🔍 Filtrar por nome ou município..." oninput="_waFiltrarLista()">
+      <button onclick="_waToggleAll(true)">✅ Todos</button>
+      <button onclick="_waToggleAll(false)">☐ Limpar</button>
+    </div>
+
+    <div class="wa-lista" id="wa-lista">
+      <div class="wa-loading">⏳ Aguardando carregamento...</div>
+    </div>
+    <div class="wa-contador" id="wa-contador">—</div>
+
+    <button class="wa-btn-iniciar" id="wa-btn-iniciar" onclick="_waIniciarEnvio()" disabled>
+      🟢 Iniciar envio via WhatsApp
+    </button>
+    <div class="push-resultado" id="wa-resultado"></div>
+  </div>
+
   <!-- Histórico -->
   <div class="push-card">
     <h3>📋 Histórico de alertas disparados</h3>
     <div id="push-historico-wrap">
       <p style="color:#94a3b8;font-size:13px">Carregando...</p>
+    </div>
+  </div>
+
+  <!-- WA Overlay sequencial -->
+  <div id="wa-seq-overlay">
+    <div class="wa-seq-box">
+      <p class="wa-seq-titulo">🟢 Envio em progresso</p>
+      <p class="wa-seq-desc" id="wa-seq-desc">—</p>
+      <div class="wa-seq-bar-wrap">
+        <div class="wa-seq-bar-fill" id="wa-seq-fill" style="width:0%"></div>
+      </div>
+      <div class="wa-seq-bar-txt" id="wa-seq-bar-txt">0 de 0</div>
+      <div class="wa-seq-assinante">
+        <div class="wa-seq-nome" id="wa-seq-nome">—</div>
+        <div class="wa-seq-info" id="wa-seq-info">—</div>
+        <div class="wa-seq-enviado" id="wa-seq-enviado">✅ WhatsApp aberto!</div>
+      </div>
+      <div class="wa-seq-btns">
+        <button class="wa-seq-abrir"   onclick="_waAbrirWhatsApp()">📱 Abrir WhatsApp</button>
+        <button class="wa-seq-proximo" id="wa-seq-btn-proximo" onclick="_waProximo()">Próximo →</button>
+      </div>
+      <button class="wa-seq-cancelar" onclick="_waCancelarEnvio()">Cancelar envio</button>
     </div>
   </div>
 
@@ -769,19 +889,19 @@ async function _carregarHistorico() {
     }
 
     const rows = snap.docs.map(doc => {
-      const d   = doc.data();
-      const em  = d.disparado_em?.toDate?.()?.toLocaleString('pt-BR') ?? '—';
-      const tip = PUSH_TEMPLATES[d.tipo]?.label ?? d.tipo;
+      const d      = doc.data();
+      const em     = d.disparado_em?.toDate?.()?.toLocaleString('pt-BR') ?? '—';
+      const tip    = PUSH_TEMPLATES[d.tipo]?.label ?? d.tipo;
+      const canal  = d.canal === 'whatsapp' ? 'whatsapp' : 'push';
+      const cLabel = canal === 'whatsapp' ? '🟢 WhatsApp' : '🔔 Push';
       return `
         <tr>
           <td>${em}</td>
+          <td><span class="push-badge ${canal}">${cLabel}</span></td>
           <td>${tip}</td>
           <td>${d.titulo || '—'}</td>
           <td style="text-align:center"><strong>${d.destinatarios_est ?? '—'}</strong></td>
           <td><span class="push-badge enviado">${d.status || 'enviado'}</span></td>
-          <td>
-            <span class="push-hist-detalhe">${d.onesignal_id ?? ''}</span>
-          </td>
         </tr>`;
     }).join('');
 
@@ -790,11 +910,11 @@ async function _carregarHistorico() {
         <thead>
           <tr>
             <th>Data/hora</th>
+            <th>Canal</th>
             <th>Tipo</th>
             <th>Título</th>
             <th>Dest.</th>
             <th>Status</th>
-            <th>OneSignal ID</th>
           </tr>
         </thead>
         <tbody>${rows}</tbody>
@@ -868,4 +988,261 @@ function _sub(str, params) {
   return str.replace(/\{(\w+)\}/g, (_, k) =>
     params[k] !== undefined && params[k] !== '' ? params[k] : `{${k}}`
   );
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// WHATSAPP — envio manual sequencial via wa.me
+// ══════════════════════════════════════════════════════════════════════════════
+
+// ─── Estado ──────────────────────────────────────────────────────────────────
+let _waState = {
+  assinantes: [],  // todos os elegíveis carregados do Firestore
+  fila:       [],  // selecionados para o envio atual
+  indice:     -1,  // posição atual no overlay sequencial
+  enviados:    0,  // quantos links wa.me foram abertos
+  mensagem:   '',  // texto do alerta
+};
+
+// ─── Toggle canal Push / WhatsApp ────────────────────────────────────────────
+window._waToggleCanal = function (canal) {
+  const isPush = canal === 'push';
+  document.getElementById('tab-canal-push')     ?.classList.toggle('ativo',  isPush);
+  document.getElementById('tab-canal-whatsapp') ?.classList.toggle('ativo', !isPush);
+
+  const pushCard = document.getElementById('push-compose-card');
+  const waCard   = document.getElementById('wa-card');
+  if (pushCard) pushCard.style.display = isPush ? '' : 'none';
+  if (waCard)   waCard.style.display   = isPush ? 'none' : '';
+
+  // Ao abrir WA: carrega assinantes (se ainda não carregou) + sincroniza mensagem
+  if (!isPush) {
+    if (_waState.assinantes.length === 0) _waCarregarAssinantes();
+    _waSincronizarMensagem();
+  }
+};
+
+// ─── Pré-preenche mensagem WA com corpo do template push ─────────────────────
+function _waSincronizarMensagem() {
+  const el = document.getElementById('wa-mensagem');
+  if (!el || el.value.trim()) return; // não sobrescreve se já editado
+  const tipo = document.getElementById('push-tipo')?.value;
+  const tpl  = PUSH_TEMPLATES[tipo];
+  if (!tpl) return;
+  el.value = _sub(tpl.corpo, _pushColetarParams());
+  _waAtualizarBotao();
+}
+
+// ─── Carregar assinantes do Firestore ────────────────────────────────────────
+window._waCarregarAssinantes = async function () {
+  const lista = document.getElementById('wa-lista');
+  const cont  = document.getElementById('wa-contador');
+  if (!lista) return;
+
+  lista.innerHTML = '<div class="wa-loading">⏳ Carregando assinantes autorizados...</div>';
+  if (cont) cont.textContent = '—';
+
+  try {
+    const snap = await window.db.collection('usuarios')
+      .where('whatsapp_optin', '==', true)
+      .get();
+
+    _waState.assinantes = snap.docs
+      .map(d => ({ id: d.id, ...d.data() }))
+      .filter(u => u.whatsapp_number && String(u.whatsapp_number).length >= 10)
+      .sort((a, b) => (a.nome || '').localeCompare(b.nome || '', 'pt-BR'));
+
+    _waRenderLista(_waState.assinantes);
+  } catch (err) {
+    lista.innerHTML = `<div class="wa-vazio">❌ Erro ao carregar: ${err.message}</div>`;
+  }
+};
+
+// ─── Renderizar lista de assinantes ──────────────────────────────────────────
+function _waRenderLista(lista) {
+  const el = document.getElementById('wa-lista');
+  if (!el) return;
+
+  if (!lista.length) {
+    el.innerHTML = '<div class="wa-vazio">⚠️ Nenhum assinante com WhatsApp autorizado encontrado.</div>';
+    _waAtualizarBotao();
+    return;
+  }
+
+  el.innerHTML = lista.map(u => {
+    const mun = [u.nome_municipio, u.cod_uf].filter(Boolean).join(' — ');
+    const raw = String(u.whatsapp_number);
+    // formata: 11 dígitos → (DD) DDDDD-DDDD
+    const num = raw.replace(/^(\d{2})(\d{4,5})(\d{4})$/, '($1) $2-$3') || raw;
+    return `
+      <div class="wa-item"
+           data-busca="${(u.nome || '').toLowerCase()} ${(u.nome_municipio || '').toLowerCase()}"
+           onclick="this.querySelector('input').click()">
+        <input type="checkbox"
+               value="${u.id}"
+               data-nome="${(u.nome || '').replace(/"/g, '&quot;')}"
+               data-numero="${u.whatsapp_number}"
+               data-mun="${mun.replace(/"/g, '&quot;')}"
+               onchange="_waAtualizarBotao()"
+               onclick="event.stopPropagation()">
+        <div style="flex:1;min-width:0">
+          <div class="wa-nome">${u.nome || '(sem nome)'}</div>
+          <div class="wa-sub">${mun || '—'}</div>
+        </div>
+        <div class="wa-fone">${num}</div>
+      </div>`;
+  }).join('');
+
+  _waAtualizarBotao();
+}
+
+// ─── Filtrar lista por texto ──────────────────────────────────────────────────
+window._waFiltrarLista = function () {
+  const termo = (document.getElementById('wa-busca')?.value || '').toLowerCase().trim();
+  document.querySelectorAll('#wa-lista .wa-item').forEach(item => {
+    item.style.display = !termo || item.dataset.busca.includes(termo) ? '' : 'none';
+  });
+};
+
+// ─── Selecionar / limpar todos (visíveis) ────────────────────────────────────
+window._waToggleAll = function (sel) {
+  document.querySelectorAll('#wa-lista .wa-item').forEach(item => {
+    if (item.style.display === 'none') return;
+    const cb = item.querySelector('input[type=checkbox]');
+    if (cb) cb.checked = sel;
+  });
+  _waAtualizarBotao();
+};
+
+// ─── Atualizar contador e estado do botão ────────────────────────────────────
+window._waAtualizarBotao = function () {
+  const selecionados = document.querySelectorAll('#wa-lista input[type=checkbox]:checked').length;
+  const mensagem     = (document.getElementById('wa-mensagem')?.value || '').trim();
+  const btn          = document.getElementById('wa-btn-iniciar');
+  const cont         = document.getElementById('wa-contador');
+
+  if (cont) {
+    if (selecionados === 0) {
+      cont.textContent = '⚠️ Selecione ao menos 1 assinante.';
+      cont.style.color = '#f59e0b';
+    } else {
+      cont.textContent = `✅ ${selecionados} assinante(s) selecionado(s).`;
+      cont.style.color = '#166534';
+    }
+  }
+  if (btn) btn.disabled = !selecionados || !mensagem;
+};
+
+// ─── Iniciar envio sequencial ────────────────────────────────────────────────
+window._waIniciarEnvio = function () {
+  const mensagem = (document.getElementById('wa-mensagem')?.value || '').trim();
+  if (!mensagem) return;
+
+  const cbs = document.querySelectorAll('#wa-lista input[type=checkbox]:checked');
+  if (!cbs.length) return;
+
+  _waState.fila     = Array.from(cbs).map(cb => ({
+    id:     cb.value,
+    nome:   cb.dataset.nome,
+    numero: cb.dataset.numero,
+    mun:    cb.dataset.mun,
+  }));
+  _waState.indice   = 0;
+  _waState.enviados = 0;
+  _waState.mensagem = mensagem;
+
+  _waRenderOverlay();
+  document.getElementById('wa-seq-overlay').style.display = 'flex';
+};
+
+// ─── Renderizar overlay para o índice atual ───────────────────────────────────
+function _waRenderOverlay() {
+  const total  = _waState.fila.length;
+  const idx    = _waState.indice;
+  const atual  = _waState.fila[idx];
+  const pct    = total ? Math.round((idx / total) * 100) : 0;
+  const isUlti = idx === total - 1;
+
+  document.getElementById('wa-seq-desc').textContent    = `Enviando alerta para ${total} assinante${total !== 1 ? 's' : ''}`;
+  document.getElementById('wa-seq-fill').style.width    = pct + '%';
+  document.getElementById('wa-seq-bar-txt').textContent = `${idx + 1} de ${total}`;
+  document.getElementById('wa-seq-nome').textContent    = atual?.nome  || '—';
+  document.getElementById('wa-seq-info').textContent    = atual?.mun   || '—';
+
+  const enviadoEl = document.getElementById('wa-seq-enviado');
+  if (enviadoEl) enviadoEl.style.display = 'none';
+
+  const btnProx = document.getElementById('wa-seq-btn-proximo');
+  if (btnProx) btnProx.textContent = isUlti ? 'Concluir ✓' : 'Próximo →';
+}
+
+// ─── Abrir wa.me para assinante atual ────────────────────────────────────────
+window._waAbrirWhatsApp = function () {
+  const atual = _waState.fila[_waState.indice];
+  if (!atual) return;
+
+  const numero = '55' + String(atual.numero);
+  const texto  = encodeURIComponent(_waState.mensagem);
+  window.open(`https://wa.me/${numero}?text=${texto}`, '_blank');
+
+  _waState.enviados++;
+  const enviadoEl = document.getElementById('wa-seq-enviado');
+  if (enviadoEl) enviadoEl.style.display = 'block';
+};
+
+// ─── Avançar para próximo / concluir ────────────────────────────────────────
+window._waProximo = async function () {
+  const isUlti = _waState.indice === _waState.fila.length - 1;
+  if (isUlti) {
+    await _waConcluirEnvio();
+  } else {
+    _waState.indice++;
+    _waRenderOverlay();
+  }
+};
+
+// ─── Cancelar envio ──────────────────────────────────────────────────────────
+window._waCancelarEnvio = async function () {
+  document.getElementById('wa-seq-overlay').style.display = 'none';
+  if (_waState.enviados > 0) {
+    await _waSalvarHistorico('cancelado');
+    _carregarHistorico();
+  }
+};
+
+// ─── Concluir envio ───────────────────────────────────────────────────────────
+async function _waConcluirEnvio() {
+  document.getElementById('wa-seq-overlay').style.display = 'none';
+
+  const enviados = _waState.enviados;
+  const total    = _waState.fila.length;
+  const res      = document.getElementById('wa-resultado');
+
+  if (res) {
+    res.style.display = 'block';
+    res.className     = 'push-resultado ok';
+    res.innerHTML     = `✅ Envio concluído! <strong>${enviados} de ${total}</strong> WhatsApps abertos.`;
+  }
+
+  await _waSalvarHistorico('concluido');
+  _carregarHistorico();
+}
+
+// ─── Salvar no histórico de alertas ──────────────────────────────────────────
+async function _waSalvarHistorico(status) {
+  try {
+    const tipo     = document.getElementById('push-tipo')?.value || 'manual';
+    const tplLabel = PUSH_TEMPLATES[tipo]?.label || 'Alerta manual';
+    await window.db.collection('alertas_disparados').add({
+      canal:             'whatsapp',
+      tipo,
+      titulo:            tplLabel,
+      mensagem:          _waState.mensagem.slice(0, 120),
+      destinatarios_est: _waState.fila.length,
+      destinatarios_env: _waState.enviados,
+      status,
+      disparado_em:      firebase.firestore.FieldValue.serverTimestamp(),
+    });
+  } catch (err) {
+    console.warn('[WA] Falha ao salvar histórico:', err.message || err);
+  }
 }
