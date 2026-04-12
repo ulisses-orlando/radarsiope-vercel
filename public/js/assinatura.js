@@ -174,17 +174,19 @@ async function carregarListaPlanos() {
         ? (valM * 12) - Number(p.valor_anual)
         : 0;
 
-      // lista de features - usar todas as features disponíveis
+      // lista de features - cada feature renderiza de forma independente
       const featuresHtml = allFeatures.map(f => {
-        const ativo = !!features[f.id];
-        // sugestão de tema e consultoria — mostra quota
-        let label = f.nome || f.id;
-        if (f.id === 'grupo_whatsapp_vip' && ativo && features.sugestao_tema_quota) {
-          label += ` + ${features.sugestao_tema_quota} sugestão/mês`;
+        const val  = features[f.id];
+        const ativo = !!val;
+        let label  = f.nome || f.id;
+
+        // Features com quota numérica — exibe o valor no label
+        if (f.id === 'sugestao_tema_quota' && Number(val) > 0) {
+          label = `${val} sugestão${Number(val) > 1 ? 'ões' : ''} de tema/mês`;
+        } else if (f.id === 'consultoria_horas_mes' && Number(val) > 0) {
+          label = `Consultoria ${val}h/mês`;
         }
-        if (f.id === 'grupo_whatsapp_vip' && features.consultoria_horas_mes) {
-          label = `Consultoria ${features.consultoria_horas_mes}h/mês`;
-        }
+
         return `<li class="${ativo ? '' : 'inativo'}">${label}</li>`;
       }).join('');
 
@@ -280,13 +282,15 @@ function _atualizarCampoParcelas(plano) {
 // ─── WhatsApp opt-in ──────────────────────────────────────────────────────────
 
 function _mostrarWhatsappOptin() {
-  // Mostra o opt-in de WhatsApp se o campo tiver algum número digitado
-  const wpInput = document.getElementById('whatsapp');
+  const wpInput   = document.getElementById('whatsapp');
   const optinWrap = document.getElementById('whatsapp-optin-wrap');
   if (!wpInput || !optinWrap) return;
 
   const mostrar = () => {
-    optinWrap.style.display = wpInput.value.replace(/\D/g, '').length >= 10 ? 'flex' : 'none';
+    // Mostra apenas se: plano selecionado tem WhatsApp E número preenchido
+    const planoTemWa = !!(_planoAtual?.features?.grupo_whatsapp_vip);
+    const numOk      = wpInput.value.replace(/\D/g, '').length >= 10;
+    optinWrap.style.display = (planoTemWa && numOk) ? 'flex' : 'none';
   };
 
   wpInput.removeEventListener('input', mostrar);
