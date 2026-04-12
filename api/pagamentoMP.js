@@ -783,6 +783,26 @@ export default async function handler(req, res) {
           } catch (e) { /* não fatal */ }
         }
 
+        // ── WhatsApp: confirmar opt-in e salvar número normalizado ──
+        // Executado apenas após pagamento confirmado — garante que só assinantes
+        // ativos com consentimento real terão whatsapp_number preenchido.
+        try {
+          const waRaw    = usuarioData?.whatsapp || null;
+          const waOptIn  = !!usuarioData?.whatsapp_opt_in;
+          const waNumber = waRaw ? String(waRaw).replace(/\D/g, '') : '';
+
+          if (waOptIn && waNumber.length >= 10) {
+            await db.collection('usuarios').doc(userId).update({
+              whatsapp_number:              waNumber,   // dígitos normalizados — usado no painel de disparo
+              whatsapp_optin:               true,
+              whatsapp_optin_confirmado_em: admin.firestore.FieldValue.serverTimestamp()
+            });
+          }
+        } catch (e) {
+          // não fatal — não impede o fluxo de ativação da assinatura
+          console.warn('[webhook] Falha ao salvar whatsapp_number:', e.message || e);
+        }
+
         // fix #3: controle de idempotência de envio usando apenas assinRef
         const logKey = `enviosAutomaticos.${String(pedidoId)}`;
         let devoEnviar = false;
