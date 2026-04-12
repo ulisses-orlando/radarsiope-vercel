@@ -409,6 +409,38 @@
       cursor: pointer;
     }
 
+    /* ── WhatsApp opt-in ── */
+    .rs-whatsapp-wrap {
+      display: none;
+      align-items: flex-start;
+      gap: 8px;
+      margin-top: 8px;
+      padding: 10px 12px;
+      background: #f0fdf4;
+      border: 1.5px solid #bbf7d0;
+      border-radius: 8px;
+    }
+    .rs-whatsapp-wrap input[type="checkbox"] {
+      width: 16px;
+      height: 16px;
+      margin-top: 2px;
+      flex-shrink: 0;
+      accent-color: #16a34a;
+    }
+    .rs-whatsapp-wrap label {
+      font-size: 12px;
+      color: #166534;
+      line-height: 1.5;
+      cursor: pointer;
+      font-weight: 500;
+    }
+    .rs-whatsapp-wrap label span.wa-detalhe {
+      display: block;
+      font-weight: 400;
+      color: #4b7a59;
+      margin-top: 2px;
+    }
+
     /* ── Segurança / rodapé ── */
     .rs-seguranca {
       text-align: center;
@@ -489,11 +521,12 @@
           <label for="whatsapp">WhatsApp</label>
           <input type="tel" id="whatsapp" placeholder="(00) 00000-0000" />
           <span id="error-whatsapp" class="field-error"></span>
-          <!-- opt-in WhatsApp -->
-          <div class="rs-whatsapp-wrap" id="whatsapp-optin-wrap" style="display:none">
+          <!-- opt-in WhatsApp — visível apenas para planos com alertas via WhatsApp -->
+          <div class="rs-whatsapp-wrap" id="whatsapp-optin-wrap">
             <input type="checkbox" id="whatsapp-optin" checked />
             <label for="whatsapp-optin">
-              Aceito receber alertas e novidades pelo WhatsApp
+              Autorizo o Radar SIOPE a enviar alertas e comunicados para este número
+              <span class="wa-detalhe">Você pode revogar este consentimento a qualquer momento pelo canal de suporte.</span>
             </label>
           </div>
         </div>
