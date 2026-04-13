@@ -2553,7 +2553,7 @@
       // carrega conteúdo da aba
       //      if (tabId === 'usuarios') carregarUsuariosComFiltro();
       if (tabId === 'planos') {
-        carregarPlanos();
+        await carregarPlanos();
         atualizarHeaderTabelaPlanos();
       }
       else if (tabId === 'cupons') carregarCupons();
