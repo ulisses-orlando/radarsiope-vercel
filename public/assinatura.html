@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
+
 <head>
   <meta charset="UTF-8" />
   <title>Assinatura – Radar SIOPE</title>
@@ -9,7 +10,11 @@
   <link rel="stylesheet" href="css/capturaLead.css" />
   <style>
     /* ── Reset base ── */
-    *, *::before, *::after { box-sizing: border-box; }
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box;
+    }
 
     body {
       font-family: system-ui, -apple-system, sans-serif;
@@ -31,16 +36,19 @@
       text-align: center;
       margin-bottom: 28px;
     }
+
     .rs-header img {
       height: 48px;
       margin-bottom: 12px;
     }
+
     .rs-header h1 {
       font-size: 22px;
       font-weight: 700;
       color: #0A3D62;
       margin: 0 0 6px;
     }
+
     .rs-header p {
       font-size: 14px;
       color: #666;
@@ -53,8 +61,9 @@
       border-radius: 12px;
       padding: 20px;
       margin-bottom: 16px;
-      box-shadow: 0 1px 4px rgba(0,0,0,.06);
+      box-shadow: 0 1px 4px rgba(0, 0, 0, .06);
     }
+
     .rs-section-title {
       font-size: 13px;
       font-weight: 700;
@@ -67,7 +76,10 @@
     }
 
     /* ── Campos ── */
-    .rs-field { margin-bottom: 14px; }
+    .rs-field {
+      margin-bottom: 14px;
+    }
+
     .rs-field label {
       display: block;
       font-size: 13px;
@@ -75,6 +87,7 @@
       color: #444;
       margin-bottom: 5px;
     }
+
     .rs-field input,
     .rs-field select,
     .rs-field textarea {
@@ -88,13 +101,19 @@
       transition: border-color .15s;
       outline: none;
     }
+
     .rs-field input:focus,
     .rs-field select:focus,
     .rs-field textarea:focus {
       border-color: #0A3D62;
-      box-shadow: 0 0 0 3px rgba(10,61,98,.1);
+      box-shadow: 0 0 0 3px rgba(10, 61, 98, .1);
     }
-    .rs-field textarea { resize: vertical; min-height: 72px; }
+
+    .rs-field textarea {
+      resize: vertical;
+      min-height: 72px;
+    }
+
     .rs-field .field-error {
       display: none;
       font-size: 11px;
@@ -108,7 +127,12 @@
       grid-template-columns: 1fr 1fr;
       gap: 12px;
     }
-    @media (max-width: 480px) { .rs-grid-2 { grid-template-columns: 1fr; } }
+
+    @media (max-width: 480px) {
+      .rs-grid-2 {
+        grid-template-columns: 1fr;
+      }
+    }
 
     /* ── Toggle ciclo mensal/anual ── */
     .rs-ciclo-toggle {
@@ -119,6 +143,7 @@
       gap: 4px;
       margin-bottom: 20px;
     }
+
     .rs-ciclo-toggle button {
       flex: 1;
       padding: 9px;
@@ -132,11 +157,13 @@
       transition: all .2s;
       position: relative;
     }
+
     .rs-ciclo-toggle button.ativo {
       background: #fff;
       color: #0A3D62;
-      box-shadow: 0 1px 4px rgba(0,0,0,.1);
+      box-shadow: 0 1px 4px rgba(0, 0, 0, .1);
     }
+
     .rs-ciclo-toggle .rs-badge-economia {
       position: absolute;
       top: -8px;
@@ -156,8 +183,18 @@
       gap: 12px;
       grid-template-columns: 1fr;
     }
-    @media (min-width: 560px) { #planos-cards { grid-template-columns: 1fr 1fr; } }
-    @media (min-width: 900px) { #planos-cards { grid-template-columns: repeat(3, 1fr); } }
+
+    @media (min-width: 560px) {
+      #planos-cards {
+        grid-template-columns: 1fr 1fr;
+      }
+    }
+
+    @media (min-width: 900px) {
+      #planos-cards {
+        grid-template-columns: repeat(3, 1fr);
+      }
+    }
 
     .plano-card {
       position: relative;
@@ -171,17 +208,24 @@
       /* faixa colorida no topo — visível apenas em destaque */
       border-top: 2px solid #e0e6f0;
     }
+
     .plano-card:hover {
-      box-shadow: 0 4px 16px rgba(0,0,0,.1);
+      box-shadow: 0 4px 16px rgba(0, 0, 0, .1);
       transform: translateY(-2px);
     }
-    .plano-card input[type="radio"] { position: absolute; opacity: 0; pointer-events: none; }
+
+    .plano-card input[type="radio"] {
+      position: absolute;
+      opacity: 0;
+      pointer-events: none;
+    }
 
     /* SELECIONADO — fundo suave + check no canto. Sem contorno. */
     .plano-card.selecionado {
       background: color-mix(in srgb, var(--plano-cor, #0A3D62) 6%, #fff);
-      box-shadow: 0 2px 12px rgba(0,0,0,.08);
+      box-shadow: 0 2px 12px rgba(0, 0, 0, .08);
     }
+
     /* Ícone ✓ no canto superior direito ao selecionar */
     .plano-card.selecionado::after {
       content: '✓';
@@ -205,7 +249,8 @@
     /* DESTAQUE — faixa colorida no topo. Independente da seleção. */
     .plano-card.destaque {
       border-top: 4px solid var(--plano-cor, #0A3D62);
-      padding-top: 14px; /* compensa os 2px extras da borda */
+      padding-top: 14px;
+      /* compensa os 2px extras da borda */
     }
 
     /* Badge flutua acima do card — só em destaque */
@@ -223,42 +268,52 @@
       white-space: nowrap;
       pointer-events: none;
     }
+
     .plano-nome {
       font-size: 15px;
       font-weight: 700;
       color: #1a1a2e;
       margin-bottom: 4px;
     }
-    .plano-preco-wrap { margin: 8px 0; }
+
+    .plano-preco-wrap {
+      margin: 8px 0;
+    }
+
     .plano-preco-valor {
       font-size: 22px;
       font-weight: 800;
       color: var(--plano-cor, #0A3D62);
       line-height: 1;
     }
+
     .plano-preco-ciclo {
       font-size: 12px;
       color: #888;
       margin-left: 2px;
     }
+
     .plano-preco-anual-economia {
       font-size: 11px;
       color: #16a34a;
       font-weight: 600;
       margin-top: 2px;
     }
+
     .plano-descricao {
       font-size: 12px;
       color: #666;
       line-height: 1.4;
       margin: 6px 0 10px;
     }
+
     .plano-features {
       list-style: none;
       padding: 0;
       margin: 0;
       font-size: 12px;
     }
+
     .plano-features li {
       padding: 3px 0;
       color: #444;
@@ -266,14 +321,22 @@
       align-items: flex-start;
       gap: 5px;
     }
+
     .plano-features li::before {
       content: '✓';
       color: #16a34a;
       font-weight: 700;
       flex-shrink: 0;
     }
-    .plano-features li.inativo { color: #bbb; }
-    .plano-features li.inativo::before { content: '–'; color: #ccc; }
+
+    .plano-features li.inativo {
+      color: #bbb;
+    }
+
+    .plano-features li.inativo::before {
+      content: '–';
+      color: #ccc;
+    }
 
     /* ── WhatsApp opt-in ── */
     .rs-whatsapp-wrap {
@@ -287,7 +350,13 @@
       margin-top: 8px;
       font-size: 13px;
     }
-    .rs-whatsapp-wrap input[type="checkbox"] { width: 16px; height: 16px; cursor: pointer; flex-shrink: 0; }
+
+    .rs-whatsapp-wrap input[type="checkbox"] {
+      width: 16px;
+      height: 16px;
+      cursor: pointer;
+      flex-shrink: 0;
+    }
 
     /* ── Cupom ── */
     .rs-cupom-row {
@@ -295,7 +364,11 @@
       gap: 8px;
       align-items: center;
     }
-    .rs-cupom-row input { flex: 1; }
+
+    .rs-cupom-row input {
+      flex: 1;
+    }
+
     .rs-cupom-row button {
       padding: 10px 16px;
       background: #0A3D62;
@@ -307,7 +380,10 @@
       cursor: pointer;
       white-space: nowrap;
     }
-    .rs-cupom-row button:hover { background: #1A5276; }
+
+    .rs-cupom-row button:hover {
+      background: #1A5276;
+    }
 
     /* ── Preview resumo ── */
     #preview-breakdown {
@@ -317,7 +393,12 @@
       border-radius: 10px;
       padding: 14px 16px;
     }
-    #preview-breakdown strong { font-size: 14px; color: #0A3D62; }
+
+    #preview-breakdown strong {
+      font-size: 14px;
+      color: #0A3D62;
+    }
+
     .preview-row {
       display: flex;
       justify-content: space-between;
@@ -325,6 +406,7 @@
       padding: 4px 0;
       color: #555;
     }
+
     .preview-row.total {
       border-top: 1px solid #bfdbfe;
       margin-top: 6px;
@@ -333,7 +415,10 @@
       font-size: 15px;
       color: #0A3D62;
     }
-    .preview-row.desconto { color: #16a34a; }
+
+    .preview-row.desconto {
+      color: #16a34a;
+    }
 
     /* ── Termos ── */
     .rs-termos {
@@ -341,6 +426,7 @@
       border-radius: 8px;
       padding: 12px;
     }
+
     .rs-termos label {
       display: flex;
       align-items: flex-start;
@@ -350,8 +436,17 @@
       cursor: pointer;
       line-height: 1.5;
     }
-    .rs-termos input[type="checkbox"] { width: 16px; height: 16px; margin-top: 2px; flex-shrink: 0; }
-    .rs-termos a { color: #0A3D62; }
+
+    .rs-termos input[type="checkbox"] {
+      width: 16px;
+      height: 16px;
+      margin-top: 2px;
+      flex-shrink: 0;
+    }
+
+    .rs-termos a {
+      color: #0A3D62;
+    }
 
     /* ── Botão submeter ── */
     #btn-assinar {
@@ -367,8 +462,15 @@
       margin-top: 4px;
       transition: background .2s;
     }
-    #btn-assinar:hover:not(:disabled) { background: #1A5276; }
-    #btn-assinar:disabled { opacity: .6; cursor: not-allowed; }
+
+    #btn-assinar:hover:not(:disabled) {
+      background: #1A5276;
+    }
+
+    #btn-assinar:disabled {
+      opacity: .6;
+      cursor: not-allowed;
+    }
 
     #status-envio {
       text-align: center;
@@ -384,10 +486,11 @@
       inset: 0;
       align-items: center;
       justify-content: center;
-      background: rgba(0,0,0,.45);
+      background: rgba(0, 0, 0, .45);
       z-index: 9999;
       padding: 16px;
     }
+
     .modal-box {
       background: #fff;
       border-radius: 14px;
@@ -396,8 +499,20 @@
       width: 100%;
       text-align: center;
     }
-    .modal-box h3 { color: #0A3D62; font-size: 20px; margin: 0 0 10px; }
-    .modal-box p { color: #555; font-size: 14px; margin: 0 0 20px; line-height: 1.5; }
+
+    .modal-box h3 {
+      color: #0A3D62;
+      font-size: 20px;
+      margin: 0 0 10px;
+    }
+
+    .modal-box p {
+      color: #555;
+      font-size: 14px;
+      margin: 0 0 20px;
+      line-height: 1.5;
+    }
+
     .modal-box button {
       padding: 10px 28px;
       background: #0A3D62;
@@ -420,6 +535,7 @@
       border: 1.5px solid #bbf7d0;
       border-radius: 8px;
     }
+
     .rs-whatsapp-wrap input[type="checkbox"] {
       width: 16px;
       height: 16px;
@@ -427,6 +543,7 @@
       flex-shrink: 0;
       accent-color: #16a34a;
     }
+
     .rs-whatsapp-wrap label {
       font-size: 12px;
       color: #166534;
@@ -434,6 +551,7 @@
       cursor: pointer;
       font-weight: 500;
     }
+
     .rs-whatsapp-wrap label span.wa-detalhe {
       display: block;
       font-weight: 400;
@@ -449,194 +567,250 @@
       margin-top: 20px;
       line-height: 1.6;
     }
-    .rs-seguranca span { margin: 0 6px; }
+
+    .rs-seguranca span {
+      margin: 0 6px;
+    }
+
+    /* ── Plano "Em breve" — adicionar ao CSS do assinatura.html ───────────────── */
+
+    /* Card com estado bloqueado */
+    .plano-card.em-breve {
+      cursor: default;
+      pointer-events: none;
+      /* impede qualquer interação */
+      position: relative;
+      opacity: 0.82;
+      filter: grayscale(20%);
+    }
+
+    /* Tarja "🚀 Em breve" — substitui o badge de destaque */
+    .plano-badge-em-breve {
+      position: absolute;
+      top: -1px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: linear-gradient(90deg, #d97706, #f59e0b);
+      color: #fff;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: .04em;
+      text-transform: uppercase;
+      padding: 4px 14px;
+      border-radius: 0 0 8px 8px;
+      white-space: nowrap;
+      box-shadow: 0 2px 8px rgba(217, 119, 6, .35);
+      z-index: 2;
+    }
+
+    /* Conteúdo interno ligeiramente opaco */
+    .plano-content--bloqueado {
+      opacity: 0.75;
+    }
+
+    /* Aviso textual no rodapé do card */
+    .plano-em-breve-aviso {
+      margin-top: 10px;
+      padding: 7px 10px;
+      background: #fffbeb;
+      border: 1px solid #fde68a;
+      border-radius: 6px;
+      font-size: 11.5px;
+      color: #92400e;
+      text-align: center;
+      line-height: 1.4;
+    }
   </style>
 </head>
 
 <body>
-<div class="rs-container">
+  <div class="rs-container">
 
-  <!-- Cabeçalho -->
-  <div class="rs-header">
-    <img src="icons/icon-192x192.png" alt="Radar SIOPE" onerror="this.style.display='none'">
-    <h1>📡 Assine o Radar SIOPE</h1>
-    <p>O guia da educação digital para o seu município. Fundeb, Siope e CACS-Fundeb</p>
-  </div>
-
-  <form id="form-assinatura" novalidate>
-    <input type="hidden" id="planId" />
-    <input type="hidden" id="planCiclo" value="mensal" />
-
-    <!-- ── SEÇÃO 1: Escolha do Plano ── -->
-    <div class="rs-section" id="secao-planos">
-      <div class="rs-section-title">📋 Escolha seu plano</div>
-
-      <!-- Toggle mensal / anual -->
-      <div class="rs-ciclo-toggle">
-        <button type="button" id="btn-ciclo-mensal" class="ativo" onclick="selecionarCiclo('mensal')">
-          Mensal
-        </button>
-        <button type="button" id="btn-ciclo-anual" onclick="selecionarCiclo('anual')">
-          Anual
-          <span class="rs-badge-economia">2 meses grátis</span>
-        </button>
-      </div>
-
-      <!-- Cards de plano renderizados pelo JS -->
-      <div id="planos-lista">
-        <div id="planos-cards"></div>
-      </div>
+    <!-- Cabeçalho -->
+    <div class="rs-header">
+      <img src="icons/icon-192x192.png" alt="Radar SIOPE" onerror="this.style.display='none'">
+      <h1>📡 Assine o Radar SIOPE</h1>
+      <p>O guia da educação digital para o seu município. Fundeb, Siope e CACS-Fundeb</p>
     </div>
 
-    <!-- ── SEÇÃO 2: Seus dados ── -->
-    <div class="rs-section">
-      <div class="rs-section-title">👤 Seus dados</div>
+    <form id="form-assinatura" novalidate>
+      <input type="hidden" id="planId" />
+      <input type="hidden" id="planCiclo" value="mensal" />
 
-      <div class="rs-field">
-        <label for="nome">Nome completo *</label>
-        <input type="text" id="nome" autocomplete="name" placeholder="Seu nome" required />
-        <span id="error-nome" class="field-error"></span>
+      <!-- ── SEÇÃO 1: Escolha do Plano ── -->
+      <div class="rs-section" id="secao-planos">
+        <div class="rs-section-title">📋 Escolha seu plano</div>
+
+        <!-- Toggle mensal / anual -->
+        <div class="rs-ciclo-toggle">
+          <button type="button" id="btn-ciclo-mensal" class="ativo" onclick="selecionarCiclo('mensal')">
+            Mensal
+          </button>
+          <button type="button" id="btn-ciclo-anual" onclick="selecionarCiclo('anual')">
+            Anual
+            <span class="rs-badge-economia">2 meses grátis</span>
+          </button>
+        </div>
+
+        <!-- Cards de plano renderizados pelo JS -->
+        <div id="planos-lista">
+          <div id="planos-cards"></div>
+        </div>
       </div>
 
-      <div class="rs-grid-2">
-        <div class="rs-field">
-          <label for="cpf">CPF *</label>
-          <input type="text" id="cpf" maxlength="14" placeholder="000.000.000-00" required />
-          <span id="error-cpf" class="field-error"></span>
-        </div>
-        <div class="rs-field">
-          <label for="email">E-mail *</label>
-          <input type="email" id="email" autocomplete="email" placeholder="seu@email.com" required />
-          <span id="error-email" class="field-error"></span>
-        </div>
-      </div>
+      <!-- ── SEÇÃO 2: Seus dados ── -->
+      <div class="rs-section">
+        <div class="rs-section-title">👤 Seus dados</div>
 
-      <div class="rs-grid-2">
         <div class="rs-field">
-          <label for="telefone">Telefone</label>
-          <input type="tel" id="telefone" autocomplete="tel" placeholder="(00) 00000-0000" />
-          <span id="error-telefone" class="field-error"></span>
+          <label for="nome">Nome completo *</label>
+          <input type="text" id="nome" autocomplete="name" placeholder="Seu nome" required />
+          <span id="error-nome" class="field-error"></span>
         </div>
-        <div class="rs-field">
-          <label for="whatsapp">WhatsApp</label>
-          <input type="tel" id="whatsapp" placeholder="(00) 00000-0000" />
-          <span id="error-whatsapp" class="field-error"></span>
-          <!-- opt-in WhatsApp — visível apenas para planos com alertas via WhatsApp -->
-          <div class="rs-whatsapp-wrap" id="whatsapp-optin-wrap">
-            <input type="checkbox" id="whatsapp-optin" checked />
-            <label for="whatsapp-optin">
-              Autorizo o Radar SIOPE a enviar alertas e comunicados para este número
-              <span class="wa-detalhe">Você pode revogar este consentimento a qualquer momento pelo canal de suporte.</span>
-            </label>
+
+        <div class="rs-grid-2">
+          <div class="rs-field">
+            <label for="cpf">CPF *</label>
+            <input type="text" id="cpf" maxlength="14" placeholder="000.000.000-00" required />
+            <span id="error-cpf" class="field-error"></span>
+          </div>
+          <div class="rs-field">
+            <label for="email">E-mail *</label>
+            <input type="email" id="email" autocomplete="email" placeholder="seu@email.com" required />
+            <span id="error-email" class="field-error"></span>
           </div>
         </div>
-      </div>
 
-      <!-- UF e Município — injetado pelo functions.js -->
-      <div id="campo-uf-municipio"></div>
+        <div class="rs-grid-2">
+          <div class="rs-field">
+            <label for="telefone">Telefone</label>
+            <input type="tel" id="telefone" autocomplete="tel" placeholder="(00) 00000-0000" />
+            <span id="error-telefone" class="field-error"></span>
+          </div>
+          <div class="rs-field">
+            <label for="whatsapp">WhatsApp</label>
+            <input type="tel" id="whatsapp" placeholder="(00) 00000-0000" />
+            <span id="error-whatsapp" class="field-error"></span>
+            <!-- opt-in WhatsApp — visível apenas para planos com alertas via WhatsApp -->
+            <div class="rs-whatsapp-wrap" id="whatsapp-optin-wrap">
+              <input type="checkbox" id="whatsapp-optin" checked />
+              <label for="whatsapp-optin">
+                Autorizo o Radar SIOPE a enviar alertas e comunicados para este número
+                <span class="wa-detalhe">Você pode revogar este consentimento a qualquer momento pelo canal de
+                  suporte.</span>
+              </label>
+            </div>
+          </div>
+        </div>
 
-      <div class="rs-grid-2">
+        <!-- UF e Município — injetado pelo functions.js -->
+        <div id="campo-uf-municipio"></div>
+
+        <div class="rs-grid-2">
+          <div class="rs-field">
+            <label for="perfil">Perfil *</label>
+            <select id="perfil" required>
+              <option value="">Selecione...</option>
+              <option value="prefeito">Prefeito</option>
+              <option value="secretario">Secretário(a) de Educação</option>
+              <option value="tecnico">Técnico de Educação</option>
+              <option value="contador">Contador(a)</option>
+              <option value="pesquisador">Pesquisador(a)</option>
+              <option value="cacs">Conselheiro CACS</option>
+              <option value="cidadao">Cidadão</option>
+            </select>
+          </div>
+          <div class="rs-field">
+            <label for="preferencia-contato">Preferência de contato</label>
+            <select id="preferencia-contato">
+              <option value="">Selecione...</option>
+              <option value="E-mail">📧 E-mail</option>
+              <option value="WhatsApp">🟢 WhatsApp</option>
+              <option value="Ligação">📞 Ligação</option>
+            </select>
+          </div>
+        </div>
+
         <div class="rs-field">
-          <label for="perfil">Perfil *</label>
-          <select id="perfil" required>
-            <option value="">Selecione...</option>
-            <option value="prefeito">Prefeito</option>
-            <option value="secretario">Secretário(a) de Educação</option>
-            <option value="tecnico">Técnico de Educação</option>
-            <option value="contador">Contador(a)</option>
-            <option value="pesquisador">Pesquisador(a)</option>
-            <option value="cacs">Conselheiro CACS</option>
-            <option value="cidadao">Cidadão</option>
-          </select>
+          <label for="mensagem">Mensagem / Observações <span
+              style="font-weight:400;color:#999">(opcional)</span></label>
+          <textarea id="mensagem" placeholder="Alguma dúvida ou informação adicional?"></textarea>
         </div>
+      </div>
+
+      <!-- ── SEÇÃO 3: Tipos de newsletter ── -->
+      <div class="rs-section" id="secao-newsletters">
+        <div class="rs-section-title">📰 Tipos de newsletter</div>
+        <div id="campo-newsletters"></div>
+      </div>
+
+      <!-- ── SEÇÃO 4: Cupom ── -->
+      <div class="rs-section">
+        <div class="rs-section-title">🎟️ Cupom de desconto</div>
         <div class="rs-field">
-          <label for="preferencia-contato">Preferência de contato</label>
-          <select id="preferencia-contato">
-            <option value="">Selecione...</option>
-            <option value="E-mail">📧 E-mail</option>
-            <option value="WhatsApp">🟢 WhatsApp</option>
-            <option value="Ligação">📞 Ligação</option>
-          </select>
+          <div class="rs-cupom-row">
+            <input type="text" id="cupom" placeholder="Digite seu cupom (opcional)" />
+            <button type="button" id="aplicar-cupom">Aplicar</button>
+          </div>
+          <span id="error-cupom" class="field-error"></span>
+          <div id="cupom-feedback" style="font-size:12px;margin-top:6px"></div>
         </div>
       </div>
 
-      <div class="rs-field">
-        <label for="mensagem">Mensagem / Observações <span style="font-weight:400;color:#999">(opcional)</span></label>
-        <textarea id="mensagem" placeholder="Alguma dúvida ou informação adicional?"></textarea>
+      <!-- ── SEÇÃO 5: Resumo / Preview ── -->
+      <div id="preview-breakdown" class="rs-section">
+        <div class="rs-section-title">📊 Resumo da assinatura</div>
+        <div id="preview-items"></div>
+        <div id="preview-total"></div>
       </div>
-    </div>
 
-    <!-- ── SEÇÃO 3: Tipos de newsletter ── -->
-    <div class="rs-section" id="secao-newsletters">
-      <div class="rs-section-title">📰 Tipos de newsletter</div>
-      <div id="campo-newsletters"></div>
-    </div>
-
-    <!-- ── SEÇÃO 4: Cupom ── -->
-    <div class="rs-section">
-      <div class="rs-section-title">🎟️ Cupom de desconto</div>
-      <div class="rs-field">
-        <div class="rs-cupom-row">
-          <input type="text" id="cupom" placeholder="Digite seu cupom (opcional)" />
-          <button type="button" id="aplicar-cupom">Aplicar</button>
+      <!-- ── SEÇÃO 6: Termos e pagamento ── -->
+      <div class="rs-section">
+        <div class="rs-section-title">✅ Confirmação</div>
+        <div class="rs-termos">
+          <label>
+            <input type="checkbox" id="aceita-termos" />
+            <span>Li e concordo com os <a href="https://www.radarsiope.com.br/termos" target="_blank">Termos de
+                Assinatura</a> do Radar SIOPE.</span>
+          </label>
+          <span id="error-aceita_termos" class="field-error"></span>
         </div>
-        <span id="error-cupom" class="field-error"></span>
-        <div id="cupom-feedback" style="font-size:12px;margin-top:6px"></div>
-      </div>
-    </div>
 
-    <!-- ── SEÇÃO 5: Resumo / Preview ── -->
-    <div id="preview-breakdown" class="rs-section">
-      <div class="rs-section-title">📊 Resumo da assinatura</div>
-      <div id="preview-items"></div>
-      <div id="preview-total"></div>
-    </div>
-
-    <!-- ── SEÇÃO 6: Termos e pagamento ── -->
-    <div class="rs-section">
-      <div class="rs-section-title">✅ Confirmação</div>
-      <div class="rs-termos">
-        <label>
-          <input type="checkbox" id="aceita-termos" />
-          <span>Li e concordo com os <a href="https://www.radarsiope.com.br/termos" target="_blank">Termos de Assinatura</a> do Radar SIOPE.</span>
-        </label>
-        <span id="error-aceita_termos" class="field-error"></span>
+        <button type="submit" id="btn-assinar" style="margin-top:16px">
+          🔒 Confirmar e Pagar
+        </button>
+        <p id="status-envio"></p>
       </div>
 
-      <button type="submit" id="btn-assinar" style="margin-top:16px">
-        🔒 Confirmar e Pagar
-      </button>
-      <p id="status-envio"></p>
+    </form><!-- /form-assinatura -->
+
+    <!-- Rodapé segurança -->
+    <div class="rs-seguranca">
+      <span>🔒 Pagamento seguro via Mercado Pago</span>
+      <span>·</span>
+      <span>🛡️ Dados protegidos pela LGPD</span>
+      <span>·</span>
+      <span>📧 Cancele quando quiser</span>
     </div>
 
-  </form><!-- /form-assinatura -->
+  </div><!-- /rs-container -->
 
-  <!-- Rodapé segurança -->
-  <div class="rs-seguranca">
-    <span>🔒 Pagamento seguro via Mercado Pago</span>
-    <span>·</span>
-    <span>🛡️ Dados protegidos pela LGPD</span>
-    <span>·</span>
-    <span>📧 Cancele quando quiser</span>
+  <!-- Modal de confirmação -->
+  <div id="modalConfirmacao">
+    <div class="modal-box">
+      <h3>🎉 Pedido recebido!</h3>
+      <p id="modal-msg">Seu pedido foi criado. Você será redirecionado para o pagamento.</p>
+      <button onclick="document.getElementById('modalConfirmacao').style.display='none'">Fechar</button>
+    </div>
   </div>
 
-</div><!-- /rs-container -->
-
-<!-- Modal de confirmação -->
-<div id="modalConfirmacao">
-  <div class="modal-box">
-    <h3>🎉 Pedido recebido!</h3>
-    <p id="modal-msg">Seu pedido foi criado. Você será redirecionado para o pagamento.</p>
-    <button onclick="document.getElementById('modalConfirmacao').style.display='none'">Fechar</button>
-  </div>
-</div>
-
-<!-- Firebase -->
-<script src="https://www.gstatic.com/firebasejs/10.0.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.0.0/firebase-firestore-compat.js"></script>
-<script src="js/firebase-init.js"></script>
-<script src="js/functions.js"></script>
-<script src="js/features.js"></script>
-<script src="js/assinatura.js"></script>
+  <!-- Firebase -->
+  <script src="https://www.gstatic.com/firebasejs/10.0.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.0.0/firebase-firestore-compat.js"></script>
+  <script src="js/firebase-init.js"></script>
+  <script src="js/functions.js"></script>
+  <script src="js/features.js"></script>
+  <script src="js/assinatura.js"></script>
 </body>
+
 </html>
