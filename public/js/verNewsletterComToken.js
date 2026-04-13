@@ -1135,6 +1135,8 @@ async function VerNewsletterComToken() {
     // 12. Exibe com fade-in
     mostrarApp();
 
+    if (acesso.isAssinante) iniciarChatFAB(newsletter, uid); 
+
     // 13. Iniciar drawer (após app visível)
     iniciarDrawer(newsletter);
 
@@ -2312,6 +2314,460 @@ async function renderSecaoFeedbacks(newsletter) {
   }).join('');
 
   window._secaoFeedbackCurrentNewsletter = newsletter;
+}
+
+// ─── Chat FAB — Pergunte ao Radar ────────────────────────────────────────────
+ 
+function iniciarChatFAB(newsletter, uid) {
+  // Remove instância anterior (caso o usuário navegue entre edições sem reload)
+  document.getElementById('rs-chat-fab')?.remove();
+  document.getElementById('rs-chat-sheet')?.remove();
+  document.getElementById('rs-chat-backdrop')?.remove();
+ 
+  const nid        = newsletter.id;
+  const edicaoNum  = newsletter.numero || newsletter.edicao || '';
+  const sessionKey = `rs_chat_seen_${nid}`;   // badge "N" some após primeiro clique
+  const isNew      = !sessionStorage.getItem(sessionKey);
+ 
+  // ── Injetar estilos (uma única vez) ──────────────────────────────────────
+  if (!document.getElementById('rs-chat-styles')) {
+    const style = document.createElement('style');
+    style.id = 'rs-chat-styles';
+    style.textContent = `
+      /* FAB */
+      #rs-chat-fab {
+        position: fixed;
+        bottom: 68px;          /* acima dos botões de tema */
+        right: 16px;
+        width: 52px; height: 52px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #f97316, #ef4444);
+        border: none; cursor: pointer;
+        display: flex; align-items: center; justify-content: center;
+        z-index: 900;
+        box-shadow: 0 4px 18px rgba(249,115,22,.45);
+        transition: opacity .22s ease, transform .18s ease, box-shadow .18s ease;
+        animation: rsChatFabPop .4s cubic-bezier(.34,1.56,.64,1) .3s both;
+      }
+      #rs-chat-fab:hover  { transform: scale(1.08); box-shadow: 0 8px 28px rgba(249,115,22,.55); }
+      #rs-chat-fab:active { transform: scale(.93); }
+      #rs-chat-fab.oculto { opacity: 0; pointer-events: none; }
+ 
+      #rs-chat-fab .rs-chat-badge {
+        position: absolute; top: 2px; right: 2px;
+        width: 15px; height: 15px; border-radius: 50%;
+        background: #22c55e; border: 2px solid var(--rs-bg, #f4f6f9);
+        display: flex; align-items: center; justify-content: center;
+        font-size: 7px; color: #fff; font-weight: 700; font-family: sans-serif;
+        animation: rsChatBadgePop .35s cubic-bezier(.34,1.56,.64,1) .7s both;
+      }
+ 
+      /* Backdrop */
+      #rs-chat-backdrop {
+        position: fixed; inset: 0;
+        background: rgba(0,0,0,.45);
+        z-index: 910;
+        animation: rsChatFadeIn .2s ease;
+      }
+ 
+      /* Bottom sheet */
+      #rs-chat-sheet {
+        position: fixed;
+        bottom: 0; left: 0; right: 0;
+        height: 74vh;
+        background: var(--rs-card, #fff);
+        border-radius: 20px 20px 0 0;
+        z-index: 920;
+        display: flex; flex-direction: column;
+        box-shadow: 0 -8px 40px rgba(0,0,0,.18);
+        animation: rsChatSlideUp .35s cubic-bezier(.32,.72,0,1);
+      }
+ 
+      .rs-chat-handle-wrap {
+        display: flex; justify-content: center; padding: 11px 0 3px;
+      }
+      .rs-chat-handle {
+        width: 36px; height: 4px; border-radius: 2px;
+        background: var(--rs-borda, #e2e8f0);
+      }
+ 
+      .rs-chat-header {
+        padding: 9px 18px 11px;
+        border-bottom: 1px solid var(--rs-borda, #e2e8f0);
+        display: flex; align-items: center; gap: 11px;
+        flex-shrink: 0;
+      }
+      .rs-chat-header-avatar {
+        width: 36px; height: 36px; border-radius: 50%;
+        background: linear-gradient(135deg, #f97316, #ef4444);
+        display: flex; align-items: center; justify-content: center;
+        font-size: 16px; flex-shrink: 0;
+        box-shadow: 0 2px 10px rgba(249,115,22,.35);
+      }
+      .rs-chat-header-titulo {
+        font-size: 14px; font-weight: 700;
+        color: var(--rs-texto, #0f172a);
+        font-family: Georgia, serif; line-height: 1.2;
+      }
+      .rs-chat-header-sub {
+        font-size: 10.5px; color: #22c55e; font-family: sans-serif;
+      }
+      .rs-chat-header-close {
+        margin-left: auto;
+        background: var(--rs-fundo-alt, #f1f5f9);
+        border: none; border-radius: 8px;
+        width: 30px; height: 30px; cursor: pointer;
+        font-size: 17px; color: var(--rs-subtexto, #64748b);
+        display: flex; align-items: center; justify-content: center;
+        transition: background .15s;
+      }
+      .rs-chat-header-close:hover { background: var(--rs-borda, #e2e8f0); }
+ 
+      /* Mensagens */
+      #rs-chat-messages {
+        flex: 1; overflow-y: auto; padding: 14px 14px 6px;
+        display: flex; flex-direction: column; gap: 9px;
+      }
+      #rs-chat-messages::-webkit-scrollbar { width: 0; }
+ 
+      .rs-chat-msg-row {
+        display: flex;
+        animation: rsChatMsgIn .22s ease;
+      }
+      .rs-chat-msg-row.user  { justify-content: flex-end; }
+      .rs-chat-msg-row.assistant { justify-content: flex-start; align-items: flex-end; }
+ 
+      .rs-chat-avatar-mini {
+        width: 26px; height: 26px; border-radius: 50%;
+        background: linear-gradient(135deg, #f97316, #ef4444);
+        display: flex; align-items: center; justify-content: center;
+        margin-right: 7px; flex-shrink: 0; font-size: 11px;
+      }
+ 
+      .rs-chat-bubble {
+        max-width: 78%; padding: 9px 13px;
+        font-family: sans-serif; font-size: 13px; line-height: 1.55;
+      }
+      .rs-chat-bubble.user {
+        border-radius: 14px 14px 4px 14px;
+        background: linear-gradient(135deg, #1d4ed8, #2563eb);
+        color: #fff;
+        box-shadow: 0 2px 8px rgba(37,99,235,.25);
+      }
+      .rs-chat-bubble.assistant {
+        border-radius: 14px 14px 14px 4px;
+        background: var(--rs-fundo-alt, #f1f5f9);
+        color: var(--rs-texto, #0f172a);
+      }
+ 
+      /* Typing dots */
+      .rs-chat-typing {
+        display: flex; gap: 4px; padding: 10px 14px; align-items: center;
+        background: var(--rs-fundo-alt, #f1f5f9);
+        border-radius: 14px 14px 14px 4px;
+      }
+      .rs-chat-typing span {
+        width: 7px; height: 7px; border-radius: 50%;
+        background: #94a3b8; display: block;
+        animation: rsChatDot 1.2s infinite;
+      }
+      .rs-chat-typing span:nth-child(2) { animation-delay: .2s; }
+      .rs-chat-typing span:nth-child(3) { animation-delay: .4s; }
+ 
+      /* Disclaimer */
+      #rs-chat-disclaimer {
+        margin: 0 14px 7px; padding: 5px 9px;
+        background: #fffbeb; border: 1px solid #fde68a; border-radius: 7px;
+        display: flex; align-items: flex-start; gap: 5px;
+        font-family: sans-serif; font-size: 10px; color: #92400e; line-height: 1.4;
+        flex-shrink: 0;
+      }
+ 
+      /* Input bar */
+      #rs-chat-input-bar {
+        padding: 6px 12px 20px;
+        display: flex; gap: 8px; align-items: flex-end;
+        flex-shrink: 0;
+      }
+      #rs-chat-input-wrap {
+        flex: 1;
+        background: var(--rs-fundo-alt, #f8fafc);
+        border: 1.5px solid var(--rs-borda, #e2e8f0);
+        border-radius: 14px; padding: 9px 13px;
+        transition: border-color .15s;
+      }
+      #rs-chat-input-wrap:focus-within {
+        border-color: #f97316;
+      }
+      #rs-chat-input {
+        width: 100%; border: none; background: transparent; outline: none;
+        font-size: 13px; color: var(--rs-texto, #0f172a); font-family: sans-serif;
+      }
+      #rs-chat-send {
+        width: 42px; height: 42px; border-radius: 13px; flex-shrink: 0;
+        background: var(--rs-borda, #e2e8f0);
+        border: none; cursor: default;
+        display: flex; align-items: center; justify-content: center;
+        transition: all .2s ease;
+      }
+      #rs-chat-send.ativo {
+        background: linear-gradient(135deg, #f97316, #ef4444);
+        cursor: pointer;
+        box-shadow: 0 2px 10px rgba(249,115,22,.3);
+      }
+      #rs-chat-send.ativo:active { transform: scale(.93); }
+ 
+      /* Keyframes */
+      @keyframes rsChatFabPop {
+        0%   { transform: scale(0); opacity: 0; }
+        70%  { transform: scale(1.12); }
+        100% { transform: scale(1); opacity: 1; }
+      }
+      @keyframes rsChatBadgePop {
+        0%   { transform: scale(0); }
+        70%  { transform: scale(1.3); }
+        100% { transform: scale(1); }
+      }
+      @keyframes rsChatSlideUp {
+        from { transform: translateY(100%); }
+        to   { transform: translateY(0); }
+      }
+      @keyframes rsChatFadeIn {
+        from { opacity: 0; }
+        to   { opacity: 1; }
+      }
+      @keyframes rsChatMsgIn {
+        from { opacity: 0; transform: translateY(7px); }
+        to   { opacity: 1; transform: translateY(0); }
+      }
+      @keyframes rsChatDot {
+        0%,60%,100% { transform: translateY(0); opacity: .4; }
+        30%         { transform: translateY(-5px); opacity: 1; }
+      }
+    `;
+    document.head.appendChild(style);
+  }
+ 
+  // ── FAB ──────────────────────────────────────────────────────────────────
+  const fab = document.createElement('button');
+  fab.id = 'rs-chat-fab';
+  fab.setAttribute('aria-label', 'Pergunte ao Radar');
+  fab.innerHTML = `
+    <svg width="23" height="23" viewBox="0 0 24 24" fill="none">
+      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" fill="white"/>
+      <text x="12" y="13.5" text-anchor="middle" font-size="7.5"
+            fill="#f97316" font-weight="bold" font-family="sans-serif">✦</text>
+    </svg>
+    ${isNew ? '<div class="rs-chat-badge">N</div>' : ''}
+  `;
+  document.body.appendChild(fab);
+ 
+  // ── Hide/show FAB ao rolar (comportamento WhatsApp) ──────────────────────
+  let _lastScroll = 0;
+  const _scrollEl = document.getElementById('rs-app') || window;
+  const _onScroll = () => {
+    const curr = _scrollEl === window ? window.scrollY : _scrollEl.scrollTop;
+    if (curr > _lastScroll + 10)       fab.classList.add('oculto');
+    else if (curr < _lastScroll - 10)  fab.classList.remove('oculto');
+    _lastScroll = curr;
+  };
+  _scrollEl.addEventListener('scroll', _onScroll, { passive: true });
+ 
+  // ── Estado do chat ────────────────────────────────────────────────────────
+  let _mensagens = [];    // [{ role, text }]
+  let _digitando  = false;
+ 
+  // ── Abrir sheet ──────────────────────────────────────────────────────────
+  function _abrirChat() {
+    sessionStorage.setItem(sessionKey, '1');
+    fab.querySelector('.rs-chat-badge')?.remove();
+ 
+    // Cria backdrop
+    const backdrop = document.createElement('div');
+    backdrop.id = 'rs-chat-backdrop';
+    backdrop.onclick = _fecharChat;
+    document.body.appendChild(backdrop);
+ 
+    // Cria sheet
+    const sheet = document.createElement('div');
+    sheet.id = 'rs-chat-sheet';
+    sheet.innerHTML = `
+      <div class="rs-chat-handle-wrap"><div class="rs-chat-handle"></div></div>
+      <div class="rs-chat-header">
+        <div class="rs-chat-header-avatar">✦</div>
+        <div>
+          <div class="rs-chat-header-titulo">Pergunte ao Radar</div>
+          <div class="rs-chat-header-sub">● Edição ${_esc(String(edicaoNum))} · sessão atual</div>
+        </div>
+        <button class="rs-chat-header-close" aria-label="Fechar chat">×</button>
+      </div>
+      <div id="rs-chat-messages"></div>
+      <div id="rs-chat-disclaimer">
+        <span>⚠️</span>
+        <span>Respostas baseadas nesta edição. Verifique sempre a legislação vigente.</span>
+      </div>
+      <div id="rs-chat-input-bar">
+        <div id="rs-chat-input-wrap">
+          <input id="rs-chat-input" type="text"
+                 placeholder="Faça sua pergunta…" autocomplete="off" maxlength="400"/>
+        </div>
+        <button id="rs-chat-send" aria-label="Enviar">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none">
+            <path d="M22 2L11 13" stroke="#94a3b8" stroke-width="2.2" stroke-linecap="round"/>
+            <path d="M22 2L15 22L11 13L2 9L22 2Z" stroke="#94a3b8" stroke-width="2.2"
+                  stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </button>
+      </div>
+    `;
+    document.body.appendChild(sheet);
+ 
+    sheet.querySelector('.rs-chat-header-close').onclick = _fecharChat;
+ 
+    const input   = document.getElementById('rs-chat-input');
+    const sendBtn = document.getElementById('rs-chat-send');
+ 
+    input.addEventListener('input', () => {
+      const temTexto = input.value.trim().length > 0;
+      sendBtn.classList.toggle('ativo', temTexto && !_digitando);
+      // Atualiza cor do ícone SVG
+      sendBtn.querySelectorAll('path').forEach(p => {
+        p.setAttribute('stroke', temTexto && !_digitando ? '#fff' : '#94a3b8');
+      });
+    });
+ 
+    input.addEventListener('keydown', e => {
+      if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); _enviar(); }
+    });
+ 
+    sendBtn.onclick = _enviar;
+ 
+    // Mensagem de abertura (se ainda não há mensagens nesta sessão)
+    if (_mensagens.length === 0) {
+      _adicionarMensagem('assistant',
+        `Olá! Pode perguntar sobre qualquer tema da Edição ${edicaoNum}. Estou aqui para ajudar.`
+      );
+    } else {
+      _renderizarMensagens();
+    }
+ 
+    setTimeout(() => input.focus(), 380);
+  }
+ 
+  // ── Fechar sheet ─────────────────────────────────────────────────────────
+  function _fecharChat() {
+    document.getElementById('rs-chat-sheet')?.remove();
+    document.getElementById('rs-chat-backdrop')?.remove();
+  }
+ 
+  // ── Adicionar mensagem ao estado e DOM ───────────────────────────────────
+  function _adicionarMensagem(role, text) {
+    _mensagens.push({ role, text });
+    const wrap = document.getElementById('rs-chat-messages');
+    if (!wrap) return;
+    const row = document.createElement('div');
+    row.className = `rs-chat-msg-row ${role}`;
+    if (role === 'assistant') {
+      row.innerHTML = `
+        <div class="rs-chat-avatar-mini">✦</div>
+        <div class="rs-chat-bubble assistant">${_esc(text)}</div>`;
+    } else {
+      row.innerHTML = `<div class="rs-chat-bubble user">${_esc(text)}</div>`;
+    }
+    wrap.appendChild(row);
+    row.scrollIntoView({ behavior: 'smooth', block: 'end' });
+  }
+ 
+  function _renderizarMensagens() {
+    const wrap = document.getElementById('rs-chat-messages');
+    if (!wrap) return;
+    wrap.innerHTML = '';
+    _mensagens.forEach(m => _adicionarMensagem(m.role, m.text));
+  }
+ 
+  // ── Typing indicator ─────────────────────────────────────────────────────
+  function _mostrarDigitando() {
+    const wrap = document.getElementById('rs-chat-messages');
+    if (!wrap) return;
+    const el = document.createElement('div');
+    el.className = 'rs-chat-msg-row assistant';
+    el.id = 'rs-chat-typing-row';
+    el.innerHTML = `
+      <div class="rs-chat-avatar-mini">✦</div>
+      <div class="rs-chat-typing">
+        <span></span><span></span><span></span>
+      </div>`;
+    wrap.appendChild(el);
+    el.scrollIntoView({ behavior: 'smooth', block: 'end' });
+  }
+ 
+  function _esconderDigitando() {
+    document.getElementById('rs-chat-typing-row')?.remove();
+  }
+ 
+  // ── Enviar mensagem ───────────────────────────────────────────────────────
+  async function _enviar() {
+    const input = document.getElementById('rs-chat-input');
+    const sendBtn = document.getElementById('rs-chat-send');
+    if (!input) return;
+    const texto = input.value.trim();
+    if (!texto || _digitando) return;
+ 
+    input.value = '';
+    sendBtn?.classList.remove('ativo');
+    sendBtn?.querySelectorAll('path').forEach(p => p.setAttribute('stroke', '#94a3b8'));
+ 
+    _adicionarMensagem('user', texto);
+    _digitando = true;
+    _mostrarDigitando();
+ 
+    try {
+      const res = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          pergunta:     texto,
+          nid:          nid,
+          municipio_cod: window._radarUser?.municipio_cod || '',
+          uid:          uid,
+          segmento:     window._radarUser?.segmento || '',
+          historico:    _mensagens.slice(-6),   // últimas 3 trocas para contexto
+        }),
+      });
+ 
+      const data = await res.json();
+      _esconderDigitando();
+      _digitando = false;
+ 
+      if (!res.ok || data.erro) {
+        _adicionarMensagem('assistant',
+          data.erro || 'Não consegui processar sua pergunta. Tente novamente.'
+        );
+        return;
+      }
+ 
+      _adicionarMensagem('assistant', data.resposta);
+ 
+    } catch (err) {
+      _esconderDigitando();
+      _digitando = false;
+      _adicionarMensagem('assistant',
+        'Erro de conexão. Verifique sua internet e tente novamente.'
+      );
+      console.warn('[rs-chat] erro:', err);
+    }
+  }
+ 
+  // ── Bind FAB ──────────────────────────────────────────────────────────────
+  fab.onclick = _abrirChat;
+ 
+  // ── Expõe para limpeza (troca de edição) ─────────────────────────────────
+  window._rsChatDestroy = () => {
+    _fecharChat();
+    fab.remove();
+    _scrollEl.removeEventListener('scroll', _onScroll);
+    delete window._rsChatDestroy;
+  };
 }
 
 // ─── Painel de upgrade de mídia ───────────────────────────────────────────────
