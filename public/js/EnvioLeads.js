@@ -452,25 +452,30 @@ async function listarUsuariosComAssinaturas(newsletterId) {
         .where('tipos_selecionados', 'array-contains', tipoId)
         .get();
 
-    // Coleta IDs de envio para esta newsletter (uma única query)
-    const userIds = snapAss.docs.map(d => d.ref.parent.parent.id);
+    // Busca o status de envio para cada (userId, assinaturaId) via path direto.
+    // Evita collectionGroup que exige regra especial de segurança no Firestore.
     const mapaStatusEnvio = {};
 
-    if (statusEnvio || userIds.length > 0) {
-        // Para assinantes os envios ficam no Firestore
-        // Fazemos uma única collectionGroup query filtrada por newsletter_id
-        try {
-            const snapEnvios = await db.collectionGroup('envios')
-                .where('newsletter_id', '==', newsletterId)
-                .get();
-            snapEnvios.forEach(d => {
-                const uid = d.ref.parent.parent?.parent?.parent?.id;
-                if (uid) mapaStatusEnvio[uid] = d.data().status || 'enviado';
-            });
-        } catch (e) {
-            console.warn('Falha ao carregar envios de assinantes:', e);
-        }
-    }
+    await Promise.allSettled(
+        snapAss.docs.map(async (doc) => {
+            const uid   = doc.ref.parent.parent.id;
+            const assId = doc.id;
+            try {
+                const snap = await db
+                    .collection('usuarios').doc(uid)
+                    .collection('assinaturas').doc(assId)
+                    .collection('envios')
+                    .where('newsletter_id', '==', newsletterId)
+                    .limit(1)
+                    .get();
+                if (!snap.empty) {
+                    mapaStatusEnvio[uid] = snap.docs[0].data().status || 'enviado';
+                }
+            } catch (e) {
+                // não fatal — usuário aparece como 'nao-enviado'
+            }
+        })
+    );
 
     let linhas = '';
     const frag = document.createDocumentFragment();
@@ -693,20 +698,26 @@ async function gerarPreviaEnvioUsuarios() {
         return;
     }
 
-    // ── Query única para status de envio ──────────────────────────────────────
-    // Busca os envios desta newsletter para todos os usuários selecionados
-    const enviadosMap  = {};
-    try {
-        const snapEnvios = await db.collectionGroup('envios')
-            .where('newsletter_id', '==', window.newsletterSelecionada.id)
-            .get();
-        snapEnvios.forEach(d => {
-            const uid = d.ref.parent?.parent?.parent?.parent?.id;
-            if (uid) enviadosMap[uid] = d.data().status || 'enviado';
-        });
-    } catch (e) {
-        console.warn('Falha ao carregar envios:', e);
-    }
+    // ── Status de envio por path direto (evita collectionGroup) ────────────────
+    const enviadosMap = {};
+    await Promise.allSettled(
+        selecionados.map(async (u) => {
+            try {
+                const snap = await db
+                    .collection('usuarios').doc(u.usuarioId)
+                    .collection('assinaturas').doc(u.assinaturaId)
+                    .collection('envios')
+                    .where('newsletter_id', '==', window.newsletterSelecionada.id)
+                    .limit(1)
+                    .get();
+                if (!snap.empty) {
+                    enviadosMap[u.usuarioId] = snap.docs[0].data().status || 'enviado';
+                }
+            } catch (e) {
+                // não fatal — aparece como 'nao-enviado'
+            }
+        })
+    );
 
     // ── Tipos selecionados por assinatura (batch) ─────────────────────────────
     const mapa          = await obterMapaNomesTipos();
