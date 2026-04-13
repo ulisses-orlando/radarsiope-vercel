@@ -150,6 +150,16 @@ function fmtFeatureBadges(features) {
 async function carregarPlanos() {
   const tbody = document.getElementById('lista-planos');
   if (!tbody) return console.warn('[planos] tbody #lista-planos não encontrado');
+
+  // 🔹 GARANTE que o cache de features dinâmicas já esteja carregado antes de renderizar
+  if (window.FeaturesManager && !window.featuresListCache && window.FeaturesManager.carregarFeatures) {
+    try {
+      window.featuresListCache = await window.FeaturesManager.carregarFeatures();
+    } catch (e) {
+      console.warn('[carregarPlanos] Erro ao pré-carregar features:', e);
+    }
+  }
+
   tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:#999;padding:12px">Carregando planos...</td></tr>';
 
   try {
