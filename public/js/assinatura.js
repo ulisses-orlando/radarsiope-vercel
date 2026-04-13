@@ -191,16 +191,18 @@ async function carregarListaPlanos() {
       }).join('');
 
       const card = document.createElement('label');
-      card.className     = `plano-card${p.destaque ? ' destaque' : ''}`;
+      card.className     = `plano-card${p.destaque ? ' destaque' : ''}${p.em_breve ? ' em-breve' : ''}`;
       card.dataset.id    = p.id;
       card.dataset.slug  = p.plano_slug || '';
+      card.dataset.emBreve = p.em_breve ? 'true' : 'false';
       card.style.setProperty('--plano-cor', cor);
       card._planoData    = p; // referência para selecionarCiclo()
 
       card.innerHTML = `
-        ${p.destaque && p.badge ? `<div class="plano-badge-destaque">${p.badge}</div>` : ''}
-        <input type="radio" name="plano-selecionado" value="${p.id}">
-        <div class="plano-content">
+        ${p.em_breve ? `<div class="plano-badge-em-breve">🚀 Em breve</div>` : ''}
+        ${!p.em_breve && p.destaque && p.badge ? `<div class="plano-badge-destaque">${p.badge}</div>` : ''}
+        <input type="radio" name="plano-selecionado" value="${p.id}" ${p.em_breve ? 'disabled' : ''}>
+        <div class="plano-content${p.em_breve ? ' plano-content--bloqueado' : ''}">
           <div class="plano-nome">${p.nome || p.id}</div>
           <div class="plano-preco-wrap">
             <span class="plano-preco-valor" style="color:${cor}">${fmtBRL(val)}</span>
@@ -211,10 +213,14 @@ async function carregarListaPlanos() {
           </div>
           ${p.descricao ? `<div class="plano-descricao">${p.descricao}</div>` : ''}
           <ul class="plano-features">${featuresHtml}</ul>
+          ${p.em_breve ? `<div class="plano-em-breve-aviso">Disponível em breve — cadastre-se para ser avisado.</div>` : ''}
         </div>
       `;
 
-      card.addEventListener('click', () => _onPlanoSelecionado(p.id));
+      card.addEventListener('click', () => {
+        if (p.em_breve) return; // plano ainda não disponível para assinatura
+        _onPlanoSelecionado(p.id);
+      });
       wrap.appendChild(card);
     });
 
@@ -239,6 +245,9 @@ async function carregarListaPlanos() {
 async function _onPlanoSelecionado(planId) {
   const plano = await carregarPlano(planId);
   if (!plano) return;
+
+  // Bloqueia seleção de planos marcados como "em breve"
+  if (plano.em_breve) return;
 
   _planoAtual = plano;
   document.getElementById('planId').value = planId;

@@ -172,9 +172,14 @@ async function carregarPlanos() {
         ? `<span style="background:${escapeHtml(d.cor_destaque||'#0A3D62')};color:#fff;padding:2px 7px;border-radius:10px;font-size:11px">${escapeHtml(d.badge||'⭐')}</span>`
         : '';
 
-      // status colorido
-      const statusColor = d.status === 'ativo' ? '#16a34a' : '#dc2626';
-      const statusDot = `<span style="color:${statusColor};font-weight:700">${d.status === 'ativo' ? '● Ativo' : '● Inativo'}</span>`;
+      // status colorido — considera em_breve
+      const statusColor = d.em_breve
+        ? '#d97706'
+        : (d.status === 'ativo' ? '#16a34a' : '#dc2626');
+      const statusLabel = d.em_breve
+        ? '🚀 Em breve'
+        : (d.status === 'ativo' ? '● Ativo' : '● Inativo');
+      const statusDot = `<span style="color:${statusColor};font-weight:600;font-size:12px">${statusLabel}</span>`;
 
       tr.innerHTML = `
         <td style="font-weight:600">${escapeHtml(d.nome || d.plano_slug || '—')} ${badgeTd}</td>
@@ -533,6 +538,26 @@ async function abrirModalPlano(id = null, editar = false) {
   `;
   body.appendChild(statusWrap);
 
+  // Seção: Disponibilidade (em breve)
+  body.appendChild(_secLabel('🚀 Disponibilidade'));
+  const dispWrap = document.createElement('div');
+  dispWrap.style.cssText = 'padding:12px;background:#fffbeb;border:1px solid #fde68a;border-radius:6px';
+  dispWrap.innerHTML = `
+    <label style="display:flex;align-items:flex-start;gap:8px;cursor:pointer">
+      <input type="checkbox" id="pl-em-breve" ${d.em_breve ? 'checked' : ''}
+        style="margin-top:3px;width:16px;height:16px;cursor:pointer">
+      <div>
+        <span style="font-size:13px;font-weight:600;color:#92400e">Marcar como "Em breve"</span>
+        <div style="font-size:12px;color:#78350f;margin-top:3px;line-height:1.5">
+          O plano aparece no formulário de assinatura com uma tarja <em>"Em breve"</em>,
+          mas não pode ser selecionado pelo assinante. Use para apresentar planos futuros
+          e criar expectativa sem abrir a venda ainda.
+        </div>
+      </div>
+    </label>
+  `;
+  body.appendChild(dispWrap);
+
   // ── Handler Salvar ──
   document.getElementById('modal-edit-save').onclick = async () => _salvarPlano(id, editar);
 }
@@ -594,6 +619,7 @@ async function _salvarPlano(id, editar) {
   const statusVal  = document.querySelector('input[name="pl-status"]:checked')?.value || 'ativo';
   const allowMulti = !!document.getElementById('pl-allow-multi')?.checked;
   const vagasRaw   = document.getElementById('pl-vagas')?.value;
+  const emBreve    = !!document.getElementById('pl-em-breve')?.checked;
 
   // features
   const features = {};
@@ -661,6 +687,7 @@ async function _salvarPlano(id, editar) {
     permitir_sem_juros: semJuros,
     parcelas_sem_juros,
     status:            statusVal,
+    em_breve:          emBreve,
     ordem:             safeNumber(ordemRaw) || 99,
     destaque,
     badge,
