@@ -213,7 +213,7 @@ async function carregarListaPlanos() {
           </div>
           ${p.descricao ? `<div class="plano-descricao">${p.descricao}</div>` : ''}
           <ul class="plano-features">${featuresHtml}</ul>
-          ${p.em_breve ? `<div class="plano-em-breve-aviso">Disponível em breve — cadastre-se para ser avisado.</div>` : ''}
+          ${p.em_breve ? `<div class="plano-em-breve-aviso">Disponível em breve — cadastre-se em <a href="capturaLead.html">Entre em contato</a> para ser avisado.</div>` : ''}
         </div>
       `;
 
