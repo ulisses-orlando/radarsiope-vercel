@@ -18,14 +18,14 @@ function getParam(nome) {
   return new URL(window.location.href).searchParams.get(nome);
 }
 
-const _origem      = getParam('origem') || 'direto';
-const _planIdUrl   = getParam('planId') || null;
-const _leadIdUrl   = getParam('leadId') || getParam('idLead') || null;
+const _origem = getParam('origem') || 'direto';
+const _planIdUrl = getParam('planId') || null;
+const _leadIdUrl = getParam('leadId') || getParam('idLead') || null;
 
 // ─── Estado global da sessão ──────────────────────────────────────────────────
-let _cicloAtual    = 'mensal';   // 'mensal' | 'anual'
-let _planoAtual    = null;       // objeto completo do plano selecionado
-let _tiposMap      = {};         // id -> nome dos tipos de newsletter
+let _cicloAtual = 'mensal';   // 'mensal' | 'anual'
+let _planoAtual = null;       // objeto completo do plano selecionado
+let _tiposMap = {};         // id -> nome dos tipos de newsletter
 let _cupomAplicado = null;       // objeto cupom validado
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -57,15 +57,15 @@ function selecionarCiclo(ciclo) {
   document.getElementById('planCiclo').value = ciclo;
 
   document.getElementById('btn-ciclo-mensal').classList.toggle('ativo', ciclo === 'mensal');
-  document.getElementById('btn-ciclo-anual').classList.toggle('ativo',  ciclo === 'anual');
+  document.getElementById('btn-ciclo-anual').classList.toggle('ativo', ciclo === 'anual');
 
   // re-renderizar preços nos cards sem recarregar do Firestore
   document.querySelectorAll('.plano-card').forEach(card => {
     const slug = card.dataset.slug;
-    const p    = card._planoData;
+    const p = card._planoData;
     if (!p) return;
 
-    const val  = getPrecoPlano(p, ciclo);
+    const val = getPrecoPlano(p, ciclo);
     const valM = getPrecoPlano(p, 'mensal');
 
     card.querySelector('.plano-preco-valor').textContent = fmtBRL(val);
@@ -164,7 +164,7 @@ async function carregarListaPlanos() {
     wrap.innerHTML = '';
 
     snap.forEach(doc => {
-      const p   = { id: doc.id, ...doc.data() };
+      const p = { id: doc.id, ...doc.data() };
       const cor = p.cor_destaque || '#0A3D62';
       const val = getPrecoPlano(p, _cicloAtual);
       const valM = getPrecoPlano(p, 'mensal');
@@ -176,9 +176,9 @@ async function carregarListaPlanos() {
 
       // lista de features - cada feature renderiza de forma independente
       const featuresHtml = allFeatures.map(f => {
-        const val  = features[f.id];
+        const val = features[f.id];
         const ativo = !!val;
-        let label  = f.nome || f.id;
+        let label = f.nome || f.id;
 
         // Features com quota numérica — exibe o valor no label
         if (f.id === 'sugestao_tema_quota' && Number(val) > 0) {
@@ -191,12 +191,12 @@ async function carregarListaPlanos() {
       }).join('');
 
       const card = document.createElement('label');
-      card.className     = `plano-card${p.destaque ? ' destaque' : ''}${p.em_breve ? ' em-breve' : ''}`;
-      card.dataset.id    = p.id;
-      card.dataset.slug  = p.plano_slug || '';
+      card.className = `plano-card${p.destaque ? ' destaque' : ''}${p.em_breve ? ' em-breve' : ''}`;
+      card.dataset.id = p.id;
+      card.dataset.slug = p.plano_slug || '';
       card.dataset.emBreve = p.em_breve ? 'true' : 'false';
       card.style.setProperty('--plano-cor', cor);
-      card._planoData    = p; // referência para selecionarCiclo()
+      card._planoData = p; // referência para selecionarCiclo()
 
       card.innerHTML = `
         ${p.em_breve ? `<div class="plano-badge-em-breve">🚀 Em breve</div>` : ''}
@@ -213,8 +213,8 @@ async function carregarListaPlanos() {
           </div>
           ${p.descricao ? `<div class="plano-descricao">${p.descricao}</div>` : ''}
           <ul class="plano-features">${featuresHtml}</ul>
-          ${p.em_breve ? `<div class="plano-em-breve-aviso">Disponível em breve — cadastre-se em <a href="capturaLead.html">Entre em contato</a> para ser avisado.</div>` : ''}
         </div>
+        ${p.em_breve ? `<div class="plano-em-breve-aviso">Disponível em breve — cadastre-se em <a href="capturaLead.html">Entre em contato</a> para ser avisado.</div>` : ''}
       `;
 
       card.addEventListener('click', () => {
@@ -291,14 +291,14 @@ function _atualizarCampoParcelas(plano) {
 // ─── WhatsApp opt-in ──────────────────────────────────────────────────────────
 
 function _mostrarWhatsappOptin() {
-  const wpInput   = document.getElementById('whatsapp');
+  const wpInput = document.getElementById('whatsapp');
   const optinWrap = document.getElementById('whatsapp-optin-wrap');
   if (!wpInput || !optinWrap) return;
 
   const mostrar = () => {
     // Mostra apenas se: plano selecionado tem WhatsApp E número preenchido
     const planoTemWa = !!(_planoAtual?.features?.grupo_whatsapp_vip);
-    const numOk      = wpInput.value.replace(/\D/g, '').length >= 10;
+    const numOk = wpInput.value.replace(/\D/g, '').length >= 10;
     optinWrap.style.display = (planoTemWa && numOk) ? 'flex' : 'none';
   };
 
@@ -338,18 +338,18 @@ async function carregarTiposNewsletter(preselected = []) {
       }
       <div id="grupo-newsletters" style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
         ${tipos.map(t => {
-          const incl = planFixado
-            ? _planoAtual.tipos_inclusos.map(String).includes(String(t.id))
-            : preselected.includes(t.id);
-          const disabled = planFixado ? 'disabled' : '';
-          return `
+        const incl = planFixado
+          ? _planoAtual.tipos_inclusos.map(String).includes(String(t.id))
+          : preselected.includes(t.id);
+        const disabled = planFixado ? 'disabled' : '';
+        return `
             <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:${planFixado ? 'default' : 'pointer'}">
               <input type="checkbox" value="${t.id}" id="tipo-${t.id}"
                 ${incl ? 'checked' : ''} ${disabled}
                 style="width:15px;height:15px">
               <span>${t.nome || t.id}</span>
             </label>`;
-        }).join('')}
+      }).join('')}
       </div>
       ${!planFixado
         ? `<button type="button" id="btn-sel-todos"
@@ -405,16 +405,16 @@ async function validarCupom(codigo) {
 // ─── Calcular preview ─────────────────────────────────────────────────────────
 
 async function calcularPreview(plano, tiposSelecionados = [], cupomObj = null) {
-  const basePrice    = getPrecoPlano(plano, _cicloAtual);
-  const tiposIncl    = Array.isArray(plano.tipos_inclusos) ? plano.tipos_inclusos.map(String) : [];
-  const allowMulti   = !!plano.allow_multi_select;
-  const bundles      = Array.isArray(plano.bundles) ? plano.bundles : [];
+  const basePrice = getPrecoPlano(plano, _cicloAtual);
+  const tiposIncl = Array.isArray(plano.tipos_inclusos) ? plano.tipos_inclusos.map(String) : [];
+  const allowMulti = !!plano.allow_multi_select;
+  const bundles = Array.isArray(plano.bundles) ? plano.bundles : [];
 
   const items = tiposSelecionados.map(id => ({
     id,
-    nome:     _tiposMap[id] || id,
+    nome: _tiposMap[id] || id,
     included: tiposIncl.includes(String(id)),
-    price:    tiposIncl.includes(String(id)) ? 0 : (Number(plano.price_per_tipo) || basePrice),
+    price: tiposIncl.includes(String(id)) ? 0 : (Number(plano.price_per_tipo) || basePrice),
   }));
 
   let total = allowMulti
@@ -434,7 +434,7 @@ async function calcularPreview(plano, tiposSelecionados = [], cupomObj = null) {
 
   if (cupomObj) {
     if (cupomObj.tipo === 'percentual') desconto = totalBruto * ((Number(cupomObj.valor) || 0) / 100);
-    else if (cupomObj.tipo === 'fixo')  desconto = Number(cupomObj.valor) || 0;
+    else if (cupomObj.tipo === 'fixo') desconto = Number(cupomObj.valor) || 0;
   }
 
   const totalFinal = Math.max(0, totalBruto - desconto);
@@ -444,25 +444,25 @@ async function calcularPreview(plano, tiposSelecionados = [], cupomObj = null) {
     basePrice,
     totalBruto,
     desconto,
-    total:        totalFinal,
+    total: totalFinal,
     amountCentavos: Math.round(totalFinal * 100),
-    ciclo:        _cicloAtual,
-    cupom:        cupomObj,
+    ciclo: _cicloAtual,
+    cupom: cupomObj,
   };
 }
 
 // ─── Atualizar preview no DOM ─────────────────────────────────────────────────
 
 async function atualizarPreview() {
-  const wrap     = document.getElementById('preview-breakdown');
-  const itemsEl  = document.getElementById('preview-items');
-  const totalEl  = document.getElementById('preview-total');
+  const wrap = document.getElementById('preview-breakdown');
+  const itemsEl = document.getElementById('preview-items');
+  const totalEl = document.getElementById('preview-total');
   if (!wrap) return;
 
   if (!_planoAtual) { wrap.style.display = 'none'; return; }
 
   const checks = [...document.querySelectorAll('#grupo-newsletters input[type="checkbox"]:checked')];
-  const tipos  = checks.map(cb => cb.value);
+  const tipos = checks.map(cb => cb.value);
 
   if (!tipos.length) { wrap.style.display = 'none'; return; }
 
@@ -526,18 +526,18 @@ async function upsertUsuario(dados) {
   const base = {
     nome,
     cpfNormalizado: cpfNorm,
-    telefone:          telefone  || null,
-    whatsapp:          whatsapp  || null,
-    whatsapp_opt_in:   whatsapp  ? (whatsappOptin ?? true) : false,
+    telefone: telefone || null,
+    whatsapp: whatsapp || null,
+    whatsapp_opt_in: whatsapp ? (whatsappOptin ?? true) : false,
     whatsapp_opt_in_em: whatsapp ? firebase.firestore.FieldValue.serverTimestamp() : null,
-    perfil:            perfil    || null,
-    mensagem:          mensagem  || null,
+    perfil: perfil || null,
+    mensagem: mensagem || null,
     preferencia_contato: preferencia || null,
-    cod_uf:            cod_uf        || null,
-    cod_municipio:     cod_municipio || null,
-    nome_municipio:    nome_municipio || null,
-    origem:            _origem,
-    updatedAt:         firebase.firestore.FieldValue.serverTimestamp(),
+    cod_uf: cod_uf || null,
+    cod_municipio: cod_municipio || null,
+    nome_municipio: nome_municipio || null,
+    origem: _origem,
+    updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
   };
 
   // Campos de plano — gravados APENAS quando o pagamento for confirmado via webhook.
@@ -557,10 +557,10 @@ async function upsertUsuario(dados) {
         email: email.toLowerCase(),
         // plano pendente — será ativado pelo webhook
         plano_status: 'pendente_pagamento',
-        plano_slug:   plano_slug || null,
-        plano_ciclo:  ciclo      || 'mensal',
-        features:     features   || null,
-        createdAt:    firebase.firestore.FieldValue.serverTimestamp(),
+        plano_slug: plano_slug || null,
+        plano_ciclo: ciclo || 'mensal',
+        features: features || null,
+        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
       });
       return ref.id;
     }
@@ -582,33 +582,33 @@ async function registrarAssinatura(userId, payload, preview) {
 
   const data = {
     // Identificação
-    planId:       payload.planId  || null,
-    plano_slug:   payload.plano_slug || null,
-    plano_nome:   payload.plano_nome || null,
-    ciclo:        preview.ciclo   || 'mensal',
+    planId: payload.planId || null,
+    plano_slug: payload.plano_slug || null,
+    plano_nome: payload.plano_nome || null,
+    ciclo: preview.ciclo || 'mensal',
     // Tipos
     tipos_selecionados: Array.isArray(payload.tipos_selecionados) ? payload.tipos_selecionados : [],
     // Valores
-    valor_original:  preview.totalBruto  ?? 0,
-    valor_desconto:  preview.desconto    ?? 0,
-    valor_final:     preview.total       ?? 0,
-    amountCentavos:  preview.amountCentavos ?? 0,
+    valor_original: preview.totalBruto ?? 0,
+    valor_desconto: preview.desconto ?? 0,
+    valor_final: preview.total ?? 0,
+    amountCentavos: preview.amountCentavos ?? 0,
     // Cupom
-    cupom:           payload.cupom || null,
+    cupom: payload.cupom || null,
     // Features snapshot — garante histórico mesmo se o plano mudar depois
     features_snapshot: payload.features || null,
     // Datas
-    data_inicio:         firebase.firestore.Timestamp.fromDate(agora),
+    data_inicio: firebase.firestore.Timestamp.fromDate(agora),
     data_proxima_renovacao: firebase.firestore.Timestamp.fromDate(renovacao),
     // Status
-    status:          'pendente_pagamento',
+    status: 'pendente_pagamento',
     paymentProvider: 'mercadopago',
-    orderId:         payload.orderId || null,
-    pedidoId:        null, // preenchido após retorno do backend
+    orderId: payload.orderId || null,
+    pedidoId: null, // preenchido após retorno do backend
     // Auditoria
-    origem:          _origem,
-    createdAt:       firebase.firestore.FieldValue.serverTimestamp(),
-    updatedAt:       firebase.firestore.FieldValue.serverTimestamp(),
+    origem: _origem,
+    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+    updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
   };
 
   try {
@@ -623,14 +623,14 @@ async function registrarAssinatura(userId, payload, preview) {
 // ─── Criar pedido no backend (Mercado Pago) ───────────────────────────────────
 
 async function criarPedidoBackend(payload) {
-  const ctrl    = new AbortController();
+  const ctrl = new AbortController();
   const timeout = setTimeout(() => ctrl.abort(), 30000);
   try {
     const resp = await fetch('/api/pagamentoMP?acao=criar-pedido', {
-      method:  'POST',
+      method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify(payload),
-      signal:  ctrl.signal,
+      body: JSON.stringify(payload),
+      signal: ctrl.signal,
     });
     clearTimeout(timeout);
     if (!resp.ok) {
@@ -654,11 +654,11 @@ async function prefillFromLead() {
     const lead = doc.data();
 
     const set = (id, val) => { if (val && document.getElementById(id)) document.getElementById(id).value = val; };
-    set('nome',              lead.nome);
-    set('email',             lead.email);
-    set('telefone',          lead.telefone);
-    set('whatsapp',          lead.whatsapp || lead.telefone);
-    set('perfil',            lead.perfil);
+    set('nome', lead.nome);
+    set('email', lead.email);
+    set('telefone', lead.telefone);
+    set('whatsapp', lead.whatsapp || lead.telefone);
+    set('perfil', lead.perfil);
     set('preferencia-contato', lead.preferencia_contato);
 
     if (Array.isArray(lead.interesses)) {
@@ -717,23 +717,23 @@ async function processarEnvioAssinatura(e) {
   e.preventDefault();
   clearErrors();
 
-  const btn    = document.getElementById('btn-assinar');
+  const btn = document.getElementById('btn-assinar');
   const status = document.getElementById('status-envio');
   const setStatus = (msg, cor = '#555') => { if (status) { status.textContent = msg; status.style.color = cor; } };
 
   // ── Coleta de dados ──
-  const nome       = document.getElementById('nome')?.value.trim()             || '';
-  const cpf        = document.getElementById('cpf')?.value.trim()              || '';
-  const email      = document.getElementById('email')?.value.trim()            || '';
-  const telefone   = document.getElementById('telefone')?.value.trim()         || '';
-  const whatsapp   = document.getElementById('whatsapp')?.value.trim()         || '';
-  const wpOptin    = !!document.getElementById('whatsapp-optin')?.checked;
-  const perfil     = document.getElementById('perfil')?.value                  || '';
-  const mensagem   = document.getElementById('mensagem')?.value.trim()         || '';
-  const preferencia = document.getElementById('preferencia-contato')?.value    || '';
-  const cupomCod   = document.getElementById('cupom')?.value.trim()            || '';
-  const aceita     = !!document.getElementById('aceita-termos')?.checked;
-  const ciclo      = document.getElementById('planCiclo')?.value               || 'mensal';
+  const nome = document.getElementById('nome')?.value.trim() || '';
+  const cpf = document.getElementById('cpf')?.value.trim() || '';
+  const email = document.getElementById('email')?.value.trim() || '';
+  const telefone = document.getElementById('telefone')?.value.trim() || '';
+  const whatsapp = document.getElementById('whatsapp')?.value.trim() || '';
+  const wpOptin = !!document.getElementById('whatsapp-optin')?.checked;
+  const perfil = document.getElementById('perfil')?.value || '';
+  const mensagem = document.getElementById('mensagem')?.value.trim() || '';
+  const preferencia = document.getElementById('preferencia-contato')?.value || '';
+  const cupomCod = document.getElementById('cupom')?.value.trim() || '';
+  const aceita = !!document.getElementById('aceita-termos')?.checked;
+  const ciclo = document.getElementById('planCiclo')?.value || 'mensal';
 
   const tiposSelecionados = [...document.querySelectorAll('#grupo-newsletters input[type="checkbox"]:checked')]
     .map(cb => cb.value);
@@ -742,13 +742,13 @@ async function processarEnvioAssinatura(e) {
   let temErro = false;
   const erro = (campo, msg) => { setError(campo, msg); temErro = true; };
 
-  if (nome.length < 3)       erro('nome',  'Nome deve ter pelo menos 3 caracteres.');
-  if (!validarCPF(cpf))      erro('cpf',   'CPF inválido.');
-  if (!validarEmail(email))  erro('email', 'E-mail inválido.');
-  if (!perfil)               { mostrarMensagem('Selecione seu perfil.'); temErro = true; }
-  if (!aceita)               { setError('aceita_termos', 'Você precisa aceitar os termos.'); temErro = true; }
+  if (nome.length < 3) erro('nome', 'Nome deve ter pelo menos 3 caracteres.');
+  if (!validarCPF(cpf)) erro('cpf', 'CPF inválido.');
+  if (!validarEmail(email)) erro('email', 'E-mail inválido.');
+  if (!perfil) { mostrarMensagem('Selecione seu perfil.'); temErro = true; }
+  if (!aceita) { setError('aceita_termos', 'Você precisa aceitar os termos.'); temErro = true; }
   if (!tiposSelecionados.length) { mostrarMensagem('Selecione pelo menos um tipo de newsletter.'); temErro = true; }
-  if (!_planoAtual)          { mostrarMensagem('Selecione um plano.'); temErro = true; }
+  if (!_planoAtual) { mostrarMensagem('Selecione um plano.'); temErro = true; }
 
   if (temErro) return;
 
@@ -799,22 +799,22 @@ async function processarEnvioAssinatura(e) {
     const userId = await upsertUsuario({
       nome, cpf, email, telefone, whatsapp, whatsappOptin: wpOptin,
       perfil, mensagem, preferencia,
-      cod_uf:        dadosUf?.cod_uf,
+      cod_uf: dadosUf?.cod_uf,
       cod_municipio: dadosUf?.cod_municipio,
       nome_municipio: dadosUf?.nome_municipio,
-      plano_slug:    _planoAtual.plano_slug,
+      plano_slug: _planoAtual.plano_slug,
       ciclo,
-      features:      _planoAtual.features || null,
+      features: _planoAtual.features || null,
     });
 
     // 2. Registrar assinatura
     const assinaturaId = await registrarAssinatura(userId, {
-      planId:           _planoAtual.id,
-      plano_slug:       _planoAtual.plano_slug || null,
-      plano_nome:       _planoAtual.nome       || null,
+      planId: _planoAtual.id,
+      plano_slug: _planoAtual.plano_slug || null,
+      plano_nome: _planoAtual.nome || null,
       tipos_selecionados: tiposSelecionados,
-      cupom:            cupomCod || null,
-      features:         _planoAtual.features   || null,
+      cupom: cupomCod || null,
+      features: _planoAtual.features || null,
     }, preview);
 
     // 3. Criar pedido no backend
@@ -823,22 +823,22 @@ async function processarEnvioAssinatura(e) {
     const backendResp = await criarPedidoBackend({
       userId,
       assinaturaId,
-      amountCentavos:  preview.amountCentavos,
+      amountCentavos: preview.amountCentavos,
       cpf,
       nome,
       email,
-      descricao:       _planoAtual.nome || 'Assinatura Radar SIOPE',
+      descricao: _planoAtual.nome || 'Assinatura Radar SIOPE',
       installmentsMax: _planoAtual.parcelas_sem_juros || 1,
       dataPrimeiroVencimento: new Date().toISOString().split('T')[0],
       ciclo,
-      plano_slug:      _planoAtual.plano_slug || null,
+      plano_slug: _planoAtual.plano_slug || null,
     });
 
     // 4. Salvar pedidoId localmente (opcional — webhook é a fonte de verdade)
     if (backendResp?.pedidoId) {
       db.collection('usuarios').doc(userId).collection('assinaturas').doc(assinaturaId)
         .update({ pedidoId: backendResp.pedidoId, updatedAt: firebase.firestore.FieldValue.serverTimestamp() })
-        .catch(() => {});
+        .catch(() => { });
     }
 
     // 5. Redirecionar para o Checkout
@@ -861,9 +861,9 @@ async function processarEnvioAssinatura(e) {
 async function initAssinatura() {
   // Máscaras
   const telEl = document.getElementById('telefone');
-  const wpEl  = document.getElementById('whatsapp');
+  const wpEl = document.getElementById('whatsapp');
   if (telEl && typeof aplicarMascaraTelefone === 'function') aplicarMascaraTelefone(telEl);
-  if (wpEl  && typeof aplicarMascaraTelefone === 'function') aplicarMascaraTelefone(wpEl);
+  if (wpEl && typeof aplicarMascaraTelefone === 'function') aplicarMascaraTelefone(wpEl);
 
   // Máscara CPF
   document.getElementById('cpf')?.addEventListener('input', function () {
@@ -878,12 +878,12 @@ async function initAssinatura() {
     try {
       const d = await db.collection('leads').doc(_leadIdUrl).get();
       if (d.exists) leadPreload = d.data();
-    } catch (e) {}
+    } catch (e) { }
   }
 
   window.validarUfMunicipio = await inserirCamposUfMunicipio(
     document.getElementById('campo-uf-municipio'),
-    leadPreload?.cod_uf        || '',
+    leadPreload?.cod_uf || '',
     leadPreload?.cod_municipio || ''
   );
 
@@ -909,9 +909,9 @@ async function initAssinatura() {
   // Cupom
   document.getElementById('aplicar-cupom')?.addEventListener('click', async () => {
     const codigo = document.getElementById('cupom')?.value.trim();
-    const fb     = document.getElementById('cupom-feedback');
+    const fb = document.getElementById('cupom-feedback');
     if (!_planoAtual) { mostrarMensagem('Selecione um plano antes de aplicar o cupom.'); return; }
-    if (!codigo)       { mostrarMensagem('Digite um código de cupom.'); return; }
+    if (!codigo) { mostrarMensagem('Digite um código de cupom.'); return; }
     const cupom = await validarCupom(codigo);
     if (cupom) {
       _cupomAplicado = cupom;
