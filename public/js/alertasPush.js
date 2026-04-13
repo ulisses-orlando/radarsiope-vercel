@@ -280,7 +280,7 @@ function _renderHTML() {
     .push-badge.whatsapp { background:#dcfce7; color:#166534; }
   </style>
 
-  <h2>🔔 Enviar Alertas Push</h2>
+  <h2>🔔 Enviar Alertas</h2>
 
   <!-- Status de autenticação (preenchido automaticamente) -->
   <div id="push-auth-status" style="padding:10px 14px;border-radius:8px;font-size:13px;margin-bottom:16px;background:#f0fdf4;color:#166534;border:1px solid #bbf7d0">
