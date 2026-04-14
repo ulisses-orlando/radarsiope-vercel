@@ -376,8 +376,8 @@ function aplicarPlaceholders(template, dados) {
   const plano = dados.plano || '(sem plano)';
   const data_assinatura = dados.data_assinatura
     ? (dados.data_assinatura instanceof Date
-        ? dados.data_assinatura.toLocaleDateString('pt-BR')
-        : String(dados.data_assinatura))
+      ? dados.data_assinatura.toLocaleDateString('pt-BR')
+      : String(dados.data_assinatura))
     : '(sem data de assinatura)';
 
   let dataFormatada = '';
@@ -436,7 +436,7 @@ export default async function handler(req, res) {
     // Parsear body JSON para rotas que recebem JSON
     try {
       if (rawBody && rawBody.length > 0 &&
-          req.headers['content-type']?.includes('application/json')) {
+        req.headers['content-type']?.includes('application/json')) {
         req.body = JSON.parse(rawBody);
       }
     } catch (e) { /* ok — manter rawBody para auditoria */ }
@@ -471,12 +471,12 @@ export default async function handler(req, res) {
       const body = req.body || {};
       const { userId, assinaturaId } = body;
       const amountCentavos = parseInt(body.amountCentavos, 10);
-      const descricao      = body.descricao || 'Assinatura';
+      const descricao = body.descricao || 'Assinatura';
       const installmentsMax = body.installmentsMax ? Math.max(1, parseInt(body.installmentsMax, 10)) : 1;
       const dataPrimeiroVencimento = body.dataPrimeiroVencimento || null;
-      const nome   = body.nome  || '';
-      const email  = body.email || '';
-      const cpf    = body.cpf   || '';
+      const nome = body.nome || '';
+      const email = body.email || '';
+      const cpf = body.cpf || '';
 
       // fix #14: validar parâmetros incluindo valor mínimo de R$ 0,50
       if (!userId || !assinaturaId) {
@@ -490,7 +490,7 @@ export default async function handler(req, res) {
       const backUrlSuccess = process.env.MP_BACK_URL_SUCCESS;
       const backUrlFailure = process.env.MP_BACK_URL_FAILURE;
       const backUrlPending = process.env.MP_BACK_URL_PENDING || '';
-      const notifUrl       = process.env.MP_WEBHOOK_URL;
+      const notifUrl = process.env.MP_WEBHOOK_URL;
 
       if (!backUrlSuccess || !backUrlFailure || !notifUrl) {
         console.error('Variáveis MP_BACK_URL_SUCCESS, MP_BACK_URL_FAILURE ou MP_WEBHOOK_URL não configuradas.');
@@ -529,9 +529,9 @@ export default async function handler(req, res) {
       const cpfNormalizado = (cpf || '').replace(/\D/g, '');
 
       // fix #12: extrair primeiro nome e sobrenome do nome completo
-      const nomePartes   = nome.trim().split(' ');
+      const nomePartes = nome.trim().split(' ');
       const primeiroNome = nomePartes[0] || nome;
-      const sobrenome    = nomePartes.length > 1 ? nomePartes.slice(1).join(' ') : '';
+      const sobrenome = nomePartes.length > 1 ? nomePartes.slice(1).join(' ') : '';
 
       const preferencePayload = {
         items: [{
@@ -769,6 +769,9 @@ export default async function handler(req, res) {
           atualizadoEm: admin.firestore.FieldValue.serverTimestamp()
         }, { merge: true });
 
+        // Ativar o campo "ativo" no documento principal do usuário
+        await db.collection('usuarios').doc(userId).update({ ativo: true });
+
         // Buscar dados para e-mail de confirmação
         const assinaturaDoc = await assinRef.get();
         const assinaturaData = assinaturaDoc.exists ? assinaturaDoc.data() : {};
@@ -781,26 +784,6 @@ export default async function handler(req, res) {
             const planoDoc = await db.collection('planos').doc(assinaturaData.planId).get();
             if (planoDoc.exists) nomePlano = planoDoc.data().nome || nomePlano;
           } catch (e) { /* não fatal */ }
-        }
-
-        // ── WhatsApp: confirmar opt-in e salvar número normalizado ──
-        // Executado apenas após pagamento confirmado — garante que só assinantes
-        // ativos com consentimento real terão whatsapp_number preenchido.
-        try {
-          const waRaw    = usuarioData?.whatsapp || null;
-          const waOptIn  = !!usuarioData?.whatsapp_opt_in;
-          const waNumber = waRaw ? String(waRaw).replace(/\D/g, '') : '';
-
-          if (waOptIn && waNumber.length >= 10) {
-            await db.collection('usuarios').doc(userId).update({
-              whatsapp_number:              waNumber,   // dígitos normalizados — usado no painel de disparo
-              whatsapp_optin:               true,
-              whatsapp_optin_confirmado_em: admin.firestore.FieldValue.serverTimestamp()
-            });
-          }
-        } catch (e) {
-          // não fatal — não impede o fluxo de ativação da assinatura
-          console.warn('[webhook] Falha ao salvar whatsapp_number:', e.message || e);
         }
 
         // fix #3: controle de idempotência de envio usando apenas assinRef
