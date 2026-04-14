@@ -71,6 +71,9 @@ async function chamarGemini(systemPrompt, historico, pergunta) {
 
   if (!res.ok) {
     const err = await res.text();
+    if (res.status === 429) {
+      throw Object.assign(new Error(`Gemini API erro 429`), { code: 'QUOTA_EXCEEDED' });
+    }
     throw new Error(`Gemini API erro ${res.status}: ${err}`);
   }
 
@@ -215,10 +218,13 @@ ${dadosMunicipio ? `--- DADOS DO MUNICÍPIO DO ASSINANTE ---\n${dadosMunicipio}`
     return res.status(200).json({ resposta });
 
   } catch (err) {
-    // Log detalhado nos Vercel Logs para diagnóstico
     console.error('[chat] Erro:', err.message);
     console.error('[chat] Stack:', err.stack);
-    console.log('[chat] privateKey preview:', privateKey?.slice(0, 50) + '...');
+    if (err.code === 'QUOTA_EXCEEDED') {
+      return res.status(503).json({
+        erro: 'O assistente está temporariamente indisponível. Tente novamente em alguns minutos.',
+      });
+    }
     return res.status(500).json({
       erro: 'Erro interno ao processar sua pergunta. Tente novamente em instantes.',
     });
