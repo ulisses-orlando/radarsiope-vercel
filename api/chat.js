@@ -14,6 +14,7 @@
 // =============================================================================
 
 import admin from 'firebase-admin';
+import crypto from 'crypto';
 
 // ── Firebase Admin (lazy init com tratamento de erro) ────────────────────────
 let db;
@@ -21,26 +22,16 @@ let db;
 function getFirestore() {
   if (db) return db;
 
-  const projectId   = process.env.FIREBASE_PROJECT_ID;
-  const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
-  const privateKey  = process.env.FIREBASE_PRIVATE_KEY;
-
-  if (!projectId || !clientEmail || !privateKey) {
-    throw new Error(
-      `[chat] Variáveis Firebase ausentes: ` +
-      `PROJECT_ID=${!!projectId} CLIENT_EMAIL=${!!clientEmail} PRIVATE_KEY=${!!privateKey}`
-    );
-  }
-
-  if (!admin.apps.length) {
-    admin.initializeApp({
-      credential: admin.credential.cert({
-        projectId,
-        clientEmail,
-        privateKey: privateKey.replace(/\\n/g, '\n'),
-      }),
-    });
-  }
+// Inicializa Firebase (atenção ao formato da PRIVATE_KEY no Vercel: use \\n)
+if (!admin.apps.length) {
+  admin.initializeApp({
+    credential: admin.credential.cert({
+      projectId: process.env.FIREBASE_PROJECT_ID,
+      clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+      privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\\\n/g, '\n')
+    })
+  });
+}
 
   db = admin.firestore();
   return db;
