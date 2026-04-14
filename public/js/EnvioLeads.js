@@ -472,6 +472,7 @@ async function listarUsuariosComAssinaturas(newsletterId) {
                     .limit(1)
                     .get();
                 if (!snap.empty) {
+                    console.log(`Status de envio encontrado para usuário ${uid} e assinatura ${assId}:`, snap.docs[0].data().status);
                     mapaStatusEnvio[uid] = snap.docs[0].data().status || 'enviado';
                 }
             } catch (e) {
