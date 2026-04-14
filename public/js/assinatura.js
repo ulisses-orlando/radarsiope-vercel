@@ -521,6 +521,8 @@ async function upsertUsuario(dados) {
   } = dados;
 
   const cpfNorm = (cpf || '').replace(/\D/g, '');
+  const waRaw = whatsapp;
+  const waNumber = waRaw ? String(waRaw).replace(/\D/g, '') : '';
 
   // Campos base (sempre salvos)
   const base = {
@@ -528,9 +530,11 @@ async function upsertUsuario(dados) {
     cpfNormalizado: cpfNorm,
     telefone:          telefone  || null,
     whatsapp:          whatsapp  || null,
-    whatsapp_opt_in:   whatsapp  ? (whatsappOptin ?? true) : false,
-    whatsapp_opt_in_em: whatsapp ? firebase.firestore.FieldValue.serverTimestamp() : null,
-    perfil:            perfil    || null,
+    whatsapp_number:   waNumber,   // dígitos normalizados — usado no painel de disparo
+    whatsapp_optin:    whatsapp  ? (whatsappOptin ?? true) : false,
+    whatsapp_optin_em: whatsapp ? firebase.firestore.FieldValue.serverTimestamp() : null,
+    tipo_perfil:       perfil    || null,
+    ativo:             false, // ativo somente após confirmação de pagamento
     mensagem:          mensagem  || null,
     preferencia_contato: preferencia || null,
     cod_uf:            cod_uf        || null,
