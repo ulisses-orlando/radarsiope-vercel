@@ -1,35 +1,76 @@
 // =============================================================================
-// PASSO 2 — /api/chat.js  (Vercel Serverless Function)
+// /api/chat.js  — Vercel Serverless Function
 //
-// Variáveis de ambiente necessárias na Vercel:
-//   GEMINI_API_KEY        → chave da API do Google AI Studio
-//   FIREBASE_PROJECT_ID   → ID do projeto Firebase (para buscar a edição)
-//   FIREBASE_CLIENT_EMAIL → service account (credencial server-side)
-//   FIREBASE_PRIVATE_KEY  → chave privada da service account
-//
-// Dependências (package.json):
+// Dependências npm necessárias (apenas uma):
 //   "firebase-admin": "^12.x"
-//   "@google/generative-ai": "^0.x"
+//
+// Variáveis de ambiente na Vercel:
+//   GEMINI_API_KEY         → chave do Google AI Studio
+//   FIREBASE_PROJECT_ID    → ID do projeto Firebase
+//   FIREBASE_CLIENT_EMAIL  → e-mail da service account
+//   FIREBASE_PRIVATE_KEY   → chave privada da service account
+//   SUPABASE_URL           → URL do projeto Supabase
+//   SUPABASE_SERVICE_KEY   → service_role key do Supabase
 // =============================================================================
 
-import { GoogleGenerativeAI } from '@google/generative-ai';
 import admin from 'firebase-admin';
 
-// ── Firebase Admin (inicializa uma única vez) ─────────────────────────────────
+// ── Firebase Admin (inicializa uma única vez por instância) ───────────────────
 if (!admin.apps.length) {
   admin.initializeApp({
     credential: admin.credential.cert({
       projectId:   process.env.FIREBASE_PROJECT_ID,
       clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-      privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\\\n/g, '\n')
+      privateKey:  process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
     }),
   });
 }
 
-const db  = admin.firestore();
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+const db = admin.firestore();
 
-// ── Limpa HTML para texto plano (contexto para a IA) ─────────────────────────
+// ── Gemini 2.0 Flash via fetch puro (sem biblioteca) ─────────────────────────
+const GEMINI_URL =
+  'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
+
+async function chamarGemini(systemPrompt, historico, pergunta) {
+  const contents = [
+    // Histórico de conversa (máx. 6 mensagens — 3 trocas)
+    ...historico.map(m => ({
+      role:  m.role === 'user' ? 'user' : 'model',
+      parts: [{ text: String(m.text) }],
+    })),
+    // Pergunta atual
+    { role: 'user', parts: [{ text: pergunta }] },
+  ];
+
+  const body = {
+    system_instruction: { parts: [{ text: systemPrompt }] },
+    contents,
+    generationConfig: {
+      temperature:     0.2,   // respostas determinísticas
+      maxOutputTokens: 512,
+      topP:            0.8,
+    },
+  };
+
+  const res = await fetch(`${GEMINI_URL}?key=${process.env.GEMINI_API_KEY}`, {
+    method:  'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body:    JSON.stringify(body),
+  });
+
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(`Gemini API erro ${res.status}: ${err}`);
+  }
+
+  const data = await res.json();
+  const texto = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+  if (!texto) throw new Error('Resposta vazia do modelo.');
+  return texto;
+}
+
+// ── Limpa HTML para texto plano ───────────────────────────────────────────────
 function htmlParaTexto(html = '') {
   return html
     .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
@@ -37,13 +78,13 @@ function htmlParaTexto(html = '') {
     .replace(/<[^>]+>/g, ' ')
     .replace(/&nbsp;/g, ' ')
     .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
+    .replace(/&lt;/g,  '<')
+    .replace(/&gt;/g,  '>')
     .replace(/\s{2,}/g, ' ')
     .trim();
 }
 
-// ── Trunca contexto para não exceder ~60k tokens ──────────────────────────────
+// ── Trunca contexto para não exceder limite de tokens ────────────────────────
 function truncar(texto, maxChars = 40000) {
   if (texto.length <= maxChars) return texto;
   return texto.slice(0, maxChars) + '\n\n[conteúdo truncado]';
@@ -51,15 +92,21 @@ function truncar(texto, maxChars = 40000) {
 
 // ── Handler principal ─────────────────────────────────────────────────────────
 export default async function handler(req, res) {
-  // Só aceita POST
   if (req.method !== 'POST') {
     return res.status(405).json({ erro: 'Método não permitido.' });
   }
 
-  const { pergunta, nid, municipio_cod, uid, segmento, historico = [] } = req.body || {};
+  const {
+    pergunta,
+    nid,
+    municipio_cod,
+    uid,
+    segmento,
+    historico = [],
+  } = req.body || {};
 
-  // ── Validações básicas ────────────────────────────────────────────────────
-  if (!pergunta || typeof pergunta !== 'string' || pergunta.trim().length === 0) {
+  // ── Validações ────────────────────────────────────────────────────────────
+  if (!pergunta || typeof pergunta !== 'string' || !pergunta.trim()) {
     return res.status(400).json({ erro: 'Pergunta ausente.' });
   }
   if (!nid) {
@@ -73,107 +120,86 @@ export default async function handler(req, res) {
   }
 
   try {
-    // ── 1. Busca conteúdo da edição no Firestore ──────────────────────────
+    // ── 1. Busca edição no Firestore ──────────────────────────────────────
     const snap = await db.collection('newsletters').doc(nid).get();
     if (!snap.exists) {
       return res.status(404).json({ erro: 'Edição não encontrada.' });
     }
 
-    const newsletter = snap.data();
-    const conteudoTexto = truncar(htmlParaTexto(newsletter.conteudo_html_completo || ''));
-    const tituloEdicao  = newsletter.titulo || '';
+    const newsletter    = snap.data();
     const numEdicao     = newsletter.numero  || newsletter.edicao || '';
+    const tituloEdicao  = newsletter.titulo  || '';
+    const conteudoTexto = truncar(htmlParaTexto(newsletter.conteudo_html_completo || ''));
     const bulletsList   = (newsletter.resumo_bullets || []).join('\n- ');
     const faqTexto      = (newsletter.faq || [])
       .map(f => `P: ${f.pergunta}\nR: ${f.resposta}`)
       .join('\n\n');
 
-    // ── 2. Dados do município (Supabase via fetch direto) ──────────────────
-    // Opcional — se não houver código de município, pula sem erro
+    // ── 2. Dados do município via Supabase (fetch puro) ───────────────────
     let dadosMunicipio = '';
     if (municipio_cod) {
       try {
-        const sbUrl  = process.env.SUPABASE_URL;
-        const sbKey  = process.env.SUPABASE_SERVICE_KEY;
+        const sbUrl = process.env.SUPABASE_URL;
+        const sbKey = process.env.SUPABASE_SERVICE_KEY;
         if (sbUrl && sbKey) {
-          const resp = await fetch(
-            `${sbUrl}/rest/v1/vw_municipio_resumo?cod_municipio=eq.${encodeURIComponent(municipio_cod)}&limit=1`,
+          const mRes = await fetch(
+            `${sbUrl}/rest/v1/vw_municipio_resumo` +
+            `?cod_municipio=eq.${encodeURIComponent(municipio_cod)}&limit=1`,
             { headers: { apikey: sbKey, Authorization: `Bearer ${sbKey}` } }
           );
-          if (resp.ok) {
-            const rows = await resp.json();
-            if (rows?.[0]) {
-              const m = rows[0];
-              dadosMunicipio = `
-Município do assinante: ${m.nome_municipio || ''} / ${m.uf || ''}
-Código IBGE: ${municipio_cod}
-${m.perc_mde       != null ? `MDE aplicado: ${m.perc_mde}%` : ''}
-${m.perc_fundeb    != null ? `FUNDEB (70%): ${m.perc_fundeb}%` : ''}
-${m.situacao_siope ? `Situação SIOPE: ${m.situacao_siope}` : ''}
-              `.trim();
+          if (mRes.ok) {
+            const rows = await mRes.json();
+            const m = rows?.[0];
+            if (m) {
+              dadosMunicipio = [
+                `Município: ${m.nome_municipio || ''} / ${m.uf || ''}`,
+                `Código IBGE: ${municipio_cod}`,
+                m.perc_mde    != null ? `MDE aplicado: ${m.perc_mde}%`    : '',
+                m.perc_fundeb != null ? `FUNDEB (70%): ${m.perc_fundeb}%` : '',
+                m.situacao_siope      ? `Situação SIOPE: ${m.situacao_siope}` : '',
+              ].filter(Boolean).join('\n');
             }
           }
         }
       } catch (e) {
-        // Não bloqueia — município é contexto adicional, não obrigatório
+        // Não bloqueia — contexto adicional, não obrigatório
         console.warn('[chat] Falha ao buscar município:', e.message);
       }
     }
 
-    // ── 3. Monta o system prompt ──────────────────────────────────────────
+    // ── 3. Monta system prompt ────────────────────────────────────────────
     const systemPrompt = `
-Você é o assistente do Radar SIOPE, uma newsletter especializada em financiamento da educação pública municipal brasileira.
+Você é o assistente do Radar SIOPE, newsletter especializada em financiamento da educação pública municipal brasileira.
 
 REGRAS ABSOLUTAS:
 1. Responda SOMENTE com base nas informações fornecidas abaixo.
 2. Nunca invente dados, percentuais, datas, nomes de leis ou valores.
-3. Se a pergunta não puder ser respondida com o contexto fornecido, diga exatamente: "Não tenho essa informação nesta edição."
+3. Se a pergunta não puder ser respondida com o contexto fornecido, responda exatamente: "Não tenho essa informação nesta edição."
 4. Seja objetivo e claro. Use linguagem acessível para gestores municipais.
 5. Nunca mencione que você é um modelo de IA ou que está usando um contexto.
 6. Máximo de 3 parágrafos por resposta.
 
 === EDIÇÃO ${numEdicao}: ${tituloEdicao} ===
 
---- RESUMO DOS PONTOS PRINCIPAIS ---
+--- PONTOS PRINCIPAIS ---
 ${bulletsList ? `- ${bulletsList}` : 'Não disponível.'}
 
---- CONTEÚDO COMPLETO DA EDIÇÃO ---
+--- CONTEÚDO DA EDIÇÃO ---
 ${conteudoTexto || 'Não disponível.'}
 
---- PERGUNTAS E RESPOSTAS DA EDIÇÃO ---
+--- PERGUNTAS E RESPOSTAS ---
 ${faqTexto || 'Não disponível.'}
 
 ${dadosMunicipio ? `--- DADOS DO MUNICÍPIO DO ASSINANTE ---\n${dadosMunicipio}` : ''}
     `.trim();
 
-    // ── 4. Monta histórico de conversa (máx. 6 mensagens) ─────────────────
-    const conversaAnterior = (Array.isArray(historico) ? historico.slice(-6) : [])
-      .filter(m => m.role && m.text)
-      .map(m => ({
-        role:  m.role === 'user' ? 'user' : 'model',
-        parts: [{ text: String(m.text) }],
-      }));
+    // ── 4. Chama Gemini via fetch ─────────────────────────────────────────
+    const resposta = await chamarGemini(
+      systemPrompt,
+      Array.isArray(historico) ? historico.slice(-6) : [],
+      pergunta.trim()
+    );
 
-    // ── 5. Chama Gemini 2.0 Flash ─────────────────────────────────────────
-    const model = genAI.getGenerativeModel({
-      model: 'gemini-2.0-flash',
-      systemInstruction: systemPrompt,
-      generationConfig: {
-        temperature:     0.2,   // respostas determinísticas
-        maxOutputTokens: 512,
-        topP:            0.8,
-      },
-    });
-
-    const chat    = model.startChat({ history: conversaAnterior });
-    const result  = await chat.sendMessage(pergunta.trim());
-    const resposta = result.response.text().trim();
-
-    if (!resposta) {
-      return res.status(500).json({ erro: 'Resposta vazia do modelo.' });
-    }
-
-    // ── 6. Retorna ─────────────────────────────────────────────────────────
     return res.status(200).json({ resposta });
 
   } catch (err) {
