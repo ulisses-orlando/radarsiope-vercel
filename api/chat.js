@@ -15,31 +15,50 @@
 
 import admin from 'firebase-admin';
 
-// ── Firebase Admin (inicializa uma única vez por instância) ───────────────────
-if (!admin.apps.length) {
-  admin.initializeApp({
-    credential: admin.credential.cert({
-      projectId:   process.env.FIREBASE_PROJECT_ID,
-      clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-      privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\\\n/g, '\n')
-    }),
-  });
-}
+// ── Firebase Admin (lazy init com tratamento de erro) ────────────────────────
+let db;
 
-const db = admin.firestore();
+function getFirestore() {
+  if (db) return db;
+
+  const projectId   = process.env.FIREBASE_PROJECT_ID;
+  const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
+  const privateKey  = process.env.FIREBASE_PRIVATE_KEY;
+
+  if (!projectId || !clientEmail || !privateKey) {
+    throw new Error(
+      `[chat] Variáveis Firebase ausentes: ` +
+      `PROJECT_ID=${!!projectId} CLIENT_EMAIL=${!!clientEmail} PRIVATE_KEY=${!!privateKey}`
+    );
+  }
+
+  if (!admin.apps.length) {
+    admin.initializeApp({
+      credential: admin.credential.cert({
+        projectId,
+        clientEmail,
+        privateKey: privateKey.replace(/\\n/g, '\n'),
+      }),
+    });
+  }
+
+  db = admin.firestore();
+  return db;
+}
 
 // ── Gemini 2.0 Flash via fetch puro (sem biblioteca) ─────────────────────────
 const GEMINI_URL =
   'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
 
 async function chamarGemini(systemPrompt, historico, pergunta) {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) throw new Error('[chat] GEMINI_API_KEY ausente.');
+
   const contents = [
-    // Histórico de conversa (máx. 6 mensagens — 3 trocas)
     ...historico.map(m => ({
       role:  m.role === 'user' ? 'user' : 'model',
       parts: [{ text: String(m.text) }],
     })),
-    // Pergunta atual
     { role: 'user', parts: [{ text: pergunta }] },
   ];
 
@@ -47,13 +66,13 @@ async function chamarGemini(systemPrompt, historico, pergunta) {
     system_instruction: { parts: [{ text: systemPrompt }] },
     contents,
     generationConfig: {
-      temperature:     0.2,   // respostas determinísticas
+      temperature:     0.2,
       maxOutputTokens: 512,
       topP:            0.8,
     },
   };
 
-  const res = await fetch(`${GEMINI_URL}?key=${process.env.GEMINI_API_KEY}`, {
+  const res = await fetch(`${GEMINI_URL}?key=${apiKey}`, {
     method:  'POST',
     headers: { 'Content-Type': 'application/json' },
     body:    JSON.stringify(body),
@@ -120,8 +139,11 @@ export default async function handler(req, res) {
   }
 
   try {
+    // ── 0. Inicializa Firestore (valida env vars) ─────────────────────────
+    const firestore = getFirestore();
+
     // ── 1. Busca edição no Firestore ──────────────────────────────────────
-    const snap = await db.collection('newsletters').doc(nid).get();
+    const snap = await firestore.collection('newsletters').doc(nid).get();
     if (!snap.exists) {
       return res.status(404).json({ erro: 'Edição não encontrada.' });
     }
@@ -162,7 +184,6 @@ export default async function handler(req, res) {
           }
         }
       } catch (e) {
-        // Não bloqueia — contexto adicional, não obrigatório
         console.warn('[chat] Falha ao buscar município:', e.message);
       }
     }
@@ -203,7 +224,9 @@ ${dadosMunicipio ? `--- DADOS DO MUNICÍPIO DO ASSINANTE ---\n${dadosMunicipio}`
     return res.status(200).json({ resposta });
 
   } catch (err) {
-    console.error('[chat] Erro:', err);
+    // Log detalhado nos Vercel Logs para diagnóstico
+    console.error('[chat] Erro:', err.message);
+    console.error('[chat] Stack:', err.stack);
     return res.status(500).json({
       erro: 'Erro interno ao processar sua pergunta. Tente novamente em instantes.',
     });
