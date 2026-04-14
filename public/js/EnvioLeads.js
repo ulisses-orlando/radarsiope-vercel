@@ -452,6 +452,9 @@ async function listarUsuariosComAssinaturas(newsletterId) {
         .where('tipos_selecionados', 'array-contains', tipoId)
         .get();
 
+        console.log(`Total de assinaturas ativas encontradas para tipo "${tipoId}":`, snapAss.size);
+        console.log('tipoId:', tipoId);
+        console.log('snapshot:', snapAss);
     // Busca o status de envio para cada (userId, assinaturaId) via path direto.
     // Evita collectionGroup que exige regra especial de segurança no Firestore.
     const mapaStatusEnvio = {};
