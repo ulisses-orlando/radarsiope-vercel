@@ -2735,7 +2735,19 @@ function iniciarChatFAB(newsletter, uid) {
         }),
       });
  
-      const data = await res.json();
+      let data;
+      try {
+        data = await res.json();
+      } catch (_) {
+        // Resposta não-JSON (ex: erro 500 inesperado do servidor)
+        _esconderDigitando();
+        _digitando = false;
+        _adicionarMensagem('assistant',
+          'O assistente encontrou um problema inesperado. Tente novamente em instantes.'
+        );
+        console.warn('[rs-chat] resposta não-JSON, status:', res.status);
+        return;
+      }
       _esconderDigitando();
       _digitando = false;
  
