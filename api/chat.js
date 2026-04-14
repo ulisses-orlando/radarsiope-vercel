@@ -227,6 +227,7 @@ ${dadosMunicipio ? `--- DADOS DO MUNICÍPIO DO ASSINANTE ---\n${dadosMunicipio}`
     // Log detalhado nos Vercel Logs para diagnóstico
     console.error('[chat] Erro:', err.message);
     console.error('[chat] Stack:', err.stack);
+    console.log('[chat] privateKey preview:', privateKey?.slice(0, 50) + '...');
     return res.status(500).json({
       erro: 'Erro interno ao processar sua pergunta. Tente novamente em instantes.',
     });
