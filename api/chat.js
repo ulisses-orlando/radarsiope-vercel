@@ -137,7 +137,7 @@ export default async function handler(req, res) {
     const firestore = getFirestore();
 
     // ── 1. Busca edição no Firestore ──────────────────────────────────────
-    const snap = await firestore.collection('newsletters').doc(nid).get();
+    const snap = await db.collection('newsletters').doc(nid).get();
     if (!snap.exists) {
       return res.status(404).json({ erro: 'Edição não encontrada.' });
     }
