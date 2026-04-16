@@ -38,8 +38,8 @@ if (!admin.apps.length) {
 }
 
 // ── Gemini 2.0 Flash via fetch puro (sem biblioteca) ─────────────────────────
-const GEMINI_URL =
-  'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent';
+  const GEMINI_URL =
+  'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-001:generateContent';
 
 async function chamarGemini(systemPrompt, historico, pergunta) {
   const apiKey = process.env.GEMINI_API_KEY;
