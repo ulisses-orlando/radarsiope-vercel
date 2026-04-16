@@ -40,49 +40,75 @@ function getFirestore() {
 const GEMINI_URL =
   'https://generativelanguage.googleapis.com/v1/models/gemini-2.0-flash-lite:generateContent';
 
-async function chamarGemini(systemPrompt, historico, pergunta) {
+async function chamarGemini(systemPrompt, historico, pergunta, tentativas = 3) {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) throw new Error('[chat] GEMINI_API_KEY ausente.');
 
-  const contents = [
-    ...historico.map(m => ({
-      role: m.role === 'user' ? 'user' : 'model',
-      parts: [{ text: String(m.text) }],
-    })),
-    { role: 'user', parts: [{ text: pergunta }] },
-  ];
+  let lastError;
+  
+  for (let i = 0; i < tentativas; i++) {
+    try {
+      // Monta contents apenas com histórico + pergunta atual
+      const contents = [
+        ...historico.map(m => ({
+          role: m.role === 'user' ? 'user' : 'model',
+          parts: [{ text: String(m.text) }],
+        })),
+        { role: 'user', parts: [{ text: pergunta }] },
+      ];
 
-  const body = {
-    contents: [
-      { role: 'user', parts: [{ text: systemPrompt }] },
-      { role: 'model', parts: [{ text: 'Entendido. Responderei somente com base nas informações fornecidas.' }] },
-      ...contents,
-    ],
-    generationConfig: {
-      temperature: 0.2,
-      maxOutputTokens: 512,
-      topP: 0.8,
-    },
-  };
+      // Body no formato CORRETO para Gemini API
+      const body = {
+        system_instruction: { parts: [{ text: systemPrompt }] },
+        contents,
+        generationConfig: {
+          temperature: 0.2,
+          maxOutputTokens: 512,
+          topP: 0.8,
+        },
+      };
 
-  const res = await fetch(`${GEMINI_URL}?key=${apiKey}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  });
+      const res = await fetch(`${GEMINI_URL}?key=${apiKey}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
 
-  if (!res.ok) {
-    const err = await res.text();
-    if (res.status === 429) {
-      throw Object.assign(new Error(`Gemini API erro 429`), { code: 'QUOTA_EXCEEDED' });
+      if (!res.ok) {
+        const errText = await res.text();
+        
+        // Se for 429, tenta novamente com backoff exponencial
+        if (res.status === 429) {
+          const retryAfter = res.headers.get('retry-after') 
+            ? parseInt(res.headers.get('retry-after')) 
+            : Math.min(30, Math.pow(2, i)); // 2s, 4s, 8s... (máx 30s)
+          
+          console.log(`[chat] Quota excedida, retry em ${retryAfter}s (tentativa ${i+1}/${tentativas})`);
+          await new Promise(resolve => setTimeout(resolve, retryAfter * 1000));
+          continue; // tenta a próxima tentativa
+        }
+        
+        throw new Error(`Gemini API erro ${res.status}: ${errText}`);
+      }
+
+      const data = await res.json();
+      const texto = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+      if (!texto) throw new Error('Resposta vazia do modelo.');
+      
+      return texto;
+      
+    } catch (err) {
+      lastError = err;
+      // Se for erro de quota e ainda houver tentativas, continua o loop
+      if (err.message.includes('429') && i < tentativas - 1) {
+        continue;
+      }
+      throw err; // outros erros, propaga imediatamente
     }
-    throw new Error(`Gemini API erro ${res.status}: ${err}`);
   }
-
-  const data = await res.json();
-  const texto = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
-  if (!texto) throw new Error('Resposta vazia do modelo.');
-  return texto;
+  
+  // Todas as tentativas falharam
+  throw lastError || new Error('Falha após múltiplas tentativas na Gemini API');
 }
 
 // ── Limpa HTML para texto plano ───────────────────────────────────────────────
