@@ -16,13 +16,47 @@
 import admin from 'firebase-admin';
 import crypto from 'crypto';
 
+// ── Cache em memória para respostas (válido por 5 minutos) ─────────────────
+const cacheRespostas = new Map();
+const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutos
+
+function gerarCacheKey(pergunta, nid, municipio_cod) {
+  const raw = `${pergunta.trim().toLowerCase()}|${nid}|${municipio_cod || ''}`;
+  return crypto.createHash('md5').update(raw).digest('hex');
+}
+
+function buscarNoCache(key) {
+  const item = cacheRespostas.get(key);
+  if (!item) return null;
+  if (Date.now() - item.timestamp > CACHE_TTL_MS) {
+    cacheRespostas.delete(key); // expirou
+    return null;
+  }
+  return item.resposta;
+}
+
+function salvarNoCache(key, resposta) {
+  cacheRespostas.set(key, {
+    resposta,
+    timestamp: Date.now()
+  });
+  // Limpeza preventiva se cache crescer muito
+  if (cacheRespostas.size > 200) {
+    const now = Date.now();
+    for (const [k, v] of cacheRespostas) {
+      if (now - v.timestamp > CACHE_TTL_MS) {
+        cacheRespostas.delete(k);
+      }
+    }
+  }
+}
+
 // ── Firebase Admin (lazy init com tratamento de erro) ────────────────────────
 let db;
 
 function getFirestore() {
   if (db) return db;
 
-  // Inicializa Firebase (atenção ao formato da PRIVATE_KEY no Vercel: use \\n)
   if (!admin.apps.length) {
     admin.initializeApp({
       credential: admin.credential.cert({
@@ -37,6 +71,7 @@ function getFirestore() {
   return db;
 }
 
+// ── Gemini API via fetch puro ───────────────────────────────────────────────
 const GEMINI_URL =
   'https://generativelanguage.googleapis.com/v1/models/gemini-2.0-flash-lite:generateContent';
 
@@ -45,10 +80,9 @@ async function chamarGemini(systemPrompt, historico, pergunta, tentativas = 3) {
   if (!apiKey) throw new Error('[chat] GEMINI_API_KEY ausente.');
 
   let lastError;
-  
+
   for (let i = 0; i < tentativas; i++) {
     try {
-      // Monta contents apenas com histórico + pergunta atual
       const contents = [
         ...historico.map(m => ({
           role: m.role === 'user' ? 'user' : 'model',
@@ -57,7 +91,6 @@ async function chamarGemini(systemPrompt, historico, pergunta, tentativas = 3) {
         { role: 'user', parts: [{ text: pergunta }] },
       ];
 
-      // Body no formato CORRETO para Gemini API
       const body = {
         system_instruction: { parts: [{ text: systemPrompt }] },
         contents,
@@ -76,38 +109,34 @@ async function chamarGemini(systemPrompt, historico, pergunta, tentativas = 3) {
 
       if (!res.ok) {
         const errText = await res.text();
-        
-        // Se for 429, tenta novamente com backoff exponencial
+
+        // Retry com backoff exponencial para erro 429
         if (res.status === 429) {
-          const retryAfter = res.headers.get('retry-after') 
-            ? parseInt(res.headers.get('retry-after')) 
-            : Math.min(30, Math.pow(2, i)); // 2s, 4s, 8s... (máx 30s)
-          
-          console.log(`[chat] Quota excedida, retry em ${retryAfter}s (tentativa ${i+1}/${tentativas})`);
+          const retryAfter = res.headers.get('retry-after')
+            ? parseInt(res.headers.get('retry-after'))
+            : Math.min(30, Math.pow(2, i));
+          console.log(`[chat] Quota excedida, retry em ${retryAfter}s (tentativa ${i + 1}/${tentativas})`);
           await new Promise(resolve => setTimeout(resolve, retryAfter * 1000));
-          continue; // tenta a próxima tentativa
+          continue;
         }
-        
+
         throw new Error(`Gemini API erro ${res.status}: ${errText}`);
       }
 
       const data = await res.json();
       const texto = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
       if (!texto) throw new Error('Resposta vazia do modelo.');
-      
       return texto;
-      
+
     } catch (err) {
       lastError = err;
-      // Se for erro de quota e ainda houver tentativas, continua o loop
       if (err.message.includes('429') && i < tentativas - 1) {
         continue;
       }
-      throw err; // outros erros, propaga imediatamente
+      throw err;
     }
   }
-  
-  // Todas as tentativas falharam
+
   throw lastError || new Error('Falha após múltiplas tentativas na Gemini API');
 }
 
@@ -161,7 +190,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    // ── 0. Inicializa Firestore (valida env vars) ─────────────────────────
+    // ── 0. Inicializa Firestore ───────────────────────────────────────────
     const firestore = getFirestore();
 
     // ── 1. Busca edição no Firestore ──────────────────────────────────────
@@ -179,7 +208,7 @@ export default async function handler(req, res) {
       .map(f => `P: ${f.pergunta}\nR: ${f.resposta}`)
       .join('\n\n');
 
-    // ── 2. Dados do município via Supabase (fetch puro) ───────────────────
+    // ── 2. Dados do município via Supabase ────────────────────────────────
     let dadosMunicipio = '';
     if (municipio_cod) {
       try {
@@ -234,7 +263,16 @@ ${conteudoTexto || 'Não disponível.'}
 ${faqTexto || 'Não disponível.'}
 
 ${dadosMunicipio ? `--- DADOS DO MUNICÍPIO DO ASSINANTE ---\n${dadosMunicipio}` : ''}
-    `.trim();
+`.trim();
+
+    // ── 3.1. Verifica cache ANTES de chamar a API ─────────────────────────
+    const cacheKey = gerarCacheKey(pergunta, nid, municipio_cod);
+    const respostaEmCache = buscarNoCache(cacheKey);
+
+    if (respostaEmCache) {
+      console.log(`[chat] ✅ Resposta servida do cache (key: ${cacheKey.slice(0, 8)}...)`);
+      return res.status(200).json({ resposta: respostaEmCache, cache: true });
+    }
 
     // ── 4. Chama Gemini via fetch ─────────────────────────────────────────
     const resposta = await chamarGemini(
@@ -243,16 +281,21 @@ ${dadosMunicipio ? `--- DADOS DO MUNICÍPIO DO ASSINANTE ---\n${dadosMunicipio}`
       pergunta.trim()
     );
 
-    return res.status(200).json({ resposta });
+    // ── 4.1. Salva no cache após resposta bem-sucedida ───────────────────
+    salvarNoCache(cacheKey, resposta);
+
+    return res.status(200).json({ resposta, cache: false });
 
   } catch (err) {
     console.error('[chat] Erro:', err.message);
     console.error('[chat] Stack:', err.stack);
+
     if (err.code === 'QUOTA_EXCEEDED') {
       return res.status(503).json({
         erro: 'O assistente está temporariamente indisponível. Tente novamente em alguns minutos.',
       });
     }
+
     return res.status(500).json({
       erro: 'Erro interno ao processar sua pergunta. Tente novamente em instantes.',
     });
