@@ -22,16 +22,16 @@ let db;
 function getFirestore() {
   if (db) return db;
 
-// Inicializa Firebase (atenção ao formato da PRIVATE_KEY no Vercel: use \\n)
-if (!admin.apps.length) {
-  admin.initializeApp({
-    credential: admin.credential.cert({
-      projectId: process.env.FIREBASE_PROJECT_ID,
-      clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-      privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\\\n/g, '\n')
-    })
-  });
-}
+  // Inicializa Firebase (atenção ao formato da PRIVATE_KEY no Vercel: use \\n)
+  if (!admin.apps.length) {
+    admin.initializeApp({
+      credential: admin.credential.cert({
+        projectId: process.env.FIREBASE_PROJECT_ID,
+        clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+        privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\\\n/g, '\n')
+      })
+    });
+  }
 
   db = admin.firestore();
   return db;
@@ -46,26 +46,29 @@ async function chamarGemini(systemPrompt, historico, pergunta) {
 
   const contents = [
     ...historico.map(m => ({
-      role:  m.role === 'user' ? 'user' : 'model',
+      role: m.role === 'user' ? 'user' : 'model',
       parts: [{ text: String(m.text) }],
     })),
     { role: 'user', parts: [{ text: pergunta }] },
   ];
 
   const body = {
-    system_instruction: { parts: [{ text: systemPrompt }] },
-    contents,
+    contents: [
+      { role: 'user', parts: [{ text: systemPrompt }] },
+      { role: 'model', parts: [{ text: 'Entendido. Responderei somente com base nas informações fornecidas.' }] },
+      ...contents,
+    ],
     generationConfig: {
-      temperature:     0.2,
+      temperature: 0.2,
       maxOutputTokens: 512,
-      topP:            0.8,
+      topP: 0.8,
     },
   };
 
   const res = await fetch(`${GEMINI_URL}?key=${apiKey}`, {
-    method:  'POST',
+    method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body:    JSON.stringify(body),
+    body: JSON.stringify(body),
   });
 
   if (!res.ok) {
@@ -90,8 +93,8 @@ function htmlParaTexto(html = '') {
     .replace(/<[^>]+>/g, ' ')
     .replace(/&nbsp;/g, ' ')
     .replace(/&amp;/g, '&')
-    .replace(/&lt;/g,  '<')
-    .replace(/&gt;/g,  '>')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
     .replace(/\s{2,}/g, ' ')
     .trim();
 }
@@ -141,12 +144,12 @@ export default async function handler(req, res) {
       return res.status(404).json({ erro: 'Edição não encontrada.' });
     }
 
-    const newsletter    = snap.data();
-    const numEdicao     = newsletter.numero  || newsletter.edicao || '';
-    const tituloEdicao  = newsletter.titulo  || '';
+    const newsletter = snap.data();
+    const numEdicao = newsletter.numero || newsletter.edicao || '';
+    const tituloEdicao = newsletter.titulo || '';
     const conteudoTexto = truncar(htmlParaTexto(newsletter.conteudo_html_completo || ''));
-    const bulletsList   = (newsletter.resumo_bullets || []).join('\n- ');
-    const faqTexto      = (newsletter.faq || [])
+    const bulletsList = (newsletter.resumo_bullets || []).join('\n- ');
+    const faqTexto = (newsletter.faq || [])
       .map(f => `P: ${f.pergunta}\nR: ${f.resposta}`)
       .join('\n\n');
 
@@ -169,9 +172,9 @@ export default async function handler(req, res) {
               dadosMunicipio = [
                 `Município: ${m.nome_municipio || ''} / ${m.uf || ''}`,
                 `Código IBGE: ${municipio_cod}`,
-                m.perc_mde    != null ? `MDE aplicado: ${m.perc_mde}%`    : '',
+                m.perc_mde != null ? `MDE aplicado: ${m.perc_mde}%` : '',
                 m.perc_fundeb != null ? `FUNDEB (70%): ${m.perc_fundeb}%` : '',
-                m.situacao_siope      ? `Situação SIOPE: ${m.situacao_siope}` : '',
+                m.situacao_siope ? `Situação SIOPE: ${m.situacao_siope}` : '',
               ].filter(Boolean).join('\n');
             }
           }
