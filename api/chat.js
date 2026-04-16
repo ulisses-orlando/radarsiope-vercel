@@ -28,7 +28,7 @@ function getFirestore() {
       credential: admin.credential.cert({
         projectId: process.env.FIREBASE_PROJECT_ID,
         clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-        privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\\\n/g, '\n')
+        privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n')
       })
     });
   }
@@ -139,7 +139,7 @@ export default async function handler(req, res) {
     const firestore = getFirestore();
 
     // ── 1. Busca edição no Firestore ──────────────────────────────────────
-    const snap = await db.collection('newsletters').doc(nid).get();
+    const snap = await firestore.collection('newsletters').doc(nid).get();
     if (!snap.exists) {
       return res.status(404).json({ erro: 'Edição não encontrada.' });
     }
