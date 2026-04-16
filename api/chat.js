@@ -72,6 +72,7 @@ async function chamarGemini(systemPrompt, historico, pergunta) {
   if (!res.ok) {
     const err = await res.text();
     if (res.status === 429) {
+      console.error('[chat] Gemini 429 body:', err);
       throw Object.assign(new Error(`Gemini API erro 429`), { code: 'QUOTA_EXCEEDED' });
     }
     throw new Error(`Gemini API erro ${res.status}: ${err}`);
@@ -98,7 +99,7 @@ function htmlParaTexto(html = '') {
 }
 
 // ── Trunca contexto para não exceder limite de tokens ────────────────────────
-function truncar(texto, maxChars = 40000) {
+function truncar(texto, maxChars = 8000) {
   if (texto.length <= maxChars) return texto;
   return texto.slice(0, maxChars) + '\n\n[conteúdo truncado]';
 }
