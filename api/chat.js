@@ -154,10 +154,49 @@ function htmlParaTexto(html = '') {
     .trim();
 }
 
-// ── Trunca contexto para não exceder limite de tokens ────────────────────────
-function truncar(texto, maxChars = 12000) {
-  if (texto.length <= maxChars) return texto;
-  return texto.slice(0, maxChars) + '\n\n[conteúdo truncado]';
+// ── Extrai trechos mais relevantes para a pergunta (RAG simples) ─────────────
+function extrairTrechosRelevantes(texto, pergunta, maxChars = 6000) {
+  if (!texto || texto.length <= maxChars) return texto;
+
+  // Tokeniza a pergunta em palavras significativas (≥4 chars)
+  const stopwords = new Set(['para','como','qual','que','este','essa','este',
+    'isso','pelo','pela','com','seu','sua','quando','onde','quem','mais',
+    'pode','deve','seria','sobre','entre','ainda','também','após','antes']);
+
+  const palavras = pergunta
+    .toLowerCase()
+    .replace(/[^a-záéíóúâêîôûãõç\s]/g, '')
+    .split(/\s+/)
+    .filter(w => w.length >= 4 && !stopwords.has(w));
+
+  if (palavras.length === 0) return texto.slice(0, maxChars);
+
+  // Divide em parágrafos/sentenças
+  const paragrafos = texto
+    .split(/(?<=[.!?])\s+|{2,}/)
+    .map(p => p.trim())
+    .filter(p => p.length > 40);
+
+  // Pontua cada parágrafo por sobreposição de palavras-chave
+  const pontuados = paragrafos.map(p => {
+    const pLower = p.toLowerCase();
+    const score = palavras.reduce((acc, w) => acc + (pLower.includes(w) ? 1 : 0), 0);
+    return { p, score };
+  });
+
+  // Ordena por relevância, mantém ordem original entre empates
+  const ordenados = [...pontuados]
+    .map((item, idx) => ({ ...item, idx }))
+    .sort((a, b) => b.score - a.score || a.idx - b.idx);
+
+  // Monta o contexto priorizando os mais relevantes até o limite
+  let resultado = '';
+  for (const { p } of ordenados) {
+    if (resultado.length + p.length + 2 > maxChars) break;
+    resultado += p + '\n\n';
+  }
+
+  return resultado.trim() || texto.slice(0, maxChars);
 }
 
 // ── Handler principal ─────────────────────────────────────────────────────────
@@ -202,7 +241,7 @@ export default async function handler(req, res) {
     const newsletter = snap.data();
     const numEdicao = newsletter.numero || newsletter.edicao || '';
     const tituloEdicao = newsletter.titulo || '';
-    const conteudoTexto = truncar(htmlParaTexto(newsletter.conteudo_html_completo || ''));
+    const conteudoTexto = extrairTrechosRelevantes(htmlParaTexto(newsletter.conteudo_html_completo || ''), pergunta);
     const bulletsList = (newsletter.resumo_bullets || []).join('\n- ');
     const faqTexto = (newsletter.faq || [])
       .map(f => `P: ${f.pergunta}\nR: ${f.resposta}`)
