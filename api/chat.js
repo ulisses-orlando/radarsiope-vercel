@@ -73,7 +73,7 @@ function getFirestore() {
 
 // ── Gemini API via fetch puro ───────────────────────────────────────────────
 const GEMINI_URL =
-  'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent';
+  'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent';
 
 async function chamarGemini(systemPrompt, historico, pergunta, tentativas = 3) {
   const apiKey = process.env.GEMINI_API_KEY;
