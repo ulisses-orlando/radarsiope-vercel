@@ -150,6 +150,8 @@ function htmlParaTexto(html = '') {
     .replace(/&amp;/g, '&')
     .replace(/&lt;/g, '<')
     .replace(/&gt;/g, '>')
+    .replace(/&#39;/g, "'")
+    .replace(/&quot;/g, '"')
     .replace(/\s{2,}/g, ' ')
     .trim();
 }
@@ -159,23 +161,27 @@ function extrairTrechosRelevantes(texto, pergunta, maxChars = 6000) {
   if (!texto || texto.length <= maxChars) return texto;
 
   // Tokeniza a pergunta em palavras significativas (≥4 chars)
-  const stopwords = new Set(['para','como','qual','que','este','essa','este',
-    'isso','pelo','pela','com','seu','sua','quando','onde','quem','mais',
-    'pode','deve','seria','sobre','entre','ainda','também','após','antes']);
+  const stopwords = new Set([
+    'para','como','qual','que','este','essa','este','isso','pelo','pela',
+    'com','seu','sua','quando','onde','quem','mais','pode','deve','seria',
+    'sobre','entre','ainda','também','após','antes','uma','com','do','da'
+  ]);
 
   const palavras = pergunta
     .toLowerCase()
-    .replace(/[^a-záéíóúâêîôûãõç\s]/g, '')
+    .replace(/[^a-záéíóúâêîôûãõç\s]/g, ' ')
     .split(/\s+/)
     .filter(w => w.length >= 4 && !stopwords.has(w));
 
   if (palavras.length === 0) return texto.slice(0, maxChars);
 
-  // Divide em parágrafos/sentenças
+  // Divide em parágrafos/sentenças - regex CORRIGIDO
   const paragrafos = texto
-    .split(/(?<=[.!?])\s+|{2,}/)
+    .split(/(?<=[.!?])\s+|\n{2,}/)  // ✅ \n{2,} em vez de {2,}
     .map(p => p.trim())
     .filter(p => p.length > 40);
+
+  if (paragrafos.length === 0) return texto.slice(0, maxChars);
 
   // Pontua cada parágrafo por sobreposição de palavras-chave
   const pontuados = paragrafos.map(p => {
