@@ -96,7 +96,7 @@ async function chamarGemini(systemPrompt, historico, pergunta, tentativas = 3) {
         contents,
         generationConfig: {
           temperature: 0.2,
-          maxOutputTokens: 512,
+          maxOutputTokens: 300,
           topP: 0.8,
         },
       };
@@ -155,7 +155,7 @@ function htmlParaTexto(html = '') {
 }
 
 // ── Trunca contexto para não exceder limite de tokens ────────────────────────
-function truncar(texto, maxChars = 40000) {
+function truncar(texto, maxChars = 12000) {
   if (texto.length <= maxChars) return texto;
   return texto.slice(0, maxChars) + '\n\n[conteúdo truncado]';
 }
