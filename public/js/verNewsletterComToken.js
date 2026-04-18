@@ -1577,6 +1577,7 @@ const _drawer = {
   tipoAtual: null,       // tipo da edição sendo lida
   edicoesCache: {},         // { [tipoId]: [array de edições] } — memória de sessão
   contadores: [],         // refs dos setInterval dos contadores regressivos
+  filtroLidas: 'todas',
 };
 
 async function _getTipos() {
@@ -1901,7 +1902,7 @@ async function abrirTipo(tipoId, tipoNome, tipoIcone) {
       </div>`;
 
   const filtroTabs = isAssinante ? _htmlFiltroLidas(_drawer.filtroLidas || 'todas') : '';
-  body.innerHTML = `${upSellBanner}${listaOuVazio}${rodape}`;
+  body.innerHTML = `${upSellBanner}${filtroTabs}${listaOuVazio}${rodape}`;
 
   // Iniciar contadores regressivos para leads
   if (!isAssinante) {
@@ -3023,7 +3024,7 @@ function iniciarChatFAB(newsletter, uid, acesso) {
       console.warn('[rs-chat] erro:', err);
     }
   }
-  
+
   // ── Clique no FAB ────────────────────────────────────────────────────────
   fab.onclick = () => {
     if (!temChat) {
