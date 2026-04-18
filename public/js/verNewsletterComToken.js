@@ -16,6 +16,8 @@ let dadosMunicipioAtual = {
   uf: null,
   vitrine: null
 };
+// ─── Contexto dinâmico para o Chat (evita referência a edição antiga) ─────
+window._chatContext = { nid: null, uid: null, edicaoNum: null };
 
 // ─── Parâmetros da URL ────────────────────────────────────────────────────────
 
@@ -2413,6 +2415,15 @@ async function navegarParaEdicao(edicaoId) {
     renderCTA(acesso, newsletter);
     renderWatermark(destinatario, newsletter);
 
+    // ⚠️ Atualiza contexto do chat para a nova edição (caso o FAB já esteja na tela)
+    if (window._chatContext) {
+      window._chatContext.nid = newsletter.id;
+      window._chatContext.edicaoNum = newsletter.numero || newsletter.edicao || '';
+      if (window._radarUser?.uid) {
+        window._chatContext.uid = window._radarUser.uid;
+      }
+    }
+
     // Notificação de edição mais recente (apenas assinante)
     if (ctx.segmento === 'assinante') {
       verificarEdicaoMaisRecente(newsletter);
@@ -2771,7 +2782,18 @@ function iniciarChatFAB(newsletter, uid, acesso) {
  
   // Só exibe o FAB para assinantes (com ou sem a feature — upsell para os sem)
   if (!acesso?.isAssinante) return;
+
+  window._chatContext = {
+    nid: newsletter.id,
+    uid: uid,
+    edicaoNum: newsletter.numero || newsletter.edicao || '',
+  };
  
+  // Se mudou de edição, limpa mensagens antigas para não misturar contextos
+  if (window._chatMensagens && window._chatContext.nid !== newsletter.id) {
+    window._chatMensagens = [];
+  }
+
   const nid        = newsletter.id;
   const edicaoNum  = newsletter.numero || newsletter.edicao || '';
   const temChat    = !!acesso.temChat;
@@ -2970,6 +2992,19 @@ function iniciarChatFAB(newsletter, uid, acesso) {
         0%, 60%, 100% { transform: translateY(0); opacity: .5; }
         30% { transform: translateY(-4px); opacity: 1; }
       }
+      .rs-chat-header-titulo {
+        font-size: 14px; font-weight: 700;
+        color: var(--rs-texto, #0f172a);
+        font-family: Georgia, serif; line-height: 1.2;
+        /* Quebra suave em mobile */
+        white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        max-width: 180px;
+      }
+      @media (max-width: 380px) {
+        .rs-chat-header-titulo {
+          font-size: 13px; max-width: 140px;
+        }
+      }
     `;
     document.head.appendChild(style);
   }
@@ -3007,7 +3042,6 @@ function iniciarChatFAB(newsletter, uid, acesso) {
   function _abrirChat() {
     if (document.getElementById('rs-chat-sheet')) return;
     sessionStorage.setItem(sessionKey, '1');
-
     const backdrop = document.createElement('div');
     backdrop.id = 'rs-chat-backdrop';
     backdrop.onclick = _fecharChat;
@@ -3015,27 +3049,35 @@ function iniciarChatFAB(newsletter, uid, acesso) {
 
     const sheet = document.createElement('div');
     sheet.id = 'rs-chat-sheet';
+    
+    // Monta título com edição (ex: "Pergunte ao Radar · Ed. 042 · Título da edição")
+    const tituloEdicao = edicaoNum ? `Ed. ${_esc(edicaoNum)}` : '';
+    const tituloNewsletter = newsletter.titulo ? _esc(newsletter.titulo) : '';
+    const tituloCompleto = tituloEdicao || tituloNewsletter 
+      ? `Pergunte ao Radar ${tituloEdicao ? `· ${tituloEdicao}` : ''}${tituloNewsletter ? ` · ${tituloNewsletter}` : ''}`
+      : 'Pergunte ao Radar';
+
     sheet.innerHTML = `
-      <div class="rs-chat-handle-wrap"><div class="rs-chat-handle"></div></div>
+      <div class="rs-chat-handle-wrap"> <div class="rs-chat-handle"> </div> </div>
       <div class="rs-chat-header">
         <div class="rs-chat-header-avatar">✦</div>
         <div>
-          <div class="rs-chat-header-titulo">Pergunte ao Radar</div>
+          <div class="rs-chat-header-titulo">${tituloCompleto}</div>
           <div class="rs-chat-header-sub">● online agora</div>
         </div>
         <button class="rs-chat-header-close"
-                onclick="document.getElementById('rs-chat-backdrop')?.click()"
-                aria-label="Fechar">✕</button>
+              onclick="document.getElementById('rs-chat-backdrop')?.click()"
+              aria-label="Fechar">✕</button>
       </div>
-      <div class="rs-chat-messages" id="rs-chat-messages"></div>
+      <div class="rs-chat-messages" id="rs-chat-messages"> </div>
       <div class="rs-chat-input-row">
         <textarea id="rs-chat-input" class="rs-chat-input"
-                  placeholder="Pergunte sobre esta edição…"
-                  rows="1" maxlength="500"></textarea>
+                placeholder="Pergunte sobre esta edição…"
+                rows="1" maxlength="500"> </textarea>
         <button id="rs-chat-send" class="rs-chat-send" aria-label="Enviar">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
-               stroke="currentColor" stroke-width="2.5"
-               stroke-linecap="round" stroke-linejoin="round">
+              stroke="currentColor" stroke-width="2.5"
+              stroke-linecap="round" stroke-linejoin="round">
             <line x1="22" y1="2" x2="11" y2="13"/>
             <polygon points="22 2 15 22 11 13 2 9 22 2"/>
           </svg>
@@ -3141,14 +3183,15 @@ function iniciarChatFAB(newsletter, uid, acesso) {
     _mostrarDigitando();
 
     try {
+      const ctx = window._chatContext; // ← lê contexto atualizado
       const res = await fetch('/api/chat', {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           pergunta:      texto,
-          nid:           nid,
+          nid:           ctx.nid,
           municipio_cod: window._radarUser?.municipio_cod || '',
-          uid:           uid,
+          uid:           ctx.uid,
           segmento:      window._radarUser?.segmento || '',
           historico:     _mensagens.slice(-6),
         }),
