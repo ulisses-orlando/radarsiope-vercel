@@ -691,15 +691,16 @@
             <label for="whatsapp">WhatsApp</label>
             <input type="tel" id="whatsapp" placeholder="(00) 00000-0000" />
             <span id="error-whatsapp" class="field-error"></span>
-            <!-- opt-in WhatsApp — visível apenas para planos com alertas via WhatsApp -->
+
+            <!-- opt-in WhatsApp — visível apenas para planos com a feature alvo -->
             <div class="rs-whatsapp-wrap" id="whatsapp-optin-wrap">
               <input type="checkbox" id="whatsapp-optin" checked />
               <label for="whatsapp-optin">
                 Autorizo o Radar SIOPE a enviar alertas e comunicados para este número
-                <span class="wa-detalhe">Você pode revogar este consentimento a qualquer momento pelo canal de
-                  suporte.</span>
+                <span class="wa-detalhe">Você pode revogar este consentimento a qualquer momento pelo canal de suporte.</span>
               </label>
             </div>
+            <span id="error-whatsapp-optin" class="field-error" style="display:none; color:#c00; font-size:12px; margin-top:4px;"></span>
           </div>
         </div>
 
