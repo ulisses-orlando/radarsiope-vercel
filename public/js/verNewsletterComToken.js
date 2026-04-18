@@ -370,6 +370,99 @@ async function renderMunicipio(destinatario, acesso, newsletter) {
   }
 }
 
+// ─── MODAL DE MÍDIA INTERNA (Vídeo / Infográfico) ─────────────────────────
+// ─── MODAL DE MÍDIA (Design System Radar SIOPE) ─────────────────────────────
+function _injetarEstiloModalMidia() {
+  if (document.getElementById('rs-modal-midia-style')) return;
+  const style = document.createElement('style');
+  style.id = 'rs-modal-midia-style';
+  style.textContent = `
+    .rs-midia-modal { position:fixed; inset:0; z-index:9990;
+      background:rgba(15,23,42,0.85); display:flex; align-items:center; justify-content:center;
+      opacity:0; pointer-events:none; transition:opacity .2s ease; }
+    .rs-midia-modal.aberto { opacity:1; pointer-events:auto; }
+    .rs-midia-modal-box { position:relative; width:92vw; max-width:880px; height:85vh;
+      background:var(--rs-card,#fff); border-radius:16px; overflow:hidden;
+      box-shadow:0 12px 40px rgba(0,0,0,0.35); display:flex; flex-direction:column; }
+    .rs-midia-modal-header { display:flex; align-items:center; justify-content:space-between;
+      padding:14px 18px; border-bottom:1px solid var(--rs-borda,#e2e8f0); background:var(--rs-card,#fff); }
+    .rs-midia-modal-titulo { margin:0; font-size:15px; font-weight:600; color:var(--rs-texto,#0f172a); }
+    .rs-midia-modal-fechar { background:none; border:none; color:var(--rs-muted,#94a3b8);
+      font-size:20px; cursor:pointer; padding:6px 8px; border-radius:8px; transition:all .15s; }
+    .rs-midia-modal-fechar:hover { background:var(--rs-borda,#e2e8f0); color:var(--rs-texto,#0f172a); }
+    .rs-midia-modal-conteudo { flex:1; position:relative; background:#000; overflow:hidden; }
+    .rs-midia-modal-conteudo iframe, .rs-midia-modal-conteudo video, .rs-midia-modal-conteudo img {
+      width:100%; height:100%; border:none; display:block; object-fit:contain; background:#000; }
+    @media(max-width:600px) {
+      .rs-midia-modal-box { width:98vw; height:90vh; border-radius:12px; }
+      .rs-midia-modal-header { padding:12px 14px; }
+      .rs-midia-modal-titulo { font-size:14px; }
+    }
+  `;
+  document.head.appendChild(style);
+}
+
+function abrirModalMidia(url, tipo) {
+  _injetarEstiloModalMidia();
+  let modal = document.getElementById('rs-midia-modal');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'rs-midia-modal';
+    modal.className = 'rs-midia-modal';
+    modal.setAttribute('role', 'dialog');
+    modal.setAttribute('aria-modal', 'true');
+    modal.innerHTML = `
+      <div class="rs-midia-modal-box">
+        <div class="rs-midia-modal-header">
+          <span class="rs-midia-modal-titulo" id="rs-midia-modal-titulo-txt">Mídia</span>
+          <button class="rs-midia-modal-fechar" onclick="fecharModalMidia()" aria-label="Fechar">✕</button>
+        </div>
+        <div class="rs-midia-modal-conteudo" id="rs-midia-conteudo"></div>
+      </div>`;
+    modal.addEventListener('click', e => { if (e.target === modal) fecharModalMidia(); });
+    document.body.appendChild(modal);
+  }
+
+  const tituloEl = document.getElementById('rs-midia-modal-titulo-txt');
+  const container = document.getElementById('rs-midia-conteudo');
+
+  // Títulos contextuais
+  const titulos = { video: '📺 Vídeo explicativo', infografico: '📊 Infográfico da edição', audio: '🎧 Podcast' };
+  tituloEl.textContent = titulos[tipo] || 'Mídia da edição';
+
+  const urlLimpa  = url.split('?')[0].split('#')[0];
+  const ext       = urlLimpa.split('.').pop().toLowerCase();
+  const isVideo   = /\.(mp4|webm|ogg)(\?.*)?$/i.test(url);
+  const isImage   = ['png','jpg','jpeg','webp','gif','svg'].includes(ext);
+  const isPdf     = ext === 'pdf';
+
+  if (isVideo) {
+    container.innerHTML = `<video src="${_esc(url)}" controls autoplay playsinline></video>`;
+  } else if (isImage) {
+    container.innerHTML = `<img src="${_esc(url)}" alt="Infográfico">`;
+  } else if (isPdf) {
+    container.innerHTML = `<iframe src="${_esc(url)}" style="background:#fff;"></iframe>`;
+  } else {
+    container.innerHTML = `<iframe src="${_esc(url)}" allow="autoplay; encrypted-media; fullscreen" allowfullscreen></iframe>`;
+  }
+
+  requestAnimationFrame(() => {
+    modal.classList.add('aberto');
+    document.body.style.overflow = 'hidden';
+  });
+}
+
+function fecharModalMidia() {
+  const modal = document.getElementById('rs-midia-modal');
+  if (!modal) return;
+  modal.classList.remove('aberto');
+  setTimeout(() => {
+    document.getElementById('rs-midia-conteudo').innerHTML = '';
+    document.body.style.overflow = '';
+  }, 200);
+}
+document.addEventListener('keydown', e => { if (e.key === 'Escape') fecharModalMidia(); });
+
 // ─── Mídia ────────────────────────────────────────────────────────────────────
 
 function renderMidia(newsletter, acesso) {
@@ -409,8 +502,7 @@ function renderMidia(newsletter, acesso) {
         <div class="rs-media-titulo">Vídeo explicativo</div>
         <div class="rs-media-sub">Análise detalhada em vídeo</div>
       </div>
-      <a href="${_esc(newsletter.video_url)}" target="_blank" rel="noopener noreferrer"
-         class="rs-media-btn rs-media-btn-primary">Assistir →</a>
+      <button class="rs-media-btn rs-media-btn-primary" onclick="abrirModalMidia('${_esc(newsletter.video_url)}', 'video')">Assistir →</button>
     </div>` : `
     <div class="rs-media-item">
       <div class="rs-media-icon" style="opacity:.4">📺</div>
@@ -431,8 +523,7 @@ function renderMidia(newsletter, acesso) {
           <div class="rs-media-titulo">Infográfico da edição</div>
           <div class="rs-media-sub">Visualização gráfica do conteúdo desta edição</div>
         </div>
-        <a href="${_esc(newsletter.infografico_url)}" target="_blank" rel="noopener noreferrer"
-           class="rs-media-btn rs-media-btn-primary">Ver →</a>
+        <button class="rs-media-btn rs-media-btn-primary" onclick="abrirModalMidia('${_esc(newsletter.infografico_url)}', 'infografico')">Ver →</button>
       </div>` : `
       <div class="rs-media-item">
         <div class="rs-media-icon" style="opacity:.4">📊</div>
