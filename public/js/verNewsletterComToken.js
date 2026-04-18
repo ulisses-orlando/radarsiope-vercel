@@ -402,6 +402,37 @@ function _injetarEstiloModalMidia() {
   document.head.appendChild(style);
 }
 
+function _converterEmbedUrl(url, tipo) {
+  if (!url) return url;
+  const u = url.trim();
+
+  // YouTube: watch?v= → embed/
+  const ytMatch = u.match(/youtube\.com\/watch\?v=([a-zA-Z0-9_-]+)/);
+  if (ytMatch) return `https://www.youtube.com/embed/${ytMatch[1]}?rel=0&modestbranding=1&playsinline=1`;
+
+  // YouTube: youtu.be/ → embed/
+  const ytShort = u.match(/youtu\.be\/([a-zA-Z0-9_-]+)/);
+  if (ytShort) return `https://www.youtube.com/embed/${ytShort[1]}?rel=0&modestbranding=1&playsinline=1`;
+
+  // Vimeo: vimeo.com/123456 → player.vimeo.com/video/123456
+  const vimeoMatch = u.match(/vimeo\.com\/(\d+)/);
+  if (vimeoMatch) return `https://player.vimeo.com/video/${vimeoMatch[1]}?badge=0&autopause=0&player_id=0&app_id=58479`;
+
+  // Google Drive: visualização → embed
+  if (u.includes('drive.google.com/file/d/') && u.includes('/view')) {
+    const fileId = u.match(/file\/d\/([^/]+)/)?.[1];
+    if (fileId) return `https://drive.google.com/file/d/${fileId}/preview`;
+  }
+
+  // Data Studio / Looker: já vem em formato embed, mas garantimos parâmetros seguros
+  if (u.includes('lookerstudio.google.com') || u.includes('datastudio.google.com')) {
+    return u.includes('?embed=') ? u : `${u}${u.includes('?') ? '&' : '?'}embed=1`;
+  }
+
+  // Fallback: retorna a URL original
+  return u;
+}
+
 function abrirModalMidia(url, tipo) {
   _injetarEstiloModalMidia();
   let modal = document.getElementById('rs-midia-modal');
@@ -426,24 +457,59 @@ function abrirModalMidia(url, tipo) {
   const tituloEl = document.getElementById('rs-midia-modal-titulo-txt');
   const container = document.getElementById('rs-midia-conteudo');
 
-  // Títulos contextuais
   const titulos = { video: '📺 Vídeo explicativo', infografico: '📊 Infográfico da edição', audio: '🎧 Podcast' };
   tituloEl.textContent = titulos[tipo] || 'Mídia da edição';
 
-  const urlLimpa  = url.split('?')[0].split('#')[0];
+  // 🔁 Converte URL para formato embed
+  const urlEmbed = _converterEmbedUrl(url, tipo);
+  const urlLimpa  = urlEmbed.split('?')[0].split('#')[0];
   const ext       = urlLimpa.split('.').pop().toLowerCase();
-  const isVideo   = /\.(mp4|webm|ogg)(\?.*)?$/i.test(url);
+
+  const isVideo   = /\.(mp4|webm|ogg)(\?.*)?$/i.test(urlEmbed);
   const isImage   = ['png','jpg','jpeg','webp','gif','svg'].includes(ext);
   const isPdf     = ext === 'pdf';
 
+  // HTML base com fallback embutido
+  const criarFallback = (msg) => `
+    <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;padding:20px;text-align:center;color:var(--rs-muted)">
+      <div style="font-size:32px;margin-bottom:12px">⚠️</div>
+      <p style="font-size:13px;line-height:1.6;margin-bottom:16px">${msg}</p>
+      <a href="${_esc(url)}" target="_blank" rel="noopener noreferrer" 
+         style="padding:8px 16px;background:var(--azul);color:#fff;border-radius:8px;font-size:12px;font-weight:600;text-decoration:none">
+        📥 Abrir em nova aba
+      </a>
+    </div>`;
+
   if (isVideo) {
-    container.innerHTML = `<video src="${_esc(url)}" controls autoplay playsinline></video>`;
+    container.innerHTML = `<video src="${_esc(urlEmbed)}" controls autoplay playsinline onerror="this.parentElement.innerHTML='${criarFallback('Não foi possível carregar o vídeo.')}';"></video>`;
   } else if (isImage) {
-    container.innerHTML = `<img src="${_esc(url)}" alt="Infográfico">`;
+    container.innerHTML = `<img src="${_esc(urlEmbed)}" alt="Infográfico" onerror="this.parentElement.innerHTML='${criarFallback('Não foi possível carregar a imagem.')}';">`;
   } else if (isPdf) {
-    container.innerHTML = `<iframe src="${_esc(url)}" style="background:#fff;"></iframe>`;
+    container.innerHTML = `<iframe src="${_esc(urlEmbed)}" style="background:#fff;" onload="this.onerror=null" onerror="this.parentElement.innerHTML='${criarFallback('Este PDF não permite visualização interna.')}';"></iframe>`;
   } else {
-    container.innerHTML = `<iframe src="${_esc(url)}" allow="autoplay; encrypted-media; fullscreen" allowfullscreen></iframe>`;
+    // Iframe genérico com fallback para erro 403/CORS
+    container.innerHTML = `
+      <iframe src="${_esc(urlEmbed)}" 
+              allow="autoplay; encrypted-media; fullscreen; picture-in-picture" 
+              allowfullscreen 
+              style="width:100%;height:100%;border:none;background:#fff;"
+              onload="this.dataset.loaded='1'"
+              onerror="this.parentElement.innerHTML='${criarFallback('Este conteúdo não pode ser exibido dentro do app.')}';">
+      </iframe>
+      <script>
+        // Fallback adicional: se o iframe carregar mas estiver vazio/bloqueado (ex: X-Frame-Options)
+        setTimeout(() => {
+          const iframe = document.querySelector('#rs-midia-conteudo iframe');
+          if (iframe && iframe.dataset.loaded !== '1') {
+            try {
+              // Tenta acessar contentDocument — se falhar, é bloqueio de origem
+              if (!iframe.contentDocument) throw new Error('blocked');
+            } catch(e) {
+              iframe.parentElement.innerHTML = '${criarFallback('Este conteúdo bloqueia visualização interna.')}';
+            }
+          }
+        }, 3000);
+      <\/script>`;
   }
 
   requestAnimationFrame(() => {
