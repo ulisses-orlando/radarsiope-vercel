@@ -343,6 +343,179 @@ async function dispararMensagemAutomatica(momento, dados) {
   }
 }
 
+// ─── Ativação de sessão pós-pagamento ──────────────────────────────────────
+async function _handleAtivarSessao(req, res) {
+  if (req.method !== 'POST') return json(res, 405, { ok: false, message: 'Método não permitido.' });
+ 
+  const { uid, session_token } = req.body || {};
+  if (!uid || !session_token) {
+    return json(res, 400, { ok: false, message: 'uid e session_token obrigatórios.' });
+  }
+ 
+  const ua      = req.headers['user-agent'] || '';
+  const uaHash  = crypto.createHash('md5').update(ua.slice(0, 80)).digest('hex').slice(0, 8);
+ 
+  try {
+    const usuarioRef  = db.collection('usuarios').doc(uid);
+    const usuarioSnap = await usuarioRef.get();
+ 
+    if (!usuarioSnap.exists) {
+      return json(res, 404, { ok: false, message: 'Usuário não encontrado.' });
+    }
+ 
+    const usuarioData = usuarioSnap.data();
+    const pst         = usuarioData.pending_session_token;
+ 
+    // Validações do token de ativação
+    if (!pst || pst.usado) {
+      return json(res, 400, { ok: false, message: 'Token inválido ou já utilizado.' });
+    }
+    if (pst.exp < Date.now()) {
+      return json(res, 400, { ok: false, message: 'Link expirado. Entre em contato para solicitar um novo acesso.' });
+    }
+    if (pst.token !== session_token) {
+      return json(res, 400, { ok: false, message: 'Token inválido.' });
+    }
+ 
+    const { assinaturaId } = pst;
+ 
+    // Busca dados atuais da assinatura
+    const assinaturaSnap = await db.collection('usuarios').doc(uid)
+      .collection('assinaturas').doc(assinaturaId).get();
+    if (!assinaturaSnap.exists) {
+      return json(res, 404, { ok: false, message: 'Assinatura não encontrada.' });
+    }
+    const assinaturaData = assinaturaSnap.data();
+ 
+    // Controle de sessões ativas: máximo 3 por assinante
+    // Se já existem 3, desativa a que ficou mais tempo sem acesso
+    const sessoesSnap = await usuarioRef.collection('sessoes')
+      .where('ativo', '==', true).get();
+ 
+    if (sessoesSnap.size >= 3) {
+      const ordenadas = sessoesSnap.docs.sort((a, b) => {
+        const ta = a.data().ultimo_acesso?.toMillis?.() || 0;
+        const tb = b.data().ultimo_acesso?.toMillis?.() || 0;
+        return ta - tb; // mais antiga primeiro
+      });
+      await ordenadas[0].ref.update({
+        ativo: false,
+        desativado_motivo: 'limite_dispositivos',
+        desativado_em: admin.firestore.FieldValue.serverTimestamp(),
+      });
+    }
+ 
+    // Cria nova sessão
+    const sessionId = crypto.randomUUID();
+    await usuarioRef.collection('sessoes').doc(sessionId).set({
+      criado_em:    admin.firestore.FieldValue.serverTimestamp(),
+      ultimo_acesso: admin.firestore.FieldValue.serverTimestamp(),
+      ua_hash:      uaHash,
+      ativo:        true,
+      assinaturaId,
+      acessos_ua_distintos: 0,
+      compartilhamento_suspeito: false,
+    });
+ 
+    // Invalida o token de ativação (uso único)
+    await usuarioRef.update({ 'pending_session_token.usado': true });
+ 
+    return json(res, 200, {
+      ok:             true,
+      session_id:     sessionId,
+      uid,
+      assinaturaId,
+      segmento:       'assinante',
+      plano_slug:     assinaturaData.plano_slug   || null,
+      features:       assinaturaData.features_snapshot || assinaturaData.features || {},
+      nome:           usuarioData.nome            || '',
+      email:          usuarioData.email           || '',
+      cod_uf:         usuarioData.cod_uf          || '',
+      cod_municipio:  usuarioData.cod_municipio   || '',
+      nome_municipio: usuarioData.nome_municipio  || '',
+      perfil:         usuarioData.perfil          || '',
+    });
+ 
+  } catch (err) {
+    console.error('[ativar-sessao] Erro:', err.message);
+    return json(res, 500, { ok: false, message: 'Erro interno ao ativar sessão.' });
+  }
+}
+ 
+// ─── Validação periódica de sessão (chamado a cada 24h pelo app) ───────────
+async function _handleValidarSessao(req, res) {
+  if (req.method !== 'POST') return json(res, 405, { ok: false, message: 'Método não permitido.' });
+ 
+  const { uid, session_id } = req.body || {};
+  if (!uid || !session_id) {
+    return json(res, 400, { ok: false, message: 'uid e session_id obrigatórios.' });
+  }
+ 
+  const ua     = req.headers['user-agent'] || '';
+  const uaHash = crypto.createHash('md5').update(ua.slice(0, 80)).digest('hex').slice(0, 8);
+ 
+  try {
+    const sessaoRef  = db.collection('usuarios').doc(uid).collection('sessoes').doc(session_id);
+    const sessaoSnap = await sessaoRef.get();
+ 
+    if (!sessaoSnap.exists || !sessaoSnap.data().ativo) {
+      return json(res, 200, { valido: false, motivo: 'sessao_invalida' });
+    }
+ 
+    const sessaoData = sessaoSnap.data();
+    const agora      = Date.now();
+    const updates    = { ultimo_acesso: admin.firestore.FieldValue.serverTimestamp() };
+ 
+    // Detecção de compartilhamento: UA diferente em menos de 1h
+    if (sessaoData.ua_hash && sessaoData.ua_hash !== uaHash) {
+      const ultimoAcessoMs = sessaoData.ultimo_acesso?.toMillis?.() || 0;
+      if (agora - ultimoAcessoMs < 60 * 60 * 1000) {
+        const distintos = (sessaoData.acessos_ua_distintos || 0) + 1;
+        updates.acessos_ua_distintos       = distintos;
+        updates.ua_hash                    = uaHash;
+        // Flag para revisão manual — não bloqueia automaticamente
+        if (distintos >= 3) updates.compartilhamento_suspeito = true;
+      } else {
+        updates.ua_hash = uaHash; // troca de dispositivo legítima após 1h
+      }
+    }
+ 
+    await sessaoRef.update(updates);
+ 
+    // Verifica status atual da assinatura (pode ter sido cancelada)
+    const assinaturaId = sessaoData.assinaturaId;
+    let plano_slug     = null;
+    let features       = {};
+    let statusAss      = null;
+ 
+    if (assinaturaId) {
+      try {
+        const assnSnap = await db.collection('usuarios').doc(uid)
+          .collection('assinaturas').doc(assinaturaId).get();
+        if (assnSnap.exists) {
+          const d    = assnSnap.data();
+          plano_slug = d.plano_slug || null;
+          features   = d.features_snapshot || d.features || {};
+          statusAss  = d.status || null;
+        }
+      } catch (e) { /* não fatal */ }
+    }
+ 
+    // Assinatura inativa → invalida sessão
+    const statusAtivos = ['ativa', 'aprovada', 'pago'];
+    if (statusAss && !statusAtivos.includes(statusAss)) {
+      await sessaoRef.update({ ativo: false, desativado_motivo: 'assinatura_inativa' });
+      return json(res, 200, { valido: false, motivo: 'assinatura_inativa' });
+    }
+ 
+    return json(res, 200, { valido: true, plano_slug, features, assinaturaId });
+ 
+  } catch (err) {
+    console.error('[validar-sessao] Erro:', err.message);
+    // Em erro de rede/servidor, retorna 500 para o cliente NÃO invalidar a sessão local
+    return json(res, 500, { ok: false, message: 'Erro interno ao validar sessão.' });
+  }
+}
 // ─── Helpers de formatação e placeholders ─────────────────────────────────────
 
 function formatDateBR(date) {
@@ -373,6 +546,7 @@ function aplicarPlaceholders(template, dados) {
   const interesse = dados.interesse || '(sem interesse)';
   const interesseId = dados.interesseId || '(sem interesseId)';
   const token = dados.token_acesso || '(sem token)';
+  const link_ativacao = dados.link_ativacao || '(sem link de ativação)';
   const plano = dados.plano || '(sem plano)';
   const data_assinatura = dados.data_assinatura
     ? (dados.data_assinatura instanceof Date
@@ -403,6 +577,7 @@ function aplicarPlaceholders(template, dados) {
     .replace(/{{interesseId}}/gi, interesseId)
     .replace(/{{token}}/gi, token)
     .replace(/{{plano}}/gi, plano)
+    .replace(/{{link_ativacao}}/gi, dados.link_ativacao || '')
     .replace(/{{data_assinatura}}/gi, data_assinatura);
 }
 
@@ -423,7 +598,7 @@ export default async function handler(req, res) {
 
     // Validar assinatura apenas para webhooks (não para criar-pedido / status-pedido)
     const acao = (req.query && req.query.acao) ? String(req.query.acao) : null;
-    const acoesPublicas = ['criar-pedido', 'status-pedido'];
+    const acoesPublicas = ['criar-pedido', 'status-pedido', 'ativar-sessao', 'validar-sessao'];
 
     if (!acao || !acoesPublicas.includes(acao)) {
       const sigCheck = validateMpWebhookSignature(rawBody, req);
@@ -464,6 +639,16 @@ export default async function handler(req, res) {
         mpInstallments: pd.mpInstallments || null,
         atualizadoEm: pd.atualizadoEm || null
       });
+    }
+
+    // ── POST ?acao=ativar-sessao ──────────────────────────────────────────
+    if (req.method === 'POST' && acao === 'ativar-sessao') {
+      return _handleAtivarSessao(req, res);
+    }
+ 
+    // ── POST ?acao=validar-sessao ─────────────────────────────────────────
+    if (req.method === 'POST' && acao === 'validar-sessao') {
+      return _handleValidarSessao(req, res);
     }
 
     // ── POST ?acao=criar-pedido ───────────────────────────────────────────────
@@ -772,6 +957,19 @@ export default async function handler(req, res) {
         // Ativar o campo "ativo" no documento principal do usuário
         await db.collection('usuarios').doc(userId).update({ ativo: true });
 
+        // Gera token de ativação de sessão (uso único, válido 72h)
+        // Será incluído no link de boas-vindas enviado ao assinante
+        const _sessionToken = crypto.randomBytes(32).toString('hex');
+        await db.collection('usuarios').doc(userId).set({
+          pending_session_token: {
+            token:        _sessionToken,
+            exp:          Date.now() + 72 * 60 * 60 * 1000, // 72h em ms
+            assinaturaId,
+            usado:        false,
+            criado_em:    admin.firestore.FieldValue.serverTimestamp(),
+          }
+        }, { merge: true });
+
         // Buscar dados para e-mail de confirmação
         const assinaturaDoc = await assinRef.get();
         const assinaturaData = assinaturaDoc.exists ? assinaturaDoc.data() : {};
@@ -817,7 +1015,8 @@ export default async function handler(req, res) {
               nome: usuarioData?.nome || mpData.payer?.first_name || assinaturaData?.nome || '',
               email: usuarioData?.email || mpData.payer?.email || '(email não informado)',
               plano: nomePlano,
-              data_assinatura: new Date()
+              data_assinatura: new Date(),
+              link_ativacao: `${process.env.NEXT_PUBLIC_BASE_URL}/verNewsletterComToken.html?ativar=${_sessionToken}&uid=${userId}`
             });
 
             const successPayload = {};
