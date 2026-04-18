@@ -225,6 +225,7 @@ function aplicarPlaceholders(template, dados) {
   const token = dados.token_acesso || "(sem token)";
   const plano = dados.plano || "(sem plano)";
   const preferencia_contato = dados.preferencia_contato || "(preferencia de contato)";
+  const link_ativacao = dados.link_ativacao || "";
 
   let dataFormatada = "";
   if (dados.data_publicacao) {
@@ -249,6 +250,7 @@ function aplicarPlaceholders(template, dados) {
     .replace(/{{interesseId}}/gi, interesseId)
     .replace(/{{token}}/gi, token)
     .replace(/{{plano}}/gi, plano)
+    .replace(/{{link_ativacao}}/gi, link_ativacao)
     .replace(/{{preferencia_contato}}/gi, preferencia_contato);
 }
 
