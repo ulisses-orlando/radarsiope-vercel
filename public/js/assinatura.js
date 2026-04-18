@@ -749,6 +749,8 @@ async function processarEnvioAssinatura(e) {
   if (nome.length < 3)       erro('nome',  'Nome deve ter pelo menos 3 caracteres.');
   if (!validarCPF(cpf))      erro('cpf',   'CPF inválido.');
   if (!validarEmail(email))  erro('email', 'E-mail inválido.');
+  if (!whatsapp || !validarTelefoneFormato(whatsapp))
+                             erro('whatsapp', 'WhatsApp obrigatório. Informe um número válido com DDD.');
   if (!perfil)               { mostrarMensagem('Selecione seu perfil.'); temErro = true; }
   if (!aceita)               { setError('aceita_termos', 'Você precisa aceitar os termos.'); temErro = true; }
   if (!tiposSelecionados.length) { mostrarMensagem('Selecione pelo menos um tipo de newsletter.'); temErro = true; }
