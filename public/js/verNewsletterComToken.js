@@ -2841,6 +2841,189 @@ function iniciarChatFAB(newsletter, uid, acesso) {
   };
   _scrollEl.addEventListener('scroll', _onScroll, { passive: true });
  
+   // ── Estado interno do chat ───────────────────────────────────────────────
+  let _mensagens = [];
+  let _digitando = false;
+
+  // ── Abrir sheet ──────────────────────────────────────────────────────────
+  function _abrirChat() {
+    if (document.getElementById('rs-chat-sheet')) return;
+    sessionStorage.setItem(sessionKey, '1');
+
+    const backdrop = document.createElement('div');
+    backdrop.id = 'rs-chat-backdrop';
+    backdrop.onclick = _fecharChat;
+    document.body.appendChild(backdrop);
+
+    const sheet = document.createElement('div');
+    sheet.id = 'rs-chat-sheet';
+    sheet.innerHTML = `
+      <div class="rs-chat-handle-wrap"><div class="rs-chat-handle"></div></div>
+      <div class="rs-chat-header">
+        <div class="rs-chat-header-avatar">✦</div>
+        <div>
+          <div class="rs-chat-header-titulo">Pergunte ao Radar</div>
+          <div class="rs-chat-header-sub">● online agora</div>
+        </div>
+        <button class="rs-chat-header-close"
+                onclick="document.getElementById('rs-chat-backdrop')?.click()"
+                aria-label="Fechar">✕</button>
+      </div>
+      <div class="rs-chat-messages" id="rs-chat-messages"></div>
+      <div class="rs-chat-input-row">
+        <textarea id="rs-chat-input" class="rs-chat-input"
+                  placeholder="Pergunte sobre esta edição…"
+                  rows="1" maxlength="500"></textarea>
+        <button id="rs-chat-send" class="rs-chat-send" aria-label="Enviar">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
+               stroke="currentColor" stroke-width="2.5"
+               stroke-linecap="round" stroke-linejoin="round">
+            <line x1="22" y1="2" x2="11" y2="13"/>
+            <polygon points="22 2 15 22 11 13 2 9 22 2"/>
+          </svg>
+        </button>
+      </div>`;
+    document.body.appendChild(sheet);
+
+    const input   = document.getElementById('rs-chat-input');
+    const sendBtn = document.getElementById('rs-chat-send');
+
+    // Auto-resize textarea
+    input?.addEventListener('input', () => {
+      input.style.height = 'auto';
+      input.style.height = Math.min(input.scrollHeight, 120) + 'px';
+      const ativo = input.value.trim().length > 0;
+      sendBtn?.classList.toggle('ativo', ativo);
+      sendBtn?.querySelectorAll('path,line,polygon').forEach(p =>
+        p.setAttribute('stroke', ativo ? '#fff' : '#94a3b8'));
+    });
+
+    // Enter envia, Shift+Enter quebra linha
+    input?.addEventListener('keydown', e => {
+      if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); _enviar(); }
+    });
+    sendBtn?.addEventListener('click', _enviar);
+
+    if (!_mensagens.length) {
+      _adicionarMensagem('assistant',
+        `Olá! Pode perguntar sobre qualquer tema da Edição ${edicaoNum}. Estou aqui para ajudar.`
+      );
+    } else {
+      _renderizarMensagens();
+    }
+
+    setTimeout(() => input?.focus(), 380);
+  }
+
+  // ── Fechar sheet ─────────────────────────────────────────────────────────
+  function _fecharChat() {
+    document.getElementById('rs-chat-sheet')?.remove();
+    document.getElementById('rs-chat-backdrop')?.remove();
+  }
+
+  // ── Adicionar mensagem ao estado e DOM ───────────────────────────────────
+  function _adicionarMensagem(role, text) {
+    _mensagens.push({ role, text });
+    const wrap = document.getElementById('rs-chat-messages');
+    if (!wrap) return;
+    const row = document.createElement('div');
+    row.className = `rs-chat-msg-row ${role}`;
+    if (role === 'assistant') {
+      row.innerHTML = `
+        <div class="rs-chat-avatar-mini">✦</div>
+        <div class="rs-chat-bubble assistant">${_esc(text)}</div>`;
+    } else {
+      row.innerHTML = `<div class="rs-chat-bubble user">${_esc(text)}</div>`;
+    }
+    wrap.appendChild(row);
+    row.scrollIntoView({ behavior: 'smooth', block: 'end' });
+  }
+
+  function _renderizarMensagens() {
+    const wrap = document.getElementById('rs-chat-messages');
+    if (!wrap) return;
+    wrap.innerHTML = '';
+    _mensagens.forEach(m => _adicionarMensagem(m.role, m.text));
+  }
+
+  // ── Typing indicator ─────────────────────────────────────────────────────
+  function _mostrarDigitando() {
+    const wrap = document.getElementById('rs-chat-messages');
+    if (!wrap) return;
+    const el = document.createElement('div');
+    el.className = 'rs-chat-msg-row assistant';
+    el.id = 'rs-chat-typing-row';
+    el.innerHTML = `
+      <div class="rs-chat-avatar-mini">✦</div>
+      <div class="rs-chat-typing">
+        <span></span><span></span><span></span>
+      </div>`;
+    wrap.appendChild(el);
+    el.scrollIntoView({ behavior: 'smooth', block: 'end' });
+  }
+
+  function _esconderDigitando() {
+    document.getElementById('rs-chat-typing-row')?.remove();
+  }
+
+  // ── Enviar mensagem ───────────────────────────────────────────────────────
+  async function _enviar() {
+    const input   = document.getElementById('rs-chat-input');
+    const sendBtn = document.getElementById('rs-chat-send');
+    if (!input) return;
+    const texto = input.value.trim();
+    if (!texto || _digitando) return;
+
+    input.value = '';
+    sendBtn?.classList.remove('ativo');
+    sendBtn?.querySelectorAll('path').forEach(p => p.setAttribute('stroke', '#94a3b8'));
+
+    _adicionarMensagem('user', texto);
+    _digitando = true;
+    _mostrarDigitando();
+
+    try {
+      const res = await fetch('/api/chat', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          pergunta:      texto,
+          nid:           nid,
+          municipio_cod: window._radarUser?.municipio_cod || '',
+          uid:           uid,
+          segmento:      window._radarUser?.segmento || '',
+          historico:     _mensagens.slice(-6),
+        }),
+      });
+
+      let data;
+      try { data = await res.json(); } catch (_) {
+        _esconderDigitando();
+        _digitando = false;
+        _adicionarMensagem('assistant',
+          'O assistente encontrou um problema inesperado. Tente novamente em instantes.');
+        console.warn('[rs-chat] resposta não-JSON, status:', res.status);
+        return;
+      }
+      _esconderDigitando();
+      _digitando = false;
+
+      if (!res.ok || data.erro) {
+        _adicionarMensagem('assistant',
+          data.erro || 'Não consegui processar sua pergunta. Tente novamente.');
+        return;
+      }
+      _adicionarMensagem('assistant', data.resposta);
+
+    } catch (err) {
+      _esconderDigitando();
+      _digitando = false;
+      _adicionarMensagem('assistant',
+        'Erro de conexão. Verifique sua internet e tente novamente.');
+      console.warn('[rs-chat] erro:', err);
+    }
+  }
+  
   // ── Clique no FAB ────────────────────────────────────────────────────────
   fab.onclick = () => {
     if (!temChat) {
