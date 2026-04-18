@@ -296,10 +296,10 @@ function _mostrarWhatsappOptin() {
   if (!wpInput || !optinWrap) return;
 
   const mostrar = () => {
-    // Mostra apenas se: plano selecionado tem WhatsApp E número preenchido
-    const planoTemWa = !!(_planoAtual?.features?.grupo_whatsapp_vip);
-    const numOk      = wpInput.value.replace(/\D/g, '').length >= 10;
-    optinWrap.style.display = (planoTemWa && numOk) ? 'flex' : 'none';
+    // Exibe o opt-in se o plano tiver "alertas_prioritarios" OU "grupo_whatsapp_vip"
+    const planoTemFeatureAlvo = !!(_planoAtual?.features?.alertas_prioritarios || _planoAtual?.features?.grupo_whatsapp_vip);
+    const numOk               = wpInput.value.replace(/\D/g, '').length >= 10;
+    optinWrap.style.display   = (planoTemFeatureAlvo && numOk) ? 'flex' : 'none';
   };
 
   wpInput.removeEventListener('input', mostrar);
@@ -742,21 +742,34 @@ async function processarEnvioAssinatura(e) {
   const tiposSelecionados = [...document.querySelectorAll('#grupo-newsletters input[type="checkbox"]:checked')]
     .map(cb => cb.value);
 
-  // ── Validações ──
-  let temErro = false;
-  const erro = (campo, msg) => { setError(campo, msg); temErro = true; };
+// ── Validações ──
+let temErro = false;
+const erro = (campo, msg) => { setError(campo, msg); temErro = true; };
 
-  if (nome.length < 3)       erro('nome',  'Nome deve ter pelo menos 3 caracteres.');
-  if (!validarCPF(cpf))      erro('cpf',   'CPF inválido.');
-  if (!validarEmail(email))  erro('email', 'E-mail inválido.');
-  if (!whatsapp || !validarTelefoneFormato(whatsapp))
-                             erro('whatsapp', 'WhatsApp obrigatório. Informe um número válido com DDD.');
-  if (!perfil)               { mostrarMensagem('Selecione seu perfil.'); temErro = true; }
-  if (!aceita)               { setError('aceita_termos', 'Você precisa aceitar os termos.'); temErro = true; }
-  if (!tiposSelecionados.length) { mostrarMensagem('Selecione pelo menos um tipo de newsletter.'); temErro = true; }
-  if (!_planoAtual)          { mostrarMensagem('Selecione um plano.'); temErro = true; }
+if (nome.length < 3)       erro('nome',  'Nome deve ter pelo menos 3 caracteres.');
+if (!validarCPF(cpf))      erro('cpf',   'CPF inválido.');
+if (!validarEmail(email))  erro('email', 'E-mail inválido.');
 
-  if (temErro) return;
+// Validação condicional do WhatsApp e Opt-in
+const temFeatureWhatsApp = !!(_planoAtual?.features?.alertas_prioritarios || _planoAtual?.features?.grupo_whatsapp_vip);
+
+if (temFeatureWhatsApp) {
+  if (!whatsapp || !validarTelefoneFormato(whatsapp)) {
+    erro('whatsapp', 'WhatsApp é obrigatório para receber alertas ou acessar o grupo VIP.');
+  }
+  if (!wpOptin) {
+    erro('whatsapp-optin', 'Autorização de envio pelo WhatsApp é obrigatória para este plano.');
+  }
+} else if (whatsapp && !validarTelefoneFormato(whatsapp)) {
+  // Para planos sem a feature, o campo é opcional, mas valida o formato se preenchido
+  erro('whatsapp', 'Formato de WhatsApp inválido.');
+}
+
+if (!perfil)               { mostrarMensagem('Selecione seu perfil.'); temErro = true; }
+if (!aceita)               { setError('aceita_termos', 'Você precisa aceitar os termos.'); temErro = true; }
+if (!tiposSelecionados.length) { mostrarMensagem('Selecione pelo menos um tipo de newsletter.'); temErro = true; }
+if (!_planoAtual)          { mostrarMensagem('Selecione um plano.'); temErro = true; }
+if (temErro) return;
 
   // ── Verificar se já tem assinatura ativa ──
   try {
