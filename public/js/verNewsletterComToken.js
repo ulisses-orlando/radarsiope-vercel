@@ -2843,7 +2843,7 @@ function iniciarChatFAB(newsletter, uid, acesso) {
       .rs-chat-avatar-mini { width:26px; height:26px; border-radius:50%; background:linear-gradient(135deg,#f97316,#ef4444); display:flex; align-items:center; justify-content:center; font-size:11px; color:#fff; flex-shrink:0; }
       .rs-chat-typing { display:flex; align-items:center; gap:3px; padding:10px 14px; background:var(--rs-borda,#e2e8f0); border-radius:16px 16px 16px 4px; }
       .rs-chat-typing span { width:6px; height:6px; border-radius:50%; background:var(--rs-muted,#94a3b8); animation:rsChatTypingDot 1.2s ease-in-out infinite; } .rs-chat-typing span:nth-child(2) { animation-delay:.2s; } .rs-chat-typing span:nth-child(3) { animation-delay:.4s; }
-      .rs-chat-input-row { display:flex; align-items:flex-end; gap:8px; padding:10px 12px 12px; border-top:1px solid var(--rs-borda,#e2e8f0); flex-shrink:0; }
+      .rs-chat-input-row {display: flex; align-items: flex-end; gap: 8px; padding: 10px 12px 12px; border-top: 1px solid var(--rs-borda, #e2e8f0); flex-shrink: 0; position: relative; z-index: 10001; background: var(--rs-card, #fff); }      
       .rs-chat-input { flex:1; border:1px solid var(--rs-borda,#e2e8f0); border-radius:20px; padding:9px 14px; font-size:13px; color:var(--rs-texto,#0f172a); background:var(--rs-bg,#f4f6f9); resize:none; outline:none; line-height:1.45; transition:border-color .15s; font-family:inherit; max-height:120px; overflow-y:auto; }
       .rs-chat-input:focus { border-color:var(--azul,#0A3D62); }
       .rs-chat-send { width:36px; height:36px; border-radius:50%; background:var(--rs-borda,#e2e8f0); border:none; display:flex; align-items:center; justify-content:center; cursor:pointer; flex-shrink:0; transition:background .2s, transform .15s; }
@@ -2881,27 +2881,41 @@ function iniciarChatFAB(newsletter, uid, acesso) {
   function _abrirChat() {
     if (document.getElementById('rs-chat-sheet')) return;
     sessionStorage.setItem(sessionKey, '1');
+    
+    // 🔒 Trava scroll do fundo e evita que o navegador de scroll sobreponha o input
+    document.body.style.overflow = 'hidden';
+    
     const backdrop = document.createElement('div');
-    backdrop.id = 'rs-chat-backdrop'; backdrop.onclick = _fecharChat;
+    backdrop.id = 'rs-chat-backdrop';
+    backdrop.onclick = _fecharChat;
     document.body.appendChild(backdrop);
 
     const sheet = document.createElement('div');
     sheet.id = 'rs-chat-sheet';
-    const ctx = window._chatContext;
-    const tituloCompleto = `Pergunte ao Radar - Edição: ${ctx.edicaoNum || '—'} - ${ctx.titulo || ''}`;
-
     sheet.innerHTML = `
-      <div class="rs-chat-handle-wrap"><div class="rs-chat-handle"></div></div>
+      <div class="rs-chat-handle-wrap"> <div class="rs-chat-handle"> </div> </div>
       <div class="rs-chat-header">
         <div class="rs-chat-header-avatar">✦</div>
-        <div><div class="rs-chat-header-titulo">${_esc(tituloCompleto)}</div><div class="rs-chat-header-sub">● online agora</div></div>
-        <button class="rs-chat-header-close" onclick="document.getElementById('rs-chat-backdrop')?.click()" aria-label="Fechar">✕</button>
+        <div>
+          <div class="rs-chat-header-titulo">Pergunte ao Radar</div>
+          <div class="rs-chat-header-sub">● online agora</div>
+        </div>
+        <button class="rs-chat-header-close"
+                onclick="document.getElementById('rs-chat-backdrop')?.click()"
+                aria-label="Fechar">✕</button>
       </div>
-      <div class="rs-chat-messages" id="rs-chat-messages"></div>
+      <div class="rs-chat-messages" id="rs-chat-messages"> </div>
       <div class="rs-chat-input-row">
-        <textarea id="rs-chat-input" class="rs-chat-input" placeholder="Pergunte sobre esta edição…" rows="1" maxlength="500"></textarea>
+        <textarea id="rs-chat-input" class="rs-chat-input"
+                  placeholder="Pergunte sobre esta edição…"
+                  rows="1" maxlength="500"> </textarea>
         <button id="rs-chat-send" class="rs-chat-send" aria-label="Enviar">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
+              stroke="currentColor" stroke-width="2.5"
+              stroke-linecap="round" stroke-linejoin="round">
+            <line x1="22" y1="2" x2="11" y2="13"/>
+            <polygon points="22 2 15 22 11 13 2 9 22 2"/>
+          </svg>
         </button>
       </div>`;
     document.body.appendChild(sheet);
@@ -2912,22 +2926,34 @@ function iniciarChatFAB(newsletter, uid, acesso) {
     input?.addEventListener('input', () => {
       input.style.height = 'auto';
       input.style.height = Math.min(input.scrollHeight, 120) + 'px';
-      sendBtn?.classList.toggle('ativo', input.value.trim().length > 0);
+      const ativo = input.value.trim().length > 0;
+      sendBtn?.classList.toggle('ativo', ativo);
+      sendBtn?.querySelectorAll('path,line,polygon').forEach(p =>
+        p.setAttribute('stroke', ativo ? '#fff' : '#94a3b8'));
     });
-    input?.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); _enviar(); } });
+
+    input?.addEventListener('keydown', e => {
+      if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); _enviar(); }
+    });
     sendBtn?.addEventListener('click', _enviar);
 
-    if (window._chatMensagens.length === 0) {
-      _adicionarMensagem('assistant', `Olá! Estou pronto para responder sobre a Edição ${ctx.edicaoNum}. O que deseja saber?`);
+    if (!_mensagens.length) {
+      _adicionarMensagem('assistant',
+        `Olá! Pode perguntar sobre qualquer tema da Edição ${edicaoNum}. Estou aqui para ajudar.`
+      );
     } else {
       _renderizarMensagens();
     }
+
     setTimeout(() => input?.focus(), 380);
   }
 
+  // ── Fechar sheet ─────────────────────────────────────────────────────────
   function _fecharChat() {
     document.getElementById('rs-chat-sheet')?.remove();
     document.getElementById('rs-chat-backdrop')?.remove();
+    // 🔓 Restaura scroll do fundo
+    document.body.style.overflow = '';
   }
 
   function _adicionarMensagem(role, text) {
