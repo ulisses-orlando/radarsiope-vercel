@@ -2930,7 +2930,7 @@ function iniciarChatFAB(newsletter, uid, acesso) {
     });
     sendBtn?.addEventListener('click', _enviar);
 
-    if (!_mensagens.length) {
+    if (!window._chatMensagens?.length) {
       _adicionarMensagem('assistant',
         `Olá! Pode perguntar sobre qualquer tema da Edição ${edicaoNum}. Estou aqui para ajudar.`
       );
