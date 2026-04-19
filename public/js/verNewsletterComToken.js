@@ -2890,7 +2890,7 @@ function iniciarChatFAB(newsletter, uid, acesso) {
       <div class="rs-chat-header">
         <div class="rs-chat-header-avatar">✦</div>
         <div>
-          <div class="rs-chat-header-titulo">Pergunte ao Radar</div>
+          <div class="rs-chat-header-titulo">${_esc(tituloCompleto)}</div>
           <div class="rs-chat-header-sub">● online agora</div>
         </div>
         <button class="rs-chat-header-close"
@@ -2931,8 +2931,9 @@ function iniciarChatFAB(newsletter, uid, acesso) {
     sendBtn?.addEventListener('click', _enviar);
 
     if (!window._chatMensagens?.length) {
+      const ctx = window._chatContext || {};
       _adicionarMensagem('assistant',
-        `Olá! Pode perguntar sobre qualquer tema da Edição ${edicaoNum}. Estou aqui para ajudar.`
+        `Olá! Pode perguntar sobre qualquer tema da Edição ${ctx.edicaoNum || '—'}. Estou aqui para ajudar.`
       );
     } else {
       _renderizarMensagens();
