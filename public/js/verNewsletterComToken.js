@@ -2425,14 +2425,6 @@ async function navegarParaEdicao(edicaoId) {
 
     window._chatMensagens = []; // Limpa histórico
     
-    // Se o chat estiver aberto, atualiza o título e limpa a UI
-    if (document.getElementById('rs-chat-sheet')) {
-      const tituloEl = document.querySelector('.rs-chat-header-titulo');
-      if (tituloEl) tituloEl.textContent = `Pergunte ao Radar - Edição: ${window._chatContext.edicaoNum} - ${window._chatContext.titulo}`;
-      document.getElementById('rs-chat-messages')?.replaceChildren();
-      _adicionarMensagem('assistant', `Olá! Edição alterada para ${window._chatContext.edicaoNum}. Como posso ajudar?`);
-    }
-
     // Notificação de edição mais recente (apenas assinante)
     if (ctx.segmento === 'assinante') {
       verificarEdicaoMaisRecente(newsletter);
@@ -2885,6 +2877,14 @@ function iniciarChatFAB(newsletter, uid, acesso) {
 
     const sheet = document.createElement('div');
     sheet.id = 'rs-chat-sheet';
+
+    // ✅ MONTA TÍTULO DINÂMICO a partir do contexto global
+    const ctx = window._chatContext || {};
+    const partes = ['Pergunte ao Radar'];
+    if (ctx.edicaoNum) partes.push(`Edição: ${ctx.edicaoNum}`);
+    if (ctx.titulo) partes.push(ctx.titulo);
+    const tituloCompleto = partes.join(' - ');
+    
     sheet.innerHTML = `
       <div class="rs-chat-handle-wrap"> <div class="rs-chat-handle"> </div> </div>
       <div class="rs-chat-header">
