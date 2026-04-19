@@ -2422,22 +2422,15 @@ async function navegarParaEdicao(edicaoId) {
       edicaoNum: newsletter.numero || newsletter.edicao || '',
       titulo:    newsletter.titulo || ''
     };
+
     window._chatMensagens = []; // Limpa histórico
+    
     // Se o chat estiver aberto, atualiza o título e limpa a UI
     if (document.getElementById('rs-chat-sheet')) {
       const tituloEl = document.querySelector('.rs-chat-header-titulo');
       if (tituloEl) tituloEl.textContent = `Pergunte ao Radar - Edição: ${window._chatContext.edicaoNum} - ${window._chatContext.titulo}`;
       document.getElementById('rs-chat-messages')?.replaceChildren();
       _adicionarMensagem('assistant', `Olá! Edição alterada para ${window._chatContext.edicaoNum}. Como posso ajudar?`);
-    }
-
-    // ⚠️ Atualiza contexto do chat para a nova edição (caso o FAB já esteja na tela)
-    if (window._chatContext) {
-      window._chatContext.nid = newsletter.id;
-      window._chatContext.edicaoNum = newsletter.numero || newsletter.edicao || '';
-      if (window._radarUser?.uid) {
-        window._chatContext.uid = window._radarUser.uid;
-      }
     }
 
     // Notificação de edição mais recente (apenas assinante)
