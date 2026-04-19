@@ -5,7 +5,7 @@ export const config = { runtime: 'nodejs', api: { bodyParser: false } };
 
 import crypto from 'crypto';
 import admin from 'firebase-admin';
-import { enviarWhatsApp } from './_whatsapp.js';
+import { enviarWhatsApp } from './js/_whatsapp.js';
 
 
 // Inicializa Firebase (atenção ao formato da PRIVATE_KEY no Vercel: use \\n)
