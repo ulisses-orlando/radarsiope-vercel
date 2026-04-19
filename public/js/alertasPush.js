@@ -371,10 +371,9 @@ function _renderHTML() {
   <div class="push-card" id="wa-card" style="display:none">
     <h3>🟢 Envio via WhatsApp</h3>
     <p style="font-size:12px;color:#64748b;margin:0 0 16px;line-height:1.6">
-      O sistema abrirá o WhatsApp Web com a mensagem pré-preenchida para cada assinante, um de cada vez.
-      Certifique-se de que o <strong>WhatsApp Web está aberto e logado com o número do Radar SIOPE</strong>.
+      Envio automático via Evolution API. Selecione um ou mais assinantes e clique em enviar —
+      as mensagens são disparadas pelo número oficial do Radar SIOPE sem intervenção manual.
     </p>
-
     <div class="wa-msg-area">
       <label>✏️ Mensagem do alerta</label>
       <textarea id="wa-mensagem" placeholder="Digite o texto do alerta a ser enviado via WhatsApp..." oninput="_waAtualizarBotao()"></textarea>
@@ -397,8 +396,14 @@ function _renderHTML() {
     <div class="wa-contador" id="wa-contador">—</div>
 
     <button class="wa-btn-iniciar" id="wa-btn-iniciar" onclick="_waIniciarEnvio()" disabled>
-      🟢 Iniciar envio via WhatsApp
+      🟢 Enviar via WhatsApp
     </button>
+    <div id="wa-progresso" style="display:none;margin-top:12px">
+      <div style="height:6px;background:#e2e8f0;border-radius:10px;overflow:hidden;margin-bottom:6px">
+        <div id="wa-prog-fill" style="height:100%;background:#16a34a;border-radius:10px;width:0%;transition:width .4s ease"></div>
+      </div>
+      <div id="wa-prog-txt" style="font-size:12px;color:#64748b;text-align:right"></div>
+    </div>
     <div class="push-resultado" id="wa-resultado"></div>
   </div>
 
@@ -407,28 +412,6 @@ function _renderHTML() {
     <h3>📋 Histórico de alertas disparados</h3>
     <div id="push-historico-wrap">
       <p style="color:#94a3b8;font-size:13px">Carregando...</p>
-    </div>
-  </div>
-
-  <!-- WA Overlay sequencial -->
-  <div id="wa-seq-overlay">
-    <div class="wa-seq-box">
-      <p class="wa-seq-titulo">🟢 Envio em progresso</p>
-      <p class="wa-seq-desc" id="wa-seq-desc">—</p>
-      <div class="wa-seq-bar-wrap">
-        <div class="wa-seq-bar-fill" id="wa-seq-fill" style="width:0%"></div>
-      </div>
-      <div class="wa-seq-bar-txt" id="wa-seq-bar-txt">0 de 0</div>
-      <div class="wa-seq-assinante">
-        <div class="wa-seq-nome" id="wa-seq-nome">—</div>
-        <div class="wa-seq-info" id="wa-seq-info">—</div>
-        <div class="wa-seq-enviado" id="wa-seq-enviado">✅ WhatsApp aberto!</div>
-      </div>
-      <div class="wa-seq-btns">
-        <button class="wa-seq-abrir"   onclick="_waAbrirWhatsApp()">📱 Abrir WhatsApp</button>
-        <button class="wa-seq-proximo" id="wa-seq-btn-proximo" onclick="_waProximo()">Próximo →</button>
-      </div>
-      <button class="wa-seq-cancelar" onclick="_waCancelarEnvio()">Cancelar envio</button>
     </div>
   </div>
 
@@ -991,16 +974,13 @@ function _sub(str, params) {
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// WHATSAPP — envio manual sequencial via wa.me
+// WHATSAPP — envio automático via Evolution API (alertas.js ?acao=enviar-whatsapp)
 // ══════════════════════════════════════════════════════════════════════════════
 
 // ─── Estado ──────────────────────────────────────────────────────────────────
 let _waState = {
   assinantes: [],  // todos os elegíveis carregados do Firestore
-  fila:       [],  // selecionados para o envio atual
-  indice:     -1,  // posição atual no overlay sequencial
-  enviados:    0,  // quantos links wa.me foram abertos
-  mensagem:   '',  // texto do alerta
+  mensagem:   '',
 };
 
 // ─── Toggle canal Push / WhatsApp ────────────────────────────────────────────
@@ -1014,7 +994,6 @@ window._waToggleCanal = function (canal) {
   if (pushCard) pushCard.style.display = isPush ? '' : 'none';
   if (waCard)   waCard.style.display   = isPush ? 'none' : '';
 
-  // Ao abrir WA: carrega assinantes (se ainda não carregou) + sincroniza mensagem
   if (!isPush) {
     if (_waState.assinantes.length === 0) _waCarregarAssinantes();
     _waSincronizarMensagem();
@@ -1024,7 +1003,7 @@ window._waToggleCanal = function (canal) {
 // ─── Pré-preenche mensagem WA com corpo do template push ─────────────────────
 function _waSincronizarMensagem() {
   const el = document.getElementById('wa-mensagem');
-  if (!el || el.value.trim()) return; // não sobrescreve se já editado
+  if (!el || el.value.trim()) return;
   const tipo = document.getElementById('push-tipo')?.value;
   const tpl  = PUSH_TEMPLATES[tipo];
   if (!tpl) return;
@@ -1042,16 +1021,24 @@ window._waCarregarAssinantes = async function () {
   if (cont) cont.textContent = '—';
 
   try {
-    const snap = await window.db.collection('usuarios')
-      .where('whatsapp_optin', '==', true)
-      .get();
+    // Aceita tanto whatsapp_optin (legado) quanto whatsappOptin (novo campo)
+    const [snap1, snap2] = await Promise.all([
+      window.db.collection('usuarios').where('whatsappOptin', '==', true).get(),
+      window.db.collection('usuarios').where('whatsapp_optin', '==', true).get(),
+    ]);
 
-    _waState.assinantes = snap.docs
+    const vistos = new Set();
+    const todos  = [...snap1.docs, ...snap2.docs]
+      .filter(d => { if (vistos.has(d.id)) return false; vistos.add(d.id); return true; })
       .map(d => ({ id: d.id, ...d.data() }))
-      .filter(u => u.whatsapp_number && String(u.whatsapp_number).length >= 10)
+      .filter(u => {
+        const num = u.whatsapp || u.whatsapp_number;
+        return num && String(num).replace(/\D/g, '').length >= 10;
+      })
       .sort((a, b) => (a.nome || '').localeCompare(b.nome || '', 'pt-BR'));
 
-    _waRenderLista(_waState.assinantes);
+    _waState.assinantes = todos;
+    _waRenderLista(todos);
   } catch (err) {
     lista.innerHTML = `<div class="wa-vazio">❌ Erro ao carregar: ${err.message}</div>`;
   }
@@ -1070,9 +1057,8 @@ function _waRenderLista(lista) {
 
   el.innerHTML = lista.map(u => {
     const mun = [u.nome_municipio, u.cod_uf].filter(Boolean).join(' — ');
-    const raw = String(u.whatsapp_number);
-    // formata: 11 dígitos → (DD) DDDDD-DDDD
-    const num = raw.replace(/^(\d{2})(\d{4,5})(\d{4})$/, '($1) $2-$3') || raw;
+    const numRaw = String(u.whatsapp || u.whatsapp_number || '').replace(/\D/g, '');
+    const num = numRaw.replace(/^(\d{2})(\d{4,5})(\d{4})$/, '($1) $2-$3') || numRaw;
     return `
       <div class="wa-item"
            data-busca="${(u.nome || '').toLowerCase()} ${(u.nome_municipio || '').toLowerCase()}"
@@ -1080,7 +1066,7 @@ function _waRenderLista(lista) {
         <input type="checkbox"
                value="${u.id}"
                data-nome="${(u.nome || '').replace(/"/g, '&quot;')}"
-               data-numero="${u.whatsapp_number}"
+               data-numero="${numRaw}"
                data-mun="${mun.replace(/"/g, '&quot;')}"
                onchange="_waAtualizarBotao()"
                onclick="event.stopPropagation()">
@@ -1132,102 +1118,86 @@ window._waAtualizarBotao = function () {
   if (btn) btn.disabled = !selecionados || !mensagem;
 };
 
-// ─── Iniciar envio sequencial ────────────────────────────────────────────────
-window._waIniciarEnvio = function () {
+// ─── Iniciar envio via API ────────────────────────────────────────────────────
+window._waIniciarEnvio = async function () {
   const mensagem = (document.getElementById('wa-mensagem')?.value || '').trim();
   if (!mensagem) return;
 
   const cbs = document.querySelectorAll('#wa-lista input[type=checkbox]:checked');
   if (!cbs.length) return;
 
-  _waState.fila     = Array.from(cbs).map(cb => ({
-    id:     cb.value,
-    nome:   cb.dataset.nome,
-    numero: cb.dataset.numero,
-    mun:    cb.dataset.mun,
-  }));
-  _waState.indice   = 0;
-  _waState.enviados = 0;
-  _waState.mensagem = mensagem;
+  const uids = Array.from(cbs).map(cb => cb.value);
+  const btn  = document.getElementById('wa-btn-iniciar');
+  const res  = document.getElementById('wa-resultado');
+  const prog = document.getElementById('wa-progresso');
+  const fill = document.getElementById('wa-prog-fill');
+  const txt  = document.getElementById('wa-prog-txt');
 
-  _waRenderOverlay();
-  document.getElementById('wa-seq-overlay').style.display = 'flex';
-};
+  // UI: inicia progresso
+  if (btn)  { btn.disabled = true; btn.textContent = '⏳ Enviando...'; }
+  if (res)  { res.style.display = 'none'; }
+  if (prog) { prog.style.display = 'block'; }
+  if (fill) { fill.style.width = '10%'; }
+  if (txt)  { txt.textContent = `0 de ${uids.length} enviados...`; }
 
-// ─── Renderizar overlay para o índice atual ───────────────────────────────────
-function _waRenderOverlay() {
-  const total  = _waState.fila.length;
-  const idx    = _waState.indice;
-  const atual  = _waState.fila[idx];
-  const pct    = total ? Math.round((idx / total) * 100) : 0;
-  const isUlti = idx === total - 1;
+  // Animação de progresso indeterminada enquanto aguarda resposta
+  let _progInterval = setInterval(() => {
+    const atual = parseFloat(fill?.style.width || '10');
+    if (atual < 85 && fill) fill.style.width = (atual + 5) + '%';
+  }, 800);
 
-  document.getElementById('wa-seq-desc').textContent    = `Enviando alerta para ${total} assinante${total !== 1 ? 's' : ''}`;
-  document.getElementById('wa-seq-fill').style.width    = pct + '%';
-  document.getElementById('wa-seq-bar-txt').textContent = `${idx + 1} de ${total}`;
-  document.getElementById('wa-seq-nome').textContent    = atual?.nome  || '—';
-  document.getElementById('wa-seq-info').textContent    = atual?.mun   || '—';
+  try {
+    const resp = await fetch('/api/alertas', {
+      method:  'POST',
+      headers: {
+        'Content-Type':  'application/json',
+        'x-admin-token': _pushAdminToken,
+      },
+      body: JSON.stringify({ acao: 'enviar-whatsapp', uids, mensagem }),
+    });
 
-  const enviadoEl = document.getElementById('wa-seq-enviado');
-  if (enviadoEl) enviadoEl.style.display = 'none';
+    clearInterval(_progInterval);
+    const data = await resp.json().catch(() => ({}));
 
-  const btnProx = document.getElementById('wa-seq-btn-proximo');
-  if (btnProx) btnProx.textContent = isUlti ? 'Concluir ✓' : 'Próximo →';
-}
+    if (fill) fill.style.width = '100%';
+    await new Promise(r => setTimeout(r, 400));
 
-// ─── Abrir wa.me para assinante atual ────────────────────────────────────────
-window._waAbrirWhatsApp = function () {
-  const atual = _waState.fila[_waState.indice];
-  if (!atual) return;
+    if (resp.ok && data.ok) {
+      const { enviados = 0, erros = 0, total = uids.length } = data;
+      if (res) {
+        res.style.display = 'block';
+        res.className = erros > 0 ? 'push-resultado' : 'push-resultado ok';
+        res.style.background = erros > 0 ? '#fef9c3' : '#dcfce7';
+        res.style.color      = erros > 0 ? '#92400e' : '#166534';
+        res.style.border     = erros > 0 ? '1px solid #fde68a' : '1px solid #bbf7d0';
+        res.innerHTML = erros > 0
+          ? `⚠️ Envio parcial: <strong>${enviados} de ${total}</strong> enviados. ${erros} com erro.`
+          : `✅ <strong>${enviados} mensagen${enviados !== 1 ? 's' : ''}</strong> enviada${enviados !== 1 ? 's' : ''} com sucesso!`;
+      }
+      if (txt) txt.textContent = `${enviados} de ${total} enviados.`;
+      _carregarHistorico();
+    } else {
+      throw new Error(data.error || `HTTP ${resp.status}`);
+    }
 
-  const numero = '55' + String(atual.numero);
-  const texto  = encodeURIComponent(_waState.mensagem);
-  window.open(`https://wa.me/${numero}?text=${texto}`, '_blank');
-
-  _waState.enviados++;
-  const enviadoEl = document.getElementById('wa-seq-enviado');
-  if (enviadoEl) enviadoEl.style.display = 'block';
-};
-
-// ─── Avançar para próximo / concluir ────────────────────────────────────────
-window._waProximo = async function () {
-  const isUlti = _waState.indice === _waState.fila.length - 1;
-  if (isUlti) {
-    await _waConcluirEnvio();
-  } else {
-    _waState.indice++;
-    _waRenderOverlay();
+  } catch (err) {
+    clearInterval(_progInterval);
+    if (fill) fill.style.width = '0%';
+    if (res) {
+      res.style.display = 'block';
+      res.className     = 'push-resultado erro';
+      res.textContent   = `❌ Erro no envio: ${err.message}`;
+    }
+    console.error('[WA] Erro no envio:', err);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '🟢 Enviar via WhatsApp'; }
+    setTimeout(() => { if (prog) prog.style.display = 'none'; }, 2000);
   }
 };
 
-// ─── Cancelar envio ──────────────────────────────────────────────────────────
-window._waCancelarEnvio = async function () {
-  document.getElementById('wa-seq-overlay').style.display = 'none';
-  if (_waState.enviados > 0) {
-    await _waSalvarHistorico('cancelado');
-    _carregarHistorico();
-  }
-};
-
-// ─── Concluir envio ───────────────────────────────────────────────────────────
-async function _waConcluirEnvio() {
-  document.getElementById('wa-seq-overlay').style.display = 'none';
-
-  const enviados = _waState.enviados;
-  const total    = _waState.fila.length;
-  const res      = document.getElementById('wa-resultado');
-
-  if (res) {
-    res.style.display = 'block';
-    res.className     = 'push-resultado ok';
-    res.innerHTML     = `✅ Envio concluído! <strong>${enviados} de ${total}</strong> WhatsApps abertos.`;
-  }
-
-  await _waSalvarHistorico('concluido');
-  _carregarHistorico();
-}
-
-// ─── Salvar no histórico de alertas ──────────────────────────────────────────
+// ─── Salvar no histórico de alertas (mantido para compatibilidade) ────────────
+// O histórico agora é gravado pelo backend em alertas.js.
+// Esta função fica como fallback caso o backend não grave.
 async function _waSalvarHistorico(status) {
   try {
     const tipo     = document.getElementById('push-tipo')?.value || 'manual';
@@ -1236,9 +1206,7 @@ async function _waSalvarHistorico(status) {
       canal:             'whatsapp',
       tipo,
       titulo:            tplLabel,
-      mensagem:          _waState.mensagem.slice(0, 120),
-      destinatarios_est: _waState.fila.length,
-      destinatarios_env: _waState.enviados,
+      mensagem:          (_waState.mensagem || '').slice(0, 120),
       status,
       disparado_em:      firebase.firestore.FieldValue.serverTimestamp(),
     });
@@ -1246,3 +1214,4 @@ async function _waSalvarHistorico(status) {
     console.warn('[WA] Falha ao salvar histórico:', err.message || err);
   }
 }
+
