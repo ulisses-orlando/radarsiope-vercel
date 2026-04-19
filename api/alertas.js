@@ -26,8 +26,7 @@
    ========================================================================== */
 
 import admin from 'firebase-admin';
-import { enviarWhatsAppEmLote } from './js/_whatsapp.js';
-
+import { enviarWhatsApp, enviarWhatsAppEmLote } from '../js/_whatsapp.js';
 
 // ─── Firebase Admin ───────────────────────────────────────────────────────────
 if (!admin.apps.length) {
@@ -197,6 +196,86 @@ async function _dispararWhatsAppNovaEdicao(tipo, titulo, corpo, parametros) {
     });
   } catch (e) { console.warn('[alertas] Erro ao registrar histórico WhatsApp:', e); }
 }
+
+async function _handleEnviarWhatsApp(req, res) {
+  const { numero, uids, todos, mensagem } = req.body || {};
+ 
+  if (!mensagem || !mensagem.trim()) {
+    return res.status(400).json({ ok: false, error: 'Mensagem obrigatória.' });
+  }
+ 
+  // ── Modo individual: número avulso ────────────────────────────────────────
+  if (numero) {
+    const resultado = await enviarWhatsApp(numero, mensagem.trim());
+    return res.status(resultado.ok ? 200 : 500).json(resultado);
+  }
+ 
+  // ── Modo lote por UIDs selecionados ───────────────────────────────────────
+  if (Array.isArray(uids) && uids.length > 0) {
+    const destinatarios = [];
+    for (const uid of uids) {
+      try {
+        const snap = await db.collection('usuarios').doc(uid).get();
+        if (!snap.exists) continue;
+        const d = snap.data();
+        const num = d.whatsapp || d.whatsapp_number;
+        if (num && (d.whatsappOptin || d.whatsapp_optin)) {
+          destinatarios.push({ numero: num, texto: mensagem.trim() });
+        }
+      } catch (e) { /* ignora uid inválido */ }
+    }
+ 
+    if (destinatarios.length === 0) {
+      return res.status(400).json({ ok: false, error: 'Nenhum destinatário com WhatsApp autorizado.' });
+    }
+ 
+    const resultado = await enviarWhatsAppEmLote(destinatarios, 1500);
+ 
+    // Registra no histórico
+    await db.collection('alertas_disparados').add({
+      canal:             'whatsapp',
+      tipo:              'manual_admin',
+      mensagem:          mensagem.slice(0, 200),
+      destinatarios_est: uids.length,
+      destinatarios_env: resultado.enviados,
+      erros:             resultado.erros,
+      status:            resultado.erros === 0 ? 'enviado' : 'parcial',
+      disparado_em:      admin.firestore.FieldValue.serverTimestamp(),
+    }).catch(() => {});
+ 
+    return res.status(200).json({ ok: true, ...resultado });
+  }
+ 
+  // ── Modo todos com opt-in ─────────────────────────────────────────────────
+  if (todos === true) {
+    const assinantes = await _buscarAssinantesWhatsApp();
+    if (assinantes.length === 0) {
+      return res.status(400).json({ ok: false, error: 'Nenhum assinante com WhatsApp autorizado.' });
+    }
+ 
+    const destinatarios = assinantes.map(a => ({
+      numero: a.numero,
+      texto:  mensagem.trim(),
+    }));
+ 
+    const resultado = await enviarWhatsAppEmLote(destinatarios, 1500);
+ 
+    await db.collection('alertas_disparados').add({
+      canal:             'whatsapp',
+      tipo:              'manual_todos',
+      mensagem:          mensagem.slice(0, 200),
+      destinatarios_est: assinantes.length,
+      destinatarios_env: resultado.enviados,
+      erros:             resultado.erros,
+      status:            resultado.erros === 0 ? 'enviado' : 'parcial',
+      disparado_em:      admin.firestore.FieldValue.serverTimestamp(),
+    }).catch(() => {});
+ 
+    return res.status(200).json({ ok: true, ...resultado });
+  }
+ 
+  return res.status(400).json({ ok: false, error: 'Informe numero, uids ou todos:true.' });
+}
  
 function _textoNovaEdicaoWpp(nome, edicaoNum, tituloEdicao, urlBase) {
   const primeiroNome = (nome || '').split(' ')[0] || 'olá';
@@ -226,6 +305,10 @@ export default async function handler(req, res) {
   const token = req.headers['x-admin-token'];
   if (!token || token !== process.env.ADMIN_API_TOKEN) {
     return res.status(401).json({ ok: false, error: 'Não autorizado.' });
+  }
+
+  if (req.method === 'POST' && req.body?.acao === 'enviar-whatsapp') {
+    return _handleEnviarWhatsApp(req, res);
   }
 
   const { tipo, parametros = {}, habilitado = true } = req.body;
