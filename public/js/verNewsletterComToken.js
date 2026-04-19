@@ -2415,6 +2415,22 @@ async function navegarParaEdicao(edicaoId) {
     renderCTA(acesso, newsletter);
     renderWatermark(destinatario, newsletter);
 
+    // ── Reseta chat ao trocar de edição ──────────────────────────────────────
+    window._chatContext = {
+      nid:       newsletter.id,
+      uid:       window._radarUser?.uid || '',
+      edicaoNum: newsletter.numero || newsletter.edicao || '',
+      titulo:    newsletter.titulo || ''
+    };
+    window._chatMensagens = []; // Limpa histórico
+    // Se o chat estiver aberto, atualiza o título e limpa a UI
+    if (document.getElementById('rs-chat-sheet')) {
+      const tituloEl = document.querySelector('.rs-chat-header-titulo');
+      if (tituloEl) tituloEl.textContent = `Pergunte ao Radar - Edição: ${window._chatContext.edicaoNum} - ${window._chatContext.titulo}`;
+      document.getElementById('rs-chat-messages')?.replaceChildren();
+      _adicionarMensagem('assistant', `Olá! Edição alterada para ${window._chatContext.edicaoNum}. Como posso ajudar?`);
+    }
+
     // ⚠️ Atualiza contexto do chat para a nova edição (caso o FAB já esteja na tela)
     if (window._chatContext) {
       window._chatContext.nid = newsletter.id;
@@ -2775,256 +2791,81 @@ async function renderSecaoFeedbacks(newsletter) {
 // ─── Chat FAB — Pergunte ao Radar ────────────────────────────────────────────
  
 function iniciarChatFAB(newsletter, uid, acesso) {
-  // Remove instância anterior (caso o usuário navegue entre edições sem reload)
+  // Limpa UI anterior
   document.getElementById('rs-chat-fab')?.remove();
   document.getElementById('rs-chat-sheet')?.remove();
   document.getElementById('rs-chat-backdrop')?.remove();
- 
-  // Só exibe o FAB para assinantes (com ou sem a feature — upsell para os sem)
   if (!acesso?.isAssinante) return;
 
+  // ── 1. Atualiza contexto global (fonte única de verdade) ──
   window._chatContext = {
-    nid: newsletter.id,
-    uid: uid,
+    nid:       newsletter.id,
+    uid:       uid,
     edicaoNum: newsletter.numero || newsletter.edicao || '',
+    titulo:    newsletter.titulo || ''
   };
- 
-  // Se mudou de edição, limpa mensagens antigas para não misturar contextos
-  if (window._chatMensagens && window._chatContext.nid !== newsletter.id) {
+
+  // ── 2. Histórico global (evita closure) ──
+  // Se mudou de edição, zera. Mantém se reabrir a mesma.
+  if (!window._chatMensagens || window._chatMensagens._nid !== newsletter.id) {
     window._chatMensagens = [];
+    window._chatMensagens._nid = newsletter.id;
   }
 
-  const nid        = newsletter.id;
-  const edicaoNum  = newsletter.numero || newsletter.edicao || '';
   const temChat    = !!acesso.temChat;
-  const sessionKey = `rs_chat_seen_${nid}`;
+  const sessionKey = `rs_chat_seen_${newsletter.id}`;
   const isNew      = !sessionStorage.getItem(sessionKey);
- 
-  // ── Injetar estilos (uma única vez) ─────────────────────────────────────
+
+  // ── 3. Injeta estilos (com CSS do título corrigido) ──
   if (!document.getElementById('rs-chat-styles')) {
     const style = document.createElement('style');
     style.id = 'rs-chat-styles';
     style.textContent = `
-      #rs-chat-fab {
-        position: fixed;
-        bottom: 68px;
-        right: 16px;
-        width: 52px; height: 52px;
-        border-radius: 50%;
-        background: ${temChat
-          ? 'linear-gradient(135deg, #f97316, #ef4444)'
-          : 'linear-gradient(135deg, #64748b, #475569)'};
-        border: none; cursor: pointer;
-        display: flex; align-items: center; justify-content: center;
-        z-index: 900;
-        box-shadow: 0 4px 18px rgba(100,116,139,.35);
-        transition: opacity .22s ease, transform .18s ease, box-shadow .18s ease;
-        animation: rsChatFabPop .4s cubic-bezier(.34,1.56,.64,1) .3s both;
-      }
-      #rs-chat-fab:hover  { transform: scale(1.08); }
-      #rs-chat-fab:active { transform: scale(.93); }
-      #rs-chat-fab.oculto { opacity: 0; pointer-events: none; }
-      #rs-chat-fab .rs-chat-badge {
-        position: absolute; top: 2px; right: 2px;
-        width: 15px; height: 15px; border-radius: 50%;
-        background: #22c55e; border: 2px solid var(--rs-bg, #f4f6f9);
-        display: flex; align-items: center; justify-content: center;
-        font-size: 7px; color: #fff; font-weight: 700;
-        animation: rsChatBadgePop .35s cubic-bezier(.34,1.56,.64,1) .7s both;
-      }
-      #rs-chat-fab .rs-chat-lock {
-        position: absolute; bottom: -2px; right: -2px;
-        font-size: 13px; line-height: 1;
-      }
-      /* Backdrop */
-      #rs-chat-backdrop {
-        position: fixed; inset: 0;
-        background: rgba(0,0,0,.45);
-        z-index: 910;
-        animation: rsChatFadeIn .2s ease;
-      }
-
-      /* Bottom sheet */
-      #rs-chat-sheet {
-        position: fixed;
-        bottom: 0; left: 0; right: 0;
-        height: 74vh;
-        background: var(--rs-card, #fff);
-        border-radius: 20px 20px 0 0;
-        z-index: 920;
-        display: flex; flex-direction: column;
-        box-shadow: 0 -8px 40px rgba(0,0,0,.18);
-        animation: rsChatSlideUp .35s cubic-bezier(.32,.72,0,1);
-      }
-
-      .rs-chat-handle-wrap {
-        display: flex; justify-content: center; padding: 11px 0 3px;
-      }
-      .rs-chat-handle {
-        width: 36px; height: 4px; border-radius: 2px;
-        background: var(--rs-borda, #e2e8f0);
-      }
-
-      .rs-chat-header {
-        padding: 9px 18px 11px;
-        border-bottom: 1px solid var(--rs-borda, #e2e8f0);
-        display: flex; align-items: center; gap: 11px;
-        flex-shrink: 0;
-      }
-      .rs-chat-header-avatar {
-        width: 36px; height: 36px; border-radius: 50%;
-        background: linear-gradient(135deg, #f97316, #ef4444);
-        display: flex; align-items: center; justify-content: center;
-        font-size: 16px; flex-shrink: 0;
-        box-shadow: 0 2px 10px rgba(249,115,22,.35);
-      }
-      .rs-chat-header-titulo {
-        font-size: 14px; font-weight: 700;
-        color: var(--rs-texto, #0f172a);
-        font-family: Georgia, serif; line-height: 1.2;
-      }
-      .rs-chat-header-sub {
-        font-size: 10.5px; color: #22c55e; font-family: sans-serif;
-      }
-      .rs-chat-header-close {
-        margin-left: auto; background: none; border: none;
-        color: var(--rs-muted, #94a3b8); font-size: 17px;
-        cursor: pointer; padding: 4px 8px; border-radius: 6px;
-        line-height: 1; transition: color .15s;
-      }
-      .rs-chat-header-close:hover { color: var(--rs-texto, #0f172a); }
-
-      /* Área de mensagens */
-      .rs-chat-messages {
-        flex: 1; overflow-y: auto; padding: 14px 14px 8px;
-        display: flex; flex-direction: column; gap: 10px;
-        scroll-behavior: smooth;
-      }
-      .rs-chat-msg-row {
-        display: flex; align-items: flex-end; gap: 6px;
-      }
-      .rs-chat-msg-row.user      { justify-content: flex-end; }
-      .rs-chat-msg-row.assistant { justify-content: flex-start; }
-
-      .rs-chat-bubble {
-        max-width: 78%; padding: 9px 13px;
-        border-radius: 16px; font-size: 13px; line-height: 1.55;
-        word-break: break-word; white-space: pre-wrap;
-      }
-      .rs-chat-bubble.user {
-        background: var(--azul, #0A3D62); color: #fff;
-        border-radius: 16px 16px 4px 16px;
-      }
-      .rs-chat-bubble.assistant {
-        background: var(--rs-borda, #e2e8f0); color: var(--rs-texto, #0f172a);
-        border-radius: 16px 16px 16px 4px;
-      }
-      .rs-chat-avatar-mini {
-        width: 26px; height: 26px; border-radius: 50%;
-        background: linear-gradient(135deg, #f97316, #ef4444);
-        display: flex; align-items: center; justify-content: center;
-        font-size: 11px; color: #fff; flex-shrink: 0;
-      }
-
-      /* Typing indicator */
-      .rs-chat-typing {
-        display: flex; align-items: center; gap: 3px;
-        padding: 10px 14px;
-        background: var(--rs-borda, #e2e8f0);
-        border-radius: 16px 16px 16px 4px;
-      }
-      .rs-chat-typing span {
-        width: 6px; height: 6px; border-radius: 50%;
-        background: var(--rs-muted, #94a3b8);
-        animation: rsChatTypingDot 1.2s ease-in-out infinite;
-      }
-      .rs-chat-typing span:nth-child(2) { animation-delay: .2s; }
-      .rs-chat-typing span:nth-child(3) { animation-delay: .4s; }
-
-      /* Input */
-      .rs-chat-input-row {
-        display: flex; align-items: flex-end; gap: 8px;
-        padding: 10px 12px 12px;
-        border-top: 1px solid var(--rs-borda, #e2e8f0);
-        flex-shrink: 0;
-      }
-      .rs-chat-input {
-        flex: 1; border: 1px solid var(--rs-borda, #e2e8f0);
-        border-radius: 20px; padding: 9px 14px;
-        font-size: 13px; color: var(--rs-texto, #0f172a);
-        background: var(--rs-bg, #f4f6f9);
-        resize: none; outline: none; line-height: 1.45;
-        transition: border-color .15s; font-family: inherit;
-        max-height: 120px; overflow-y: auto;
-      }
-      .rs-chat-input:focus { border-color: var(--azul, #0A3D62); }
-      .rs-chat-send {
-        width: 36px; height: 36px; border-radius: 50%;
-        background: var(--rs-borda, #e2e8f0); border: none;
-        display: flex; align-items: center; justify-content: center;
-        cursor: pointer; flex-shrink: 0;
-        transition: background .2s, transform .15s;
-      }
-      .rs-chat-send.ativo { background: var(--azul, #0A3D62); }
-      .rs-chat-send.ativo path,
-      .rs-chat-send.ativo line,
-      .rs-chat-send.ativo polygon { stroke: #fff; }
-      .rs-chat-send:active { transform: scale(.92); }
-
-      /* Animações */
-      @keyframes rsChatFabPop {
-        from { opacity:0; transform:scale(.6); }
-        to   { opacity:1; transform:scale(1); }
-      }
-      @keyframes rsChatBadgePop {
-        from { transform:scale(0); }
-        to   { transform:scale(1); }
-      }
-      @keyframes rsChatSlideUp {
-        from { transform: translateY(100%); }
-        to   { transform: translateY(0); }
-      }
-      @keyframes rsChatFadeIn {
-        from { opacity: 0; }
-        to   { opacity: 1; }
-      }
-      @keyframes rsChatTypingDot {
-        0%, 60%, 100% { transform: translateY(0); opacity: .5; }
-        30% { transform: translateY(-4px); opacity: 1; }
-      }
-      .rs-chat-header-titulo {
-        font-size: 14px; font-weight: 700;
-        color: var(--rs-texto, #0f172a);
-        font-family: Georgia, serif; line-height: 1.2;
-        /* Quebra suave em mobile */
-        white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-        max-width: 180px;
-      }
-      @media (max-width: 380px) {
-        .rs-chat-header-titulo {
-          font-size: 13px; max-width: 140px;
-        }
-      }
+      #rs-chat-fab { position:fixed; bottom:68px; right:16px; width:52px; height:52px; border-radius:50%; background:${temChat ? 'linear-gradient(135deg,#f97316,#ef4444)' : 'linear-gradient(135deg,#64748b,#475569)'}; border:none; cursor:pointer; display:flex; align-items:center; justify-content:center; z-index:900; box-shadow:0 4px 18px rgba(100,116,139,.35); transition:opacity .22s ease, transform .18s ease; animation:rsChatFabPop .4s cubic-bezier(.34,1.56,.64,1) .3s both; }
+      #rs-chat-fab:hover { transform:scale(1.08); } #rs-chat-fab:active { transform:scale(.93); } #rs-chat-fab.oculto { opacity:0; pointer-events:none; }
+      #rs-chat-fab .rs-chat-badge { position:absolute; top:2px; right:2px; width:15px; height:15px; border-radius:50%; background:#22c55e; border:2px solid var(--rs-bg,#f4f6f9); display:flex; align-items:center; justify-content:center; font-size:7px; color:#fff; font-weight:700; animation:rsChatBadgePop .35s cubic-bezier(.34,1.56,.64,1) .7s both; }
+      #rs-chat-fab .rs-chat-lock { position:absolute; bottom:-2px; right:-2px; font-size:13px; line-height:1; }
+      #rs-chat-backdrop { position:fixed; inset:0; background:rgba(0,0,0,.45); z-index:910; animation:rsChatFadeIn .2s ease; }
+      #rs-chat-sheet { position:fixed; bottom:0; left:0; right:0; height:74vh; background:var(--rs-card,#fff); border-radius:20px 20px 0 0; z-index:920; display:flex; flex-direction:column; box-shadow:0 -8px 40px rgba(0,0,0,.18); animation:rsChatSlideUp .35s cubic-bezier(.32,.72,0,1); }
+      .rs-chat-handle-wrap { display:flex; justify-content:center; padding:11px 0 3px; }
+      .rs-chat-handle { width:36px; height:4px; border-radius:2px; background:var(--rs-borda,#e2e8f0); }
+      .rs-chat-header { padding:9px 18px 11px; border-bottom:1px solid var(--rs-borda,#e2e8f0); display:flex; align-items:center; gap:11px; flex-shrink:0; }
+      .rs-chat-header-avatar { width:36px; height:36px; border-radius:50%; background:linear-gradient(135deg,#f97316,#ef4444); display:flex; align-items:center; justify-content:center; font-size:16px; flex-shrink:0; box-shadow:0 2px 10px rgba(249,115,22,.35); }
+      .rs-chat-header-titulo { font-size:13.5px; font-weight:700; color:var(--rs-texto,#0f172a); font-family:Georgia,serif; line-height:1.25; white-space:normal; overflow:visible; text-overflow:clip; max-width:85vw; }
+      .rs-chat-header-sub { font-size:10.5px; color:#22c55e; font-family:sans-serif; }
+      .rs-chat-header-close { margin-left:auto; background:none; border:none; color:var(--rs-muted,#94a3b8); font-size:17px; cursor:pointer; padding:4px 8px; border-radius:6px; line-height:1; transition:color .15s; }
+      .rs-chat-header-close:hover { color:var(--rs-texto,#0f172a); }
+      .rs-chat-messages { flex:1; overflow-y:auto; padding:14px 14px 8px; display:flex; flex-direction:column; gap:10px; scroll-behavior:smooth; }
+      .rs-chat-msg-row { display:flex; align-items:flex-end; gap:6px; } .rs-chat-msg-row.user { justify-content:flex-end; } .rs-chat-msg-row.assistant { justify-content:flex-start; }
+      .rs-chat-bubble { max-width:78%; padding:9px 13px; border-radius:16px; font-size:13px; line-height:1.55; word-break:break-word; white-space:pre-wrap; }
+      .rs-chat-bubble.user { background:var(--azul,#0A3D62); color:#fff; border-radius:16px 16px 4px 16px; }
+      .rs-chat-bubble.assistant { background:var(--rs-borda,#e2e8f0); color:var(--rs-texto,#0f172a); border-radius:16px 16px 16px 4px; }
+      .rs-chat-avatar-mini { width:26px; height:26px; border-radius:50%; background:linear-gradient(135deg,#f97316,#ef4444); display:flex; align-items:center; justify-content:center; font-size:11px; color:#fff; flex-shrink:0; }
+      .rs-chat-typing { display:flex; align-items:center; gap:3px; padding:10px 14px; background:var(--rs-borda,#e2e8f0); border-radius:16px 16px 16px 4px; }
+      .rs-chat-typing span { width:6px; height:6px; border-radius:50%; background:var(--rs-muted,#94a3b8); animation:rsChatTypingDot 1.2s ease-in-out infinite; } .rs-chat-typing span:nth-child(2) { animation-delay:.2s; } .rs-chat-typing span:nth-child(3) { animation-delay:.4s; }
+      .rs-chat-input-row { display:flex; align-items:flex-end; gap:8px; padding:10px 12px 12px; border-top:1px solid var(--rs-borda,#e2e8f0); flex-shrink:0; }
+      .rs-chat-input { flex:1; border:1px solid var(--rs-borda,#e2e8f0); border-radius:20px; padding:9px 14px; font-size:13px; color:var(--rs-texto,#0f172a); background:var(--rs-bg,#f4f6f9); resize:none; outline:none; line-height:1.45; transition:border-color .15s; font-family:inherit; max-height:120px; overflow-y:auto; }
+      .rs-chat-input:focus { border-color:var(--azul,#0A3D62); }
+      .rs-chat-send { width:36px; height:36px; border-radius:50%; background:var(--rs-borda,#e2e8f0); border:none; display:flex; align-items:center; justify-content:center; cursor:pointer; flex-shrink:0; transition:background .2s, transform .15s; }
+      .rs-chat-send.ativo { background:var(--azul,#0A3D62); } .rs-chat-send.ativo path, .rs-chat-send.ativo line, .rs-chat-send.ativo polygon { stroke:#fff; }
+      .rs-chat-send:active { transform:scale(.92); }
+      @keyframes rsChatFabPop { from { opacity:0; transform:scale(.6); } to { opacity:1; transform:scale(1); } }
+      @keyframes rsChatBadgePop { from { transform:scale(0); } to { transform:scale(1); } }
+      @keyframes rsChatSlideUp { from { transform:translateY(100%); } to { transform:translateY(0); } }
+      @keyframes rsChatFadeIn { from { opacity:0; } to { opacity:1; } }
+      @keyframes rsChatTypingDot { 0%, 60%, 100% { transform:translateY(0); opacity:.5; } 30% { transform:translateY(-4px); opacity:1; } }
+      @media(max-width:380px) { .rs-chat-header-titulo { font-size:12.5px; } }
     `;
     document.head.appendChild(style);
   }
- 
-  // ── FAB ──────────────────────────────────────────────────────────────────
+
+  // ── 4. FAB ──
   const fab = document.createElement('button');
   fab.id = 'rs-chat-fab';
-  fab.setAttribute('aria-label', temChat ? 'Pergunte ao Radar' : 'Recurso bloqueado — Pergunte ao Radar');
-  fab.setAttribute('title',      temChat ? 'Pergunte ao Radar' : '🔒 Disponível no plano Profissional');
-  fab.innerHTML = `
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="none"
-         stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
-    </svg>
-    ${isNew && temChat ? '<div class="rs-chat-badge">N</div>' : ''}
-    ${!temChat ? '<div class="rs-chat-lock">🔒</div>' : ''}
-  `;
+  fab.setAttribute('aria-label', temChat ? 'Pergunte ao Radar' : 'Recurso bloqueado');
+  fab.innerHTML = `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>${isNew && temChat ? '<div class="rs-chat-badge">N</div>' : ''}${!temChat ? '<div class="rs-chat-lock">🔒</div>' : ''}`;
   document.body.appendChild(fab);
- 
-  // ── Scroll hide/show ─────────────────────────────────────────────────────
+
   const _scrollEl = document.getElementById('rs-app') || window;
   let _lastY = 0;
   const _onScroll = () => {
@@ -3033,54 +2874,34 @@ function iniciarChatFAB(newsletter, uid, acesso) {
     if (Math.abs(y - _lastY) > 10) _lastY = y;
   };
   _scrollEl.addEventListener('scroll', _onScroll, { passive: true });
- 
-   // ── Estado interno do chat ───────────────────────────────────────────────
-  let _mensagens = [];
+
   let _digitando = false;
 
-  // ── Abrir sheet ──────────────────────────────────────────────────────────
+  // ── 5. Funções internas (agora leem do global) ──
   function _abrirChat() {
     if (document.getElementById('rs-chat-sheet')) return;
     sessionStorage.setItem(sessionKey, '1');
     const backdrop = document.createElement('div');
-    backdrop.id = 'rs-chat-backdrop';
-    backdrop.onclick = _fecharChat;
+    backdrop.id = 'rs-chat-backdrop'; backdrop.onclick = _fecharChat;
     document.body.appendChild(backdrop);
 
     const sheet = document.createElement('div');
     sheet.id = 'rs-chat-sheet';
-    
-    // Monta título com edição (ex: "Pergunte ao Radar · Ed. 042 · Título da edição")
-    const tituloEdicao = edicaoNum ? `Ed. ${_esc(edicaoNum)}` : '';
-    const tituloNewsletter = newsletter.titulo ? _esc(newsletter.titulo) : '';
-    const tituloCompleto = tituloEdicao || tituloNewsletter 
-      ? `Pergunte ao Radar ${tituloEdicao ? `· ${tituloEdicao}` : ''}${tituloNewsletter ? ` · ${tituloNewsletter}` : ''}`
-      : 'Pergunte ao Radar';
+    const ctx = window._chatContext;
+    const tituloCompleto = `Pergunte ao Radar - Edição: ${ctx.edicaoNum || '—'} - ${ctx.titulo || ''}`;
 
     sheet.innerHTML = `
-      <div class="rs-chat-handle-wrap"> <div class="rs-chat-handle"> </div> </div>
+      <div class="rs-chat-handle-wrap"><div class="rs-chat-handle"></div></div>
       <div class="rs-chat-header">
         <div class="rs-chat-header-avatar">✦</div>
-        <div>
-          <div class="rs-chat-header-titulo">${tituloCompleto}</div>
-          <div class="rs-chat-header-sub">● online agora</div>
-        </div>
-        <button class="rs-chat-header-close"
-              onclick="document.getElementById('rs-chat-backdrop')?.click()"
-              aria-label="Fechar">✕</button>
+        <div><div class="rs-chat-header-titulo">${_esc(tituloCompleto)}</div><div class="rs-chat-header-sub">● online agora</div></div>
+        <button class="rs-chat-header-close" onclick="document.getElementById('rs-chat-backdrop')?.click()" aria-label="Fechar">✕</button>
       </div>
-      <div class="rs-chat-messages" id="rs-chat-messages"> </div>
+      <div class="rs-chat-messages" id="rs-chat-messages"></div>
       <div class="rs-chat-input-row">
-        <textarea id="rs-chat-input" class="rs-chat-input"
-                placeholder="Pergunte sobre esta edição…"
-                rows="1" maxlength="500"> </textarea>
+        <textarea id="rs-chat-input" class="rs-chat-input" placeholder="Pergunte sobre esta edição…" rows="1" maxlength="500"></textarea>
         <button id="rs-chat-send" class="rs-chat-send" aria-label="Enviar">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
-              stroke="currentColor" stroke-width="2.5"
-              stroke-linecap="round" stroke-linejoin="round">
-            <line x1="22" y1="2" x2="11" y2="13"/>
-            <polygon points="22 2 15 22 11 13 2 9 22 2"/>
-          </svg>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
         </button>
       </div>`;
     document.body.appendChild(sheet);
@@ -3088,166 +2909,97 @@ function iniciarChatFAB(newsletter, uid, acesso) {
     const input   = document.getElementById('rs-chat-input');
     const sendBtn = document.getElementById('rs-chat-send');
 
-    // Auto-resize textarea
     input?.addEventListener('input', () => {
       input.style.height = 'auto';
       input.style.height = Math.min(input.scrollHeight, 120) + 'px';
-      const ativo = input.value.trim().length > 0;
-      sendBtn?.classList.toggle('ativo', ativo);
-      sendBtn?.querySelectorAll('path,line,polygon').forEach(p =>
-        p.setAttribute('stroke', ativo ? '#fff' : '#94a3b8'));
+      sendBtn?.classList.toggle('ativo', input.value.trim().length > 0);
     });
-
-    // Enter envia, Shift+Enter quebra linha
-    input?.addEventListener('keydown', e => {
-      if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); _enviar(); }
-    });
+    input?.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); _enviar(); } });
     sendBtn?.addEventListener('click', _enviar);
 
-    if (!_mensagens.length) {
-      _adicionarMensagem('assistant',
-        `Olá! Pode perguntar sobre qualquer tema da Edição ${edicaoNum}. Estou aqui para ajudar.`
-      );
+    if (window._chatMensagens.length === 0) {
+      _adicionarMensagem('assistant', `Olá! Estou pronto para responder sobre a Edição ${ctx.edicaoNum}. O que deseja saber?`);
     } else {
       _renderizarMensagens();
     }
-
     setTimeout(() => input?.focus(), 380);
   }
 
-  // ── Fechar sheet ─────────────────────────────────────────────────────────
   function _fecharChat() {
     document.getElementById('rs-chat-sheet')?.remove();
     document.getElementById('rs-chat-backdrop')?.remove();
   }
 
-  // ── Adicionar mensagem ao estado e DOM ───────────────────────────────────
   function _adicionarMensagem(role, text) {
-    _mensagens.push({ role, text });
+    window._chatMensagens.push({ role, text });
     const wrap = document.getElementById('rs-chat-messages');
     if (!wrap) return;
     const row = document.createElement('div');
     row.className = `rs-chat-msg-row ${role}`;
-    if (role === 'assistant') {
-      row.innerHTML = `
-        <div class="rs-chat-avatar-mini">✦</div>
-        <div class="rs-chat-bubble assistant">${_esc(text)}</div>`;
-    } else {
-      row.innerHTML = `<div class="rs-chat-bubble user">${_esc(text)}</div>`;
-    }
+    row.innerHTML = role === 'assistant'
+      ? `<div class="rs-chat-avatar-mini">✦</div><div class="rs-chat-bubble assistant">${_esc(text)}</div>`
+      : `<div class="rs-chat-bubble user">${_esc(text)}</div>`;
     wrap.appendChild(row);
     row.scrollIntoView({ behavior: 'smooth', block: 'end' });
   }
 
   function _renderizarMensagens() {
     const wrap = document.getElementById('rs-chat-messages');
-    if (!wrap) return;
-    wrap.innerHTML = '';
-    _mensagens.forEach(m => _adicionarMensagem(m.role, m.text));
+    if (!wrap) return; wrap.innerHTML = '';
+    window._chatMensagens.forEach(m => _adicionarMensagem(m.role, m.text));
   }
 
-  // ── Typing indicator ─────────────────────────────────────────────────────
-  function _mostrarDigitando() {
-    const wrap = document.getElementById('rs-chat-messages');
-    if (!wrap) return;
-    const el = document.createElement('div');
-    el.className = 'rs-chat-msg-row assistant';
-    el.id = 'rs-chat-typing-row';
-    el.innerHTML = `
-      <div class="rs-chat-avatar-mini">✦</div>
-      <div class="rs-chat-typing">
-        <span></span><span></span><span></span>
-      </div>`;
-    wrap.appendChild(el);
-    el.scrollIntoView({ behavior: 'smooth', block: 'end' });
-  }
-
-  function _esconderDigitando() {
-    document.getElementById('rs-chat-typing-row')?.remove();
-  }
-
-  // ── Enviar mensagem ───────────────────────────────────────────────────────
   async function _enviar() {
     const input   = document.getElementById('rs-chat-input');
     const sendBtn = document.getElementById('rs-chat-send');
     if (!input) return;
     const texto = input.value.trim();
     if (!texto || _digitando) return;
-
-    input.value = '';
-    sendBtn?.classList.remove('ativo');
-    sendBtn?.querySelectorAll('path').forEach(p => p.setAttribute('stroke', '#94a3b8'));
+    input.value = ''; sendBtn?.classList.remove('ativo');
 
     _adicionarMensagem('user', texto);
     _digitando = true;
-    _mostrarDigitando();
+    const wrap = document.getElementById('rs-chat-messages');
+    const typing = document.createElement('div');
+    typing.className = 'rs-chat-msg-row assistant'; typing.id = 'rs-chat-typing-row';
+    typing.innerHTML = `<div class="rs-chat-avatar-mini">✦</div><div class="rs-chat-typing"><span></span><span></span><span></span></div>`;
+    wrap?.appendChild(typing); typing?.scrollIntoView({ behavior:'smooth' });
 
     try {
-      const ctx = window._chatContext; // ← lê contexto atualizado
+      const ctx = window._chatContext; // ✅ Lê contexto ATUALIZADO
       const res = await fetch('/api/chat', {
-        method:  'POST',
+        method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           pergunta:      texto,
-          nid:           ctx.nid,
+          nid:           ctx.nid,             // ✅ Usa global
           municipio_cod: window._radarUser?.municipio_cod || '',
-          uid:           ctx.uid,
+          uid:           ctx.uid,             // ✅ Usa global
           segmento:      window._radarUser?.segmento || '',
-          historico:     _mensagens.slice(-6),
+          historico:     window._chatMensagens.slice(-6) // ✅ Usa global
         }),
       });
-
-      let data;
-      try { data = await res.json(); } catch (_) {
-        _esconderDigitando();
-        _digitando = false;
-        _adicionarMensagem('assistant',
-          'O assistente encontrou um problema inesperado. Tente novamente em instantes.');
-        console.warn('[rs-chat] resposta não-JSON, status:', res.status);
-        return;
-      }
-      _esconderDigitando();
-      _digitando = false;
-
-      if (!res.ok || data.erro) {
-        _adicionarMensagem('assistant',
-          data.erro || 'Não consegui processar sua pergunta. Tente novamente.');
-        return;
-      }
+      let data; try { data = await res.json(); } catch { _digitando = false; typing?.remove(); return; }
+      _digitando = false; typing?.remove();
+      if (!res.ok || data.erro) { _adicionarMensagem('assistant', data.erro || 'Não consegui processar.'); return; }
       _adicionarMensagem('assistant', data.resposta);
-
     } catch (err) {
-      _esconderDigitando();
-      _digitando = false;
-      _adicionarMensagem('assistant',
-        'Erro de conexão. Verifique sua internet e tente novamente.');
-      console.warn('[rs-chat] erro:', err);
+      _digitando = false; typing?.remove();
+      _adicionarMensagem('assistant', 'Erro de conexão. Verifique sua internet.');
     }
   }
 
-  // ── Clique no FAB ────────────────────────────────────────────────────────
   fab.onclick = () => {
-    if (!temChat) {
-      // Upsell — reutiliza o painel de upgrade existente
-      _solicitarUpgrade('chat', true); // true = já é assinante
-      return;
-    }
+    if (!temChat) { _solicitarUpgrade('chat', true); return; }
     sessionStorage.setItem(sessionKey, '1');
-    const badge = fab.querySelector('.rs-chat-badge');
-    if (badge) badge.remove();
+    fab.querySelector('.rs-chat-badge')?.remove();
     _abrirChat();
   };
- 
-  // ── Resto do código do chat (abrirChat, enviar, etc.) permanece IDÊNTICO ─
-  // Apenas mova as funções _abrirChat, _fecharChat, _adicionarMensagem,
-  // _enviar, _mostrarDigitando, _esconderDigitando para fora do escopo do FAB
-  // (ou mantenha como estão — não há impacto funcional).
- 
+
   window._rsChatDestroy = () => {
     document.getElementById('rs-chat-sheet')?.remove();
     document.getElementById('rs-chat-backdrop')?.remove();
-    fab.remove();
-    _scrollEl.removeEventListener('scroll', _onScroll);
+    fab.remove(); _scrollEl.removeEventListener('scroll', _onScroll);
     delete window._rsChatDestroy;
   };
 }
