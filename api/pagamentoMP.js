@@ -5,6 +5,8 @@ export const config = { runtime: 'nodejs', api: { bodyParser: false } };
 
 import crypto from 'crypto';
 import admin from 'firebase-admin';
+import { enviarWhatsApp } from './_whatsapp.js';
+
 
 // Inicializa Firebase (atenção ao formato da PRIVATE_KEY no Vercel: use \\n)
 if (!admin.apps.length) {
@@ -581,6 +583,23 @@ function aplicarPlaceholders(template, dados) {
     .replace(/{{data_assinatura}}/gi, data_assinatura);
 }
 
+function _textoBoasVindas(nome, plano, linkAtivacao) {
+  const primeiroNome = (nome || '').split(' ')[0] || 'olá';
+  return [
+    `✅ *Radar SIOPE* — Assinatura confirmada!`,
+    ``,
+    `Olá, ${primeiroNome}! Sua assinatura do plano *${plano}* foi ativada com sucesso.`,
+    ``,
+    `Acesse agora sua primeira edição pelo link abaixo:`,
+    `👉 ${linkAtivacao}`,
+    ``,
+    `⚠️ _Este link é de uso único e válido por 72h. Após o primeiro acesso, o app fica salvo no seu dispositivo._`,
+    ``,
+    `Qualquer dúvida, responda esta mensagem.`,
+    `*Equipe Radar SIOPE*`,
+  ].join('\n');
+}
+
 // ─── Handler principal ────────────────────────────────────────────────────────
 export default async function handler(req, res) {
   try {
@@ -1008,40 +1027,48 @@ export default async function handler(req, res) {
         }
 
         if (devoEnviar) {
-          try {
-            await dispararMensagemAutomatica('pos_cadastro_assinante', {
-              userId,
-              assinaturaId,
-              nome: usuarioData?.nome || mpData.payer?.first_name || assinaturaData?.nome || '',
-              email: usuarioData?.email || mpData.payer?.email || '(email não informado)',
-              plano: nomePlano,
-              data_assinatura: new Date(),
-              link_ativacao: `${process.env.NEXT_PUBLIC_BASE_URL}/verNewsletterComToken.html?ativar=${_sessionToken}&uid=${userId}`
-            });
-
-            const successPayload = {};
-            successPayload[logKey] = {
-              momento: 'pos_cadastro_assinante',
-              email: usuarioData?.email || mpData.payer?.email || '(email não informado)',
-              status: 'enviado',
-              enviadoEm: admin.firestore.FieldValue.serverTimestamp()
-            };
-            await assinRef.set(successPayload, { merge: true });
-
-          } catch (err) {
-            console.error('Erro ao enviar e-mail de confirmação:', err && err.message ? err.message : err);
-            const errPayload = {};
-            errPayload[logKey] = {
-              momento: 'pos_cadastro_assinante',
-              email: usuarioData?.email || mpData.payer?.email || '(email não informado)',
-              status: 'erro',
-              erro: String(err && err.message ? err.message : err),
-              atualizadoEm: admin.firestore.FieldValue.serverTimestamp()
-            };
-            try { await assinRef.set(errPayload, { merge: true }); } catch (e2) {
-              console.warn('Falha ao gravar erro no doc da assinatura:', e2 && e2.message ? e2.message : e2);
-            }
-          }
+          const linkAtivacao = `${process.env.NEXT_PUBLIC_BASE_URL}/verNewsletterComToken.html?ativar=${_sessionToken}&uid=${userId}`;
+          const nomeAssinante = usuarioData?.nome || mpData.payer?.first_name || assinaturaData?.nome || '';
+          const emailAssinante = usuarioData?.email || mpData.payer?.email || '(email não informado)';
+          const whatsappAssinante = usuarioData?.whatsapp || null;
+ 
+          // ── E-mail (comportamento existente, mantido) ──────────────────────
+          const emailPromise = dispararMensagemAutomatica('pos_cadastro_assinante', {
+            userId,
+            assinaturaId,
+            nome:            nomeAssinante,
+            email:           emailAssinante,
+            plano:           nomePlano,
+            data_assinatura: new Date(),
+            link_ativacao:   linkAtivacao,
+          }).catch(err => {
+            console.error('[pagamentoMP] Erro no e-mail de boas-vindas:', err?.message || err);
+          });
+ 
+          // ── WhatsApp (novo) ────────────────────────────────────────────────
+          const whatsappPromise = whatsappAssinante
+            ? enviarWhatsApp(
+                whatsappAssinante,
+                _textoBoasVindas(nomeAssinante, nomePlano, linkAtivacao),
+                { tentativas: 2, timeoutMs: 8000 }
+              ).catch(err => {
+                console.warn('[pagamentoMP] Erro no WhatsApp de boas-vindas:', err?.message || err);
+              })
+            : Promise.resolve();
+ 
+          // Dispara os dois em paralelo — falha de um não bloqueia o outro
+          await Promise.allSettled([emailPromise, whatsappPromise]);
+ 
+          const successPayload = {};
+          successPayload[logKey] = {
+            momento:    'pos_cadastro_assinante',
+            email:      emailAssinante,
+            whatsapp:   whatsappAssinante ? 'enviado' : 'sem_numero',
+            status:     'enviado',
+            enviadoEm:  admin.firestore.FieldValue.serverTimestamp(),
+          };
+          await assinRef.set(successPayload, { merge: true });
+ 
         } else {
           if (logCompleto()) console.info('Envio já registrado para pedidoId:', pedidoId);
         }
