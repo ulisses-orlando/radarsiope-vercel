@@ -7,8 +7,6 @@
    - Receber eventos do webhook do Mercado Pago
    - Disparar push notifications segmentadas via OneSignal REST API
    - Registrar o alerta no Firestore (histórico + auditoria)
-   - MUDANÇAS EM alertas.js — integração WhatsApp para nova_edicao
-
    
    TIPOS DE ALERTA:
    ┌─────────────────────────────┬──────────────┬──────────────────────────┐
@@ -135,163 +133,6 @@ const TEMPLATES_ALERTA = {
   },
 };
 
-async function _buscarAssinantesWhatsApp() {
-  try {
-    // Busca usuários ativos com whatsappOptin = true e whatsapp preenchido
-    const snap = await db.collection('usuarios')
-      .where('ativo', '==', true)
-      .where('whatsappOptin', '==', true)
-      .get();
- 
-    const resultado = [];
-    for (const doc of snap.docs) {
-      const d = doc.data();
-      if (d.whatsapp) {
-        resultado.push({
-          uid:     doc.id,
-          numero:  d.whatsapp,
-          nome:    d.nome || '',
-        });
-      }
-    }
-    return resultado;
-  } catch (err) {
-    console.error('[alertas] Erro ao buscar assinantes WhatsApp:', err.message);
-    return [];
-  }
-}
-
-async function _dispararWhatsAppNovaEdicao(tipo, titulo, corpo, parametros) {
-  const assinantes = await _buscarAssinantesWhatsApp();
-  if (assinantes.length === 0) {
-    console.log('[alertas] Nenhum assinante com WhatsApp opt-in.');
-    return;
-  }
- 
-  const urlBase = process.env.NEXT_PUBLIC_BASE_URL || 'https://app.radarsiope.com.br';
-  const edicaoNum = parametros.edicao || '';
- 
-  // Monta lista de destinatários com texto personalizado pelo nome
-  const destinatarios = assinantes.map(a => ({
-    numero: a.numero,
-    texto:  _textoNovaEdicaoWpp(a.nome, edicaoNum, parametros.titulo || titulo, urlBase),
-  }));
- 
-  // Envia em lote com intervalo de 1.5s entre mensagens
-  const resultado = await enviarWhatsAppEmLote(destinatarios, 1500);
- 
-  // Registra resultado no Firestore para auditoria
-  try {
-    await db.collection('alertas_disparados').add({
-      tipo:          `${tipo}_whatsapp`,
-      titulo,
-      corpo,
-      parametros,
-      canal:         'whatsapp',
-      enviados:       resultado.enviados,
-      erros:          resultado.erros,
-      total:          resultado.total,
-      disparado_em:   admin.firestore.FieldValue.serverTimestamp(),
-      status:         resultado.erros === 0 ? 'enviado' : 'parcial',
-    });
-  } catch (e) { console.warn('[alertas] Erro ao registrar histórico WhatsApp:', e); }
-}
-
-async function _handleEnviarWhatsApp(req, res) {
-  const { numero, uids, todos, mensagem } = req.body || {};
- 
-  if (!mensagem || !mensagem.trim()) {
-    return res.status(400).json({ ok: false, error: 'Mensagem obrigatória.' });
-  }
- 
-  // ── Modo individual: número avulso ────────────────────────────────────────
-  if (numero) {
-    const resultado = await enviarWhatsApp(numero, mensagem.trim());
-    return res.status(resultado.ok ? 200 : 500).json(resultado);
-  }
- 
-  // ── Modo lote por UIDs selecionados ───────────────────────────────────────
-  if (Array.isArray(uids) && uids.length > 0) {
-    const destinatarios = [];
-    for (const uid of uids) {
-      try {
-        const snap = await db.collection('usuarios').doc(uid).get();
-        if (!snap.exists) continue;
-        const d = snap.data();
-        const num = d.whatsapp || d.whatsapp_number;
-        if (num && (d.whatsappOptin || d.whatsapp_optin)) {
-          destinatarios.push({ numero: num, texto: mensagem.trim() });
-        }
-      } catch (e) { /* ignora uid inválido */ }
-    }
- 
-    if (destinatarios.length === 0) {
-      return res.status(400).json({ ok: false, error: 'Nenhum destinatário com WhatsApp autorizado.' });
-    }
- 
-    const resultado = await enviarWhatsAppEmLote(destinatarios, 1500);
- 
-    // Registra no histórico
-    await db.collection('alertas_disparados').add({
-      canal:             'whatsapp',
-      tipo:              'manual_admin',
-      mensagem:          mensagem.slice(0, 200),
-      destinatarios_est: uids.length,
-      destinatarios_env: resultado.enviados,
-      erros:             resultado.erros,
-      status:            resultado.erros === 0 ? 'enviado' : 'parcial',
-      disparado_em:      admin.firestore.FieldValue.serverTimestamp(),
-    }).catch(() => {});
- 
-    return res.status(200).json({ ok: true, ...resultado });
-  }
- 
-  // ── Modo todos com opt-in ─────────────────────────────────────────────────
-  if (todos === true) {
-    const assinantes = await _buscarAssinantesWhatsApp();
-    if (assinantes.length === 0) {
-      return res.status(400).json({ ok: false, error: 'Nenhum assinante com WhatsApp autorizado.' });
-    }
- 
-    const destinatarios = assinantes.map(a => ({
-      numero: a.numero,
-      texto:  mensagem.trim(),
-    }));
- 
-    const resultado = await enviarWhatsAppEmLote(destinatarios, 1500);
- 
-    await db.collection('alertas_disparados').add({
-      canal:             'whatsapp',
-      tipo:              'manual_todos',
-      mensagem:          mensagem.slice(0, 200),
-      destinatarios_est: assinantes.length,
-      destinatarios_env: resultado.enviados,
-      erros:             resultado.erros,
-      status:            resultado.erros === 0 ? 'enviado' : 'parcial',
-      disparado_em:      admin.firestore.FieldValue.serverTimestamp(),
-    }).catch(() => {});
- 
-    return res.status(200).json({ ok: true, ...resultado });
-  }
- 
-  return res.status(400).json({ ok: false, error: 'Informe numero, uids ou todos:true.' });
-}
- 
-function _textoNovaEdicaoWpp(nome, edicaoNum, tituloEdicao, urlBase) {
-  const primeiroNome = (nome || '').split(' ')[0] || 'olá';
-  const numStr = edicaoNum ? ` #${edicaoNum}` : '';
-  return [
-    `📡 *Radar SIOPE${numStr}* — Nova edição disponível!`,
-    ``,
-    `Olá, ${primeiroNome}! A edição${numStr} já está no ar:`,
-    `*${tituloEdicao}*`,
-    ``,
-    `👉 ${urlBase}`,
-    ``,
-    `_Acesse pelo app e confira os indicadores do seu município._`,
-  ].join('\n');
-}
-
 // ─── Handler principal (Vercel Function) ─────────────────────────────────────
 export default async function handler(req, res) {
   // CORS
@@ -307,6 +148,7 @@ export default async function handler(req, res) {
     return res.status(401).json({ ok: false, error: 'Não autorizado.' });
   }
 
+  // ── POST acao=enviar-whatsapp ────────────────────────────────────────────────
   if (req.method === 'POST' && req.body?.acao === 'enviar-whatsapp') {
     return _handleEnviarWhatsApp(req, res);
   }
@@ -402,11 +244,12 @@ export default async function handler(req, res) {
     });
   } catch (e) { console.warn('[alertas] Erro ao registrar histórico:', e); }
 
+  // ── WhatsApp: apenas para nova_edicao ────────────────────────────────────────
   if (tipo === 'nova_edicao') {
     _dispararWhatsAppNovaEdicao(tipo, titulo, corpo, parametros)
-      .catch(err => console.error('[alertas] Erro no disparo WhatsApp:', err.message));
+      .catch(err => console.error('[alertas] Erro no disparo WhatsApp nova_edicao:', err.message));
   }
- 
+
   return res.status(200).json({
     ok:           true,
     tipo,
@@ -414,6 +257,154 @@ export default async function handler(req, res) {
     destinatarios: oneSignalResult.recipients || 0,
     onesignal_id:  oneSignalResult.id,
   });
+}
+
+// ─── Buscar assinantes com WhatsApp opt-in ────────────────────────────────────
+async function _buscarAssinantesWhatsApp() {
+  try {
+    const [snap1, snap2] = await Promise.all([
+      db.collection('usuarios').where('ativo', '==', true).where('whatsappOptin', '==', true).get(),
+      db.collection('usuarios').where('ativo', '==', true).where('whatsapp_optin', '==', true).get(),
+    ]);
+    const vistos = new Set();
+    return [...snap1.docs, ...snap2.docs]
+      .filter(d => { if (vistos.has(d.id)) return false; vistos.add(d.id); return true; })
+      .map(d => ({ uid: d.id, numero: d.data().whatsapp || d.data().whatsapp_number, nome: d.data().nome || '' }))
+      .filter(a => a.numero);
+  } catch (err) {
+    console.error('[alertas] Erro ao buscar assinantes WhatsApp:', err.message);
+    return [];
+  }
+}
+
+// ─── Envio automático pós-nova_edicao ─────────────────────────────────────────
+async function _dispararWhatsAppNovaEdicao(tipo, titulo, corpo, parametros) {
+  const assinantes = await _buscarAssinantesWhatsApp();
+  if (!assinantes.length) return;
+
+  const urlBase   = process.env.NEXT_PUBLIC_BASE_URL || 'https://app.radarsiope.com.br';
+  const edicaoNum = parametros.edicao || '';
+
+  const destinatarios = assinantes.map(a => ({
+    numero: a.numero,
+    texto:  _textoNovaEdicaoWpp(a.nome, edicaoNum, parametros.titulo || titulo, urlBase),
+  }));
+
+  const resultado = await enviarWhatsAppEmLote(destinatarios, 1500);
+
+  await db.collection('alertas_disparados').add({
+    tipo:              `${tipo}_whatsapp`,
+    canal:             'whatsapp',
+    titulo,
+    parametros,
+    enviados:          resultado.enviados,
+    erros:             resultado.erros,
+    total:             resultado.total,
+    disparado_em:      admin.firestore.FieldValue.serverTimestamp(),
+    status:            resultado.erros === 0 ? 'enviado' : 'parcial',
+  }).catch(() => {});
+}
+
+function _textoNovaEdicaoWpp(nome, edicaoNum, tituloEdicao, urlBase) {
+  const primeiroNome = (nome || '').split(' ')[0] || 'olá';
+  const numStr = edicaoNum ? ` #${edicaoNum}` : '';
+  return [
+    `📡 *Radar SIOPE${numStr}* — Nova edição disponível!`,
+    ``,
+    `Olá, ${primeiroNome}! A edição${numStr} já está no ar:`,
+    `*${tituloEdicao}*`,
+    ``,
+    `👉 ${urlBase}`,
+    ``,
+    `_Acesse pelo app e confira os indicadores do seu município._`,
+  ].join('\n');
+}
+
+// ─── Handler: enviar WhatsApp manual (admin) ──────────────────────────────────
+async function _handleEnviarWhatsApp(req, res) {
+  const { numero, uids, todos, comunidade, mensagem } = req.body || {};
+
+  if (!mensagem?.trim()) {
+    return res.status(400).json({ ok: false, error: 'Mensagem obrigatória.' });
+  }
+
+  // ── Modo: grupo/comunidade ─────────────────────────────────────────────────
+  if (comunidade) {
+    const jidMap = {
+      edicoes: process.env.EVOLUTION_GROUP_EDICOES,
+      alertas: process.env.EVOLUTION_GROUP_ALERTAS,
+    };
+    const jid = jidMap[comunidade];
+    if (!jid) {
+      return res.status(400).json({
+        ok: false,
+        error: `Grupo "${comunidade}" não configurado. Defina EVOLUTION_GROUP_${comunidade.toUpperCase()} no Vercel.`,
+      });
+    }
+    const resultado = await enviarWhatsApp(jid, mensagem.trim());
+    if (resultado.ok) {
+      await db.collection('alertas_disparados').add({
+        canal: 'whatsapp', tipo: `comunidade_${comunidade}`,
+        mensagem: mensagem.slice(0, 200), jid,
+        status: 'enviado', disparado_em: admin.firestore.FieldValue.serverTimestamp(),
+      }).catch(() => {});
+    }
+    return res.status(resultado.ok ? 200 : 500).json(resultado);
+  }
+
+  // ── Modo: número avulso ────────────────────────────────────────────────────
+  if (numero) {
+    const resultado = await enviarWhatsApp(numero, mensagem.trim());
+    return res.status(resultado.ok ? 200 : 500).json(resultado);
+  }
+
+  // ── Modo: UIDs selecionados ────────────────────────────────────────────────
+  if (Array.isArray(uids) && uids.length > 0) {
+    const destinatarios = [];
+    for (const uid of uids) {
+      try {
+        const snap = await db.collection('usuarios').doc(uid).get();
+        if (!snap.exists) continue;
+        const d   = snap.data();
+        const num = d.whatsapp || d.whatsapp_number;
+        if (num && (d.whatsappOptin || d.whatsapp_optin)) {
+          destinatarios.push({ numero: num, texto: mensagem.trim() });
+        }
+      } catch (e) { /* ignora uid inválido */ }
+    }
+    if (!destinatarios.length) {
+      return res.status(400).json({ ok: false, error: 'Nenhum destinatário com WhatsApp autorizado.' });
+    }
+    const resultado = await enviarWhatsAppEmLote(destinatarios, 1500);
+    await db.collection('alertas_disparados').add({
+      canal: 'whatsapp', tipo: 'manual_admin',
+      mensagem: mensagem.slice(0, 200),
+      destinatarios_est: uids.length, destinatarios_env: resultado.enviados,
+      erros: resultado.erros, status: resultado.erros === 0 ? 'enviado' : 'parcial',
+      disparado_em: admin.firestore.FieldValue.serverTimestamp(),
+    }).catch(() => {});
+    return res.status(200).json({ ok: true, ...resultado });
+  }
+
+  // ── Modo: todos com opt-in ─────────────────────────────────────────────────
+  if (todos === true) {
+    const assinantes = await _buscarAssinantesWhatsApp();
+    if (!assinantes.length) {
+      return res.status(400).json({ ok: false, error: 'Nenhum assinante com WhatsApp autorizado.' });
+    }
+    const destinatarios = assinantes.map(a => ({ numero: a.numero, texto: mensagem.trim() }));
+    const resultado     = await enviarWhatsAppEmLote(destinatarios, 1500);
+    await db.collection('alertas_disparados').add({
+      canal: 'whatsapp', tipo: 'manual_todos',
+      mensagem: mensagem.slice(0, 200),
+      destinatarios_est: assinantes.length, destinatarios_env: resultado.enviados,
+      erros: resultado.erros, status: resultado.erros === 0 ? 'enviado' : 'parcial',
+      disparado_em: admin.firestore.FieldValue.serverTimestamp(),
+    }).catch(() => {});
+    return res.status(200).json({ ok: true, ...resultado });
+  }
+
+  return res.status(400).json({ ok: false, error: 'Informe numero, uids, comunidade ou todos:true.' });
 }
 
 // ─── Utilitário: substitui {variavel} no template ────────────────────────────
