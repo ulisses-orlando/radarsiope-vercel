@@ -2826,7 +2826,7 @@ function iniciarChatFAB(newsletter, uid, acesso) {
       #rs-chat-fab .rs-chat-badge { position:absolute; top:2px; right:2px; width:15px; height:15px; border-radius:50%; background:#22c55e; border:2px solid var(--rs-bg,#f4f6f9); display:flex; align-items:center; justify-content:center; font-size:7px; color:#fff; font-weight:700; animation:rsChatBadgePop .35s cubic-bezier(.34,1.56,.64,1) .7s both; }
       #rs-chat-fab .rs-chat-lock { position:absolute; bottom:-2px; right:-2px; font-size:13px; line-height:1; }
       #rs-chat-backdrop { position:fixed; inset:0; background:rgba(0,0,0,.45); z-index:910; animation:rsChatFadeIn .2s ease; }
-      #rs-chat-sheet { position:fixed; bottom:0; left:0; right:0; height:74vh; background:var(--rs-card,#fff); border-radius:20px 20px 0 0; z-index:920; display:flex; flex-direction:column; box-shadow:0 -8px 40px rgba(0,0,0,.18); animation:rsChatSlideUp .35s cubic-bezier(.32,.72,0,1); }
+      #rs-chat-sheet { position:fixed; bottom:0; left:0; right:0; height:74vh; background:var(--rs-card,#fff); border-radius:20px 20px 0 0; z-index:10000; display:flex; flex-direction:column; box-shadow:0 -8px 40px rgba(0,0,0,.18); animation:rsChatSlideUp .35s cubic-bezier(.32,.72,0,1); }
       .rs-chat-handle-wrap { display:flex; justify-content:center; padding:11px 0 3px; }
       .rs-chat-handle { width:36px; height:4px; border-radius:2px; background:var(--rs-borda,#e2e8f0); }
       .rs-chat-header { padding:9px 18px 11px; border-bottom:1px solid var(--rs-borda,#e2e8f0); display:flex; align-items:center; gap:11px; flex-shrink:0; }
