@@ -20,6 +20,39 @@ let dadosMunicipioAtual = {
 window._chatContext = { nid: null, uid: null, edicaoNum: null };
 
 // ─── Parâmetros da URL ────────────────────────────────────────────────────────
+// ─── Buscar config pública via API (variáveis de ambiente) ──────────────────
+let _configCache = null;
+async function _getConfigPublica() {
+  // Retorna cache se já buscado
+  if (_configCache) return _configCache;
+  
+  try {
+    // ✅ URL absoluta para o domínio da API
+    const resp = await fetch('https://api.radarsiope.com.br/api/click?acao=config', { 
+      method: 'GET',
+      headers: { 'Accept': 'application/json' }
+    });
+    
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    
+    const data = await resp.json();
+    if (data.ok && data.config) {
+      _configCache = data.config;
+      // Opcional: salva no window para acesso global
+      window.RADAR_CONFIG = data.config;
+      return data.config;
+    }
+  } catch (err) {
+    console.warn('[verNL] Falha ao buscar config pública:', err);
+  }
+  
+  // Fallback: valores vazios
+  return {
+    NEXT_PUBLIC_WA_GRUPO_AVISOS_LINK: null,
+    NEXT_PUBLIC_WA_GRUPO_ALERTAS_LINK: null,
+    NEXT_PUBLIC_BASE_URL: null,
+  };
+}
 
 function normalizeParam(value) {
   if (!value) return null;
@@ -820,26 +853,29 @@ async function verificarEExibirLinksGrupos(uid, assinaturaId) {
       .collection('assinaturas')
       .doc(assinaturaId)
       .get();
-    console.log('[verNL] Verificando grupos WhatsApp para assinatura:', assinaturaId, '->', assinSnap.exists);
-    if (!assinSnap.exists) return;
+
+      if (!assinSnap.exists) return;
     
     const assinData = assinSnap.data();
     
     // ✅ Verifica flag diretamente na raiz
     if (assinData.links_grupos_ativos !== false) return;
-    console.log('[verNL] Grupos WhatsApp estão ativos para esta assinatura. Preparando modal de convite.');
+
+    // ✅ Busca config pública (cacheada)
+    const config = await _getConfigPublica();
+
     // Segmentação por feature
     const features = assinData.features_snapshot || assinData.features || {};
     const temAlertasPrioritarios = features.alertas_prioritarios === true;
     
-    // Links das variáveis NEXT_PUBLIC_ (frontend)
-    const linkAvisos = process.env.NEXT_PUBLIC_WA_GRUPO_AVISOS_LINK;
+    // Usa config da API em vez de process.env
+    const linkAvisos = config.NEXT_PUBLIC_WA_GRUPO_AVISOS_LINK;
     const linkAlertas = temAlertasPrioritarios 
-      ? process.env.NEXT_PUBLIC_WA_GRUPO_ALERTAS_LINK 
+      ? config.NEXT_PUBLIC_WA_GRUPO_ALERTAS_LINK 
       : null;
-    
-    if (!linkAvisos) return;
-    console.log('[verNL] Links de grupos WhatsApp encontrados. Exibindo modal para o usuário.');
+
+    if (!linkAvisos) return; // Sem links configurados → não exibe modal
+
     // Detecta dispositivo para instrução contextual
     const isMobile = /Android|iPhone|iPad|iPod|Windows Phone/i.test(navigator.userAgent);
     
@@ -1413,6 +1449,9 @@ async function VerNewsletterComToken() {
     return;
   }
   // ─────────────────────────────────────────────────────────
+  
+  // Pré-carrega config pública (cache para uso posterior)
+  await _getConfigPublica();
 
   // ── Detecta ativação de sessão pós-pagamento (?ativar=TOKEN&uid=UID) ────
   const _ativarToken = params.get('ativar');
