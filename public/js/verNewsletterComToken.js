@@ -820,14 +820,14 @@ async function verificarEExibirLinksGrupos(uid, assinaturaId) {
       .collection('assinaturas')
       .doc(assinaturaId)
       .get();
-    
+    console.log('[verNL] Verificando grupos WhatsApp para assinatura:', assinaturaId, '->', assinSnap.exists);
     if (!assinSnap.exists) return;
     
     const assinData = assinSnap.data();
     
     // ✅ Verifica flag diretamente na raiz
     if (assinData.links_grupos_ativos !== false) return;
-    
+    console.log('[verNL] Grupos WhatsApp estão ativos para esta assinatura. Preparando modal de convite.');
     // Segmentação por feature
     const features = assinData.features_snapshot || assinData.features || {};
     const temAlertasPrioritarios = features.alertas_prioritarios === true;
@@ -839,7 +839,7 @@ async function verificarEExibirLinksGrupos(uid, assinaturaId) {
       : null;
     
     if (!linkAvisos) return;
-    
+    console.log('[verNL] Links de grupos WhatsApp encontrados. Exibindo modal para o usuário.');
     // Detecta dispositivo para instrução contextual
     const isMobile = /Android|iPhone|iPad|iPod|Windows Phone/i.test(navigator.userAgent);
     
