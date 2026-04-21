@@ -600,6 +600,40 @@ function _textoBoasVindas(nome, plano, linkAtivacao) {
   ].join('\n');
 }
 
+// ─── Gerador de mensagem WA com links dos grupos ─────────────────────────────
+function _gerarMensagemBoasVindasWA(nome, plano, linkAtivacao, temAlertasPrioritarios) {
+  const primeiroNome = (nome || '').split(' ')[0] || 'Olá';
+  const partes = [
+    `✅ *Radar SIOPE* — Assinatura confirmada!`,
+    ``,
+    `Olá, ${primeiroNome}! Sua assinatura do plano *${plano}* foi ativada com sucesso.`,
+    ``,
+    `Acesse agora sua primeira edição pelo link abaixo:`,
+    `👉 ${linkAtivacao}`,
+    ``,
+    `⚠️ _Este link é de uso único e válido por 72h. Após o primeiro acesso, o app fica salvo no seu dispositivo._`
+  ];
+
+  // Grupo Avisos (sempre incluído, se configurado)
+  const linkAvisos = process.env.WA_GRUPO_AVISOS_LINK;
+  if (linkAvisos) {
+    partes.push(``, `📢 Participe do nosso grupo de *Avisos* para receber novidades e atualizações:`);
+    partes.push(`👉 ${linkAvisos}`);
+  }
+
+  // Grupo Alertas (apenas se tiver a feature)
+  if (temAlertasPrioritarios) {
+    const linkAlertas = process.env.WA_GRUPO_ALERTAS_LINK;
+    if (linkAlertas) {
+      partes.push(``, `🔔 Como você possui a feature *Alertas Prioritários*, entre também no grupo exclusivo:`);
+      partes.push(`👉 ${linkAlertas}`);
+    }
+  }
+
+  partes.push(``, `Qualquer dúvida, responda esta mensagem.`, `*Equipe Radar SIOPE*`);
+  return partes.join('\n');
+}
+
 // ─── Handler principal ────────────────────────────────────────────────────────
 export default async function handler(req, res) {
   try {
@@ -1045,17 +1079,15 @@ export default async function handler(req, res) {
             console.error('[pagamentoMP] Erro no e-mail de boas-vindas:', err?.message || err);
           });
  
-          // ── WhatsApp (novo) ────────────────────────────────────────────────
+          // ── WhatsApp (com links dos grupos) ─────────────────────────────────
+          const temAlertasPrioritarios = assinaturaData.features_snapshot?.alertas_prioritarios === true;
+          const mensagemWA = _gerarMensagemBoasVindasWA(nomeAssinante, nomePlano, linkAtivacao, temAlertasPrioritarios);
+
           const whatsappPromise = whatsappAssinante
-            ? enviarWhatsApp(
-                whatsappAssinante,
-                _textoBoasVindas(nomeAssinante, nomePlano, linkAtivacao),
-                { tentativas: 2, timeoutMs: 8000 }
-              ).catch(err => {
-                console.warn('[pagamentoMP] Erro no WhatsApp de boas-vindas:', err?.message || err);
-              })
+            ? enviarWhatsApp(whatsappAssinante, mensagemWA, { tentativas: 2, timeoutMs: 8000 })
+                .catch(err => { console.warn('[pagamentoMP] Erro no WhatsApp de boas-vindas:', err?.message || err); })
             : Promise.resolve();
- 
+    
           // Dispara os dois em paralelo — falha de um não bloqueia o outro
           await Promise.allSettled([emailPromise, whatsappPromise]);
  
