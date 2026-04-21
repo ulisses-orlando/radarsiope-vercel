@@ -24,7 +24,7 @@
    ========================================================================== */
 
 import admin from 'firebase-admin';
-import { enviarWhatsApp, enviarWhatsAppEmLote } from '../js/_whatsapp.js';
+import { enviarWhatsApp, enviarWhatsAppEmLote } from '../lib/whatsapp.js';
 
 // ─── Firebase Admin ───────────────────────────────────────────────────────────
 if (!admin.apps.length) {
