@@ -819,8 +819,9 @@ async function verificarEExibirLinksGrupos(uid, assinaturaId) {
       .collection('assinaturas')
       .doc(assinaturaId)
       .get();
-    
+    console.log('[verNL] Dados da assinatura para grupos WA:', assinSnap.data());
     if (!assinSnap.exists) return;
+    console.log('[verNL] Assinatura encontrada para grupos WA, verificando envios automáticos…');
     const assinData = assinSnap.data();
     const enviosAuto = assinData.enviosAutomaticos || {};
     
@@ -838,7 +839,7 @@ async function verificarEExibirLinksGrupos(uid, assinaturaId) {
     }
     
     if (!deveExibir) return;
-    
+    console.log('[verNL] Envio automático encontrado com links_grupos_ativos: false — exibindo modal de grupos WA');
     // Segmentação por feature
     const features = assinData.features_snapshot || assinData.features || {};
     const temAlertasPrioritarios = features.alertas_prioritarios === true;
@@ -850,6 +851,7 @@ async function verificarEExibirLinksGrupos(uid, assinaturaId) {
       : null;
     
     if (!linkAvisos) return;
+    console.log('[verNL] Link do grupo de avisos encontrado:', linkAvisos);
     
     // Detecta dispositivo para instrução contextual
     const isMobile = /Android|iPhone|iPad|iPod|Windows Phone/i.test(navigator.userAgent);
@@ -1670,6 +1672,7 @@ async function VerNewsletterComToken() {
 
     // verificar links dos grupos no whatsApp (apenas assinantes)
     if (segmento === 'assinantes' && assinaturaId) {
+      console.log('[verNL] Verificando links dos grupos de WhatsApp para o usuário...');
       verificarEExibirLinksGrupos(uid, assinaturaId);
     }
 
