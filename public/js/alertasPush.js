@@ -838,47 +838,118 @@ window._waAtualizarBotao = function () {
   if (btn) btn.disabled = !selecionados || !mensagem;
 };
 
+// ─── Iniciar envio assistido (abre WhatsApp Web para cada selecionado) ───────
 window._waIniciarEnvio = async function () {
   const mensagem = (document.getElementById('wa-mensagem')?.value || '').trim();
-  if (!mensagem) return;
+  if (!mensagem) return alert('Digite a mensagem antes de enviar.');
+
   const cbs = document.querySelectorAll('#wa-lista input[type=checkbox]:checked');
-  if (!cbs.length) return;
-  const uids = Array.from(cbs).map(cb => cb.value);
+  if (!cbs.length) return alert('Selecione ao menos 1 assinante.');
+
   const btn = document.getElementById('wa-btn-iniciar');
   const res = document.getElementById('wa-resultado');
-  const prog = document.getElementById('wa-progresso');
-  const fill = document.getElementById('wa-prog-fill');
-  const txt = document.getElementById('wa-prog-txt');
-  if (btn) { btn.disabled = true; btn.textContent = '⏳ Enviando...'; }
-  if (res) res.style.display = 'none';
-  if (prog) prog.style.display = 'block';
-  if (fill) fill.style.width = '10%';
-  if (txt) txt.textContent = `0 de ${uids.length} enviados...`;
-  let _progInterval = setInterval(() => { const atual = parseFloat(fill?.style.width || '10'); if (atual < 85 && fill) fill.style.width = (atual + 5) + '%'; }, 800);
-  try {
-    const resp = await fetch('/api/alertas', { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-admin-token': _pushAdminToken }, body: JSON.stringify({ acao: 'enviar-whatsapp', uids, mensagem }) });
-    clearInterval(_progInterval);
-    const data = await resp.json().catch(() => ({}));
-    if (fill) fill.style.width = '100%'; await new Promise(r => setTimeout(r, 400));
-    if (resp.ok && data.ok) {
-      const { enviados = 0, erros = 0, total = uids.length } = data;
-      if (res) {
-        res.style.display = 'block';
-        res.className = erros > 0 ? 'push-resultado' : 'push-resultado ok';
-        res.style.background = erros > 0 ? '#fef9c3' : '#dcfce7';
-        res.style.color = erros > 0 ? '#92400e' : '#166534';
-        res.style.border = erros > 0 ? '1px solid #fde68a' : '1px solid #bbf7d0';
-        res.innerHTML = erros > 0 ? `⚠️ Envio parcial: <strong>${enviados} de ${total}</strong> enviados. ${erros} com erro.` : `✅ <strong>${enviados} mensagen${enviados !== 1 ? 's' : ''}</strong> enviada${enviados !== 1 ? 's' : ''} com sucesso!`;
-      }
-      if (txt) txt.textContent = `${enviados} de ${total} enviados.`;
-      _carregarHistorico();
-    } else throw new Error(data.error || `HTTP ${resp.status}`);
-  } catch (err) {
-    clearInterval(_progInterval);
-    if (fill) fill.style.width = '0%';
-    if (res) { res.style.display = 'block'; res.className = 'push-resultado erro'; res.textContent = `❌ Erro no envio: ${err.message}`; }
-  } finally {
-    if (btn) { btn.disabled = false; btn.textContent = '🟢 Enviar via WhatsApp'; }
-    setTimeout(() => { if (prog) prog.style.display = 'none'; }, 2000);
+  const cont = document.getElementById('wa-contador');
+
+  // Prepara UI
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Abrindo WhatsApp...'; }
+  if (res) { res.style.display = 'none'; }
+
+  // Coleta dados dos selecionados
+  const selecionados = Array.from(cbs).map(cb => {
+    const item = cb.closest('.wa-item');
+    return {
+      uid: cb.value,
+      nome: cb.dataset.nome || 'Contato',
+      numero: cb.dataset.numero,
+      mun: cb.dataset.mun || ''
+    };
+  });
+
+  // Overlay de progresso manual
+  const overlay = document.createElement('div');
+  overlay.id = 'wa-envio-overlay';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(15,23,42,0.85);z-index:9998;display:flex;align-items:center;justify-content:center;';
+  overlay.innerHTML = `
+    <div style="background:#fff;border-radius:14px;padding:24px;max-width:420px;width:90%;text-align:center;box-shadow:0 12px 40px rgba(0,0,0,0.3);">
+      <div style="font-size:28px;margin-bottom:12px">🟢</div>
+      <h3 style="margin:0 0 8px;color:#0A3D62">Enviando para assinantes</h3>
+      <p id="wa-overlay-txt" style="margin:0 0 16px;color:#64748b;font-size:13px">Preparando...</p>
+      <div style="height:6px;background:#e2e8f0;border-radius:10px;overflow:hidden;margin-bottom:12px">
+        <div id="wa-overlay-bar" style="height:100%;background:#16a34a;border-radius:10px;width:0%;transition:width .3s ease"></div>
+      </div>
+      <p style="font-size:11px;color:#94a3b8;margin:0">
+        ⚠️ <strong>Atenção:</strong> Confirme o envio em cada aba do WhatsApp que abrir.
+      </p>
+      <button id="wa-overlay-cancel" style="margin-top:16px;padding:8px 20px;background:transparent;border:1px solid #e2e8f0;border-radius:8px;color:#64748b;cursor:pointer;font-size:12px">
+        Cancelar
+      </button>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+
+  const barra = document.getElementById('wa-overlay-bar');
+  const txt = document.getElementById('wa-overlay-txt');
+  let cancelado = false;
+  document.getElementById('wa-overlay-cancel').onclick = () => { cancelado = true; };
+
+  // Itera sobre os selecionados
+  let enviados = 0;
+  for (let i = 0; i < selecionados.length; i++) {
+    if (cancelado) break;
+
+    const { nome, numero, mun } = selecionados[i];
+    const numFormatado = numero.replace(/^(\d{2})(\d{4,5})(\d{4})$/, '($1) $2-$3');
+
+    // Atualiza overlay
+    txt.textContent = `Abrindo WhatsApp para ${nome} ${mun ? `(${mun})` : ''}...`;
+    barra.style.width = `${Math.round((i / selecionados.length) * 100)}%`;
+
+    // Abre WhatsApp Web com mensagem pré-preenchida
+    const waUrl = `https://web.whatsapp.com/send?phone=55${numero.replace(/\D/g, '')}&text=${encodeURIComponent(mensagem)}`;
+    const novaAba = window.open(waUrl, `_wa_${numero}`, 'width=900,height=700');
+
+    // Aguarda breve para não travar o navegador
+    await new Promise(r => setTimeout(r, 1200));
+
+    // Feedback visual no overlay
+    if (novaAba) {
+      enviados++;
+      txt.textContent = `✅ ${nome} — aba aberta. Aguarde sua confirmação...`;
+    } else {
+      txt.textContent = `⚠️ ${nome} — popup bloqueado. Verifique as permissões do navegador.`;
+      await new Promise(r => setTimeout(r, 800));
+    }
   }
+
+  // Finaliza overlay
+  barra.style.width = '100%';
+  txt.textContent = cancelado ? '⚠️ Envio cancelado pelo usuário.' : `✅ ${enviados} de ${selecionados.length} abas abertas.`;
+  setTimeout(() => overlay.remove(), 2000);
+
+  // Restaura UI
+  if (btn) { btn.disabled = false; btn.textContent = '🟢 Enviar para selecionados'; }
+  if (cont) {
+    cont.textContent = cancelado 
+      ? '⚠️ Envio cancelado.' 
+      : `✅ ${enviados} assinante(s) processado(s). Confirme o envio nas abas abertas.`;
+    cont.style.color = cancelado ? '#f59e0b' : '#166534';
+  }
+
+  // Registra no histórico (intenção de envio)
+  try {
+    await window.db?.collection('alertas_disparados').add({
+      canal: 'whatsapp',
+      tipo: 'manual_admin_lista',
+      mensagem: mensagem.slice(0, 140),
+      destinatarios_est: selecionados.length,
+      enviados_manual: enviados,
+      status: cancelado ? 'cancelado' : 'assistido_concluido',
+      disparado_em: new Date(),
+    });
+  } catch (e) {
+    console.warn('[WA] Falha ao registrar histórico:', e);
+  }
+
+  // Atualiza histórico do painel
+  _carregarHistorico();
 };
