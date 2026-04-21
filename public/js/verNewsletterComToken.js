@@ -810,6 +810,172 @@ function renderWatermark(destinatario, newsletter) {
     new Date().toLocaleString('pt-BR');
 }
 
+// ─── Modal de Boas-Vindas: Links dos Grupos WhatsApp ────────────────────────
+// Exibido quando links_grupos_ativos === false no Firestore
+async function verificarEExibirLinksGrupos(uid, assinaturaId) {
+  try {
+    const assinSnap = await db.collection('usuarios')
+      .doc(uid)
+      .collection('assinaturas')
+      .doc(assinaturaId)
+      .get();
+    
+    if (!assinSnap.exists) return;
+    const assinData = assinSnap.data();
+    const enviosAuto = assinData.enviosAutomaticos || {};
+    
+    // ✅ Busca qualquer registro com links_grupos_ativos: false
+    // (sem teste de momento — assume que só boas-vindas usam esta flag)
+    let deveExibir = false;
+    let pedidoId = null;
+    
+    for (const [pid, dados] of Object.entries(enviosAuto)) {
+      if (dados.links_grupos_ativos === false) {
+        deveExibir = true;
+        pedidoId = pid;
+        break;
+      }
+    }
+    
+    if (!deveExibir) return;
+    
+    // Segmentação por feature
+    const features = assinData.features_snapshot || assinData.features || {};
+    const temAlertasPrioritarios = features.alertas_prioritarios === true;
+    
+    // Links das variáveis NEXT_PUBLIC_ (frontend)
+    const linkAvisos = process.env.NEXT_PUBLIC_WA_GRUPO_AVISOS_LINK;
+    const linkAlertas = temAlertasPrioritarios 
+      ? process.env.NEXT_PUBLIC_WA_GRUPO_ALERTAS_LINK 
+      : null;
+    
+    if (!linkAvisos) return;
+    
+    // Detecta dispositivo para instrução contextual
+    const isMobile = /Android|iPhone|iPad|iPod|Windows Phone/i.test(navigator.userAgent);
+    
+    // Cria modal
+    const overlay = document.createElement('div');
+    overlay.id = 'rs-modal-grupos-wa';
+    overlay.style.cssText = `
+      position:fixed; inset:0; background:rgba(15,23,42,0.85); 
+      z-index:9999; display:flex; align-items:center; justify-content:center;
+      padding:16px; animation:rsFadeIn .2s ease;
+    `;
+    
+    overlay.innerHTML = `
+      <div style="background:var(--rs-card,#fff); border-radius:16px; max-width:420px; width:100%; padding:24px; box-shadow:0 12px 40px rgba(0,0,0,0.35); position:relative;">
+        <button onclick="_fecharModalGruposWA('${pedidoId}')" 
+                style="position:absolute; top:12px; right:12px; background:none; border:none; color:var(--rs-muted,#94a3b8); font-size:20px; cursor:pointer; padding:4px; border-radius:6px;"
+                aria-label="Fechar">✕</button>
+        
+        <div style="text-align:center; margin-bottom:20px;">
+          <div style="width:56px; height:56px; border-radius:50%; background:linear-gradient(135deg,#25D366,#128C7E); display:flex; align-items:center; justify-content:center; margin:0 auto 12px; font-size:24px; color:#fff; box-shadow:0 4px 14px rgba(37,211,102,0.4);">🟢</div>
+          <h3 style="margin:0 0 4px; color:var(--rs-texto,#0f172a); font-size:17px;">Bem-vindo à comunidade Radar SIOPE!</h3>
+          <p style="margin:0; color:var(--rs-muted,#64748b); font-size:13px;">Entre nos grupos para receber atualizações e alertas.</p>
+        </div>
+        
+        <div style="display:flex; flex-direction:column; gap:12px; margin-bottom:20px;">
+          <!-- Grupo Avisos (sempre) -->
+          <a href="${linkAvisos}" target="_blank" rel="noopener noreferrer"
+             onclick="_registrarAcessoGrupo('avisos')"
+             style="display:flex; align-items:center; gap:12px; padding:14px 16px; background:var(--rs-borda,#f1f5f9); border-radius:12px; text-decoration:none; color:var(--rs-texto,#0f172a); border:2px solid transparent; transition:all .15s;"
+             onmouseover="this.style.borderColor='var(--azul,#0A3D62)'; this.style.background='var(--rs-card,#fff)'"
+             onmouseout="this.style.borderColor='transparent'; this.style.background='var(--rs-borda,#f1f5f9)'">
+            <span style="font-size:22px;">📢</span>
+            <div style="flex:1;">
+              <div style="font-weight:600; font-size:14px;">Grupo Avisos</div>
+              <div style="font-size:12px; color:var(--rs-muted,#64748b);">Comunicados gerais e novidades</div>
+            </div>
+            <span style="font-size:18px; color:var(--azul,#0A3D62);">→</span>
+          </a>
+          
+          <!-- Grupo Alertas (apenas com feature) -->
+          ${linkAlertas ? `
+          <a href="${linkAlertas}" target="_blank" rel="noopener noreferrer"
+             onclick="_registrarAcessoGrupo('alertas')"
+             style="display:flex; align-items:center; gap:12px; padding:14px 16px; background:var(--rs-borda,#f1f5f9); border-radius:12px; text-decoration:none; color:var(--rs-texto,#0f172a); border:2px solid transparent; transition:all .15s;"
+             onmouseover="this.style.borderColor='var(--azul,#0A3D62)'; this.style.background='var(--rs-card,#fff)'"
+             onmouseout="this.style.borderColor='transparent'; this.style.background='var(--rs-borda,#f1f5f9)'">
+            <span style="font-size:22px;">🔔</span>
+            <div style="flex:1;">
+              <div style="font-weight:600; font-size:14px;">Grupo Alertas</div>
+              <div style="font-size:12px; color:var(--rs-muted,#64748b);">Alertas prioritários exclusivos</div>
+            </div>
+            <span style="font-size:18px; color:var(--azul,#0A3D62);">→</span>
+          </a>` : ''}
+        </div>
+        
+        <!-- Instruções por dispositivo -->
+        <div style="background:var(--rs-bg,#f8fafc); border-radius:10px; padding:12px 14px; margin-bottom:20px; font-size:12px; color:var(--rs-muted,#64748b); line-height:1.5;">
+          ${isMobile 
+            ? '📱 <strong>No celular:</strong> Os links abrirão diretamente no WhatsApp.'
+            : '💻 <strong>No computador:</strong> Os links abrirão o WhatsApp Web. Certifique-se de estar logado.'}
+          ${!isMobile ? '<br><small>Se não abrir, verifique se o WhatsApp Web está ativo em <a href="https://web.whatsapp.com" target="_blank" style="color:var(--azul);">web.whatsapp.com</a>.</small>' : ''}
+        </div>
+        
+        <button onclick="_fecharModalGruposWA('${pedidoId}')"
+                style="width:100%; padding:12px; background:var(--azul,#0A3D62); color:#fff; border:none; border-radius:10px; font-size:14px; font-weight:600; cursor:pointer; transition:background .15s;"
+                onmouseover="this.style.background='#0d4f7c'"
+                onmouseout="this.style.background='var(--azul,#0A3D62)'">
+          ✅ Já entrei nos grupos
+        </button>
+      </div>
+    `;
+    
+    document.body.appendChild(overlay);
+    document.body.style.overflow = 'hidden';
+    
+    // Fecha com ESC
+    const onKey = (e) => { if (e.key === 'Escape') _fecharModalGruposWA(pedidoId); };
+    document.addEventListener('keydown', onKey);
+    overlay.dataset.onKeyHandler = '1';
+    
+  } catch (err) {
+    console.warn('[verNL] Erro ao exibir modal de grupos:', err);
+  }
+}
+
+function _fecharModalGruposWA(pedidoId) {
+  // Remove modal
+  const overlay = document.getElementById('rs-modal-grupos-wa');
+  if (overlay) {
+    overlay.style.opacity = '0';
+    setTimeout(() => overlay.remove(), 200);
+  }
+  
+  // Restaura scroll
+  document.body.style.overflow = '';
+  
+  // Marca como visualizado no Firestore
+  _marcarLinksVisualizados(pedidoId);
+}
+
+async function _marcarLinksVisualizados(pedidoId) {
+  try {
+    const ctx = window._radarUser;
+    if (!ctx?.uid || !ctx.assinaturaId) return;
+    
+    const assinRef = db.collection('usuarios')
+      .doc(ctx.uid)
+      .collection('assinaturas')
+      .doc(ctx.assinaturaId);
+    
+    const logKey = `enviosAutomaticos.${pedidoId}.links_grupos_ativos`;
+    await assinRef.update({ [logKey]: true });
+  } catch (err) {
+    console.warn('[verNL] Falha ao marcar links como visualizados:', err);
+  }
+}
+
+function _registrarAcessoGrupo(grupo) {
+  // Registro local para analytics (opcional)
+  console.log(`[WA] Usuário acessou grupo: ${grupo}`);
+}
+
+// Expor funções globalmente
+window._fecharModalGruposWA = _fecharModalGruposWA;
+
 // ─── _radarUser para OneSignal ────────────────────────────────────────────────
 
 function publicarRadarUser(destinatario, segmento, assinaturaId) {
@@ -1501,6 +1667,11 @@ async function VerNewsletterComToken() {
 
     // 12. Exibe com fade-in
     mostrarApp();
+
+    // verificar links dos grupos no whatsApp (apenas assinantes)
+    if (segmento === 'assinantes' && assinaturaId) {
+      verificarEExibirLinksGrupos(uid, assinaturaId);
+    }
 
     iniciarAutoMarcarLida(nid, uid);
 
