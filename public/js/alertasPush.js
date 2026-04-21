@@ -1,6 +1,6 @@
 /* ==========================================================================
 alertasPush.js — Radar SIOPE · Admin
-Painel de envio manual de alertas push via OneSignal.
+Painel de envio manual de alertas push via OneSignal + WhatsApp (Modo Assistido)
 Chamado por abrirTab('alertas-push') no admin.html.
 ========================================================================== */
 
@@ -252,10 +252,10 @@ function _renderHTML() {
       .wa-modo-tab:hover:not(.ativo) { border-color:#16a34a; color:#16a34a; }
       .wa-grupo-btn { width:100%; padding:14px 16px; border:none; border-radius:10px; font-size:14px; font-weight:700; cursor:pointer; margin-bottom:10px; display:flex; align-items:center; gap:10px; transition:opacity .15s; }
       .wa-grupo-btn:hover { opacity:.88; }
-      .wa-grupo-btn.edicoes { background:#075e54; color:#fff; }
-      .wa-grupo-btn.alertas { background:#128c7e; color:#fff; }
+      .wa-grupo-btn.alertas { background:#075e54; color:#fff; }
+      .wa-grupo-btn.avisos  { background:#25D366; color:#fff; }
       .wa-grupo-btn .wa-grupo-desc { font-size:11px; font-weight:400; opacity:.85; margin-top:2px; }
-      .push-badge.push { background:#dbeafe; color:#1e40af; }
+      .push-badge.push     { background:#dbeafe; color:#1e40af; }
       .push-badge.whatsapp { background:#dcfce7; color:#166534; }
     </style>
 
@@ -327,7 +327,7 @@ function _renderHTML() {
 
     <div class="push-card" id="wa-card" style="display:none">
       <h3>🟢 Envio via WhatsApp</h3>
-      <p style="font-size:12px;color:#64748b;margin:0 0 14px;line-height:1.6">Envio automático via Evolution API — pelo número oficial do Radar SIOPE, sem intervenção manual.</p>
+      <p style="font-size:12px;color:#64748b;margin:0 0 14px;line-height:1.6">Modo assistido: o WhatsApp Web abrirá com a mensagem pronta. Copie e cole no grupo desejado.</p>
 
       <div class="wa-modo-tabs">
         <button class="wa-modo-tab ativo" id="wa-tab-assinantes" onclick="_waSetModo('assinantes')">📋 Lista de assinantes</button>
@@ -357,22 +357,18 @@ function _renderHTML() {
       </div>
 
       <div id="wa-modo-comunidade" style="display:none">
-        <p style="font-size:12px;color:#64748b;margin:0 0 14px;line-height:1.6">
-          Envia a mensagem acima diretamente para o grupo selecionado.
-          Certifique-se de que o número do Radar SIOPE é administrador do grupo.
-        </p>
-        <button class="wa-grupo-btn edicoes" id="wa-btn-grupo-edicoes" onclick="_waEnviarComunidade('edicoes')">
-          <span style="font-size:22px">📢</span>
-          <div>
-            <div>Grupo Nova Edição</div>
-            <div class="wa-grupo-desc">Todos os assinantes — nova edição disponível</div>
-          </div>
-        </button>
-        <button class="wa-grupo-btn alertas" id="wa-btn-grupo-alertas" onclick="_waEnviarComunidade('alertas')">
+        <button class="wa-grupo-btn alertas" onclick="_waPrepararEnvioComunidade('alertas')">
           <span style="font-size:22px">🔔</span>
           <div>
             <div>Grupo Alertas</div>
-            <div class="wa-grupo-desc">Assinantes com feature de alertas prioritários</div>
+            <div class="wa-grupo-desc">Assinantes com feature de alertas ativada</div>
+          </div>
+        </button>
+        <button class="wa-grupo-btn avisos" onclick="_waPrepararEnvioComunidade('avisos')">
+          <span style="font-size:22px">📢</span>
+          <div>
+            <div>Grupo Avisos</div>
+            <div class="wa-grupo-desc">Comunicações gerais, atualizações e novidades</div>
           </div>
         </button>
       </div>
@@ -689,7 +685,7 @@ function _sub(str, params) {
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// WHATSAPP — envio automático via Evolution API
+// WHATSAPP — Fluxo Assistido (Manual) + Lista de Assinantes
 // ══════════════════════════════════════════════════════════════════════════════
 let _waState = { assinantes: [], mensagem: '' };
 
@@ -704,34 +700,54 @@ window._waSetModo = function (modo) {
   if (isAssinantes && _waState.assinantes.length === 0) _waCarregarAssinantes();
 };
 
-window._waEnviarComunidade = async function (grupo) {
+// 🔹 NOVO: Fluxo assistido para comunidade
+window._waPrepararEnvioComunidade = function (grupo) {
   const mensagem = (document.getElementById('wa-mensagem')?.value || '').trim();
-  if (!mensagem) { alert('Digite a mensagem antes de enviar para a comunidade.'); return; }
-  const nomes = { edicoes: 'Grupo Nova Edição', alertas: 'Grupo Alertas' };
-  if (!confirm(`Enviar para o ${nomes[grupo] || grupo}?\n\n${mensagem.slice(0, 120)}${mensagem.length > 120 ? '…' : ''}`)) return;
-  const res = document.getElementById('wa-resultado');
-  const prog = document.getElementById('wa-progresso');
-  const fill = document.getElementById('wa-prog-fill');
-  document.querySelectorAll('.wa-grupo-btn').forEach(b => b.disabled = true);
-  if (res) res.style.display = 'none';
-  if (prog) prog.style.display = 'block';
-  if (fill) fill.style.width = '40%';
-  try {
-    const resp = await fetch('/api/alertas', { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-admin-token': _pushAdminToken }, body: JSON.stringify({ acao: 'enviar-whatsapp', comunidade: grupo, mensagem }) });
-    if (fill) fill.style.width = '100%'; await new Promise(r => setTimeout(r, 300));
-    const data = await resp.json().catch(() => ({}));
-    if (res) {
-      res.style.display = 'block';
-      if (resp.ok && data.ok) { res.className = 'push-resultado ok'; res.textContent = `✅ Mensagem enviada para o ${nomes[grupo]}!`; _carregarHistorico(); }
-      else { res.className = 'push-resultado erro'; res.textContent = `❌ Erro: ${data.error || `HTTP ${resp.status}`}`; }
-    }
-  } catch (err) {
-    if (res) { res.style.display = 'block'; res.className = 'push-resultado erro'; res.textContent = `❌ Erro de conexão: ${err.message}`; }
-  } finally {
-    document.querySelectorAll('.wa-grupo-btn').forEach(b => b.disabled = false);
-    setTimeout(() => { if (prog) prog.style.display = 'none'; if (fill) fill.style.width = '0%'; }, 2000);
-  }
+  if (!mensagem) return alert('Digite a mensagem antes de enviar para a comunidade.');
+
+  const nomes = { alertas: 'Grupo Alertas', avisos: 'Grupo Avisos' };
+  const nomeGrupo = nomes[grupo] || grupo;
+
+  // Abre WhatsApp Web com texto pré-preenchido
+  const waUrl = `https://web.whatsapp.com/send?text=${encodeURIComponent(mensagem)}`;
+  window.open(waUrl, '_blank');
+
+  // Overlay de apoio
+  const overlay = document.createElement('div');
+  overlay.id = 'wa-assistido-overlay';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;z-index:9999;';
+  overlay.innerHTML = `
+    <div style="background:#fff;border-radius:12px;padding:24px;max-width:480px;width:90%;box-shadow:0 10px 40px rgba(0,0,0,.2);">
+      <h3 style="margin:0 0 12px;color:#0A3D62">✅ Pronto para enviar</h3>
+      <p style="font-size:13px;color:#64748b;margin:0 0 16px">O WhatsApp Web abriu. Cole a mensagem no <strong>${nomeGrupo}</strong> e envie.</p>
+      <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:12px;font-size:13px;line-height:1.5;white-space:pre-wrap;max-height:120px;overflow-y:auto;margin-bottom:14px;color:#1e293b">${mensagem.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</div>
+      <button onclick="navigator.clipboard.writeText('${mensagem.replace(/'/g, "\\'")}').then(()=>{this.textContent='✅ Copiado!';setTimeout(()=>this.textContent='📋 Copiar texto',1500)})" style="width:100%;padding:10px;background:#16a34a;color:#fff;border:none;border-radius:8px;font-weight:600;cursor:pointer;margin-bottom:8px">📋 Copiar texto</button>
+      <button onclick="document.getElementById('wa-assistido-overlay').remove()" style="width:100%;padding:10px;background:transparent;border:1px solid #cbd5e1;border-radius:8px;cursor:pointer;color:#64748b">Fechar</button>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+
+  // Registra no histórico
+  _waRegistrarHistoricoComunidade(grupo, nomeGrupo, mensagem);
 };
+
+async function _waRegistrarHistoricoComunidade(grupoId, nomeGrupo, mensagem) {
+  const tipo = document.getElementById('push-tipo')?.value || 'comunicacao_manual';
+  try {
+    await window.db?.collection('alertas_disparados').add({
+      canal: 'whatsapp',
+      tipo,
+      titulo: `Grupo: ${nomeGrupo}`,
+      mensagem: mensagem.slice(0, 140),
+      modo: 'manual',
+      grupo_id: grupoId,
+      status: 'aguardando_confirmacao',
+      disparado_em: new Date(),
+    });
+  } catch (e) {
+    console.warn('[WA] Falha ao registrar histórico:', e);
+  }
+}
 
 window._waToggleCanal = function (canal) {
   const isPush = canal === 'push';
