@@ -12,6 +12,18 @@ if (!admin.apps.length) {
 const db = admin.firestore();
 
 export default async function handler(req, res) {
+    // ── NOVO: Endpoint para config pública (variáveis de ambiente) ─────────────
+  if (req.query.acao === 'config') {
+    // Retorna APENAS variáveis com prefixo NEXT_PUBLIC_ (seguro para frontend)
+    return res.status(200).json({
+      ok: true,
+      config: {
+        NEXT_PUBLIC_WA_GRUPO_AVISOS_LINK: process.env.NEXT_PUBLIC_WA_GRUPO_AVISOS_LINK || null,
+        NEXT_PUBLIC_WA_GRUPO_ALERTAS_LINK: process.env.NEXT_PUBLIC_WA_GRUPO_ALERTAS_LINK || null,
+        NEXT_PUBLIC_BASE_URL: process.env.NEXT_PUBLIC_BASE_URL || null,
+      }
+    });
+  }
   const { envioId, destinatarioId, newsletterId, url } = req.query;
 
   if (!envioId || !destinatarioId || !newsletterId || !url) {
