@@ -814,32 +814,20 @@ function renderWatermark(destinatario, newsletter) {
 // Exibido quando links_grupos_ativos === false no Firestore
 async function verificarEExibirLinksGrupos(uid, assinaturaId) {
   try {
+    // Busca documento da assinatura
     const assinSnap = await db.collection('usuarios')
       .doc(uid)
       .collection('assinaturas')
       .doc(assinaturaId)
       .get();
-    console.log('[verNL] Dados da assinatura para grupos WA:', assinSnap.data());
+    
     if (!assinSnap.exists) return;
-    console.log('[verNL] Assinatura encontrada para grupos WA, verificando envios automáticos…');
+    
     const assinData = assinSnap.data();
-    const enviosAuto = assinData.enviosAutomaticos || {};
     
-    // ✅ Busca qualquer registro com links_grupos_ativos: false
-    // (sem teste de momento — assume que só boas-vindas usam esta flag)
-    let deveExibir = false;
-    let pedidoId = null;
+    // ✅ Verifica flag diretamente na raiz
+    if (assinData.links_grupos_ativos !== false) return;
     
-    for (const [pid, dados] of Object.entries(enviosAuto)) {
-      if (dados.links_grupos_ativos === false) {
-        deveExibir = true;
-        pedidoId = pid;
-        break;
-      }
-    }
-    
-    if (!deveExibir) return;
-    console.log('[verNL] Envio automático encontrado com links_grupos_ativos: false — exibindo modal de grupos WA');
     // Segmentação por feature
     const features = assinData.features_snapshot || assinData.features || {};
     const temAlertasPrioritarios = features.alertas_prioritarios === true;
@@ -851,7 +839,6 @@ async function verificarEExibirLinksGrupos(uid, assinaturaId) {
       : null;
     
     if (!linkAvisos) return;
-    console.log('[verNL] Link do grupo de avisos encontrado:', linkAvisos);
     
     // Detecta dispositivo para instrução contextual
     const isMobile = /Android|iPhone|iPad|iPod|Windows Phone/i.test(navigator.userAgent);
@@ -867,7 +854,7 @@ async function verificarEExibirLinksGrupos(uid, assinaturaId) {
     
     overlay.innerHTML = `
       <div style="background:var(--rs-card,#fff); border-radius:16px; max-width:420px; width:100%; padding:24px; box-shadow:0 12px 40px rgba(0,0,0,0.35); position:relative;">
-        <button onclick="_fecharModalGruposWA('${pedidoId}')" 
+        <button onclick="_fecharModalGruposWA()" 
                 style="position:absolute; top:12px; right:12px; background:none; border:none; color:var(--rs-muted,#94a3b8); font-size:20px; cursor:pointer; padding:4px; border-radius:6px;"
                 aria-label="Fechar">✕</button>
         
@@ -916,7 +903,7 @@ async function verificarEExibirLinksGrupos(uid, assinaturaId) {
           ${!isMobile ? '<br><small>Se não abrir, verifique se o WhatsApp Web está ativo em <a href="https://web.whatsapp.com" target="_blank" style="color:var(--azul);">web.whatsapp.com</a>.</small>' : ''}
         </div>
         
-        <button onclick="_fecharModalGruposWA('${pedidoId}')"
+        <button onclick="_fecharModalGruposWA()"
                 style="width:100%; padding:12px; background:var(--azul,#0A3D62); color:#fff; border:none; border-radius:10px; font-size:14px; font-weight:600; cursor:pointer; transition:background .15s;"
                 onmouseover="this.style.background='#0d4f7c'"
                 onmouseout="this.style.background='var(--azul,#0A3D62)'">
@@ -929,7 +916,7 @@ async function verificarEExibirLinksGrupos(uid, assinaturaId) {
     document.body.style.overflow = 'hidden';
     
     // Fecha com ESC
-    const onKey = (e) => { if (e.key === 'Escape') _fecharModalGruposWA(pedidoId); };
+    const onKey = (e) => { if (e.key === 'Escape') _fecharModalGruposWA(); };
     document.addEventListener('keydown', onKey);
     overlay.dataset.onKeyHandler = '1';
     
@@ -938,7 +925,7 @@ async function verificarEExibirLinksGrupos(uid, assinaturaId) {
   }
 }
 
-function _fecharModalGruposWA(pedidoId) {
+function _fecharModalGruposWA() {
   // Remove modal
   const overlay = document.getElementById('rs-modal-grupos-wa');
   if (overlay) {
@@ -950,10 +937,10 @@ function _fecharModalGruposWA(pedidoId) {
   document.body.style.overflow = '';
   
   // Marca como visualizado no Firestore
-  _marcarLinksVisualizados(pedidoId);
+  _marcarLinksVisualizados();
 }
 
-async function _marcarLinksVisualizados(pedidoId) {
+async function _marcarLinksVisualizados() {
   try {
     const ctx = window._radarUser;
     if (!ctx?.uid || !ctx.assinaturaId) return;
@@ -963,8 +950,8 @@ async function _marcarLinksVisualizados(pedidoId) {
       .collection('assinaturas')
       .doc(ctx.assinaturaId);
     
-    const logKey = `enviosAutomaticos.${pedidoId}.links_grupos_ativos`;
-    await assinRef.update({ [logKey]: true });
+    // Atualiza flag diretamente na raiz
+    await assinRef.update({ links_grupos_ativos: true });
   } catch (err) {
     console.warn('[verNL] Falha ao marcar links como visualizados:', err);
   }
@@ -1672,7 +1659,6 @@ async function VerNewsletterComToken() {
 
     // verificar links dos grupos no whatsApp (apenas assinantes)
     if (segmento === 'assinantes' && assinaturaId) {
-      console.log('[verNL] Verificando links dos grupos de WhatsApp para o usuário...');
       verificarEExibirLinksGrupos(uid, assinaturaId);
     }
 
