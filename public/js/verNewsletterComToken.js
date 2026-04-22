@@ -1483,49 +1483,66 @@ async function VerNewsletterComToken() {
     let envio;
 
     if (assinaturaId) {
-      // ── Assinante: Firestore ──────────────────────────────────────────────
-      const envioRef = db.collection('usuarios').doc(uid)
-        .collection('assinaturas').doc(assinaturaId)
-        .collection('envios').doc(env);
-      const envioSnap = await envioRef.get();
-      if (!envioSnap.exists) {
-        mostrarErro('Envio não encontrado.',
-          'O link pode ter expirado. Acesse a <a href="/login.html">Área do Assinante</a>.');
-        return;
-      }
-      envio = envioSnap.data();
+      // ── Assinante: acesso controlado por status da assinatura (modelo de sessão).
+      // Sem validação de envio — token/expiração/contador não se aplicam para assinantes.
+      envio = { token_acesso: null, expira_em: null };
 
-      // Validar token
-      if (!envio.token_acesso || envio.token_acesso !== token) {
-        mostrarErro('Acesso negado.', 'Token inválido.'); return;
-      }
+      // Bootstrap de sessão: se não há session_id local, cria sessão no servidor.
+      // Isso ativa _validarSessaoBackground nos próximos acessos e registra o dispositivo.
+      try {
+        const _sessaoAtual = (() => {
+          try { return JSON.parse(localStorage.getItem('rs_pwa_session')); } catch { return null; }
+        })();
 
-      // Validar expiração — se o link venceu, não bloqueia o app:
-      // redireciona para modo alerta para que o assinante ainda acesse
-      // "Minha Área", alertas e drawer sem depender do link.
-      if (envio.expira_em) {
-        const exp = envio.expira_em.toDate ? envio.expira_em.toDate() : new Date(envio.expira_em);
-        if (new Date() > exp) {
-          await _tentarModoAlerta();
-          return;
+        if (!_sessaoAtual?.session_id) {
+          // Sem sessão ativa — cria uma nova (o servidor verifica se a assinatura está ativa)
+          const _respSessao = await fetch('/api/pagamentoMP?acao=criar-sessao', {
+            method:  'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body:    JSON.stringify({ uid, assinaturaId }),
+          });
+
+          if (!_respSessao.ok) {
+            const _errData = await _respSessao.json().catch(() => ({}));
+            if (_respSessao.status === 403) {
+              // 403 = assinatura inativa → bloqueia acesso
+              mostrarErro(
+                '<strong>Assinatura inativa.</strong>',
+                'Para reativar sua assinatura, entre em contato com o suporte.'
+              );
+              return;
+            }
+            // 4xx/5xx inesperado: continua sem sessão (benefício da dúvida)
+            console.warn('[verNL] Falha ao criar sessão (não fatal):', _errData.message);
+          } else {
+            const _sessaoNova = await _respSessao.json();
+            if (_sessaoNova.ok) {
+              try {
+                localStorage.setItem('rs_pwa_session', JSON.stringify({
+                  uid:            _sessaoNova.uid,
+                  assinaturaId:   _sessaoNova.assinaturaId,
+                  segmento:       'assinante',
+                  session_id:     _sessaoNova.session_id,
+                  plano_slug:     _sessaoNova.plano_slug,
+                  features:       _sessaoNova.features,
+                  nome:           _sessaoNova.nome,
+                  email:          _sessaoNova.email,
+                  cod_uf:         _sessaoNova.cod_uf,
+                  cod_municipio:  _sessaoNova.cod_municipio,
+                  nome_municipio: _sessaoNova.nome_municipio,
+                  perfil:         _sessaoNova.perfil,
+                  validado_em:    Date.now(),
+                }));
+              } catch (e) { /* ignora se localStorage bloqueado */ }
+            }
+          }
+        } else {
+          // Sessão existente com session_id — valida em background (a cada 24h)
+          _validarSessaoBackground(_sessaoAtual);
         }
+      } catch (e) {
+        console.warn('[verNL] Erro no bootstrap de sessão (não fatal):', e.message);
       }
-
-      // Atualizar metadados (fire & forget)
-      envioRef.update({
-        ultimo_acesso: new Date(),
-        acessos_totais: firebase.firestore.FieldValue.increment(1),
-      }).catch(() => { });
-
-      // Verificar compartilhamento excessivo — mesmo tratamento: abre o app
-      // em modo alerta em vez de bloquear, mas sinaliza para revisão manual.
-      const envioAtual = (await envioRef.get()).data() || envio;
-      if (Number(envioAtual.acessos_totais || 0) > 5) {
-        envioRef.update({ sinalizacao_compartilhamento: true }).catch(() => { });
-        await _tentarModoAlerta();
-        return;
-      }
-
     } else {
       // ── Lead: Supabase (leads_envios) ─────────────────────────────────────
       // env = id numérico do registro em leads_envios
@@ -1617,6 +1634,16 @@ async function VerNewsletterComToken() {
           .collection('assinaturas').doc(assinaturaId).get();
         if (assinaturaSnap.exists) {
           const assinaturaData = assinaturaSnap.data();
+
+          // Verificação de status (novo modelo de controle de acesso para assinantes)
+          if (assinaturaData.status !== 'ativa') {
+            mostrarErro(
+              '<strong>Assinatura inativa.</strong>',
+              'Para reativar sua assinatura, entre em contato com o suporte.'
+            );
+            return;
+          }
+
           // features_snapshot tem precedência sobre qualquer features do usuário
           destinatario.features = assinaturaData.features_snapshot || assinaturaData.features || destinatario.features || {};
           destinatario.plano_slug = assinaturaData.plano_slug || destinatario.plano_slug || null;
@@ -1656,7 +1683,10 @@ async function VerNewsletterComToken() {
     const acesso = detectarAcesso(destinatario, newsletter, segmento, envio);
 
     // 9. Side effects não bloqueantes
-    registrarClique(env, uid, nid);
+    // registrarClique só se aplica a leads — assinantes usam o sistema de sessão
+    if (!assinaturaId) {
+      registrarClique(env, uid, nid);
+    }
     publicarRadarUser(destinatario, segmento, assinaturaId);
 
     // 10. Dados para placeholders
