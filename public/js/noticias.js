@@ -14,7 +14,7 @@ async function carregarTemasENoticias() {
   try {
    // const response = await fetch(API_TEMAS);
 
-    const response = await fetch('https://api.radarsiope.com.br/api/noticiasApi', { 
+    const response = await fetch('/api/noticiasApi', { 
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({}) // Envia um corpo vazio ou os parâmetros necessários
