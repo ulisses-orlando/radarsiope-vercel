@@ -2,7 +2,7 @@ window.addEventListener("DOMContentLoaded", () => {
   carregarTemasENoticias();
 });
 
-const API_TEMAS = "https://api.radarsiope.com.br/api/noticiasApi";
+
 
 // ===============================
 // 1. Carrega temas do Firestore
@@ -12,7 +12,7 @@ async function carregarTemasENoticias() {
   container.innerHTML = "<p>Carregando notícias...</p>";
 
   try {
-    const response = await fetch(API_TEMAS);
+    const response = await fetch(/api/noticiasApi);
 
     const temas = await response.json();
 
