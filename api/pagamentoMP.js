@@ -516,6 +516,92 @@ async function _handleValidarSessao(req, res) {
     return json(res, 500, { ok: false, message: 'Erro interno ao validar sessão.' });
   }
 }
+
+// ─── Criação de sessão para assinante autenticado via link de edição ──────────
+// Chamado quando o assinante chega via link direto sem session_id no localStorage.
+// Verifica que a assinatura está ativa e cria o documento de sessão no Firestore.
+async function _handleCriarSessao(req, res) {
+  if (req.method !== 'POST') return json(res, 405, { ok: false, message: 'Método não permitido.' });
+
+  const { uid, assinaturaId } = req.body || {};
+  if (!uid || !assinaturaId) {
+    return json(res, 400, { ok: false, message: 'uid e assinaturaId obrigatórios.' });
+  }
+
+  const ua     = req.headers['user-agent'] || '';
+  const uaHash = crypto.createHash('md5').update(ua.slice(0, 80)).digest('hex').slice(0, 8);
+
+  try {
+    const usuarioRef    = db.collection('usuarios').doc(uid);
+    const assinaturaRef = usuarioRef.collection('assinaturas').doc(assinaturaId);
+
+    const [usuarioSnap, assinaturaSnap] = await Promise.all([
+      usuarioRef.get(),
+      assinaturaRef.get(),
+    ]);
+
+    if (!usuarioSnap.exists)    return json(res, 404, { ok: false, message: 'Usuário não encontrado.' });
+    if (!assinaturaSnap.exists) return json(res, 404, { ok: false, message: 'Assinatura não encontrada.' });
+
+    const assinaturaData = assinaturaSnap.data();
+    const usuarioData    = usuarioSnap.data();
+
+    if (assinaturaData.status !== 'ativa') {
+      return json(res, 403, { ok: false, message: 'Assinatura inativa.' });
+    }
+
+    // Controle de sessões ativas: máximo 3 por assinante
+    const sessoesSnap = await usuarioRef.collection('sessoes')
+      .where('ativo', '==', true).get();
+
+    if (sessoesSnap.size >= 3) {
+      const ordenadas = sessoesSnap.docs.sort((a, b) => {
+        const ta = a.data().ultimo_acesso?.toMillis?.() || 0;
+        const tb = b.data().ultimo_acesso?.toMillis?.() || 0;
+        return ta - tb; // mais antiga primeiro
+      });
+      await ordenadas[0].ref.update({
+        ativo:             false,
+        desativado_motivo: 'limite_dispositivos',
+        desativado_em:     admin.firestore.FieldValue.serverTimestamp(),
+      });
+    }
+
+    const sessionId = crypto.randomUUID();
+    await usuarioRef.collection('sessoes').doc(sessionId).set({
+      criado_em:                 admin.firestore.FieldValue.serverTimestamp(),
+      ultimo_acesso:             admin.firestore.FieldValue.serverTimestamp(),
+      ua_hash:                   uaHash,
+      ativo:                     true,
+      assinaturaId,
+      acessos_ua_distintos:      0,
+      compartilhamento_suspeito: false,
+      origem:                    'link_edicao',
+    });
+
+    return json(res, 200, {
+      ok:             true,
+      session_id:     sessionId,
+      uid,
+      assinaturaId,
+      segmento:       'assinante',
+      plano_slug:     assinaturaData.plano_slug                          || null,
+      features:       assinaturaData.features_snapshot || assinaturaData.features || {},
+      nome:           usuarioData.nome            || '',
+      email:          usuarioData.email           || '',
+      cod_uf:         usuarioData.cod_uf          || '',
+      cod_municipio:  usuarioData.cod_municipio   || '',
+      nome_municipio: usuarioData.nome_municipio  || '',
+      perfil:         usuarioData.perfil          || '',
+      validado_em:    Date.now(),
+    });
+
+  } catch (err) {
+    console.error('[criar-sessao] Erro:', err.message);
+    return json(res, 500, { ok: false, message: 'Erro interno ao criar sessão.' });
+  }
+}
+
 // ─── Helpers de formatação e placeholders ─────────────────────────────────────
 
 function formatDateBR(date) {
@@ -598,7 +684,7 @@ export default async function handler(req, res) {
 
     // Validar assinatura apenas para webhooks (não para criar-pedido / status-pedido)
     const acao = (req.query && req.query.acao) ? String(req.query.acao) : null;
-    const acoesPublicas = ['criar-pedido', 'status-pedido', 'ativar-sessao', 'validar-sessao'];
+    const acoesPublicas = ['criar-pedido', 'status-pedido', 'ativar-sessao', 'validar-sessao', 'criar-sessao'];
 
     if (!acao || !acoesPublicas.includes(acao)) {
       const sigCheck = validateMpWebhookSignature(rawBody, req);
@@ -651,6 +737,11 @@ export default async function handler(req, res) {
       return _handleValidarSessao(req, res);
     }
 
+    // ── POST ?acao=criar-sessao ───────────────────────────────────────────
+    if (req.method === 'POST' && acao === 'criar-sessao') {
+      return _handleCriarSessao(req, res);
+    }
+    
     // ── POST ?acao=criar-pedido ───────────────────────────────────────────────
     if (req.method === 'POST' && acao === 'criar-pedido') {
       const body = req.body || {};
