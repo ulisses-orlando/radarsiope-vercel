@@ -1468,7 +1468,20 @@ async function VerNewsletterComToken() {
   const assinaturaId = normalizeParam(params.get('assinaturaId'));
   const edicaoNum = params.get('edicao_numero');
 
-  // 0. Validação inicial
+  // 0. Se o link não tem assinaturaId (link de lead), mas existe uma sessão de
+  // assinante ativa no localStorage, o lead virou assinante: ignora o link antigo
+  // e carrega com acesso total via sessão.
+  if (!assinaturaId) {
+    try {
+      const _sessaoSalva = JSON.parse(localStorage.getItem('rs_pwa_session') || 'null');
+      if (_sessaoSalva?.segmento === 'assinante' && _sessaoSalva?.session_id && _sessaoSalva?.uid) {
+        await _tentarModoAssinante(_sessaoSalva);
+        return;
+      }
+    } catch (e) { /* ignora — continua o fluxo normal de lead */ }
+  }
+
+  // 1. Validação inicial
   // Se não há parâmetros mas existe sessão PWA salva → abre em "modo alerta"
   // (usuário chegou via notificação push sem link de edição específica)
   if ((!d_nid && !edicaoNum) || !env || !uid || !token) {
