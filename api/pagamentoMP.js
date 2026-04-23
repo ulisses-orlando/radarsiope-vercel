@@ -115,6 +115,19 @@ function parseExternalReference(externalRef) {
   return { userId: parts[0], assinaturaId: parts[1], pedidoId: parts[2] };
 }
 
+// ─── Mapeamento de métodos permitidos → excluded_payment_types (MP) ──────────
+const _TODOS_TIPOS_MP = ['credit_card', 'debit_card', 'ticket', 'bank_transfer', 'atm', 'prepaid_card'];
+
+function buildExcludedPaymentTypes(metodosPermitidos) {
+  if (!Array.isArray(metodosPermitidos) || !metodosPermitidos.length) {
+    // Sem configuração: exclui apenas boleto (comportamento anterior)
+    return [{ id: 'ticket' }];
+  }
+  return _TODOS_TIPOS_MP
+    .filter(tipo => !metodosPermitidos.includes(tipo))
+    .map(tipo => ({ id: tipo }));
+}
+
 // ─── Registro de pagamento (doc único) ───────────────────────────────────────
 
 async function registrarPagamentoPendente(userId, assinaturaId, amountCentavos, numParcelas = 1, metodoPagamento = null, pedidoId) {
@@ -741,7 +754,7 @@ export default async function handler(req, res) {
     if (req.method === 'POST' && acao === 'criar-sessao') {
       return _handleCriarSessao(req, res);
     }
-    
+
     // ── POST ?acao=criar-pedido ───────────────────────────────────────────────
     if (req.method === 'POST' && acao === 'criar-pedido') {
       const body = req.body || {};
@@ -753,6 +766,7 @@ export default async function handler(req, res) {
       const nome = body.nome || '';
       const email = body.email || '';
       const cpf = body.cpf || '';
+      const metodosPagamento = Array.isArray(body.metodosPagamento) ? body.metodosPagamento : null;
 
       // fix #14: validar parâmetros incluindo valor mínimo de R$ 0,50
       if (!userId || !assinaturaId) {
@@ -835,7 +849,7 @@ export default async function handler(req, res) {
         // fix #1: installments e excluded_payment_types dentro de payment_methods
         payment_methods: {
           installments: installmentsMax,
-          excluded_payment_types: [{ id: 'ticket' }]
+          excluded_payment_types: buildExcludedPaymentTypes(metodosPagamento)
         }
       };
 
