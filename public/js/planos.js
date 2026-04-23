@@ -28,7 +28,8 @@ const PLANOS_CANON = {
       biblioteca_acesso:   true,
       sugestao_tema_quota: 0,
       consultoria_horas_mes: 0,
-    }
+    },
+    metodos_pagamento: ['credit_card'],
   },
   essence: {
     nome: 'Radar Essence',
@@ -46,7 +47,8 @@ const PLANOS_CANON = {
       biblioteca_acesso:   true,
       sugestao_tema_quota: 0,
       consultoria_horas_mes: 0,
-    }
+    },
+    metodos_pagamento: ['credit_card'],
   },
   profissional: {
     nome: 'Radar Profissional',
@@ -64,7 +66,8 @@ const PLANOS_CANON = {
       biblioteca_acesso:   true,
       sugestao_tema_quota: 0,
       consultoria_horas_mes: 0,
-    }
+    },
+    metodos_pagamento: ['credit_card'],
   },
   premium: {
     nome: 'Radar Premium',
@@ -82,7 +85,8 @@ const PLANOS_CANON = {
       biblioteca_acesso:   true,
       sugestao_tema_quota: 2,
       consultoria_horas_mes: 0,
-    }
+    },
+    metodos_pagamento: ['credit_card'],
   },
   supreme: {
     nome: 'Radar Supreme',
@@ -100,7 +104,8 @@ const PLANOS_CANON = {
       biblioteca_acesso:   true,
       sugestao_tema_quota: 2,
       consultoria_horas_mes: 4,
-    }
+    },
+    metodos_pagamento: ['credit_card'],
   }
 };
 
@@ -276,6 +281,7 @@ async function abrirModalPlano(id = null, editar = false) {
     tipos_inclusos:    [],
     allow_multi_select: false,
     vagas_grupo_vip:   50,
+    metodos_pagamento: ['credit_card'],
     features: {
       newsletter_texto:       true,
       newsletter_audio:       false,
@@ -401,6 +407,33 @@ async function abrirModalPlano(id = null, editar = false) {
     const el = document.getElementById('pl-parcelas-sem-juros');
     if (el) el.style.opacity = this.checked ? '1' : '0.4';
   });
+
+  // Seção: Métodos de pagamento aceitos
+  body.appendChild(_secLabel('💳 Métodos de Pagamento Aceitos'));
+  const mpWrap = document.createElement('div');
+  mpWrap.style.cssText = 'display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:12px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px';
+
+  const _metodosMp = [
+    { id: 'credit_card',    label: '💳 Cartão de crédito' },
+    { id: 'debit_card',     label: '🏧 Cartão de débito'  },
+    { id: 'ticket',         label: '📄 Boleto'             },
+    { id: 'bank_transfer',  label: '🏦 Pix / Transferência' },
+  ];
+  const _metodosAtivos = Array.isArray(d.metodos_pagamento) ? d.metodos_pagamento : ['credit_card'];
+
+  _metodosMp.forEach(m => {
+    const lbl = document.createElement('label');
+    lbl.style.cssText = 'display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer';
+    lbl.innerHTML = `
+      <input type="checkbox" class="mp-metodo-check" value="${m.id}"
+        ${_metodosAtivos.includes(m.id) ? 'checked' : ''}
+        style="width:15px;height:15px;cursor:pointer">
+      <span>${m.label}</span>
+    `;
+    mpWrap.appendChild(lbl);
+  });
+  body.appendChild(mpWrap);
+  body.appendChild(_info('Define quais formas de pagamento estarão disponíveis no checkout do Mercado Pago para este plano.'));
 
   // Seção: Visual
   body.appendChild(_secLabel('🎨 Visual no Formulário de Assinatura'));
@@ -630,6 +663,9 @@ async function _salvarPlano(id, editar) {
   const allowMulti = !!document.getElementById('pl-allow-multi')?.checked;
   const vagasRaw   = document.getElementById('pl-vagas')?.value;
   const emBreve    = !!document.getElementById('pl-em-breve')?.checked;
+  const metodosPagamento = Array.from(
+    document.querySelectorAll('.mp-metodo-check:checked')
+  ).map(cb => cb.value);
 
   // features
   const features = {};
@@ -706,6 +742,7 @@ async function _salvarPlano(id, editar) {
     tipos_inclusos,
     vagas_grupo_vip:   features.grupo_whatsapp_vip ? (safeNumber(vagasRaw) || 50) : null,
     features,
+    metodos_pagamento: metodosPagamento.length ? metodosPagamento : ['credit_card'],
     tipo:              'assinatura', // mantém campo legado
     updatedAt:         firebase.firestore.FieldValue.serverTimestamp(),
   };

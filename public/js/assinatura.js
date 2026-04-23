@@ -851,6 +851,9 @@ if (temErro) return;
       dataPrimeiroVencimento: new Date().toISOString().split('T')[0],
       ciclo,
       plano_slug:      _planoAtual.plano_slug || null,
+      metodosPagamento: Array.isArray(_planoAtual.metodos_pagamento) && _planoAtual.metodos_pagamento.length
+        ? _planoAtual.metodos_pagamento
+        : ['credit_card'],
     });
 
     // 4. Salvar pedidoId localmente (opcional — webhook é a fonte de verdade)
