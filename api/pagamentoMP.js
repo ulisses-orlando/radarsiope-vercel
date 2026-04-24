@@ -615,6 +615,91 @@ async function _handleCriarSessao(req, res) {
   }
 }
 
+// ─── Cancelamento de assinatura com cálculo de ajuste por fidelização ─────────
+// POST ?acao=cancelar-assinatura  { uid, assinaturaId, motivo? }
+// Calcula ajuste = desconto_mensal × meses_usados (apenas dentro do período de fidelização).
+// Não cobra automaticamente — registra o valor e retorna para o admin processar.
+async function _handleCancelarAssinatura(req, res) {
+  if (req.method !== 'POST') return json(res, 405, { ok: false, message: 'Método não permitido.' });
+
+  const { uid, assinaturaId, motivo } = req.body || {};
+  if (!uid || !assinaturaId) {
+    return json(res, 400, { ok: false, message: 'uid e assinaturaId obrigatórios.' });
+  }
+
+  try {
+    const assinRef  = db.collection('usuarios').doc(uid).collection('assinaturas').doc(assinaturaId);
+    const assinSnap = await assinRef.get();
+
+    if (!assinSnap.exists) return json(res, 404, { ok: false, message: 'Assinatura não encontrada.' });
+
+    const d = assinSnap.data();
+
+    if (d.status !== 'ativa') {
+      return json(res, 409, { ok: false, message: `Assinatura não está ativa (status: ${d.status}).` });
+    }
+
+    const agora        = new Date();
+    const dataInicio   = d.data_inicio?.toDate?.() || new Date(d.data_inicio);
+    const dataFimFid   = d.data_fim_fidelizacao?.toDate?.() || null;
+    const temFid       = !!d.tem_fidelizacao && !!dataFimFid;
+    const dentroFid    = temFid && agora < dataFimFid;
+
+    // Meses usados (arredonda para cima — mês iniciado conta)
+    const msUsados     = agora - dataInicio;
+    const mesesUsados  = Math.max(1, Math.ceil(msUsados / (30 * 24 * 60 * 60 * 1000)));
+
+    // Ajuste = desconto concedido × meses usados (só dentro do período de fidelização)
+    const descontoMensal = Number(d.desconto_mensal) || 0;
+    const ajusteCentavos = dentroFid ? Math.round(descontoMensal * mesesUsados * 100) : 0;
+    const ajusteReais    = ajusteCentavos / 100;
+
+    const novoStatus = ajusteCentavos > 0 ? 'cancelamento_pendente_ajuste' : 'cancelada';
+
+    await assinRef.set({
+      status:               novoStatus,
+      cancelado_em:         admin.firestore.FieldValue.serverTimestamp(),
+      cancelamento_motivo:  motivo || null,
+      ajuste_fidelizacao:   ajusteReais,
+      ajuste_meses_usados:  mesesUsados,
+      ajuste_status:        ajusteCentavos > 0 ? 'pendente' : 'nao_aplicavel',
+      atualizadoEm:         admin.firestore.FieldValue.serverTimestamp(),
+    }, { merge: true });
+
+    // Desativa sessões ativas do usuário
+    try {
+      const sessoesSnap = await db.collection('usuarios').doc(uid)
+        .collection('sessoes').where('ativo', '==', true).get();
+      const batch = db.batch();
+      sessoesSnap.docs.forEach(doc => {
+        batch.update(doc.ref, {
+          ativo: false,
+          desativado_motivo: 'assinatura_cancelada',
+          desativado_em: admin.firestore.FieldValue.serverTimestamp(),
+        });
+      });
+      if (!sessoesSnap.empty) await batch.commit();
+    } catch (e) { console.warn('[cancelar-assinatura] Falha ao desativar sessões:', e.message); }
+
+    return json(res, 200, {
+      ok:             true,
+      status:         novoStatus,
+      tem_ajuste:     ajusteCentavos > 0,
+      ajuste_reais:   ajusteReais,
+      ajuste_centavos: ajusteCentavos,
+      meses_usados:   mesesUsados,
+      desconto_mensal: descontoMensal,
+      data_fim_fidelizacao: dataFimFid ? dataFimFid.toISOString() : null,
+      message: ajusteCentavos > 0
+        ? `Cancelamento registrado. Ajuste de ${ajusteReais.toLocaleString('pt-BR',{style:'currency',currency:'BRL'})} pendente (${mesesUsados} meses × ${descontoMensal.toLocaleString('pt-BR',{style:'currency',currency:'BRL'})}).`
+        : 'Assinatura cancelada sem ajuste.',
+    });
+
+  } catch (err) {
+    console.error('[cancelar-assinatura] Erro:', err.message);
+    return json(res, 500, { ok: false, message: 'Erro interno ao cancelar assinatura.' });
+  }
+}
 // ─── Helpers de formatação e placeholders ─────────────────────────────────────
 
 function formatDateBR(date) {
@@ -697,7 +782,7 @@ export default async function handler(req, res) {
 
     // Validar assinatura apenas para webhooks (não para criar-pedido / status-pedido)
     const acao = (req.query && req.query.acao) ? String(req.query.acao) : null;
-    const acoesPublicas = ['criar-pedido', 'status-pedido', 'ativar-sessao', 'validar-sessao', 'criar-sessao'];
+    const acoesPublicas = ['criar-pedido', 'status-pedido', 'ativar-sessao', 'validar-sessao', 'criar-sessao', 'cancelar-assinatura'];
 
     if (!acao || !acoesPublicas.includes(acao)) {
       const sigCheck = validateMpWebhookSignature(rawBody, req);
@@ -755,6 +840,11 @@ export default async function handler(req, res) {
       return _handleCriarSessao(req, res);
     }
 
+    // ── POST ?acao=cancelar-assinatura ────────────────────────────────────────
+    if (req.method === 'POST' && acao === 'cancelar-assinatura') {
+      return _handleCancelarAssinatura(req, res);
+    }
+    
     // ── POST ?acao=criar-pedido ───────────────────────────────────────────────
     if (req.method === 'POST' && acao === 'criar-pedido') {
       const body = req.body || {};
