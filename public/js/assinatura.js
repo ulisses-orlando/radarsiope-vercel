@@ -1,7 +1,6 @@
 /* ==========================================================================
 assinatura.js — Radar SIOPE
-Layout: Agrupado por Ciclo → Cards de Planos dentro de cada ciclo
-Fluxo completo de assinatura: planos, ciclos dinâmicos, WhatsApp,
+Fluxo completo de assinatura: planos, ciclos dinâmicos por ciclo (tabs), WhatsApp,
 cupom, preview, upsert usuário, registro assinatura, pagamento MP.
 Dependências globais:
 window.db (Firestore inicializado)
@@ -42,17 +41,14 @@ function safeNum(v) {
 function getDescontoPct(plano, cicloMeses) {
   if (!plano) return 0;
   const c = String(cicloMeses);
-  // Novo formato dinâmico
   if (plano.descontos_por_ciclo && plano.descontos_por_ciclo[c] !== undefined) {
     return Number(plano.descontos_por_ciclo[c]) || 0;
   }
-  // Fallback legado
   if (c === '6')  return Number(plano.desconto_pct_6m)  || 0;
   if (c === '12') return Number(plano.desconto_pct_12m) || 0;
   return 0;
 }
 
-// Retorna o preço mensal efetivo (com desconto) para o ciclo
 function getPrecoPlano(plano, cicloMeses) {
   if (!plano) return 0;
   const base = Number(plano.valor_mensal) || Number(plano.valor) || 0;
@@ -60,7 +56,6 @@ function getPrecoPlano(plano, cicloMeses) {
   return Math.round(base * (1 - pct / 100) * 100) / 100;
 }
 
-// Retorna o total do ciclo (mensal efetivo × meses)
 function getTotalCiclo(plano, cicloMeses) {
   return Math.round(getPrecoPlano(plano, cicloMeses) * Number(cicloMeses) * 100) / 100;
 }
@@ -77,7 +72,7 @@ async function carregarPlano(planId) {
   }
 }
 
-// ─── Renderizar lista de planos AGRUPADA POR CICLO ────────────────────────────
+// ─── Renderizar lista de planos com ABAS DE CICLO ─────────────────────────────
 async function carregarListaPlanos() {
   const wrap = document.getElementById('planos-cards');
   if (!wrap) return;
@@ -101,7 +96,7 @@ async function carregarListaPlanos() {
     if (allFeatures.length === 0) {
       allFeatures = [
         { id: 'newsletter_texto', nome: 'Newsletter em texto' },
-        { id: 'newsletter_audio', nome: 'Newsletter em áudio' },
+        { id: 'newsletter_audio', nome: 'Newsletter em áudio (podcast)' },
         { id: 'newsletter_video', nome: 'Newsletter em vídeo' },
         { id: 'newsletter_infografico', nome: 'Infográfico por edição' },
         { id: 'alertas_prioritarios', nome: 'Alertas prioritários' },
@@ -127,46 +122,94 @@ async function carregarListaPlanos() {
     wrap.innerHTML = '';
     const planos = snap.docs.map(d => ({ id: d.id, ...d.data() }));
 
-    // 🔄 Ciclos que aparecerão como "containers/cards" principais
-    const ciclosParaExibir = ['3', '12']; 
+    // 🔹 1. Extrair ciclos únicos disponíveis
+    const ciclosSet = new Set();
+    planos.forEach(p => {
+      if (Array.isArray(p.ciclos_disponiveis)) p.ciclos_disponiveis.forEach(c => ciclosSet.add(String(c)));
+    });
+    const ciclosOrdenados = Array.from(ciclosSet).sort((a, b) => Number(a) - Number(b));
+    if (ciclosOrdenados.length === 0) {
+      wrap.innerHTML = '<div style="color:#999">Nenhum ciclo configurado nos planos.</div>';
+      return;
+    }
 
-    ciclosParaExibir.forEach(ciclo => {
-      // Filtra planos que possuem este ciclo habilitado
-      const planosDoCiclo = planos.filter(p => 
-        Array.isArray(p.ciclos_disponiveis) && p.ciclos_disponiveis.map(String).includes(String(ciclo))
+    // 🔹 2. Criar container de abas (tabs)
+    const tabsWrap = document.createElement('div');
+    tabsWrap.id = 'ciclo-tabs';
+    tabsWrap.style.cssText = 'display:flex;gap:10px;margin-bottom:24px;flex-wrap:wrap;border-bottom:1px solid #e2e8f0;padding-bottom:12px;';
+    wrap.appendChild(tabsWrap);
+
+    // 🔹 3. Container dinâmico para os planos (2 colunas)
+    const gridContainer = document.createElement('div');
+    gridContainer.id = 'grid-planos-dinamico';
+    gridContainer.style.cssText = 'display:grid;grid-template-columns:repeat(2, 1fr);gap:16px;min-height:200px;';
+    // Responsivo: 1 coluna em telas < 768px
+    const styleSheet = document.createElement('style');
+    styleSheet.textContent = `@media (max-width: 768px) { #grid-planos-dinamico { grid-template-columns: 1fr !important; } }`;
+    document.head.appendChild(styleSheet);
+    wrap.appendChild(gridContainer);
+
+    // 🔹 4. Função que renderiza os planos de um ciclo específico
+    function renderPlanosPorCiclo(cicloAtivo) {
+      gridContainer.innerHTML = '';
+      const planosFiltrados = planos.filter(p => 
+        Array.isArray(p.ciclos_disponiveis) && p.ciclos_disponiveis.map(String).includes(cicloAtivo)
       );
 
-      if (planosDoCiclo.length === 0) return;
+      if (planosFiltrados.length === 0) {
+        gridContainer.innerHTML = '<div style="color:#999;text-align:center;grid-column:1/-1;padding:30px;font-size:14px">Nenhum plano disponível para este ciclo.</div>';
+        return;
+      }
 
-      // Container visual do ciclo
-      const cicloSection = document.createElement('div');
-      cicloSection.className = `ciclo-section ciclo-${ciclo}m`;
-      cicloSection.style.marginBottom = '32px';
-
-      // Header do ciclo
-      const header = document.createElement('div');
-      header.style.cssText = 'font-size:18px;font-weight:700;color:#0A3D62;margin-bottom:12px;padding-bottom:6px;border-bottom:2px solid #e2e8f0;display:flex;align-items:center;gap:8px';
-      header.innerHTML = `📅 ${ciclo} Meses <span style="font-size:12px;color:#64748b;font-weight:400">(${planosDoCiclo.length} plano${planosDoCiclo.length>1?'s':''})</span>`;
-      cicloSection.appendChild(header);
-
-      // Grid de planos dentro deste ciclo
-      const grid = document.createElement('div');
-      grid.style.cssText = 'display:grid;grid-template-columns:repeat(auto-fit, minmax(280px, 1fr));gap:16px';
-
-      planosDoCiclo.forEach(p => {
-        const card = _criarCardPlano(p, ciclo, allFeatures);
-        grid.appendChild(card);
+      planosFiltrados.forEach(p => {
+        const card = _criarCardPlano(p, cicloAtivo, allFeatures);
+        gridContainer.appendChild(card);
       });
+    }
 
-      cicloSection.appendChild(grid);
-      wrap.appendChild(cicloSection);
+    // 🔹 5. Criar botões das abas
+    ciclosOrdenados.forEach((ciclo, idx) => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.textContent = `${ciclo} Meses`;
+      btn.dataset.ciclo = ciclo;
+      const isDefault = idx === 0;
+      btn.style.cssText = `padding:10px 20px;border:1px solid ${isDefault ? '#0A3D62' : '#cbd5e1'};border-radius:24px;font-size:14px;font-weight:600;cursor:pointer;
+        background:${isDefault ? '#0A3D62' : '#ffffff'};color:${isDefault ? '#ffffff' : '#475569'};transition:all 0.2s;box-shadow:0 1px 2px rgba(0,0,0,0.05);`;
+      
+      btn.addEventListener('click', () => {
+        tabsWrap.querySelectorAll('button').forEach(b => {
+          b.style.background = '#fff';
+          b.style.color = '#475569';
+          b.style.borderColor = '#cbd5e1';
+        });
+        btn.style.background = '#0A3D62';
+        btn.style.color = '#fff';
+        btn.style.borderColor = '#0A3D62';
+        renderPlanosPorCiclo(ciclo);
+      });
+      tabsWrap.appendChild(btn);
     });
 
-    // Pré-seleciona se veio planId na URL
+    // 🔹 6. Renderizar ciclo padrão
+    renderPlanosPorCiclo(ciclosOrdenados[0]);
+
+    // 🔹 7. Pré-seleção via URL (se vier ?planId=xyz)
     if (_planIdUrl) {
-      const match = wrap.querySelector(`.plano-card[data-id="${_planIdUrl}"]`);
-      if (match) match.click();
-      else await _onPlanoSelecionado(_planIdUrl);
+      const planoUrl = await carregarPlano(_planIdUrl);
+      if (planoUrl) {
+        const cicloDisp = Array.isArray(planoUrl.ciclos_disponiveis) ? planoUrl.ciclos_disponiveis.map(String) : ['3'];
+        const cicloParaAbrir = cicloDisp[0];
+        // Ativar aba correta
+        const tabBtn = tabsWrap.querySelector(`button[data-ciclo="${cicloParaAbrir}"]`);
+        if (tabBtn) tabBtn.click();
+        // Espera o DOM atualizar e clica no card
+        setTimeout(() => {
+          const match = gridContainer.querySelector(`.plano-card[data-id="${_planIdUrl}"]`);
+          if (match) match.click();
+          else _onPlanoSelecionado(_planIdUrl, cicloParaAbrir);
+        }, 100);
+      }
     }
 
   } catch (err) {
@@ -194,7 +237,7 @@ function _criarCardPlano(plano, ciclo, allFeatures) {
   const card = document.createElement('label');
   card.className = `plano-card${plano.destaque ? ' destaque' : ''}${plano.em_breve ? ' em-breve' : ''}`;
   card.dataset.id    = plano.id;
-  card.dataset.ciclo = ciclo; // 🔹 Importante para agrupamento
+  card.dataset.ciclo = ciclo;
   card.style.setProperty('--plano-cor', cor);
   card._planoData = plano;
   card._cicloAtual = Number(ciclo);
@@ -218,7 +261,6 @@ function _criarCardPlano(plano, ciclo, allFeatures) {
     </div>
   `;
 
-  // Clique no card seleciona o plano + ciclo
   card.addEventListener('click', (e) => {
     if (plano.em_breve) return;
     e.stopPropagation();
@@ -242,7 +284,7 @@ async function _onPlanoSelecionado(planId, cicloInicial = null) {
 
   document.getElementById('planId').value = planId;
   
-  // Marca visualmente o card selecionado (funciona entre grupos de ciclo)
+  // Marca visualmente o card selecionado
   document.querySelectorAll('.plano-card').forEach(c => {
     const isSelected = c.dataset.id === planId && String(c.dataset.ciclo) === String(_planoAtual.cicloSelecionado);
     c.classList.toggle('selecionado', isSelected);
@@ -403,34 +445,24 @@ async function calcularPreview(plano, tiposSelecionados = [], cupomObj = null) {
   dataFimFidelizacao.setMonth(dataFimFidelizacao.getMonth() + cicloMeses);
 
   return {
-    items,
-    basePrice,
-    baseMensal,
-    totalBruto:              totalMensalBruto,
-    desconto:                descontoCupom,
-    total:                   totalCiclo,
-    valor_mensal_contratado: totalMensalFinal,
-    amountCentavos:          Math.round(totalCiclo * 100),
-    ciclo:                   cicloMeses,
-    ciclo_meses:             cicloMeses,
-    desconto_pct:            pct,
-    desconto_mensal:         descontoMensal,
-    tem_fidelizacao:         temFidelizacao,
-    data_fim_fidelizacao:    dataFimFidelizacao,
-    cupom:                   cupomObj,
+    items, basePrice, baseMensal, totalBruto: totalMensalBruto, desconto: descontoCupom,
+    total: totalCiclo, valor_mensal_contratado: totalMensalFinal,
+    amountCentavos: Math.round(totalCiclo * 100), ciclo: cicloMeses, ciclo_meses: cicloMeses,
+    desconto_pct: pct, desconto_mensal: descontoMensal, tem_fidelizacao: temFidelizacao,
+    data_fim_fidelizacao: dataFimFidelizacao, cupom: cupomObj,
   };
 }
 
 // ─── Atualizar preview no DOM ─────────────────────────────────────────────────
 async function atualizarPreview() {
-  const wrap     = document.getElementById('preview-breakdown');
-  const itemsEl  = document.getElementById('preview-items');
-  const totalEl  = document.getElementById('preview-total');
+  const wrap = document.getElementById('preview-breakdown');
+  const itemsEl = document.getElementById('preview-items');
+  const totalEl = document.getElementById('preview-total');
   if (!wrap) return;
   if (!_planoAtual) { wrap.style.display = 'none'; return; }
 
   const checks = [...document.querySelectorAll('#grupo-newsletters input[type="checkbox"]:checked')];
-  const tipos  = checks.map(cb => cb.value);
+  const tipos = checks.map(cb => cb.value);
   if (!tipos.length) { wrap.style.display = 'none'; return; }
 
   const pv = await calcularPreview(_planoAtual, tipos, _cupomAplicado);
@@ -482,57 +514,34 @@ async function atualizarPreview() {
 
 // ─── Upsert usuário no Firestore ──────────────────────────────────────────────
 async function upsertUsuario(dados) {
-  const {
-    nome, cpf, email, telefone, whatsapp, whatsappOptin,
-    perfil, mensagem, preferencia,
-    cod_uf, cod_municipio, nome_municipio,
-    plano_slug, ciclo, features
-  } = dados;
+  const { nome, cpf, email, telefone, whatsapp, whatsappOptin, perfil, mensagem, preferencia, cod_uf, cod_municipio, nome_municipio, plano_slug, ciclo, features } = dados;
   const cpfNorm = (cpf || '').replace(/\D/g, '');
   const waRaw = whatsapp;
   const waNumber = waRaw ? String(waRaw).replace(/\D/g, '') : '';
 
   const base = {
-    nome,
-    cpfNormalizado: cpfNorm,
-    telefone:          telefone  || null,
-    whatsapp:          whatsapp  || null,
-    whatsapp_number:   waNumber,
-    whatsapp_optin:    whatsapp  ? (whatsappOptin ?? true) : false,
+    nome, cpfNormalizado: cpfNorm, telefone: telefone || null, whatsapp: whatsapp || null,
+    whatsapp_number: waNumber, whatsapp_optin: whatsapp ? (whatsappOptin ?? true) : false,
     whatsapp_optin_em: whatsapp ? firebase.firestore.FieldValue.serverTimestamp() : null,
-    tipo_perfil:       perfil    || null,
-    ativo:             false,
-    mensagem:          mensagem  || null,
-    preferencia_contato: preferencia || null,
-    cod_uf:            cod_uf        || null,
-    cod_municipio:     cod_municipio || null,
-    nome_municipio:    nome_municipio || null,
-    origem:            _origem,
-    updatedAt:         firebase.firestore.FieldValue.serverTimestamp(),
+    tipo_perfil: perfil || null, ativo: false, mensagem: mensagem || null,
+    preferencia_contato: preferencia || null, cod_uf: cod_uf || null, cod_municipio: cod_municipio || null,
+    nome_municipio: nome_municipio || null, origem: _origem, updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
   };
 
   try {
     const q = await db.collection('usuarios').where('email', '==', email.toLowerCase()).limit(1).get();
     if (!q.empty) {
-      const uid = q.docs[0].id;
-      await db.collection('usuarios').doc(uid).update(base);
-      return uid;
+      await db.collection('usuarios').doc(q.docs[0].id).update(base);
+      return q.docs[0].id;
     } else {
       const ref = await db.collection('usuarios').add({
-        ...base,
-        email: email.toLowerCase(),
-        plano_status: 'pendente_pagamento',
-        plano_slug:   plano_slug || null,
-        plano_ciclo:  ciclo      || '3',
-        features:     features   || null,
-        createdAt:    firebase.firestore.FieldValue.serverTimestamp(),
+        ...base, email: email.toLowerCase(), plano_status: 'pendente_pagamento',
+        plano_slug: plano_slug || null, plano_ciclo: ciclo || '3', features: features || null,
+        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
       });
       return ref.id;
     }
-  } catch (err) {
-    console.error('[assinatura] Erro em upsertUsuario:', err);
-    throw err;
-  }
+  } catch (err) { console.error('[assinatura] Erro em upsertUsuario:', err); throw err; }
 }
 
 // ─── Registrar assinatura (subcoleção) ───────────────────────────────────────
@@ -544,64 +553,36 @@ async function registrarAssinatura(userId, payload, preview) {
   renovacao.setMonth(renovacao.getMonth() + cicloMeses);
 
   const data = {
-    planId:       payload.planId  || null,
-    plano_slug:   payload.plano_slug || null,
-    plano_nome:   payload.plano_nome || null,
-    ciclo:        String(cicloMeses),
-    ciclo_meses:  cicloMeses,
+    planId: payload.planId || null, plano_slug: payload.plano_slug || null, plano_nome: payload.plano_nome || null,
+    ciclo: String(cicloMeses), ciclo_meses: cicloMeses,
     tipos_selecionados: Array.isArray(payload.tipos_selecionados) ? payload.tipos_selecionados : [],
-    valor_original:          preview.totalBruto            ?? 0,
-    valor_desconto:          preview.desconto               ?? 0,
-    valor_final:             preview.total                  ?? 0,
-    amountCentavos:          preview.amountCentavos         ?? 0,
-    valor_base_mensal:       preview.baseMensal             ?? 0,
-    valor_mensal_contratado: preview.valor_mensal_contratado ?? 0,
-    desconto_mensal:         preview.desconto_mensal        ?? 0,
-    desconto_pct:            preview.desconto_pct           ?? 0,
-    tem_fidelizacao:         preview.tem_fidelizacao        ?? false,
-    data_fim_fidelizacao:    preview.tem_fidelizacao ? firebase.firestore.Timestamp.fromDate(preview.data_fim_fidelizacao) : null,
-    cupom:           payload.cupom || null,
-    features_snapshot: payload.features || null,
-    data_inicio:            firebase.firestore.Timestamp.fromDate(agora),
+    valor_original: preview.totalBruto ?? 0, valor_desconto: preview.desconto ?? 0, valor_final: preview.total ?? 0,
+    amountCentavos: preview.amountCentavos ?? 0, valor_base_mensal: preview.baseMensal ?? 0,
+    valor_mensal_contratado: preview.valor_mensal_contratado ?? 0, desconto_mensal: preview.desconto_mensal ?? 0,
+    desconto_pct: preview.desconto_pct ?? 0, tem_fidelizacao: preview.tem_fidelizacao ?? false,
+    data_fim_fidelizacao: preview.tem_fidelizacao ? firebase.firestore.Timestamp.fromDate(preview.data_fim_fidelizacao) : null,
+    cupom: payload.cupom || null, features_snapshot: payload.features || null,
+    data_inicio: firebase.firestore.Timestamp.fromDate(agora),
     data_proxima_renovacao: firebase.firestore.Timestamp.fromDate(renovacao),
-    status:          'pendente_pagamento',
-    paymentProvider: 'mercadopago',
-    orderId:         payload.orderId || null,
-    pedidoId:        null,
-    origem:          _origem,
-    createdAt:       firebase.firestore.FieldValue.serverTimestamp(),
-    updatedAt:       firebase.firestore.FieldValue.serverTimestamp(),
+    status: 'pendente_pagamento', paymentProvider: 'mercadopago', orderId: payload.orderId || null,
+    pedidoId: null, origem: _origem, createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+    updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
   };
   try {
-    const ref = await db.collection('usuarios').doc(userId).collection('assinaturas').add(data);
-    return ref.id;
-  } catch (err) {
-    console.error('[assinatura] Erro em registrarAssinatura:', err);
-    throw err;
-  }
+    return (await db.collection('usuarios').doc(userId).collection('assinaturas').add(data)).id;
+  } catch (err) { console.error('[assinatura] Erro em registrarAssinatura:', err); throw err; }
 }
 
 // ─── Criar pedido no backend (Mercado Pago) ───────────────────────────────────
 async function criarPedidoBackend(payload) {
-  const ctrl    = new AbortController();
+  const ctrl = new AbortController();
   const timeout = setTimeout(() => ctrl.abort(), 30000);
   try {
-    const resp = await fetch('/api/pagamentoMP?acao=criar-pedido', {
-      method:  'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify(payload),
-      signal:  ctrl.signal,
-    });
+    const resp = await fetch('/api/pagamentoMP?acao=criar-pedido', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload), signal: ctrl.signal });
     clearTimeout(timeout);
-    if (!resp.ok) {
-      const txt = await resp.text().catch(() => '');
-      throw new Error(`Backend ${resp.status}: ${txt}`);
-    }
+    if (!resp.ok) throw new Error(`Backend ${resp.status}: ${await resp.text().catch(() => '')}`);
     return await resp.json();
-  } catch (err) {
-    clearTimeout(timeout);
-    throw err;
-  }
+  } catch (err) { clearTimeout(timeout); throw err; }
 }
 
 // ─── Prefill a partir do lead ─────────────────────────────────────────────────
@@ -612,11 +593,8 @@ async function prefillFromLead() {
     if (!doc.exists) return null;
     const lead = doc.data();
     const set = (id, val) => { if (val && document.getElementById(id)) document.getElementById(id).value = val; };
-    set('nome',              lead.nome);
-    set('email',             lead.email);
-    set('telefone',          lead.telefone);
-    set('whatsapp',          lead.whatsapp || lead.telefone);
-    set('perfil',            lead.perfil);
+    set('nome', lead.nome); set('email', lead.email); set('telefone', lead.telefone);
+    set('whatsapp', lead.whatsapp || lead.telefone); set('perfil', lead.perfil);
     set('preferencia-contato', lead.preferencia_contato);
 
     if (Array.isArray(lead.interesses)) {
@@ -629,10 +607,7 @@ async function prefillFromLead() {
     const st = document.getElementById('status-envio');
     if (st) { st.textContent = '✅ Dados preenchidos a partir do seu cadastro.'; st.style.color = '#16a34a'; }
     return lead;
-  } catch (err) {
-    console.error('[assinatura] Erro ao buscar lead:', err);
-    return null;
-  }
+  } catch (err) { console.error('[assinatura] Erro ao buscar lead:', err); return null; }
 }
 
 // ─── Validações do formulário ─────────────────────────────────────────────────
@@ -660,32 +635,29 @@ function validarCPF(cpf) {
 async function processarEnvioAssinatura(e) {
   e.preventDefault();
   clearErrors();
-  const btn    = document.getElementById('btn-assinar');
+  const btn = document.getElementById('btn-assinar');
   const status = document.getElementById('status-envio');
   const setStatus = (msg, cor = '#555') => { if (status) { status.textContent = msg; status.style.color = cor; } };
 
-  const nome       = document.getElementById('nome')?.value.trim()             || '';
-  const cpf        = document.getElementById('cpf')?.value.trim()              || '';
-  const email      = document.getElementById('email')?.value.trim()            || '';
-  const telefone   = document.getElementById('telefone')?.value.trim()         || '';
-  const whatsapp   = document.getElementById('whatsapp')?.value.trim()         || '';
-  const wpOptin    = !!document.getElementById('whatsapp-optin')?.checked;
-  const perfil     = document.getElementById('perfil')?.value                  || '';
-  const mensagem   = document.getElementById('mensagem')?.value.trim()         || '';
-  const preferencia = document.getElementById('preferencia-contato')?.value    || '';
-  const cupomCod   = document.getElementById('cupom')?.value.trim()            || '';
-  const aceita     = !!document.getElementById('aceita-termos')?.checked;
-  
-  // Ciclo vem diretamente do estado do plano selecionado
-  const ciclo      = _planoAtual?.cicloSelecionado || 3;
+  const nome = document.getElementById('nome')?.value.trim() || '';
+  const cpf = document.getElementById('cpf')?.value.trim() || '';
+  const email = document.getElementById('email')?.value.trim() || '';
+  const telefone = document.getElementById('telefone')?.value.trim() || '';
+  const whatsapp = document.getElementById('whatsapp')?.value.trim() || '';
+  const wpOptin = !!document.getElementById('whatsapp-optin')?.checked;
+  const perfil = document.getElementById('perfil')?.value || '';
+  const mensagem = document.getElementById('mensagem')?.value.trim() || '';
+  const preferencia = document.getElementById('preferencia-contato')?.value || '';
+  const cupomCod = document.getElementById('cupom')?.value.trim() || '';
+  const aceita = !!document.getElementById('aceita-termos')?.checked;
+  const ciclo = _planoAtual?.cicloSelecionado || 3;
   const tiposSelecionados = [...document.querySelectorAll('#grupo-newsletters input[type="checkbox"]:checked')].map(cb => cb.value);
 
   let temErro = false;
   const erro = (campo, msg) => { setError(campo, msg); temErro = true; };
-
-  if (nome.length < 3)       erro('nome',  'Nome deve ter pelo menos 3 caracteres.');
-  if (!validarCPF(cpf))      erro('cpf',   'CPF inválido.');
-  if (!validarEmail(email))  erro('email', 'E-mail inválido.');
+  if (nome.length < 3) erro('nome', 'Nome deve ter pelo menos 3 caracteres.');
+  if (!validarCPF(cpf)) erro('cpf', 'CPF inválido.');
+  if (!validarEmail(email)) erro('email', 'E-mail inválido.');
 
   const temFeatureWhatsApp = !!(_planoAtual?.features?.alertas_prioritarios || _planoAtual?.features?.grupo_whatsapp_vip);
   if (temFeatureWhatsApp) {
@@ -694,10 +666,10 @@ async function processarEnvioAssinatura(e) {
   } else if (whatsapp && !validarTelefoneFormato(whatsapp)) {
     erro('whatsapp', 'Formato de WhatsApp inválido.');
   }
-  if (!perfil)               { mostrarMensagem('Selecione seu perfil.'); temErro = true; }
-  if (!aceita)               { setError('aceita_termos', 'Você precisa aceitar os termos.'); temErro = true; }
+  if (!perfil) { mostrarMensagem('Selecione seu perfil.'); temErro = true; }
+  if (!aceita) { setError('aceita_termos', 'Você precisa aceitar os termos.'); temErro = true; }
   if (!tiposSelecionados.length) { mostrarMensagem('Selecione pelo menos um tipo de newsletter.'); temErro = true; }
-  if (!_planoAtual)          { mostrarMensagem('Selecione um plano.'); temErro = true; }
+  if (!_planoAtual) { mostrarMensagem('Selecione um plano.'); temErro = true; }
   if (temErro) return;
 
   try {
@@ -734,38 +706,23 @@ async function processarEnvioAssinatura(e) {
   setStatus('Registrando dados...', '#555');
   try {
     const userId = await upsertUsuario({
-      nome, cpf, email, telefone, whatsapp, whatsappOptin: wpOptin,
-      perfil, mensagem, preferencia,
-      cod_uf:        dadosUf?.cod_uf,
-      cod_municipio: dadosUf?.cod_municipio,
-      nome_municipio: dadosUf?.nome_municipio,
-      plano_slug:    _planoAtual.plano_slug,
-      ciclo,
-      features:      _planoAtual.features || null,
+      nome, cpf, email, telefone, whatsapp, whatsappOptin: wpOptin, perfil, mensagem, preferencia,
+      cod_uf: dadosUf?.cod_uf, cod_municipio: dadosUf?.cod_municipio, nome_municipio: dadosUf?.nome_municipio,
+      plano_slug: _planoAtual.plano_slug, ciclo, features: _planoAtual.features || null,
     });
 
     const assinaturaId = await registrarAssinatura(userId, {
-      planId:           _planoAtual.id,
-      plano_slug:       _planoAtual.plano_slug || null,
-      plano_nome:       _planoAtual.nome       || null,
-      tipos_selecionados: tiposSelecionados,
-      cupom:            cupomCod || null,
-      features:         _planoAtual.features   || null,
+      planId: _planoAtual.id, plano_slug: _planoAtual.plano_slug || null, plano_nome: _planoAtual.nome || null,
+      tipos_selecionados: tiposSelecionados, cupom: cupomCod || null, features: _planoAtual.features || null,
     }, preview);
 
     setStatus('Iniciando pagamento...', '#555');
     const backendResp = await criarPedidoBackend({
-      userId,
-      assinaturaId,
-      amountCentavos:  preview.amountCentavos,
-      cpf,
-      nome,
-      email,
-      descricao:       `${_planoAtual.nome || 'Assinatura Radar SIOPE'} — ${preview.ciclo_meses} meses`,
+      userId, assinaturaId, amountCentavos: preview.amountCentavos, cpf, nome, email,
+      descricao: `${_planoAtual.nome || 'Assinatura Radar SIOPE'} — ${preview.ciclo_meses} meses`,
       installmentsMax: _planoAtual.parcelas_sem_juros || preview.ciclo_meses,
-      dataPrimeiroVencimento: new Date().toISOString().split('T')[0],
-      ciclo_meses:     preview.ciclo_meses,
-      plano_slug:      _planoAtual.plano_slug || null,
+      dataPrimeiroVencimento: new Date().toISOString().split('T')[0], ciclo_meses: preview.ciclo_meses,
+      plano_slug: _planoAtual.plano_slug || null,
       metodosPagamento: Array.isArray(_planoAtual.metodos_pagamento) && _planoAtual.metodos_pagamento.length ? _planoAtual.metodos_pagamento : ['credit_card'],
     });
 
@@ -821,9 +778,9 @@ async function initAssinatura() {
 
   document.getElementById('aplicar-cupom')?.addEventListener('click', async () => {
     const codigo = document.getElementById('cupom')?.value.trim();
-    const fb     = document.getElementById('cupom-feedback');
+    const fb = document.getElementById('cupom-feedback');
     if (!_planoAtual) { mostrarMensagem('Selecione um plano antes de aplicar o cupom.'); return; }
-    if (!codigo)       { mostrarMensagem('Digite um código de cupom.'); return; }
+    if (!codigo) { mostrarMensagem('Digite um código de cupom.'); return; }
     const cupom = await validarCupom(codigo);
     if (cupom) {
       _cupomAplicado = cupom;
