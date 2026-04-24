@@ -765,6 +765,67 @@ function aplicarPlaceholders(template, dados) {
     .replace(/{{data_assinatura}}/gi, data_assinatura);
 }
 
+// ─── Gerar cobrança de multa de cancelamento (MP) ──────────────────────────
+async function _handleGerarCobrancaCancelamento(req, res) {
+  if (req.method !== 'POST') return json(res, 405, { ok: false, message: 'Método não permitido.' });
+  const { uid, assinaturaId, solicitacaoId, valorReais } = req.body || {};
+  if (!uid || !assinaturaId || !solicitacaoId || !valorReais) {
+    return json(res, 400, { ok: false, message: 'Parâmetros obrigatórios ausentes.' });
+  }
+
+  try {
+    const assinRef = db.collection('usuarios').doc(uid).collection('assinaturas').doc(assinaturaId);
+    const solRef = db.collection('usuarios').doc(uid).collection('solicitacoes').doc(solicitacaoId);
+
+    const [assinSnap, solSnap] = await Promise.all([assinRef.get(), solRef.get()]);
+    if (!assinSnap.exists || !solSnap.exists) {
+      return json(res, 404, { ok: false, message: 'Assinatura ou solicitação não encontrada.' });
+    }
+
+    const usuarioSnap = await db.collection('usuarios').doc(uid).get();
+    const usuario = usuarioSnap.data() || {};
+
+    const extRef = `cancelamento_${uid}_${assinaturaId}_${solicitacaoId}`;
+    const preferencePayload = {
+      items: [{
+        id: solicitacaoId,
+        title: `Multa Cancelamento - ${assinSnap.data().plano_nome || 'Assinatura'}`,
+        quantity: 1,
+        currency_id: 'BRL',
+        unit_price: Number(valorReais)
+      }],
+      payer: {
+        name: usuario.nome?.split(' ')[0] || 'Cliente',
+        surname: usuario.nome?.split(' ').slice(1).join(' ') || '',
+        email: usuario.email
+      },
+      external_reference: extRef,
+      back_urls: {
+        success: process.env.MP_BACK_URL_SUCCESS || `${process.env.NEXT_PUBLIC_BASE_URL}/painel.html`,
+        failure: process.env.MP_BACK_URL_FAILURE || `${process.env.NEXT_PUBLIC_BASE_URL}/painel.html`,
+        pending: process.env.MP_BACK_URL_PENDING || `${process.env.NEXT_PUBLIC_BASE_URL}/painel.html`
+      },
+      notification_url: process.env.MP_WEBHOOK_URL,
+      auto_return: 'approved',
+      payment_methods: { excluded_payment_types: [{ id: 'ticket' }, { id: 'bank_transfer' }] } // Só cartão
+    };
+
+    const mpResp = await mpFetch('/checkout/preferences', 'POST', preferencePayload);
+    const initPoint = mpResp.init_point || mpResp.sandbox_init_point;
+
+    // Salva link e referência
+    await Promise.all([
+      assinRef.set({ mp_link_multa: initPoint, mp_preference_multa: mpResp.id, atualizadoEm: admin.firestore.FieldValue.serverTimestamp() }, { merge: true }),
+      solRef.set({ status: 'cancelamento_pendente_multa', mp_link_multa: initPoint, atualizadoEm: admin.firestore.FieldValue.serverTimestamp() }, { merge: true })
+    ]);
+
+    return json(res, 200, { ok: true, link: initPoint, preferenceId: mpResp.id });
+  } catch (err) {
+    console.error('[gerar-cobranca-cancelamento] Erro:', err);
+    return json(res, 500, { ok: false, message: 'Erro ao gerar link MP.' });
+  }
+}
+
 // ─── Handler principal ────────────────────────────────────────────────────────
 export default async function handler(req, res) {
   try {
@@ -782,7 +843,7 @@ export default async function handler(req, res) {
 
     // Validar assinatura apenas para webhooks (não para criar-pedido / status-pedido)
     const acao = (req.query && req.query.acao) ? String(req.query.acao) : null;
-    const acoesPublicas = ['criar-pedido', 'status-pedido', 'ativar-sessao', 'validar-sessao', 'criar-sessao', 'cancelar-assinatura'];
+    const acoesPublicas = ['criar-pedido', 'status-pedido', 'ativar-sessao', 'validar-sessao', 'criar-sessao', 'cancelar-assinatura', 'gerar-cobranca-cancelamento'];
 
     if (!acao || !acoesPublicas.includes(acao)) {
       const sigCheck = validateMpWebhookSignature(rawBody, req);
@@ -844,7 +905,11 @@ export default async function handler(req, res) {
     if (req.method === 'POST' && acao === 'cancelar-assinatura') {
       return _handleCancelarAssinatura(req, res);
     }
-    
+
+    if (req.method === 'POST' && acao === 'gerar-cobranca-cancelamento') {
+      return _handleGerarCobrancaCancelamento(req, res);
+    }
+
     // ── POST ?acao=criar-pedido ───────────────────────────────────────────────
     if (req.method === 'POST' && acao === 'criar-pedido') {
       const body = req.body || {};
@@ -1060,43 +1125,65 @@ export default async function handler(req, res) {
         return json(res, 200, { ok: true, message: 'sem external_reference' });
       }
 
-      const parsed = parseExternalReference(externalRef);
-      if (!parsed) {
-        await globalNotifRef.set({ resolved: false, motivo: 'external_reference inválido' }, { merge: true });
-        return json(res, 200, { ok: true, message: 'external_reference inválido' });
-      }
+        const parsed = parseExternalReference(externalRef);
+        if (!parsed) {
+          await globalNotifRef.set({ resolved: false, motivo: 'external_reference inválido' }, { merge: true });
+          return json(res, 200, { ok: true, message: 'external_reference inválido' });
+        }
 
-      const { userId, assinaturaId, pedidoId } = parsed;
+        // 🔹 IMPORTANTE: mpStatus deve ser definido ANTES do bloco de cancelamento
+        const mpStatus = mpData.status || mpData.payment_status || null;
 
-      // fix #8: salvar notificação SEMPRE em notificacoes_mp (com mais ou menos dados)
-      // remove a bifurcação que descartava histórico em produção (logCompleto=false)
-      const notifRef = db.collection('usuarios').doc(userId)
-        .collection('assinaturas').doc(assinaturaId)
-        .collection('notificacoes_mp').doc(notifId);
+        // 🔹 TRATAMENTO DE MULTA DE CANCELAMENTO
+        if (externalRef && externalRef.startsWith('cancelamento_')) {
+          const parts = externalRef.replace('cancelamento_', '').split('_');
+          const [cUid, cAssinId, cSolId] = parts;
+          
+          if (mpStatus === 'approved' || mpStatus === 'paid') {
+            await Promise.all([
+              db.collection('usuarios').doc(cUid).collection('assinaturas').doc(cAssinId).set({ 
+                ajuste_status: 'pago', 
+                multa_pago_em: admin.firestore.FieldValue.serverTimestamp(), 
+                atualizadoEm: admin.firestore.FieldValue.serverTimestamp() 
+              }, { merge: true }),
+              db.collection('usuarios').doc(cUid).collection('solicitacoes').doc(cSolId).set({ 
+                status: 'multa_pago', 
+                atualizadoEm: admin.firestore.FieldValue.serverTimestamp() 
+              }, { merge: true })
+            ]);
+          }
+          return json(res, 200, { ok: true, message: 'multa processada' });
+        }
+        
+        // ── Fluxo normal (assinatura) ──
+        const { userId, assinaturaId, pedidoId } = parsed;
 
-      const notifSnap = await notifRef.get();
-      if (notifSnap.exists) {
-        return json(res, 200, { ok: true, message: 'já processado' });
-      }
+        // fix #8: salvar notificação SEMPRE em notificacoes_mp
+        const notifRef = db.collection('usuarios').doc(userId)
+          .collection('assinaturas').doc(assinaturaId)
+          .collection('notificacoes_mp').doc(notifId);
 
-      await notifRef.set(logCompleto()
-        ? { topic, id, mpData, recebidoEm: admin.firestore.FieldValue.serverTimestamp(), resolvedTipo: resolved.tipo }
-        : { topic, id, mpStatus: mpData.status || mpData.payment_status || null, recebidoEm: admin.firestore.FieldValue.serverTimestamp() }
-      );
+        const notifSnap = await notifRef.get();
+        if (notifSnap.exists) {
+          return json(res, 200, { ok: true, message: 'já processado' });
+        }
 
-      // Atualizar pedido
-      const pedidoRef = db.collection('usuarios').doc(userId)
-        .collection('assinaturas').doc(assinaturaId)
-        .collection('pedidos_mp').doc(pedidoId);
+        await notifRef.set(logCompleto()
+          ? { topic, id, mpData, recebidoEm: admin.firestore.FieldValue.serverTimestamp(), resolvedTipo: resolved.tipo }
+          : { topic, id, mpStatus, recebidoEm: admin.firestore.FieldValue.serverTimestamp() }
+        );
 
-      const pedidoSnap = await pedidoRef.get();
-      if (!pedidoSnap.exists) {
-        console.warn('Pedido não encontrado para external_reference:', externalRef);
-        await globalNotifRef.set({ processado: true, motivo: 'pedido não encontrado' }, { merge: true });
-        return json(res, 200, { ok: true, message: 'processado' });
-      }
+        // Atualizar pedido
+        const pedidoRef = db.collection('usuarios').doc(userId)
+          .collection('assinaturas').doc(assinaturaId)
+          .collection('pedidos_mp').doc(pedidoId);
 
-      const mpStatus = mpData.status || mpData.payment_status || null;
+        const pedidoSnap = await pedidoRef.get();
+        if (!pedidoSnap.exists) {
+          await globalNotifRef.set({ processado: true, motivo: 'pedido não encontrado' }, { merge: true });
+          return json(res, 200, { ok: true, message: 'processado' });
+        }
+
       let novoStatusPedido = 'pendente';
 
       if (['payment', 'payment_search', 'payment_search_ext'].includes(resolved.tipo)) {
