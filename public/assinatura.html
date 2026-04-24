@@ -635,20 +635,24 @@
 
     <form id="form-assinatura" novalidate>
       <input type="hidden" id="planId" />
-      <input type="hidden" id="planCiclo" value="mensal" />
+      <input type="hidden" id="planCiclo" value="3" />
 
       <!-- ── SEÇÃO 1: Escolha do Plano ── -->
       <div class="rs-section" id="secao-planos">
         <div class="rs-section-title">📋 Escolha seu plano</div>
 
-        <!-- Toggle mensal / anual -->
+        <!-- Toggle 3 / 6 / 12 meses -->
         <div class="rs-ciclo-toggle">
-          <button type="button" id="btn-ciclo-mensal" class="ativo" onclick="selecionarCiclo('mensal')">
-            Mensal
+          <button type="button" id="btn-ciclo-3" class="ativo" onclick="selecionarCiclo(3)">
+            3 meses
           </button>
-          <button type="button" id="btn-ciclo-anual" onclick="selecionarCiclo('anual')">
-            Anual
-            <span class="rs-badge-economia">2 meses grátis</span>
+          <button type="button" id="btn-ciclo-6" onclick="selecionarCiclo(6)">
+            6 meses
+            <span class="rs-badge-economia" id="badge-eco-6"></span>
+          </button>
+          <button type="button" id="btn-ciclo-12" onclick="selecionarCiclo(12)">
+            12 meses
+            <span class="rs-badge-economia" id="badge-eco-12"></span>
           </button>
         </div>
 
@@ -691,16 +695,15 @@
             <label for="whatsapp">WhatsApp</label>
             <input type="tel" id="whatsapp" placeholder="(00) 00000-0000" />
             <span id="error-whatsapp" class="field-error"></span>
-
-            <!-- opt-in WhatsApp — visível apenas para planos com a feature alvo -->
+            <!-- opt-in WhatsApp — visível apenas para planos com alertas via WhatsApp -->
             <div class="rs-whatsapp-wrap" id="whatsapp-optin-wrap">
               <input type="checkbox" id="whatsapp-optin" checked />
               <label for="whatsapp-optin">
                 Autorizo o Radar SIOPE a enviar alertas e comunicados para este número
-                <span class="wa-detalhe">Você pode revogar este consentimento a qualquer momento pelo canal de suporte.</span>
+                <span class="wa-detalhe">Você pode revogar este consentimento a qualquer momento pelo canal de
+                  suporte.</span>
               </label>
             </div>
-            <span id="error-whatsapp-optin" class="field-error" style="display:none; color:#c00; font-size:12px; margin-top:4px;"></span>
           </div>
         </div>
 
