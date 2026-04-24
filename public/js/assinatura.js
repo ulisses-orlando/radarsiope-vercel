@@ -23,7 +23,7 @@ const _planIdUrl   = getParam('planId') || null;
 const _leadIdUrl   = getParam('leadId') || getParam('idLead') || null;
 
 // ─── Estado global da sessão ──────────────────────────────────────────────────
-let _cicloAtual    = 'mensal';   // 'mensal' | 'anual'
+let _cicloAtual    = 3;          // 3 | 6 | 12 (meses)
 let _planoAtual    = null;       // objeto completo do plano selecionado
 let _tiposMap      = {};         // id -> nome dos tipos de newsletter
 let _cupomAplicado = null;       // objeto cupom validado
@@ -42,40 +42,69 @@ function safeNum(v) {
   return Number.isFinite(n) ? n : null;
 }
 
-function getPrecoPlano(plano, ciclo) {
+// Retorna o percentual de desconto configurado no plano para o ciclo
+function getDescontoPct(plano, cicloMeses) {
   if (!plano) return 0;
-  if (ciclo === 'anual' && plano.valor_anual != null) return Number(plano.valor_anual) || 0;
-  if (plano.valor_mensal != null) return Number(plano.valor_mensal) || 0;
-  // fallback campo legado
-  return Number(plano.valor) || 0;
+  if (cicloMeses === 6)  return Number(plano.desconto_pct_6m)  || 0;
+  if (cicloMeses === 12) return Number(plano.desconto_pct_12m) || 0;
+  return 0; // 3 meses sem desconto
+}
+
+// Retorna o preço mensal efetivo (com desconto) para o ciclo
+function getPrecoPlano(plano, cicloMeses) {
+  if (!plano) return 0;
+  const base = Number(plano.valor_mensal) || Number(plano.valor) || 0;
+  const pct  = getDescontoPct(plano, cicloMeses);
+  return Math.round(base * (1 - pct / 100) * 100) / 100;
+}
+
+// Retorna o total do ciclo (mensal efetivo × meses)
+function getTotalCiclo(plano, cicloMeses) {
+  return Math.round(getPrecoPlano(plano, cicloMeses) * cicloMeses * 100) / 100;
 }
 
 // ─── Toggle ciclo mensal / anual ─────────────────────────────────────────────
 
-function selecionarCiclo(ciclo) {
-  _cicloAtual = ciclo;
-  document.getElementById('planCiclo').value = ciclo;
+function selecionarCiclo(cicloMeses) {
+  _cicloAtual = Number(cicloMeses);
+  document.getElementById('planCiclo').value = _cicloAtual;
 
-  document.getElementById('btn-ciclo-mensal').classList.toggle('ativo', ciclo === 'mensal');
-  document.getElementById('btn-ciclo-anual').classList.toggle('ativo',  ciclo === 'anual');
+  [3, 6, 12].forEach(m => {
+    document.getElementById(`btn-ciclo-${m}`)?.classList.toggle('ativo', m === _cicloAtual);
+  });
 
-  // re-renderizar preços nos cards sem recarregar do Firestore
+  // Atualiza badges de desconto nos botões (lê do primeiro plano disponível)
+  const primeiroPlan = document.querySelector('.plano-card:not(.em-breve)')?._planoData;
+  if (primeiroPlan) {
+    const pct6  = getDescontoPct(primeiroPlan, 6);
+    const pct12 = getDescontoPct(primeiroPlan, 12);
+    const b6  = document.getElementById('badge-eco-6');
+    const b12 = document.getElementById('badge-eco-12');
+    if (b6)  { b6.textContent  = pct6  > 0 ? `${pct6}% off`  : ''; b6.style.display  = pct6  > 0 ? '' : 'none'; }
+    if (b12) { b12.textContent = pct12 > 0 ? `${pct12}% off` : ''; b12.style.display = pct12 > 0 ? '' : 'none'; }
+  }
+
+  // Re-renderiza preços nos cards sem recarregar do Firestore
   document.querySelectorAll('.plano-card').forEach(card => {
-    const slug = card.dataset.slug;
-    const p    = card._planoData;
+    const p = card._planoData;
     if (!p) return;
 
-    const val  = getPrecoPlano(p, ciclo);
-    const valM = getPrecoPlano(p, 'mensal');
+    const base    = Number(p.valor_mensal) || Number(p.valor) || 0;
+    const pct     = getDescontoPct(p, _cicloAtual);
+    const mensal  = getPrecoPlano(p, _cicloAtual);
+    const total   = getTotalCiclo(p, _cicloAtual);
+    const economia = Math.round(base * _cicloAtual * pct / 100 * 100) / 100;
 
-    card.querySelector('.plano-preco-valor').textContent = fmtBRL(val);
-    card.querySelector('.plano-preco-ciclo').textContent = ciclo === 'anual' ? '/ano' : '/mês';
+    card.querySelector('.plano-preco-valor').textContent = fmtBRL(mensal);
+    card.querySelector('.plano-preco-ciclo').textContent = '/mês';
+
+    const totalEl = card.querySelector('.plano-preco-total');
+    if (totalEl) totalEl.textContent = `Total: ${fmtBRL(total)}`;
 
     const econEl = card.querySelector('.plano-preco-anual-economia');
     if (econEl) {
-      if (ciclo === 'anual' && valM > 0 && val > 0) {
-        const economia = (valM * 12) - val;
-        econEl.textContent = economia > 0 ? `Economia de ${fmtBRL(economia)}/ano` : '';
+      if (pct > 0 && economia > 0) {
+        econEl.textContent = `${pct}% off · economia de ${fmtBRL(economia)}`;
         econEl.style.display = 'block';
       } else {
         econEl.style.display = 'none';
@@ -83,7 +112,6 @@ function selecionarCiclo(ciclo) {
     }
   });
 
-  // atualiza preview se já tiver plano selecionado
   if (_planoAtual) atualizarPreview();
 }
 
@@ -206,6 +234,7 @@ async function carregarListaPlanos() {
           <div class="plano-nome">${p.nome || p.id}</div>
           <div class="plano-preco-wrap">
             <span class="plano-preco-valor" style="color:${cor}">${fmtBRL(val)}</span>
+            <div class="plano-preco-total" style="font-size:11px;color:#666;margin-top:1px">${_cicloAtual > 3 ? `Total: ${fmtBRL(getTotalCiclo(p, _cicloAtual))}` : ''}</div>
             <span class="plano-preco-ciclo">${_cicloAtual === 'anual' ? '/ano' : '/mês'}</span>
             <div class="plano-preco-anual-economia" style="${economia > 0 && _cicloAtual === 'anual' ? '' : 'display:none'}">
               ${economia > 0 ? `Economia de ${fmtBRL(economia)}/ano` : ''}
@@ -405,7 +434,12 @@ async function validarCupom(codigo) {
 // ─── Calcular preview ─────────────────────────────────────────────────────────
 
 async function calcularPreview(plano, tiposSelecionados = [], cupomObj = null) {
-  const basePrice    = getPrecoPlano(plano, _cicloAtual);
+  const cicloMeses   = _cicloAtual;
+  const baseMensal   = Number(plano.valor_mensal) || Number(plano.valor) || 0;
+  const pct          = getDescontoPct(plano, cicloMeses);
+  const basePrice    = getPrecoPlano(plano, cicloMeses); // mensal com desconto
+  const descontoMensal = Math.round((baseMensal - basePrice) * 100) / 100;
+
   const tiposIncl    = Array.isArray(plano.tipos_inclusos) ? plano.tipos_inclusos.map(String) : [];
   const allowMulti   = !!plano.allow_multi_select;
   const bundles      = Array.isArray(plano.bundles) ? plano.bundles : [];
@@ -417,37 +451,51 @@ async function calcularPreview(plano, tiposSelecionados = [], cupomObj = null) {
     price:    tiposIncl.includes(String(id)) ? 0 : (Number(plano.price_per_tipo) || basePrice),
   }));
 
-  let total = allowMulti
+  let totalMensal = allowMulti
     ? items.reduce((s, i) => s + i.price, 0)
     : items.find(i => !i.included)?.price ?? (items.length ? basePrice : 0);
 
   // bundles
   bundles.forEach(b => {
     if (Array.isArray(b.types) && b.types.every(t => tiposSelecionados.includes(t))) {
-      if (b.discount_percent) total -= total * (Number(b.discount_percent) / 100);
-      else if (b.discount_fixed) total -= Number(b.discount_fixed);
+      if (b.discount_percent) totalMensal -= totalMensal * (Number(b.discount_percent) / 100);
+      else if (b.discount_fixed) totalMensal -= Number(b.discount_fixed);
     }
   });
 
-  const totalBruto = Math.max(0, total);
-  let desconto = 0;
+  const totalMensalBruto = Math.max(0, totalMensal);
+  let descontoCupom = 0;
 
   if (cupomObj) {
-    if (cupomObj.tipo === 'percentual') desconto = totalBruto * ((Number(cupomObj.valor) || 0) / 100);
-    else if (cupomObj.tipo === 'fixo')  desconto = Number(cupomObj.valor) || 0;
+    if (cupomObj.tipo === 'percentual') descontoCupom = totalMensalBruto * ((Number(cupomObj.valor) || 0) / 100);
+    else if (cupomObj.tipo === 'fixo')  descontoCupom = Number(cupomObj.valor) || 0;
   }
 
-  const totalFinal = Math.max(0, totalBruto - desconto);
+  const totalMensalFinal = Math.max(0, totalMensalBruto - descontoCupom);
+  const totalCiclo       = Math.round(totalMensalFinal * cicloMeses * 100) / 100;
+
+  // Campos de fidelização
+  const temFidelizacao = cicloMeses >= 6 && pct > 0;
+  const agora = new Date();
+  const dataFimFidelizacao = new Date(agora);
+  dataFimFidelizacao.setMonth(dataFimFidelizacao.getMonth() + cicloMeses);
 
   return {
     items,
     basePrice,
-    totalBruto,
-    desconto,
-    total:        totalFinal,
-    amountCentavos: Math.round(totalFinal * 100),
-    ciclo:        _cicloAtual,
-    cupom:        cupomObj,
+    baseMensal,
+    totalBruto:              totalMensalBruto,
+    desconto:                descontoCupom,
+    total:                   totalCiclo,           // total do ciclo completo
+    valor_mensal_contratado: totalMensalFinal,      // mensal efetivo após desconto de ciclo
+    amountCentavos:          Math.round(totalCiclo * 100),
+    ciclo:                   cicloMeses,            // mantém compatibilidade
+    ciclo_meses:             cicloMeses,
+    desconto_pct:            pct,
+    desconto_mensal:         descontoMensal,
+    tem_fidelizacao:         temFidelizacao,
+    data_fim_fidelizacao:    dataFimFidelizacao,
+    cupom:                   cupomObj,
   };
 }
 
@@ -495,15 +543,35 @@ async function atualizarPreview() {
     const parcelas = parcelasEl ? Number(parcelasEl.value) || 1 : 1;
     const semJuros = _planoAtual.permitir_sem_juros && parcelas <= (_planoAtual.parcelas_sem_juros || 1);
 
-    let textoTotal = fmtBRL(pv.total);
-    if (_cicloAtual === 'anual') {
-      textoTotal += ' (pagamento anual)';
+    // Linha de desconto de ciclo
+    if (pv.desconto_pct > 0 && pv.desconto_mensal > 0) {
+      html += `<div class="preview-row desconto">
+                 <span>🏷 Desconto ${pv.ciclo_meses} meses (${pv.desconto_pct}% off)</span>
+                 <span>− ${fmtBRL(pv.desconto_mensal)}/mês</span>
+               </div>`;
+    }
+
+    let textoTotal = '';
+    if (pv.ciclo_meses > 1) {
+      textoTotal = `${fmtBRL(pv.valor_mensal_contratado)}/mês × ${pv.ciclo_meses} = ${fmtBRL(pv.total)}`;
     } else if (parcelas > 1) {
       const parcVal = pv.total / parcelas;
       textoTotal = `${parcelas}× de ${fmtBRL(parcVal)}${semJuros ? ' sem juros' : ''}`;
+    } else {
+      textoTotal = fmtBRL(pv.total);
     }
 
-    html += `<div class="preview-row total"><span>Total</span><span>${textoTotal}</span></div>`;
+    html += `<div class="preview-row total"><span>Total do período</span><span>${textoTotal}</span></div>`;
+
+    // Cláusula de fidelização
+    if (pv.tem_fidelizacao) {
+      const dtFim = pv.data_fim_fidelizacao.toLocaleDateString('pt-BR');
+      html += `<div class="preview-row" style="margin-top:8px;padding:8px 10px;background:#fffbeb;border-radius:6px;font-size:12px;color:#92400e;border:1px solid #fde68a">
+                 <span>⚖️ Fidelização até ${dtFim}</span>
+                 <span>Cancelamento antecipado: devolução de ${fmtBRL(pv.desconto_mensal)} × meses usados</span>
+               </div>`;
+    }
+
     totalEl.innerHTML = html;
   }
 
@@ -580,35 +648,45 @@ async function registrarAssinatura(userId, payload, preview) {
   if (!userId || !payload || !preview) throw new Error('Parâmetros obrigatórios ausentes.');
 
   const agora = new Date();
+  const cicloMeses = preview.ciclo_meses || 3;
   const renovacao = new Date(agora);
-  if (preview.ciclo === 'anual') renovacao.setFullYear(renovacao.getFullYear() + 1);
-  else renovacao.setMonth(renovacao.getMonth() + 1);
+  renovacao.setMonth(renovacao.getMonth() + cicloMeses);
 
   const data = {
     // Identificação
     planId:       payload.planId  || null,
     plano_slug:   payload.plano_slug || null,
     plano_nome:   payload.plano_nome || null,
-    ciclo:        preview.ciclo   || 'mensal',
+    ciclo:        String(cicloMeses), // mantém campo legado
+    ciclo_meses:  cicloMeses,
     // Tipos
     tipos_selecionados: Array.isArray(payload.tipos_selecionados) ? payload.tipos_selecionados : [],
     // Valores
-    valor_original:  preview.totalBruto  ?? 0,
-    valor_desconto:  preview.desconto    ?? 0,
-    valor_final:     preview.total       ?? 0,
-    amountCentavos:  preview.amountCentavos ?? 0,
+    valor_original:          preview.totalBruto            ?? 0,
+    valor_desconto:          preview.desconto               ?? 0,
+    valor_final:             preview.total                  ?? 0,
+    amountCentavos:          preview.amountCentavos         ?? 0,
+    valor_base_mensal:       preview.baseMensal             ?? 0,
+    valor_mensal_contratado: preview.valor_mensal_contratado ?? 0,
+    desconto_mensal:         preview.desconto_mensal        ?? 0,
+    desconto_pct:            preview.desconto_pct           ?? 0,
+    // Fidelização
+    tem_fidelizacao:         preview.tem_fidelizacao        ?? false,
+    data_fim_fidelizacao:    preview.tem_fidelizacao
+      ? firebase.firestore.Timestamp.fromDate(preview.data_fim_fidelizacao)
+      : null,
     // Cupom
     cupom:           payload.cupom || null,
     // Features snapshot — garante histórico mesmo se o plano mudar depois
     features_snapshot: payload.features || null,
     // Datas
-    data_inicio:         firebase.firestore.Timestamp.fromDate(agora),
+    data_inicio:            firebase.firestore.Timestamp.fromDate(agora),
     data_proxima_renovacao: firebase.firestore.Timestamp.fromDate(renovacao),
     // Status
     status:          'pendente_pagamento',
     paymentProvider: 'mercadopago',
     orderId:         payload.orderId || null,
-    pedidoId:        null, // preenchido após retorno do backend
+    pedidoId:        null,
     // Auditoria
     origem:          _origem,
     createdAt:       firebase.firestore.FieldValue.serverTimestamp(),
@@ -846,10 +924,10 @@ if (temErro) return;
       cpf,
       nome,
       email,
-      descricao:       _planoAtual.nome || 'Assinatura Radar SIOPE',
-      installmentsMax: _planoAtual.parcelas_sem_juros || 1,
+      descricao:       `${_planoAtual.nome || 'Assinatura Radar SIOPE'} — ${preview.ciclo_meses} meses`,
+      installmentsMax: _planoAtual.parcelas_sem_juros || preview.ciclo_meses,
       dataPrimeiroVencimento: new Date().toISOString().split('T')[0],
-      ciclo,
+      ciclo_meses:     preview.ciclo_meses,
       plano_slug:      _planoAtual.plano_slug || null,
       metodosPagamento: Array.isArray(_planoAtual.metodos_pagamento) && _planoAtual.metodos_pagamento.length
         ? _planoAtual.metodos_pagamento
