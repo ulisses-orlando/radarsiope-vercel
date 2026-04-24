@@ -138,10 +138,10 @@ async function carregarListaPlanos() {
       return;
     }
 
-    // 🔹 2. Container de abas (sempre horizontal)
+    // 🔹 2. Container de abas (SEMPRE horizontal, ocupa 100% da largura)
     const tabsWrap = document.createElement('div');
     tabsWrap.id = 'ciclo-tabs';
-    tabsWrap.style.cssText = 'display:flex;flex-direction:row;gap:12px;margin-bottom:24px;flex-wrap:wrap;align-items:center;width:100%;';
+    tabsWrap.style.cssText = 'display:flex; gap:12px; margin-bottom:24px; width:100%; align-items:stretch;';
     wrap.appendChild(tabsWrap);
 
     // 🔹 3. Container dinâmico para os planos (sempre 2 colunas)
@@ -149,7 +149,6 @@ async function carregarListaPlanos() {
     gridContainer.id = 'grid-planos-dinamico';
     gridContainer.style.cssText = 'display:grid;grid-template-columns:repeat(2, 1fr);gap:16px;min-height:200px;width:100%;';
     
-    // Injeta CSS responsivo garantido
     if (!document.getElementById('css-assinatura-dinamico')) {
       const style = document.createElement('style');
       style.id = 'css-assinatura-dinamico';
@@ -176,7 +175,7 @@ async function carregarListaPlanos() {
       });
     }
 
-    // 🔹 5. Criar botões das abas
+    // 🔹 5. Criar botões das abas (LARGURA IGUAL E OCUPA A LINHA TODA)
     ciclosOrdenados.forEach((ciclo, idx) => {
       const btn = document.createElement('button');
       btn.type = 'button';
@@ -184,9 +183,7 @@ async function carregarListaPlanos() {
       btn.dataset.ciclo = ciclo;
       const isDefault = idx === 0;
       
-      // display:inline-flex garante que fiquem na mesma linha
-      btn.style.cssText = `display:inline-flex;align-items:center;justify-content:center;padding:10px 24px;border:1px solid ${isDefault ? '#0A3D62' : '#cbd5e1'};border-radius:24px;font-size:14px;font-weight:600;cursor:pointer;
-        background:${isDefault ? '#0A3D62' : '#ffffff'};color:${isDefault ? '#ffffff' : '#475569'};transition:all 0.2s;box-shadow:0 1px 2px rgba(0,0,0,0.05);min-width:110px;`;
+      btn.style.cssText = `flex:1; min-width:0; display:flex; align-items:center; justify-content:center; padding:14px 12px; border:1px solid ${isDefault ? '#0A3D62' : '#cbd5e1'}; border-radius:10px; font-size:14px; font-weight:600; cursor:pointer; background:${isDefault ? '#0A3D62' : '#ffffff'}; color:${isDefault ? '#ffffff' : '#475569'}; transition:all 0.2s; box-shadow:0 1px 2px rgba(0,0,0,0.05); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;`;
       
       btn.addEventListener('click', () => {
         tabsWrap.querySelectorAll('button').forEach(b => {
