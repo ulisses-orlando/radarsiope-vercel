@@ -393,23 +393,51 @@ async function abrirModalPlano(id = null, editar = false) {
   body.appendChild(btnCalcAnual);
 
   // Seção: Ciclos e Descontos
-  body.appendChild(_secLabel('📅 Ciclos e Descontos por Fidelização'));
+  body.appendChild(_secLabel('📅 Ciclos Disponíveis e Descontos'));
+  const ciclosWrap = document.createElement('div');
+  ciclosWrap.style.cssText = 'display:flex;flex-direction:column;gap:10px;padding:12px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px';
 
-  const ciclosGrid = document.createElement('div');
-  ciclosGrid.style.cssText = 'display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:10px';
-  ciclosGrid.innerHTML = `
-    <div>
-      <label style="font-size:12px;color:#555;display:block;margin-bottom:4px">Desconto — 6 meses (%)</label>
-      <input id="pl-desc-6m" type="number" value="${d.desconto_pct_6m ?? 10}" min="0" max="50" step="1" style="${_inputStyle()}">
-      <div style="font-size:11px;color:#888;margin-top:3px">0 = sem desconto neste ciclo</div>
-    </div>
-    <div>
-      <label style="font-size:12px;color:#555;display:block;margin-bottom:4px">Desconto — 12 meses (%)</label>
-      <input id="pl-desc-12m" type="number" value="${d.desconto_pct_12m ?? 20}" min="0" max="50" step="1" style="${_inputStyle()}">
-      <div style="font-size:11px;color:#888;margin-top:3px">0 = sem desconto neste ciclo</div>
-    </div>
-  `;
-  body.appendChild(ciclosGrid);
+  const ciclosDef = [
+    { id: '1', label: '1 mês (mensal)', default: false },
+    { id: '3', label: '3 meses (trimestral)', default: true },
+    { id: '6', label: '6 meses (semestral)', default: false },
+    { id: '12', label: '12 meses (anual)', default: false }
+  ];
+
+  const ciclosSelecionados = Array.isArray(d.ciclos_disponiveis) 
+    ? d.ciclos_disponiveis 
+    : ciclosDef.filter(c => c.default).map(c => c.id);
+
+  const descontos = typeof d.descontos_por_ciclo === 'object' 
+    ? d.descontos_por_ciclo 
+    : { 1: 0, 3: 0, 6: 10, 12: 20 };
+
+  ciclosDef.forEach(c => {
+    const ativo = ciclosSelecionados.includes(c.id);
+    const desc = descontos[c.id] || 0;
+    const row = document.createElement('div');
+    row.style.cssText = 'display:flex;align-items:center;gap:12px';
+    row.innerHTML = `
+      <label style="display:flex;align-items:center;gap:6px;cursor:pointer;min-width:200px">
+        <input type="checkbox" class="ciclo-check" value="${c.id}" ${ativo ? 'checked' : ''}> 
+        <span style="font-size:13px">${c.label}</span>
+      </label>
+      <div style="display:flex;align-items:center;gap:6px;opacity:${ativo ? '1' : '0.4'};pointer-events:${ativo ? 'auto' : 'none'}">
+        <label style="font-size:12px;color:#555">Desconto:</label>
+        <input type="number" class="ciclo-desc-input" data-ciclo="${c.id}" value="${desc}" min="0" max="50" style="width:70px;padding:4px 6px;border:1px solid #ccc;border-radius:4px">
+        <span style="font-size:12px;color:#888">%</span>
+      </div>
+    `;
+    // Habilita/desabilita input ao marcar ciclo
+    row.querySelector('.ciclo-check').addEventListener('change', function() {
+      const input = row.querySelector('.ciclo-desc-input');
+      input.parentElement.style.opacity = this.checked ? '1' : '0.4';
+      input.parentElement.style.pointerEvents = this.checked ? 'auto' : 'none';
+    });
+    ciclosWrap.appendChild(row);
+  });
+  body.appendChild(ciclosWrap);
+  body.appendChild(_info('Marque os ciclos que este plano oferecerá. O desconto será aplicado automaticamente no checkout.'));
 
   // Calculadora de ciclos (atualiza ao mudar preço ou descontos)
   const calcWrap = document.createElement('div');
@@ -711,7 +739,12 @@ function _autoPreencherPeloSlug() {
 // ─── Salvar plano ────────────────────────────────────────────────────────────
 
 async function _salvarPlano(id, editar) {
-  // coleta
+  // Coleta ciclos e descontos
+  const ciclosDisponiveis = Array.from(document.querySelectorAll('.ciclo-check:checked')).map(cb => cb.value);
+  const descontosPorCiclo = {};
+  document.querySelectorAll('.ciclo-desc-input').forEach(inp => {
+    descontosPorCiclo[inp.dataset.ciclo] = Number(inp.value) || 0;
+  });
   const slug       = document.getElementById('pl-slug')?.value?.trim() || '';
   const nome       = document.getElementById('pl-nome')?.value?.trim() || '';
   const descricao  = document.getElementById('pl-descricao')?.value?.trim() || '';
@@ -809,8 +842,8 @@ async function _salvarPlano(id, editar) {
     tipos_inclusos,
     vagas_grupo_vip:   features.grupo_whatsapp_vip ? (safeNumber(vagasRaw) || 50) : null,
     features,
-    desconto_pct_6m:   descontoPct6m,
-    desconto_pct_12m:  descontoPct12m,
+    ciclos_disponiveis:    ciclosDisponiveis.length ? ciclosDisponiveis : ['3'],
+    descontos_por_ciclo:   descontosPorCiclo,
     metodos_pagamento: metodosPagamento.length ? metodosPagamento : ['credit_card'],
     tipo:              'assinatura',
     updatedAt:         firebase.firestore.FieldValue.serverTimestamp(),
