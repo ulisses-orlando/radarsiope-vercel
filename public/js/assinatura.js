@@ -20,7 +20,6 @@ const _planIdUrl   = getParam('planId') || null;
 const _leadIdUrl   = getParam('leadId') || getParam('idLead') || null;
 
 // ─── Estado global da sessão ──────────────────────────────────────────────────
-// _cicloAtual removido. Agora cada plano mantém seu próprio cicloSelecionado
 let _planoAtual    = null;       // objeto completo do plano selecionado + cicloSelecionado
 let _tiposMap      = {};         // id -> nome dos tipos de newsletter
 let _cupomAplicado = null;       // objeto cupom validado
@@ -39,7 +38,6 @@ function safeNum(v) {
 }
 
 // Retorna o percentual de desconto configurado no plano para o ciclo
-// Suporta novo formato (descontos_por_ciclo) e fallback antigo
 function getDescontoPct(plano, cicloMeses) {
   if (!plano) return 0;
   const c = String(cicloMeses);
@@ -134,20 +132,25 @@ async function carregarListaPlanos() {
       const cor = p.cor_destaque || '#0A3D62';
       const features = p.features || {};
       
-      // Define ciclos disponíveis (fallback para ['3'] se não configurado)
-      const ciclosDisp = Array.isArray(p.ciclos_disponiveis) && p.ciclos_disponiveis.length 
-        ? p.ciclos_disponiveis 
-        : ['3'];
-      const cicloPadrao = ciclosDisp[0];
+      // 🔹 BLINDAGEM 1: Sanitiza ciclos_disponiveis para garantir array de strings
+      let ciclosRaw = p.ciclos_disponiveis;
+      if (!Array.isArray(ciclosRaw) || ciclosRaw.length === 0) {
+        ciclosRaw = ['3', '6', '12'];
+        console.warn(`[assinatura] Plano "${p.nome || p.id}" sem ciclos configurados. Usando fallback padrão.`, p);
+      }
+      const ciclosDisp = ciclosRaw.map(c => String(c));
+      
+      // 🔹 BLINDAGEM 2: Define ciclo padrão seguro (prioriza '3' se disponível)
+      const cicloPadrao = ciclosDisp.includes('3') ? '3' : ciclosDisp[0];
 
       // Gera botões de ciclo dinâmicos por card
       const botoesCiclosHtml = ciclosDisp.map(c => {
         const preco = getPrecoPlano(p, c);
         const ativo = c === cicloPadrao;
         return `<button type="button" class="ciclo-btn" data-plan="${p.id}" data-ciclo="${c}" 
-                style="padding:4px 10px;font-size:12px;border:1px solid ${ativo ? cor : '#ddd'};
-                background:${ativo ? cor : '#fff'};color:${ativo ? '#fff' : '#333'};
-                border-radius:4px;cursor:pointer;margin:4px 2px 0 0;transition:all .2s">
+                style="display:inline-flex; align-items:center; justify-content:center; padding:5px 12px; font-size:12px; font-weight:500; border:1px solid ${ativo ? cor : '#cbd5e1'};
+                background:${ativo ? cor : '#ffffff'}; color:${ativo ? '#ffffff' : '#475569'};
+                border-radius:20px; cursor:pointer; margin:4px 2px 0 0; transition:all .2s; box-shadow:0 1px 2px rgba(0,0,0,0.05);">
                 ${c}m · ${fmtBRL(preco)}/mês
               </button>`;
       }).join('');
@@ -165,7 +168,7 @@ async function carregarListaPlanos() {
       const total = getTotalCiclo(p, cicloPadrao);
 
       const card = document.createElement('label');
-      card.className     = `plano-card${p.destaque ? ' destaque' : ''}${p.em_breve ? ' em-breve' : ''}`;
+      card.className      = `plano-card${p.destaque ? ' destaque' : ''}${p.em_breve ? ' em-breve' : ''}`;
       card.dataset.id    = p.id;
       card.dataset.slug  = p.plano_slug || '';
       card.dataset.emBreve = p.em_breve ? 'true' : 'false';
@@ -175,21 +178,27 @@ async function carregarListaPlanos() {
       card.innerHTML = `
         ${p.em_breve ? `<div class="plano-badge-em-breve">🚀 Em breve</div>` : ''}
         ${!p.em_breve && p.destaque && p.badge ? `<div class="plano-badge-destaque">${p.badge}</div>` : ''}
-        <input type="radio" name="plano-selecionado" value="${p.id}" ${p.em_breve ? 'disabled' : ''}>
-        <div class="plano-content${p.em_breve ? ' plano-content--bloqueado' : ''}">
-          <div class="plano-nome">${p.nome || p.id}</div>
-          <div class="plano-preco-wrap">
-            <span class="plano-preco-valor" style="color:${cor}">${fmtBRL(val)}</span>
-            <div class="plano-preco-total" style="font-size:11px;color:#666;margin-top:1px">
+         <input type="radio" name="plano-selecionado" value="${p.id}" ${p.em_breve ? 'disabled' : ''}>
+         <div class="plano-content${p.em_breve ? ' plano-content--bloqueado' : ''}">
+           <div class="plano-nome">${p.nome || p.id}</div>
+           
+           <!-- Container dedicado para evitar colapso de layout -->
+           <div class="ciclo-options" style="display:flex; flex-wrap:wrap; gap:4px; margin:8px 0 4px;">
+             ${botoesCiclosHtml}
+           </div>
+
+           <div class="plano-preco-wrap">
+             <span class="plano-preco-valor" style="color:${cor}">${fmtBRL(val)}</span>
+             <div class="plano-preco-total" style="font-size:11px;color:#666;margin-top:1px">
               ${Number(cicloPadrao) > 1 ? `Total: ${fmtBRL(total)}` : ''}
-            </div>
-            <span class="plano-preco-ciclo">/mês</span>
-          </div>
-          ${botoesCiclosHtml}
+             </div>
+             <span class="plano-preco-ciclo">/mês</span>
+           </div>
+          
           ${p.descricao ? `<div class="plano-descricao">${p.descricao}</div>` : ''}
-          <ul class="plano-features">${featuresHtml}</ul>
+           <ul class="plano-features">${featuresHtml}</ul>
           ${p.em_breve ? `<div class="plano-em-breve-aviso">Disponível em breve — cadastre-se em <a href="capturaLead.html" style="pointer-events:auto;position:relative;z-index:10;text-decoration:underline;cursor:pointer">nossa página</a> para garantir sua vaga.</div>` : ''}
-        </div>
+         </div>
       `;
 
       // Listener único para troca de ciclo e seleção de plano
@@ -214,10 +223,10 @@ async function carregarListaPlanos() {
           const totalEl = card.querySelector('.plano-preco-total');
           if (totalEl) totalEl.textContent = Number(novoCiclo) > 1 ? `Total: ${fmtBRL(totalC)}` : '';
 
-          // Seleciona o plano com o ciclo escolhido (mesmo que ainda não estivesse selecionado)
+          // Seleciona o plano com o ciclo escolhido
           _onPlanoSelecionado(p.id, novoCiclo);
 
-        } else if (!p.em_breve) {
+         } else if (!p.em_breve) {
           _onPlanoSelecionado(p.id, cicloPadrao);
         }
       });
@@ -241,7 +250,7 @@ async function carregarListaPlanos() {
 async function _onPlanoSelecionado(planId, cicloInicial = null) {
   const plano = await carregarPlano(planId);
   if (!plano || plano.em_breve) return;
-
+  
   const ciclosDisp = Array.isArray(plano.ciclos_disponiveis) && plano.ciclos_disponiveis.length 
     ? plano.ciclos_disponiveis 
     : ['3'];
@@ -446,7 +455,7 @@ async function atualizarPreview() {
 
   if (itemsEl) {
     itemsEl.innerHTML = pv.items.map(it => 
-      `<div class="preview-row"><span>${it.nome}</span><span>${it.included ? '<span style="color:#16a34a">Incluído</span>' : fmtBRL(it.price)}</span></div>`
+     `<div class="preview-row"><span>${it.nome}</span><span>${it.included ? '<span style="color:#16a34a">Incluído</span>' : fmtBRL(it.price)}</span></div>`
     ).join('');
   }
 
@@ -683,6 +692,7 @@ async function processarEnvioAssinatura(e) {
   const preferencia = document.getElementById('preferencia-contato')?.value    || '';
   const cupomCod   = document.getElementById('cupom')?.value.trim()            || '';
   const aceita     = !!document.getElementById('aceita-termos')?.checked;
+  
   // Ciclo vem do estado do plano selecionado, com fallback seguro
   const ciclo      = _planoAtual?.cicloSelecionado || 3;
   const tiposSelecionados = [...document.querySelectorAll('#grupo-newsletters input[type="checkbox"]:checked')].map(cb => cb.value);
