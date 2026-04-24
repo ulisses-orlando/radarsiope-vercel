@@ -1,6 +1,7 @@
 /* ==========================================================================
 assinatura.js — Radar SIOPE
-Fluxo completo de assinatura: planos, ciclos dinâmicos por plano, WhatsApp,
+Layout: Agrupado por Ciclo → Cards de Planos dentro de cada ciclo
+Fluxo completo de assinatura: planos, ciclos dinâmicos, WhatsApp,
 cupom, preview, upsert usuário, registro assinatura, pagamento MP.
 Dependências globais:
 window.db (Firestore inicializado)
@@ -76,7 +77,7 @@ async function carregarPlano(planId) {
   }
 }
 
-// ─── Renderizar lista de planos em cards ──────────────────────────────────────
+// ─── Renderizar lista de planos AGRUPADA POR CICLO ────────────────────────────
 async function carregarListaPlanos() {
   const wrap = document.getElementById('planos-cards');
   if (!wrap) return;
@@ -84,25 +85,23 @@ async function carregarListaPlanos() {
 
   try {
     if (!window.FeaturesManager || !window.FeaturesManager.carregarFeatures) {
-      console.error('[assinatura] FeaturesManager não está disponível');
       wrap.innerHTML = '<div style="color:#c00;font-size:13px">Erro: FeaturesManager não carregado.</div>';
       return;
     }
     if (!window.db) {
-      console.error('[assinatura] Firebase db não está disponível');
       wrap.innerHTML = '<div style="color:#c00;font-size:13px">Erro: Firebase não inicializado.</div>';
       return;
     }
 
     let allFeatures = [];
     try { allFeatures = await window.FeaturesManager.carregarFeatures() || []; } 
-    catch (err) { console.error('[assinatura] Erro ao carregar features do Firestore:', err); }
+    catch (err) { console.error('[assinatura] Erro ao carregar features:', err); }
     allFeatures = allFeatures.filter(f => f.ativo !== false);
 
     if (allFeatures.length === 0) {
       allFeatures = [
         { id: 'newsletter_texto', nome: 'Newsletter em texto' },
-        { id: 'newsletter_audio', nome: 'Newsletter em áudio (podcast)' },
+        { id: 'newsletter_audio', nome: 'Newsletter em áudio' },
         { id: 'newsletter_video', nome: 'Newsletter em vídeo' },
         { id: 'newsletter_infografico', nome: 'Infográfico por edição' },
         { id: 'alertas_prioritarios', nome: 'Alertas prioritários' },
@@ -126,112 +125,41 @@ async function carregarListaPlanos() {
     }
 
     wrap.innerHTML = '';
+    const planos = snap.docs.map(d => ({ id: d.id, ...d.data() }));
 
-    snap.forEach(doc => {
-      const p   = { id: doc.id, ...doc.data() };
-      const cor = p.cor_destaque || '#0A3D62';
-      const features = p.features || {};
-      
-      // 🔹 BLINDAGEM 1: Sanitiza ciclos_disponiveis para garantir array de strings
-      let ciclosRaw = p.ciclos_disponiveis;
-      if (!Array.isArray(ciclosRaw) || ciclosRaw.length === 0) {
-        ciclosRaw = ['3', '6', '12'];
-        console.warn(`[assinatura] Plano "${p.nome || p.id}" sem ciclos configurados. Usando fallback padrão.`, p);
-      }
-      const ciclosDisp = ciclosRaw.map(c => String(c));
-      
-      // 🔹 BLINDAGEM 2: Define ciclo padrão seguro (prioriza '3' se disponível)
-      const cicloPadrao = ciclosDisp.includes('3') ? '3' : ciclosDisp[0];
+    // 🔄 Ciclos que aparecerão como "containers/cards" principais
+    const ciclosParaExibir = ['3', '12']; 
 
-      // Gera botões de ciclo dinâmicos por card
-      const botoesCiclosHtml = ciclosDisp.map(c => {
-        const preco = getPrecoPlano(p, c);
-        const ativo = c === cicloPadrao;
-        return `<button type="button" class="ciclo-btn" data-plan="${p.id}" data-ciclo="${c}" 
-                style="display:inline-flex; align-items:center; justify-content:center; padding:5px 12px; font-size:12px; font-weight:500; border:1px solid ${ativo ? cor : '#cbd5e1'};
-                background:${ativo ? cor : '#ffffff'}; color:${ativo ? '#ffffff' : '#475569'};
-                border-radius:20px; cursor:pointer; margin:4px 2px 0 0; transition:all .2s; box-shadow:0 1px 2px rgba(0,0,0,0.05);">
-                ${c}m · ${fmtBRL(preco)}/mês
-              </button>`;
-      }).join('');
+    ciclosParaExibir.forEach(ciclo => {
+      // Filtra planos que possuem este ciclo habilitado
+      const planosDoCiclo = planos.filter(p => 
+        Array.isArray(p.ciclos_disponiveis) && p.ciclos_disponiveis.map(String).includes(String(ciclo))
+      );
 
-      const featuresHtml = allFeatures.map(f => {
-        const val  = features[f.id];
-        const ativo = !!val;
-        let label  = f.nome || f.id;
-        if (f.id === 'sugestao_tema_quota' && Number(val) > 0) label = `${val} sugestão${Number(val) > 1 ? 'ões' : ''} de tema/mês`;
-        else if (f.id === 'consultoria_horas_mes' && Number(val) > 0) label = `Consultoria ${val}h/mês`;
-        return `<li class="${ativo ? '' : 'inativo'}">${label}</li>`;
-      }).join('');
+      if (planosDoCiclo.length === 0) return;
 
-      const val = getPrecoPlano(p, cicloPadrao);
-      const total = getTotalCiclo(p, cicloPadrao);
+      // Container visual do ciclo
+      const cicloSection = document.createElement('div');
+      cicloSection.className = `ciclo-section ciclo-${ciclo}m`;
+      cicloSection.style.marginBottom = '32px';
 
-      const card = document.createElement('label');
-      card.className      = `plano-card${p.destaque ? ' destaque' : ''}${p.em_breve ? ' em-breve' : ''}`;
-      card.dataset.id    = p.id;
-      card.dataset.slug  = p.plano_slug || '';
-      card.dataset.emBreve = p.em_breve ? 'true' : 'false';
-      card.style.setProperty('--plano-cor', cor);
-      card._planoData    = p;
+      // Header do ciclo
+      const header = document.createElement('div');
+      header.style.cssText = 'font-size:18px;font-weight:700;color:#0A3D62;margin-bottom:12px;padding-bottom:6px;border-bottom:2px solid #e2e8f0;display:flex;align-items:center;gap:8px';
+      header.innerHTML = `📅 ${ciclo} Meses <span style="font-size:12px;color:#64748b;font-weight:400">(${planosDoCiclo.length} plano${planosDoCiclo.length>1?'s':''})</span>`;
+      cicloSection.appendChild(header);
 
-      card.innerHTML = `
-        ${p.em_breve ? `<div class="plano-badge-em-breve">🚀 Em breve</div>` : ''}
-        ${!p.em_breve && p.destaque && p.badge ? `<div class="plano-badge-destaque">${p.badge}</div>` : ''}
-         <input type="radio" name="plano-selecionado" value="${p.id}" ${p.em_breve ? 'disabled' : ''}>
-         <div class="plano-content${p.em_breve ? ' plano-content--bloqueado' : ''}">
-           <div class="plano-nome">${p.nome || p.id}</div>
-           
-           <!-- Container dedicado para evitar colapso de layout -->
-           <div class="ciclo-options" style="display:flex; flex-wrap:wrap; gap:4px; margin:8px 0 4px;">
-             ${botoesCiclosHtml}
-           </div>
+      // Grid de planos dentro deste ciclo
+      const grid = document.createElement('div');
+      grid.style.cssText = 'display:grid;grid-template-columns:repeat(auto-fit, minmax(280px, 1fr));gap:16px';
 
-           <div class="plano-preco-wrap">
-             <span class="plano-preco-valor" style="color:${cor}">${fmtBRL(val)}</span>
-             <div class="plano-preco-total" style="font-size:11px;color:#666;margin-top:1px">
-              ${Number(cicloPadrao) > 1 ? `Total: ${fmtBRL(total)}` : ''}
-             </div>
-             <span class="plano-preco-ciclo">/mês</span>
-           </div>
-          
-          ${p.descricao ? `<div class="plano-descricao">${p.descricao}</div>` : ''}
-           <ul class="plano-features">${featuresHtml}</ul>
-          ${p.em_breve ? `<div class="plano-em-breve-aviso">Disponível em breve — cadastre-se em <a href="capturaLead.html" style="pointer-events:auto;position:relative;z-index:10;text-decoration:underline;cursor:pointer">nossa página</a> para garantir sua vaga.</div>` : ''}
-         </div>
-      `;
-
-      // Listener único para troca de ciclo e seleção de plano
-      card.addEventListener('click', (e) => {
-        const cicloBtn = e.target.closest('.ciclo-btn');
-        if (cicloBtn && !p.em_breve) {
-          e.stopPropagation();
-          const novoCiclo = cicloBtn.dataset.ciclo;
-
-          // Atualiza visual dos botões neste card
-          card.querySelectorAll('.ciclo-btn').forEach(btn => {
-            const isAtivo = btn.dataset.ciclo === novoCiclo;
-            btn.style.background    = isAtivo ? cor : '#fff';
-            btn.style.color         = isAtivo ? '#fff' : '#333';
-            btn.style.borderColor   = isAtivo ? cor : '#ddd';
-          });
-
-          // Atualiza preço exibido no card
-          const preco  = getPrecoPlano(p, novoCiclo);
-          const totalC = getTotalCiclo(p, novoCiclo);
-          card.querySelector('.plano-preco-valor').textContent = fmtBRL(preco);
-          const totalEl = card.querySelector('.plano-preco-total');
-          if (totalEl) totalEl.textContent = Number(novoCiclo) > 1 ? `Total: ${fmtBRL(totalC)}` : '';
-
-          // Seleciona o plano com o ciclo escolhido
-          _onPlanoSelecionado(p.id, novoCiclo);
-
-         } else if (!p.em_breve) {
-          _onPlanoSelecionado(p.id, cicloPadrao);
-        }
+      planosDoCiclo.forEach(p => {
+        const card = _criarCardPlano(p, ciclo, allFeatures);
+        grid.appendChild(card);
       });
 
-      wrap.appendChild(card);
+      cicloSection.appendChild(grid);
+      wrap.appendChild(cicloSection);
     });
 
     // Pré-seleciona se veio planId na URL
@@ -240,17 +168,71 @@ async function carregarListaPlanos() {
       if (match) match.click();
       else await _onPlanoSelecionado(_planIdUrl);
     }
+
   } catch (err) {
     console.error('[assinatura] Erro ao carregar planos:', err);
     wrap.innerHTML = '<div style="color:#c00;font-size:13px">Erro ao carregar planos. Recarregue a página.</div>';
   }
 }
 
+// ─── Helper: Cria um card de plano para um ciclo específico ───────────────────
+function _criarCardPlano(plano, ciclo, allFeatures) {
+  const cor = plano.cor_destaque || '#0A3D62';
+  const features = plano.features || {};
+  const featuresHtml = allFeatures.map(f => {
+    const val = features[f.id];
+    const ativo = !!val;
+    let label = f.nome || f.id;
+    if (f.id === 'sugestao_tema_quota' && Number(val) > 0) label = `${val} sugestão${Number(val)>1?'ões':''}/mês`;
+    else if (f.id === 'consultoria_horas_mes' && Number(val) > 0) label = `Consultoria ${val}h/mês`;
+    return `<li class="${ativo ? '' : 'inativo'}">${label}</li>`;
+  }).join('');
+
+  const val = getPrecoPlano(plano, ciclo);
+  const total = getTotalCiclo(plano, ciclo);
+
+  const card = document.createElement('label');
+  card.className = `plano-card${plano.destaque ? ' destaque' : ''}${plano.em_breve ? ' em-breve' : ''}`;
+  card.dataset.id    = plano.id;
+  card.dataset.ciclo = ciclo; // 🔹 Importante para agrupamento
+  card.style.setProperty('--plano-cor', cor);
+  card._planoData = plano;
+  card._cicloAtual = Number(ciclo);
+
+  card.innerHTML = `
+    ${plano.em_breve ? '<div class="plano-badge-em-breve">🚀 Em breve</div>' : ''}
+    ${!plano.em_breve && plano.destaque && plano.badge ? `<div class="plano-badge-destaque">${plano.badge}</div>` : ''}
+    <input type="radio" name="plano-selecionado" value="${plano.id}-${ciclo}" ${plano.em_breve ? 'disabled' : ''}>
+    <div class="plano-content${plano.em_breve ? ' plano-content--bloqueado' : ''}">
+      <div class="plano-nome">${plano.nome || plano.id}</div>
+      <div class="plano-preco-wrap">
+        <span class="plano-preco-valor" style="color:${cor}">${fmtBRL(val)}</span>
+        <div class="plano-preco-total" style="font-size:11px;color:#666;margin-top:1px">
+          ${Number(ciclo)>1 ? `Total: ${fmtBRL(total)}` : ''}
+        </div>
+        <span class="plano-preco-ciclo">/mês</span>
+      </div>
+      ${plano.descricao ? `<div class="plano-descricao">${plano.descricao}</div>` : ''}
+      <ul class="plano-features">${featuresHtml}</ul>
+      ${plano.em_breve ? `<div class="plano-em-breve-aviso">Em breve — <a href="capturaLead.html">cadastre-se</a></div>` : ''}
+    </div>
+  `;
+
+  // Clique no card seleciona o plano + ciclo
+  card.addEventListener('click', (e) => {
+    if (plano.em_breve) return;
+    e.stopPropagation();
+    _onPlanoSelecionado(plano.id, ciclo);
+  });
+
+  return card;
+}
+
 // ─── Ao selecionar um plano ───────────────────────────────────────────────────
 async function _onPlanoSelecionado(planId, cicloInicial = null) {
   const plano = await carregarPlano(planId);
   if (!plano || plano.em_breve) return;
-  
+
   const ciclosDisp = Array.isArray(plano.ciclos_disponiveis) && plano.ciclos_disponiveis.length 
     ? plano.ciclos_disponiveis 
     : ['3'];
@@ -260,11 +242,12 @@ async function _onPlanoSelecionado(planId, cicloInicial = null) {
 
   document.getElementById('planId').value = planId;
   
-  // marca card visualmente
+  // Marca visualmente o card selecionado (funciona entre grupos de ciclo)
   document.querySelectorAll('.plano-card').forEach(c => {
-    c.classList.toggle('selecionado', c.dataset.id === planId);
+    const isSelected = c.dataset.id === planId && String(c.dataset.ciclo) === String(_planoAtual.cicloSelecionado);
+    c.classList.toggle('selecionado', isSelected);
     const radio = c.querySelector('input[type="radio"]');
-    if (radio) radio.checked = c.dataset.id === planId;
+    if (radio) radio.checked = isSelected;
   });
 
   _atualizarCampoParcelas(plano);
@@ -455,7 +438,7 @@ async function atualizarPreview() {
 
   if (itemsEl) {
     itemsEl.innerHTML = pv.items.map(it => 
-     `<div class="preview-row"><span>${it.nome}</span><span>${it.included ? '<span style="color:#16a34a">Incluído</span>' : fmtBRL(it.price)}</span></div>`
+      `<div class="preview-row"><span>${it.nome}</span><span>${it.included ? '<span style="color:#16a34a">Incluído</span>' : fmtBRL(it.price)}</span></div>`
     ).join('');
   }
 
@@ -693,7 +676,7 @@ async function processarEnvioAssinatura(e) {
   const cupomCod   = document.getElementById('cupom')?.value.trim()            || '';
   const aceita     = !!document.getElementById('aceita-termos')?.checked;
   
-  // Ciclo vem do estado do plano selecionado, com fallback seguro
+  // Ciclo vem diretamente do estado do plano selecionado
   const ciclo      = _planoAtual?.cicloSelecionado || 3;
   const tiposSelecionados = [...document.querySelectorAll('#grupo-newsletters input[type="checkbox"]:checked')].map(cb => cb.value);
 
