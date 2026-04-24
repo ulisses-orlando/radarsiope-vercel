@@ -198,27 +198,25 @@ async function carregarListaPlanos() {
         if (cicloBtn && !p.em_breve) {
           e.stopPropagation();
           const novoCiclo = cicloBtn.dataset.ciclo;
-          
+
           // Atualiza visual dos botões neste card
           card.querySelectorAll('.ciclo-btn').forEach(btn => {
             const isAtivo = btn.dataset.ciclo === novoCiclo;
-            btn.style.background = isAtivo ? cor : '#fff';
-            btn.style.color = isAtivo ? '#fff' : '#333';
-            btn.style.borderColor = isAtivo ? cor : '#ddd';
+            btn.style.background    = isAtivo ? cor : '#fff';
+            btn.style.color         = isAtivo ? '#fff' : '#333';
+            btn.style.borderColor   = isAtivo ? cor : '#ddd';
           });
 
-          // Atualiza preço exibido
-          const preco = getPrecoPlano(p, novoCiclo);
+          // Atualiza preço exibido no card
+          const preco  = getPrecoPlano(p, novoCiclo);
           const totalC = getTotalCiclo(p, novoCiclo);
           card.querySelector('.plano-preco-valor').textContent = fmtBRL(preco);
           const totalEl = card.querySelector('.plano-preco-total');
-          if (totalEl) totalEl.textContent = `Total: ${fmtBRL(totalC)}`;
+          if (totalEl) totalEl.textContent = Number(novoCiclo) > 1 ? `Total: ${fmtBRL(totalC)}` : '';
 
-          // Se este plano está selecionado, atualiza preview
-          if (_planoAtual?.id === p.id) {
-            _planoAtual.cicloSelecionado = Number(novoCiclo);
-            atualizarPreview();
-          }
+          // Seleciona o plano com o ciclo escolhido (mesmo que ainda não estivesse selecionado)
+          _onPlanoSelecionado(p.id, novoCiclo);
+
         } else if (!p.em_breve) {
           _onPlanoSelecionado(p.id, cicloPadrao);
         }

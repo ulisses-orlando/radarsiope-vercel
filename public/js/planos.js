@@ -32,6 +32,8 @@ const PLANOS_CANON = {
     metodos_pagamento: ['credit_card'],
     desconto_pct_6m:  10,
     desconto_pct_12m: 20,
+    descontos_por_ciclo: { '1': 0, '3': 0, '6': 10, '12': 20 },
+    ciclos_disponiveis: ['3', '6', '12'],
   },
   essence: {
     nome: 'Radar Essence',
@@ -53,6 +55,8 @@ const PLANOS_CANON = {
     metodos_pagamento: ['credit_card'],
     desconto_pct_6m:  10,
     desconto_pct_12m: 20,
+    descontos_por_ciclo: { '1': 0, '3': 0, '6': 10, '12': 20 },
+    ciclos_disponiveis: ['3', '6', '12'],
   },
   profissional: {
     nome: 'Radar Profissional',
@@ -74,6 +78,8 @@ const PLANOS_CANON = {
     metodos_pagamento: ['credit_card'],
     desconto_pct_6m:  10,
     desconto_pct_12m: 20,
+    descontos_por_ciclo: { '1': 0, '3': 0, '6': 10, '12': 20 },
+    ciclos_disponiveis: ['3', '6', '12'],
   },
   premium: {
     nome: 'Radar Premium',
@@ -95,6 +101,7 @@ const PLANOS_CANON = {
     metodos_pagamento: ['credit_card'],
     desconto_pct_6m:  10,
     desconto_pct_12m: 20,
+    descontos_por_ciclo: { '1': 0, '3': 0, '6': 10, '12': 20 },
   },
   supreme: {
     nome: 'Radar Supreme',
@@ -116,6 +123,8 @@ const PLANOS_CANON = {
     metodos_pagamento: ['credit_card'],
     desconto_pct_6m:  10,
     desconto_pct_12m: 20,
+    descontos_por_ciclo: { '1': 0, '3': 0, '6': 10, '12': 20 },
+    ciclos_disponiveis: ['3', '6', '12'],
   }
 };
 
@@ -447,26 +456,33 @@ async function abrirModalPlano(id = null, editar = false) {
 
   function _atualizarCalcCiclos() {
     const vm = safeNumber(document.getElementById('pl-valor-mensal')?.value) || 0;
-    const d6  = Number(document.getElementById('pl-desc-6m')?.value)  || 0;
-    const d12 = Number(document.getElementById('pl-desc-12m')?.value) || 0;
     if (!vm) { calcWrap.innerHTML = '<em>Preencha o valor mensal para ver os totais por ciclo.</em>'; return; }
-    const t3  = vm * 3;
-    const t6  = Math.round(vm * 6  * (1 - d6  / 100) * 100) / 100;
-    const t12 = Math.round(vm * 12 * (1 - d12 / 100) * 100) / 100;
-    const m6  = Math.round(vm * (1 - d6  / 100) * 100) / 100;
-    const m12 = Math.round(vm * (1 - d12 / 100) * 100) / 100;
-    calcWrap.innerHTML = `
-      <strong>Valores calculados por ciclo:</strong><br>
-      3 meses: ${fmtBRL(vm)}/mês — total <strong>${fmtBRL(t3)}</strong> (sem desconto)<br>
-      6 meses: ${fmtBRL(m6)}/mês — total <strong>${fmtBRL(t6)}</strong>${d6 > 0 ? ` (${d6}% off · economia ${fmtBRL(vm*6 - t6)})` : ''}<br>
-      12 meses: ${fmtBRL(m12)}/mês — total <strong>${fmtBRL(t12)}</strong>${d12 > 0 ? ` (${d12}% off · economia ${fmtBRL(vm*12 - t12)})` : ''}
-    `;
+
+    // Lê descontos a partir dos inputs dinâmicos por ciclo
+    const descs = {};
+    document.querySelectorAll('.ciclo-desc-input').forEach(inp => {
+      descs[inp.dataset.ciclo] = Number(inp.value) || 0;
+    });
+
+    const linhas = [1, 3, 6, 12].map(m => {
+      // Só exibe se o ciclo estiver marcado (checkbox ativo)
+      const check = document.querySelector(`.ciclo-check[value="${m}"]`);
+      if (check && !check.checked) return null;
+      const pct      = descs[m] || 0;
+      const mensal   = Math.round(vm * (1 - pct / 100) * 100) / 100;
+      const total    = Math.round(mensal * m * 100) / 100;
+      const economia = Math.round(vm * m * pct / 100 * 100) / 100;
+      const label    = { 1: '1 mês', 3: '3 meses', 6: '6 meses', 12: '12 meses' }[m];
+      return `${label}: ${fmtBRL(mensal)}/mês — total <strong>${fmtBRL(total)}</strong>${pct > 0 ? ` (${pct}% off · economia ${fmtBRL(economia)})` : ' (sem desconto)'}`;
+    }).filter(Boolean);
+
+    calcWrap.innerHTML = `<strong>Valores calculados por ciclo:</strong><br>${linhas.join('<br>')}`;
   }
 
-  // Recalcula ao mudar campos
-  ['pl-valor-mensal', 'pl-desc-6m', 'pl-desc-12m'].forEach(id => {
-    document.getElementById(id)?.addEventListener('input', _atualizarCalcCiclos);
-  });
+  // Recalcula ao mudar valor mensal, descontos ou seleção de ciclos
+  document.getElementById('pl-valor-mensal')?.addEventListener('input', _atualizarCalcCiclos);
+  ciclosWrap.addEventListener('change', _atualizarCalcCiclos);
+  ciclosWrap.addEventListener('input', _atualizarCalcCiclos);
   _atualizarCalcCiclos();
 
   // Seção: Parcelamento
@@ -725,12 +741,22 @@ function _autoPreencherPeloSlug() {
   const vagasWrap = document.getElementById('pl-vagas-wrap');
   if (vagasWrap) vagasWrap.style.display = canon.features.grupo_whatsapp_vip ? 'block' : 'none';
 
-  // preenche descontos de ciclo
-  const desc6El  = document.getElementById('pl-desc-6m');
-  const desc12El = document.getElementById('pl-desc-12m');
-  if (desc6El  && canon.desconto_pct_6m  !== undefined) desc6El.value  = canon.desconto_pct_6m;
-  if (desc12El && canon.desconto_pct_12m !== undefined) desc12El.value = canon.desconto_pct_12m;
-  // recalcula a calculadora de ciclos
+  // Preenche ciclos disponíveis e descontos a partir do canônico
+  const canonCiclos    = canon.ciclos_disponiveis    || ['3', '6', '12'];
+  const canonDescontos = canon.descontos_por_ciclo   || {};
+
+  document.querySelectorAll('.ciclo-check').forEach(cb => {
+    cb.checked = canonCiclos.includes(cb.value);
+    // dispara change para habilitar/desabilitar o input de desconto
+    cb.dispatchEvent(new Event('change'));
+  });
+
+  document.querySelectorAll('.ciclo-desc-input').forEach(inp => {
+    const pct = canonDescontos[inp.dataset.ciclo];
+    if (pct !== undefined) inp.value = pct;
+  });
+
+  // Recalcula a calculadora de ciclos
   if (typeof _atualizarCalcCiclos === 'function') _atualizarCalcCiclos();
 
   mostrarMensagem(`✅ Features do "${canon.nome}" aplicadas! Ajuste os valores de preço.`);
@@ -760,9 +786,7 @@ async function _salvarPlano(id, editar) {
   const statusVal  = document.querySelector('input[name="pl-status"]:checked')?.value || 'ativo';
   const allowMulti = !!document.getElementById('pl-allow-multi')?.checked;
   const vagasRaw   = document.getElementById('pl-vagas')?.value;
-  const emBreve         = !!document.getElementById('pl-em-breve')?.checked;
-  const descontoPct6m   = Number(document.getElementById('pl-desc-6m')?.value)  || 0;
-  const descontoPct12m  = Number(document.getElementById('pl-desc-12m')?.value) || 0;
+  const emBreve          = !!document.getElementById('pl-em-breve')?.checked;
   const metodosPagamento = Array.from(
     document.querySelectorAll('.mp-metodo-check:checked')
   ).map(cb => cb.value);
@@ -844,7 +868,10 @@ async function _salvarPlano(id, editar) {
     features,
     ciclos_disponiveis:    ciclosDisponiveis.length ? ciclosDisponiveis : ['3'],
     descontos_por_ciclo:   descontosPorCiclo,
-    metodos_pagamento: metodosPagamento.length ? metodosPagamento : ['credit_card'],
+    // Campos legados — mantidos para getDescontoPct fallback em assinatura.js
+    desconto_pct_6m:       Number(descontosPorCiclo['6'])  || 0,
+    desconto_pct_12m:      Number(descontosPorCiclo['12']) || 0,
+    metodos_pagamento:     metodosPagamento.length ? metodosPagamento : ['credit_card'],
     tipo:              'assinatura',
     updatedAt:         firebase.firestore.FieldValue.serverTimestamp(),
   };
