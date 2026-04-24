@@ -635,26 +635,13 @@
 
     <form id="form-assinatura" novalidate>
       <input type="hidden" id="planId" />
-      <input type="hidden" id="planCiclo" value="3" />
+      <input type="hidden" id="planCiclo" value="" />
 
       <!-- ── SEÇÃO 1: Escolha do Plano ── -->
       <div class="rs-section" id="secao-planos">
         <div class="rs-section-title">📋 Escolha seu plano</div>
 
-        <!-- Toggle 3 / 6 / 12 meses -->
-        <div class="rs-ciclo-toggle">
-          <button type="button" id="btn-ciclo-3" class="ativo" onclick="selecionarCiclo(3)">
-            3 meses
-          </button>
-          <button type="button" id="btn-ciclo-6" onclick="selecionarCiclo(6)">
-            6 meses
-            <span class="rs-badge-economia" id="badge-eco-6"></span>
-          </button>
-          <button type="button" id="btn-ciclo-12" onclick="selecionarCiclo(12)">
-            12 meses
-            <span class="rs-badge-economia" id="badge-eco-12"></span>
-          </button>
-        </div>
+        <!-- Ciclos disponíveis por plano — os botões são renderizados em cada card pelo JS -->
 
         <!-- Cards de plano renderizados pelo JS -->
         <div id="planos-lista">
