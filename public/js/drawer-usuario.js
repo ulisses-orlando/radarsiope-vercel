@@ -551,11 +551,8 @@ async function _renderSolicitacoes() {
   try {
     const snap = await db.collection('usuarios').doc(uid)
       .collection('solicitacoes').orderBy('data_solicitacao', 'desc').get();
-
     let html = `<div style="margin-bottom:10px">
-      <button class="btn-drawer-sm" onclick="abrirModalEnvioManual('${uid}')">
-        📧 Enviar mensagem manual
-      </button>
+      <button class="btn-drawer-sm" onclick="abrirModalEnvioManual('${uid}')">📧 Enviar mensagem manual</button>
     </div>`;
 
     if (snap.empty) {
@@ -567,58 +564,167 @@ async function _renderSolicitacoes() {
     snap.forEach(doc => {
       const s = doc.data();
       const status = (s.status || 'pendente').toLowerCase();
-      if (status === 'aberta' || status === 'pendente') pendentes++;
+      if (status === 'aberta' || status === 'pendente' || status === 'cancelamento_pendente_multa') pendentes++;
       const c = _stColor(status);
-      const isAdmin = s.tipo === 'envio_manual_admin';
+      const isCancel = s.tipo === 'cancelamento';
+      const calculo  = s.calculo_multa || {};
+      const valorMulta = Number(calculo.valor_ajuste || 0);
 
-      const respostaHtml = s.resposta
-        ? `<div style="background:#f1f5f9;border-left:3px solid #0284c7;
-            border-radius:4px;padding:6px 8px;font-size:12px;margin-top:6px">
-            💡 ${s.resposta}
-           </div>` : '';
-
-      const acoes = (status === 'aberta' || status === 'pendente') ? `
+      // Botões padrão (outros tipos)
+      let acoes = (status === 'aberta' || status === 'pendente') && !isCancel ? `
         <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">
-          <button class="btn-drawer-sm btn-verde"
-            onclick="_drawerResponderSolicitacao('${uid}','${doc.id}','atendida')">
-            ✅ Atendida
-          </button>
-          <button class="btn-drawer-sm btn-vermelho"
-            onclick="_drawerResponderSolicitacao('${uid}','${doc.id}','cancelada')">
-            ❌ Cancelar
-          </button>
-          <button class="btn-drawer-sm"
-            onclick="_drawerResponderSolicitacao('${uid}','${doc.id}','atendida')">
-            ✍️ Responder
-          </button>
+          <button class="btn-drawer-sm btn-verde" onclick="_drawerResponderSolicitacao('${uid}','${doc.id}','atendida')">✅ Atendida</button>
+          <button class="btn-drawer-sm btn-vermelho" onclick="_drawerResponderSolicitacao('${uid}','${doc.id}','cancelada')">❌ Cancelar</button>
+          <button class="btn-drawer-sm" onclick="_drawerResponderSolicitacao('${uid}','${doc.id}','atendida')">✍️ Responder</button>
         </div>` : '';
 
-      html += `
-        <div id="sol-card-${doc.id}" style="border-left:4px solid ${c};border-radius:8px;background:#f8fafc;
-          padding:10px 12px;margin-bottom:10px">
-          <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">
-            <span style="font-size:12px;font-weight:700;color:#334155">
-              ${isAdmin ? '📧 Mensagem da equipe' : (s.tipo || 'Outros')}
-            </span>
-            ${_stBadge(s.status)}
-          </div>
-          <div style="font-size:13px;color:#334155;margin-top:6px;line-height:1.5">
-            ${isAdmin ? (s.assunto ? `<strong>${s.assunto}</strong><br>` : '') : ''}
-            ${s.descricao || s.mensagem || '—'}
-          </div>
-          ${respostaHtml}${acoes}
-          <div style="font-size:11px;color:#94a3b8;margin-top:6px">${_fmtHora(s.data_solicitacao || s.data_envio)}</div>
-        </div>`;
+      // Botões exclusivos para CANCELAMENTO (usa APENAS calculo_multa)
+      if (isCancel) {
+        if (status === 'aberta' || status === 'pendente') {
+          acoes = `
+            <div style="margin-top:8px;padding:10px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;font-size:12px">
+              <div style="font-weight:600;margin-bottom:6px;color:#0A3D62">⛔ Cálculo de Fidelização (Pré-aprovado)</div>
+              <div style="display:grid;grid-template-columns:auto 1fr;gap:4px 8px;color:#475569;line-height:1.5">
+                <span>📅 Meses usados:</span> <strong>${calculo.meses_usados || '—'}</strong>
+                <span>🔒 Fidelização até:</span> <strong>${calculo.data_fim_fidelizacao ? new Date(calculo.data_fim_fidelizacao).toLocaleDateString('pt-BR') : 'Não se aplica'}</strong>
+                <span>💰 Desconto/mês:</span> <strong>${calculo.desconto_mensal ? calculo.desconto_mensal.toLocaleString('pt-BR',{style:'currency',currency:'BRL'}) : 'R$ 0,00'}</strong>
+                <span>🧾 Valor do ajuste:</span> <strong style="color:${valorMulta > 0 ? '#b45309' : '#16a34a'};font-size:13px">${valorMulta.toLocaleString('pt-BR',{style:'currency',currency:'BRL'})}</strong>
+              </div>
+              ${valorMulta > 0 
+                ? `<button class="btn-drawer-sm" style="background:#2563eb;color:#fff;border:none;margin-top:8px;width:100%" onclick="_gerarLinkMulta('${uid}','${doc.id}',${valorMulta})">🔗 Gerar Link de Multa (MP)</button>`
+                : `<button class="btn-drawer-sm btn-verde" style="margin-top:8px;width:100%" onclick="_confirmarEncerramentoDireto('${uid}','${doc.id}')">✅ Confirmar Encerramento (Isento)</button>`
+              }
+            </div>`;
+        } else if (status === 'cancelamento_pendente_multa' && s.mp_link_multa) {
+          acoes = `
+            <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">
+              <button class="btn-drawer-sm" style="background:#2563eb;color:#fff;border:none" onclick="window.open('${s.mp_link_multa}', '_blank')">🔍 Visualizar Pagamento</button>
+              <button class="btn-drawer-sm btn-verde" onclick="_confirmarEncerramentoFinal('${uid}','${doc.id}')">✅ Confirmar Encerramento</button>
+            </div>`;
+        } else if (status === 'multa_pago' || status === 'cancelada') {
+          acoes = `<div style="margin-top:6px;font-size:12px;color:#22c55e">✅ Processo finalizado</div>`;
+        }
+      }
     });
 
     if (pendentes) {
       html = `<div class="drawer-alerta amarelo">🟠 <strong>${pendentes}</strong> solicitação(ões) aguardando atendimento</div>` + html;
     }
     body.innerHTML = html;
+  } catch (e) { body.innerHTML = `<p style="color:#ef4444">Erro: ${e.message}</p>`; }
+}
+
+// ─── Modal para gerar link MP usando o valor JÁ CALCULADO ─────────────────────
+async function _abrirModalGerarLinkMulta(uid, solId, valorReais) {
+  const valor = Number(valorReais) || 0;
+  const mensagem = `Gerar link de cobrança de ${valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} para o assinante?`;
+  
+  if (!confirm(mensagem)) return;
+
+  const btn = event.target;
+  btn.disabled = true; 
+  btn.textContent = '⏳ Gerando...';
+  
+  try {
+    const resp = await fetch('/api/pagamentoMP?acao=gerar-cobranca-cancelamento', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ uid, solicitacaoId: solId, valorReais: valor })
+    });
+    const data = await resp.json();
+    if (!data.ok) throw new Error(data.message || 'Erro ao gerar link');
+
+    await db.collection('usuarios').doc(uid).collection('solicitacoes').doc(solId)
+      .update({ 
+        status: 'cancelamento_pendente_multa',
+        mp_link_multa: data.link,
+        mp_preference_multa: data.preferenceId,
+        atualizadoEm: new Date().toISOString()
+      });
+
+    mostrarMensagem('✅ Link gerado! O assinante poderá pagar pelo painel ou por e-mail.');
+    _ativarDrawerTab('solicitacoes');
   } catch (e) {
-    body.innerHTML = `<p style="color:#ef4444">Erro: ${e.message}</p>`;
+    mostrarMensagem('❌ Erro ao gerar link: ' + e.message);
   }
 }
+
+// Não esqueça de exportar a função no final do arquivo:
+window._abrirModalGerarLinkMulta = _abrirModalGerarLinkMulta;
+
+// ─── Encerramento direto (quando multa = R$ 0,00) ───────────────────────────
+async function _confirmarEncerramentoDireto(uid, solId) {
+  if (!confirm('Confirmar encerramento da assinatura sem cobrança de multa?')) return;
+  try {
+    // 1. Busca assinatura ativa
+    const assSnap = await db.collection('usuarios').doc(uid).collection('assinaturas')
+      .where('status', 'in', ['ativa', 'aprovada']).limit(1).get();
+    if (assSnap.empty) throw new Error('Assinatura ativa não encontrada.');
+    const assinId = assSnap.docs[0].id;
+
+    // 2. Atualiza tudo em batch
+    const batch = db.batch();
+    batch.update(db.collection('usuarios').doc(uid).collection('assinaturas').doc(assinId), {
+      status: 'cancelada',
+      cancelado_em: new Date().toISOString(),
+      atualizadoEm: new Date().toISOString()
+    });
+    batch.update(db.collection('usuarios').doc(uid).collection('solicitacoes').doc(solId), {
+      status: 'cancelada',
+      resposta: 'Cancelamento processado e encerrado pelo administrador (isento de multa).',
+      data_resposta: new Date().toISOString(),
+      atualizadoEm: new Date().toISOString()
+    });
+    // 3. Desativa sessões
+    const sessoes = await db.collection('usuarios').doc(uid).collection('sessoes').where('ativo', '==', true).get();
+    sessoes.docs.forEach(doc => batch.update(doc.ref, { ativo: false, desativado_motivo: 'cancelamento_admin' }));
+
+    await batch.commit();
+    mostrarMensagem('✅ Encerramento confirmado. Sessões desativadas.');
+    _ativarDrawerTab('solicitacoes');
+    atualizarBadgeUsuarios();
+  } catch (e) {
+    mostrarMensagem('❌ Erro: ' + e.message);
+  }
+}
+
+// ─── Confirmar Encerramento ─────────────────────────────────────────────────
+async function _confirmarEncerramentoCancelamento(uid, solId) {
+  if (!confirm('Confirmar o encerramento definitivo da assinatura? Esta ação não pode ser desfeita.')) return;
+  try {
+    // Busca assinatura ativa
+    const assSnap = await db.collection('usuarios').doc(uid).collection('assinaturas').where('status', 'in', ['ativa','aprovada','cancelamento_pendente_multa','multa_pago']).limit(1).get();
+    if (assSnap.empty) throw new Error('Assinatura não encontrada.');
+    const assinId = assSnap.docs[0].id;
+
+    const batch = db.batch();
+    // 1. Atualiza assinatura
+    batch.update(db.collection('usuarios').doc(uid).collection('assinaturas').doc(assinId), {
+      status: 'cancelada',
+      cancelado_em: admin.firestore.FieldValue.serverTimestamp(),
+      atualizadoEm: admin.firestore.FieldValue.serverTimestamp()
+    });
+    // 2. Atualiza solicitação
+    batch.update(db.collection('usuarios').doc(uid).collection('solicitacoes').doc(solId), {
+      status: 'cancelada',
+      resposta: 'Cancelamento processado e encerrado pelo administrador.',
+      atualizadoEm: admin.firestore.FieldValue.serverTimestamp()
+    });
+    // 3. Desativa sessões
+    const sessoes = await db.collection('usuarios').doc(uid).collection('sessoes').where('ativo', '==', true).get();
+    sessoes.docs.forEach(doc => batch.update(doc.ref, { ativo: false, desativado_motivo: 'cancelamento_admin' }));
+
+    await batch.commit();
+    mostrarMensagem('✅ Encerramento confirmado. Sessões desativadas.');
+    _ativarDrawerTab('solicitacoes');
+    await atualizarBadgeUsuarios();
+  } catch (e) { mostrarMensagem('Erro: ' + e.message); }
+}
+
+// Não esqueça de exportar no final do arquivo:
+window._abrirModalProcessarCancelamento = _abrirModalProcessarCancelamento;
+window._confirmarEncerramentoCancelamento = _confirmarEncerramentoCancelamento;
+window._gerarLinkMulta = _gerarLinkMulta;
 
 // Responder solicitação → mostra campo inline, decrementa contador, dispara push
 async function _drawerResponderSolicitacao(uid, solId, novoStatus) {
@@ -1041,6 +1147,53 @@ async function _resetarFeedbackEnvio(assinId, envioId) {
   } catch (e) { mostrarMensagem('Erro: ' + e.message); }
 }
 
+async function _gerarLinkMulta(uid, solId, valor) {
+const mensagem = `Gerar link de cobrança de ${valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} para o assinante?`;
+
+if (!confirm(mensagem)) return;
+
+try {
+    const resp = await fetch('/api/pagamentoMP?acao=gerar-cobranca-cancelamento', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ uid, solicitacaoId: solId, valorReais: valor })
+    });
+    const data = await resp.json();
+    if (!data.ok) throw new Error(data.message);
+    await db.collection('usuarios').doc(uid).collection('solicitacoes').doc(solId)
+      .update({ status: 'cancelamento_pendente_multa', mp_link_multa: data.link, mp_preference_multa: data.preferenceId, atualizadoEm: new Date().toISOString() });
+    mostrarMensagem('✅ Link gerado!');
+    _ativarDrawerTab('solicitacoes');
+  } catch (e) { mostrarMensagem('❌ Erro: ' + e.message); }
+}
+
+async function _confirmarEncerramentoDireto(uid, solId) {
+  if (!confirm('Encerrar sem cobrança de multa?')) return;
+  await _executarEncerramento(uid, solId, 'Isento de multa');
+}
+
+async function _confirmarEncerramentoFinal(uid, solId) {
+  if (!confirm('Confirmar encerramento definitivo após pagamento?')) return;
+  await _executarEncerramento(uid, solId, 'Pago e confirmado pelo admin');
+}
+
+async function _executarEncerramento(uid, solId, motivo) {
+  try {
+    const assSnap = await db.collection('usuarios').doc(uid).collection('assinaturas').where('status', 'in', ['ativa','aprovada','cancelamento_pendente_multa','multa_pago']).limit(1).get();
+    if (assSnap.empty) throw new Error('Assinatura ativa não encontrada.');
+    const assinId = assSnap.docs[0].id;
+
+    const batch = db.batch();
+    batch.update(db.collection('usuarios').doc(uid).collection('assinaturas').doc(assinId), { status: 'cancelada', cancelado_em: new Date().toISOString(), atualizadoEm: new Date().toISOString() });
+    batch.update(db.collection('usuarios').doc(uid).collection('solicitacoes').doc(solId), { status: 'cancelada', resposta: motivo, atualizadoEm: new Date().toISOString() });
+    const sessoes = await db.collection('usuarios').doc(uid).collection('sessoes').where('ativo', '==', true).get();
+    sessoes.docs.forEach(doc => batch.update(doc.ref, { ativo: false, desativado_motivo: 'cancelamento_admin' }));
+    await batch.commit();
+    mostrarMensagem('✅ Encerramento confirmado. Sessões desativadas.');
+    _ativarDrawerTab('solicitacoes');
+    atualizarBadgeUsuarios();
+  } catch (e) { mostrarMensagem('❌ Erro: ' + e.message); }
+}
+
 // ─── Exportações globais ─────────────────────────────────────────────────────
 window._resetarFeedbackEnvio = _resetarFeedbackEnvio;
 window.abrirDrawerUsuario = abrirDrawerUsuario;
@@ -1055,5 +1208,10 @@ window.atualizarBadgeUsuarios = atualizarBadgeUsuarios;
 window._confirmarResposta = _confirmarResposta;
 window.recalcularContadores = recalcularContadores;
 window._incrementarContador = _incrementarContador;
+window._abrirModalGerarLinkMulta = _abrirModalGerarLinkMulta;
+window._confirmarEncerramentoDireto = _confirmarEncerramentoDireto;
+window._gerarLinkMulta = _gerarLinkMulta;
+window._confirmarEncerramentoDireto = _confirmarEncerramentoDireto;
+window._confirmarEncerramentoFinal = _confirmarEncerramentoFinal;
 
 document.addEventListener('DOMContentLoaded', () => setTimeout(atualizarBadgeUsuarios, 1500));

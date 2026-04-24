@@ -356,38 +356,230 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 });
  
-function enviarSolicitacao() {
+// ─── ENVIO DE SOLICITAÇÃO (ATUALIZADA COM FLUXO DE CANCELAMENTO) ─────────────
+async function enviarSolicitacao() {
   const usuario = JSON.parse(localStorage.getItem('usuarioLogado'));
-  const tipo = document.getElementById('tipo-suporte').value;
-  const descricao = document.getElementById('mensagem-suporte').value.trim();
+  const tipoEl  = document.getElementById('tipo-suporte');
+  const descEl  = document.getElementById('mensagem-suporte');
   const feedback = document.getElementById('suporte-feedback');
- 
-  feedback.innerHTML = '';
-  if (!descricao) {
-    feedback.innerHTML = `<span style="color:#ef4444">❌ Descreva sua solicitação.</span>`;
+  const tipo    = tipoEl?.value || '';
+  const descricao = descEl?.value.trim() || '';
+  if (feedback) feedback.innerHTML = '';
+
+  if (!descricao && !tipo.toLowerCase().includes('cancelamento')) {
+    if (feedback) feedback.innerHTML = `<span style="color:#ef4444">❌ Descreva sua solicitação.</span>`;
     return;
   }
- 
-  db.collection('usuarios').doc(usuario.id).collection('solicitacoes').add({
-    tipo,
-    descricao,
-    status: 'aberta',
-    data_solicitacao: new Date().toISOString(),
-  }).then(() => {
-    feedback.innerHTML = `<span style="color:#22c55e">✅ Solicitação enviada com sucesso!</span>`;
-    document.getElementById('mensagem-suporte').value = '';
+
+  // 🔹 Intercepta cancelamento
+  if (tipo.toLowerCase().includes('cancelamento')) {
+    await _processarSolicitacaoCancelamento(usuario.id, descricao);
+    return;
+  }
+
+  // ✅ Fluxo normal
+  try {
+    await db.collection('usuarios').doc(usuario.id).collection('solicitacoes').add({
+      tipo, descricao, status: 'aberta', data_solicitacao: new Date().toISOString()
+    });
+    await db.collection('admin_contadores').doc('pendencias').set({ solicitacoes: firebase.firestore.FieldValue.increment(1) }, { merge: true });
+    if (feedback) feedback.innerHTML = `<span style="color:#22c55e">✅ Solicitação enviada com sucesso!</span>`;
+    if (descEl) descEl.value = '';
     carregarHistoricoSolicitacoes(usuario.id);
-  }).catch(err => {
+  } catch (err) {
     console.error('[suporte]', err);
-    feedback.innerHTML = `<span style="color:#ef4444">❌ Erro ao enviar. Tente novamente.</span>`;
-  });
- 
-  db.collection('admin_contadores').doc('pendencias').set(
-    { solicitacoes: firebase.firestore.FieldValue.increment(1) },
-    { merge: true }
-  );
+    if (feedback) feedback.innerHTML = `<span style="color:#ef4444">❌ Erro ao enviar.</span>`;
+  }
 }
- 
+
+async function _processarSolicitacaoCancelamento(uid, descricao) {
+  const snap = await db.collection('usuarios').doc(uid).collection('assinaturas').where('status', 'in', ['ativa', 'aprovada']).limit(1).get();
+  if (snap.empty) return alert('⚠️ Nenhuma assinatura ativa encontrada.');
+
+  const assin  = snap.docs[0].data();
+  const assinId = snap.docs[0].id;
+  const agora = new Date();
+  const dataInicio = assin.data_inicio?.toDate?.() || new Date(assin.data_inicio);
+  const dataFimFid = assin.data_fim_fidelizacao?.toDate?.() || null;
+  const temFid     = !!assin.tem_fidelizacao && !!dataFimFid;
+  const dentroFid  = temFid && agora < dataFimFid;
+  const mesesUsados = Math.max(1, Math.ceil((agora - dataInicio) / (30*24*60*60*1000)));
+  const descMensal  = Number(assin.desconto_mensal) || 0;
+  const valorMulta  = dentroFid ? Math.round(descMensal * mesesUsados * 100) / 100 : 0;
+
+  _abrirModalConfirmacaoCancelamento({
+    plano: assin.plano_nome || assin.plano_slug || 'Plano',
+    ciclo: assin.ciclo_meses || assin.ciclo || '—',
+    inicio: dataInicio.toLocaleDateString('pt-BR'),
+    fimFid: dataFimFid ? dataFimFid.toLocaleDateString('pt-BR') : 'Não se aplica',
+    mesesUsados, valorMulta, temFid,
+    onConfirm: async () => {
+      try {
+        await db.collection('usuarios').doc(uid).collection('solicitacoes').add({
+          tipo: 'cancelamento', descricao: descricao || 'Solicitação via painel', status: 'aberta',
+          data_solicitacao: new Date().toISOString(), assinaturaId: assinId,
+          calculo_multa: { tem_fidelizacao: temFid, meses_usados: mesesUsados, desconto_mensal: descMensal, valor_ajuste: valorMulta, dentro_periodo: dentroFid, data_fim_fidelizacao: dataFimFid?.toISOString() }
+        });
+        await db.collection('admin_contadores').doc('pendencias').set({ solicitacoes: firebase.firestore.FieldValue.increment(1) }, { merge: true });
+        alert('✅ Solicitação enviada! Aguarde análise da equipe.');
+        document.getElementById('mensagem-suporte').value = '';
+        carregarHistoricoSolicitacoes(uid);
+        _fecharModalCancelamento();
+      } catch (e) { alert('❌ Erro ao registrar.'); }
+    },
+    onCancel: _fecharModalCancelamento
+  });
+}
+
+function _abrirModalConfirmacaoCancelamento(d) {
+  _fecharModalCancelamento();
+  const multaHtml = d.temFid
+    ? `<div style="background:#fffbeb;border:1px solid #fde68a;padding:14px;border-radius:8px;margin:14px 0;font-size:13px"><strong>⚖️ Cláusula Aplicada</strong><br>Ajuste: ${d.mesesUsados}m × ${d.valorMulta.toLocaleString('pt-BR',{style:'currency',currency:'BRL'})}/m = <span style="color:#b45309;font-weight:700">${(d.valorMulta * d.mesesUsados).toLocaleString('pt-BR',{style:'currency',currency:'BRL'})}</span></div>`
+    : `<div style="background:#f0fdf4;border:1px solid #bbf7d0;padding:14px;border-radius:8px;margin:14px 0;font-size:13px"><strong>✅ Sem Multa</strong><br>Fora do período de fidelização ou plano sem ajuste.</div>`;
+
+  const modal = document.createElement('div');
+  modal.id = 'modal-cancelamento';
+  modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;z-index:9999;';
+  modal.innerHTML = `<div style="background:#fff;padding:24px;border-radius:12px;max-width:500px;width:92%">
+    <h3 style="margin:0 0 16px">⛔ Solicitar Cancelamento</h3>
+    <div style="background:#f8fafc;padding:12px;border-radius:8px;font-size:13px;line-height:1.7">
+      <strong>Plano:</strong> ${d.plano} (${d.ciclo}m) | <strong>Início:</strong> ${d.inicio} | <strong>Usados:</strong> ${d.mesesUsados}
+    </div>${multaHtml}
+    <p style="font-size:12px;color:#64748b;margin-top:8px">Ao prosseguir, a equipe analisará e enviará o link de pagamento, se aplicável.</p>
+    <div style="display:flex;gap:12px;margin-top:20px;justify-content:flex-end">
+      <button id="btn-desistir-cancel" style="padding:9px 16px;border:1px solid #cbd5e1;background:#fff;border-radius:6px;cursor:pointer">❌ Desistir</button>
+      <button id="btn-prosseguir-cancel" style="padding:9px 16px;border:none;background:#0A3D62;color:#fff;border-radius:6px;cursor:pointer">✅ Prosseguir</button>
+    </div></div>`;
+  document.body.appendChild(modal);
+  document.getElementById('btn-desistir-cancel').onclick = d.onCancel;
+  document.getElementById('btn-prosseguir-cancel').onclick = d.onConfirm;
+}
+
+function _fecharModalCancelamento() {
+  const el = document.getElementById('modal-cancelamento');
+  if (el) el.remove();
+}
+
+// ─── MODAL + CÁLCULO DE CANCELAMENTO ──────────────────────────────────────────
+async function _processarSolicitacaoCancelamento(uid, descricao) {
+  // 1. Buscar assinatura ativa
+  const snap = await db.collection('usuarios').doc(uid)
+    .collection('assinaturas').where('status', 'in', ['ativa', 'aprovada']).limit(1).get();
+  
+  if (snap.empty) {
+    alert('⚠️ Nenhuma assinatura ativa encontrada para solicitar cancelamento.');
+    return;
+  }
+
+  const assin  = snap.docs[0].data();
+  const assinId = snap.docs[0].id;
+
+  // 2. Calcular valores da multa
+  const agora = new Date();
+  const dataInicio   = assin.data_inicio?.toDate?.() || new Date(assin.data_inicio);
+  const dataFimFid   = assin.data_fim_fidelizacao?.toDate?.() || null;
+  const temFid       = !!assin.tem_fidelizacao && !!dataFimFid;
+  const dentroFid    = temFid && agora < dataFimFid;
+
+  const msUsados     = agora - dataInicio;
+  const mesesUsados  = Math.max(1, Math.ceil(msUsados / (30 * 24 * 60 * 60 * 1000)));
+  const descontoMensal = Number(assin.desconto_mensal) || 0;
+  const valorMulta   = dentroFid ? Math.round(descontoMensal * mesesUsados * 100) / 100 : 0;
+
+  // 3. Exibir modal de confirmação
+  _abrirModalConfirmacaoCancelamento({
+    plano:        assin.plano_nome || assin.plano_slug || 'Plano',
+    ciclo:        assin.ciclo_meses || assin.ciclo || '—',
+    inicio:       dataInicio.toLocaleDateString('pt-BR'),
+    fimFid:       dataFimFid ? dataFimFid.toLocaleDateString('pt-BR') : 'Não se aplica',
+    mesesUsados,
+    valorMulta,
+    temFid,
+    onConfirm: async () => {
+      // 4. Salvar no Firestore APÓS confirmação
+      try {
+        await db.collection('usuarios').doc(uid).collection('solicitacoes').add({
+          tipo: 'cancelamento',
+          descricao: descricao || 'Solicitação de cancelamento via painel do assinante',
+          status: 'aberta',
+          data_solicitacao: new Date().toISOString(),
+          assinaturaId: assinId,
+          calculo_multa: {
+            tem_fidelizacao: temFid,
+            meses_usados: mesesUsados,
+            desconto_mensal: descontoMensal,
+            valor_ajuste: valorMulta,
+            dentro_periodo: dentroFid
+          }
+        });
+        await db.collection('admin_contadores').doc('pendencias').set({
+          solicitacoes: firebase.firestore.FieldValue.increment(1)
+        }, { merge: true });
+
+        alert('✅ Solicitação enviada! Nossa equipe analisará e enviará o link de pagamento da multa, se houver.');
+        document.getElementById('mensagem-suporte').value = '';
+        carregarHistoricoSolicitacoes(uid);
+        _fecharModalCancelamento();
+      } catch (err) {
+        console.error(err);
+        alert('❌ Erro ao registrar solicitação. Tente novamente.');
+      }
+    },
+    onCancel: () => {
+      _fecharModalCancelamento();
+    }
+  });
+}
+
+// ─── RENDERIZAÇÃO DO MODAL ────────────────────────────────────────────────────
+function _abrirModalConfirmacaoCancelamento(dados) {
+  _fecharModalCancelamento(); // Garante que não haja duplicata
+
+  const multaHtml = dados.temFid
+    ? `<div style="background:#fffbeb;border:1px solid #fde68a;padding:14px;border-radius:8px;margin:14px 0;font-size:13px">
+         <strong>⚖️ Cláusula de Fidelização Aplicada</strong><br>
+         Ajuste proporcional: ${dados.mesesUsados} meses × ${dados.desconto_mensal.toLocaleString('pt-BR', {style:'currency',currency:'BRL'})} = 
+         <span style="color:#b45309;font-weight:700;font-size:15px">${dados.valorMulta.toLocaleString('pt-BR', {style:'currency',currency:'BRL'})}</span>
+       </div>`
+    : `<div style="background:#f0fdf4;border:1px solid #bbf7d0;padding:14px;border-radius:8px;margin:14px 0;font-size:13px">
+         <strong>✅ Sem Multa</strong><br>
+         Você está fora do período de fidelização ou seu plano não possui cláusula de ajuste.
+       </div>`;
+
+  const modal = document.createElement('div');
+  modal.id = 'modal-cancelamento';
+  modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;z-index:9999;backdrop-filter:blur(2px);animation:fadeIn .2s ease;';
+  modal.innerHTML = `
+    <div style="background:#fff;padding:24px;border-radius:12px;max-width:500px;width:92%;box-shadow:0 10px 25px rgba(0,0,0,0.2);">
+      <h3 style="margin:0 0 16px;font-size:18px;color:#0A3D62">⛔ Solicitar Cancelamento de Assinatura</h3>
+      <div style="background:#f8fafc;padding:12px;border-radius:8px;font-size:13px;line-height:1.7;border:1px solid #e2e8f0">
+        <strong>Plano:</strong> ${dados.plano} (${dados.ciclo} meses)<br>
+        <strong>Início:</strong> ${dados.inicio}<br>
+        <strong>Fidelização até:</strong> ${dados.fimFid}<br>
+        <strong>Meses utilizados:</strong> ${dados.mesesUsados}
+      </div>
+      ${multaHtml}
+      <p style="font-size:12px;color:#64748b;margin-top:8px;line-height:1.5">
+        Ao prosseguir, sua solicitação será enviada para análise administrativa. 
+        ${dados.valorMulta > 0 ? 'Se aplicável, você receberá um link de pagamento da multa para concluir o encerramento.' : 'O cancelamento será processado após confirmação da equipe.'}
+      </p>
+      <div style="display:flex;gap:12px;margin-top:20px;justify-content:flex-end">
+        <button id="btn-desistir-cancel" style="padding:9px 16px;border:1px solid #cbd5e1;background:#fff;border-radius:6px;cursor:pointer;font-weight:600;color:#475569;transition:all .2s">❌ Desistir</button>
+        <button id="btn-prosseguir-cancel" style="padding:9px 16px;border:none;background:#0A3D62;color:#fff;border-radius:6px;cursor:pointer;font-weight:600;transition:all .2s">✅ Prosseguir</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(modal);
+
+  document.getElementById('btn-desistir-cancel').onclick = dados.onCancel;
+  document.getElementById('btn-prosseguir-cancel').onclick = dados.onConfirm;
+}
+
+function _fecharModalCancelamento() {
+  const el = document.getElementById('modal-cancelamento');
+  if (el) el.remove();
+}
+
 // ─── Histórico de Solicitações ────────────────────────────────────────────────
 function filtrarSolicitacoes(status) {
   filtroStatusSolicitacoes = status;
