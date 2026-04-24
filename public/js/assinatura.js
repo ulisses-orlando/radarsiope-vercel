@@ -1,6 +1,6 @@
 /* ==========================================================================
 assinatura.js — Radar SIOPE
-Fluxo completo de assinatura: planos, ciclos dinâmicos por ciclo (tabs), WhatsApp,
+Fluxo completo de assinatura: planos, ciclos dinâmicos (tabs horizontais), WhatsApp,
 cupom, preview, upsert usuário, registro assinatura, pagamento MP.
 Dependências globais:
 window.db (Firestore inicializado)
@@ -72,11 +72,16 @@ async function carregarPlano(planId) {
   }
 }
 
-// ─── Renderizar lista de planos com ABAS DE CICLO ─────────────────────────────
+// ─── Renderizar lista de planos com ABAS DE CICLO HORIZONTAIS ─────────────────
 async function carregarListaPlanos() {
   const wrap = document.getElementById('planos-cards');
   if (!wrap) return;
   wrap.innerHTML = '<div style="color:#555;font-size:13px;padding:12px">Carregando planos...</div>';
+
+  // 🔹 BLINDAGEM DE LAYOUT: Reseta qualquer grid/flex herdado pelo container pai
+  wrap.style.display = 'block';
+  wrap.style.gridTemplateColumns = 'none';
+  wrap.style.flexDirection = 'none';
 
   try {
     if (!window.FeaturesManager || !window.FeaturesManager.carregarFeatures) {
@@ -122,7 +127,7 @@ async function carregarListaPlanos() {
     wrap.innerHTML = '';
     const planos = snap.docs.map(d => ({ id: d.id, ...d.data() }));
 
-    // 🔹 1. Extrair ciclos únicos disponíveis
+    // 🔹 1. Extrair ciclos únicos disponíveis (apenas se houver planos habilitados)
     const ciclosSet = new Set();
     planos.forEach(p => {
       if (Array.isArray(p.ciclos_disponiveis)) p.ciclos_disponiveis.forEach(c => ciclosSet.add(String(c)));
@@ -133,20 +138,24 @@ async function carregarListaPlanos() {
       return;
     }
 
-    // 🔹 2. Criar container de abas (tabs)
+    // 🔹 2. Container de abas (sempre horizontal)
     const tabsWrap = document.createElement('div');
     tabsWrap.id = 'ciclo-tabs';
-    tabsWrap.style.cssText = 'display:flex;gap:10px;margin-bottom:24px;flex-wrap:wrap;border-bottom:1px solid #e2e8f0;padding-bottom:12px;';
+    tabsWrap.style.cssText = 'display:flex;flex-direction:row;gap:12px;margin-bottom:24px;flex-wrap:wrap;align-items:center;width:100%;';
     wrap.appendChild(tabsWrap);
 
-    // 🔹 3. Container dinâmico para os planos (2 colunas)
+    // 🔹 3. Container dinâmico para os planos (sempre 2 colunas)
     const gridContainer = document.createElement('div');
     gridContainer.id = 'grid-planos-dinamico';
-    gridContainer.style.cssText = 'display:grid;grid-template-columns:repeat(2, 1fr);gap:16px;min-height:200px;';
-    // Responsivo: 1 coluna em telas < 768px
-    const styleSheet = document.createElement('style');
-    styleSheet.textContent = `@media (max-width: 768px) { #grid-planos-dinamico { grid-template-columns: 1fr !important; } }`;
-    document.head.appendChild(styleSheet);
+    gridContainer.style.cssText = 'display:grid;grid-template-columns:repeat(2, 1fr);gap:16px;min-height:200px;width:100%;';
+    
+    // Injeta CSS responsivo garantido
+    if (!document.getElementById('css-assinatura-dinamico')) {
+      const style = document.createElement('style');
+      style.id = 'css-assinatura-dinamico';
+      style.textContent = `@media (max-width: 768px) { #grid-planos-dinamico { grid-template-columns: 1fr !important; } }`;
+      document.head.appendChild(style);
+    }
     wrap.appendChild(gridContainer);
 
     // 🔹 4. Função que renderiza os planos de um ciclo específico
@@ -174,8 +183,10 @@ async function carregarListaPlanos() {
       btn.textContent = `${ciclo} Meses`;
       btn.dataset.ciclo = ciclo;
       const isDefault = idx === 0;
-      btn.style.cssText = `padding:10px 20px;border:1px solid ${isDefault ? '#0A3D62' : '#cbd5e1'};border-radius:24px;font-size:14px;font-weight:600;cursor:pointer;
-        background:${isDefault ? '#0A3D62' : '#ffffff'};color:${isDefault ? '#ffffff' : '#475569'};transition:all 0.2s;box-shadow:0 1px 2px rgba(0,0,0,0.05);`;
+      
+      // display:inline-flex garante que fiquem na mesma linha
+      btn.style.cssText = `display:inline-flex;align-items:center;justify-content:center;padding:10px 24px;border:1px solid ${isDefault ? '#0A3D62' : '#cbd5e1'};border-radius:24px;font-size:14px;font-weight:600;cursor:pointer;
+        background:${isDefault ? '#0A3D62' : '#ffffff'};color:${isDefault ? '#ffffff' : '#475569'};transition:all 0.2s;box-shadow:0 1px 2px rgba(0,0,0,0.05);min-width:110px;`;
       
       btn.addEventListener('click', () => {
         tabsWrap.querySelectorAll('button').forEach(b => {
@@ -194,16 +205,14 @@ async function carregarListaPlanos() {
     // 🔹 6. Renderizar ciclo padrão
     renderPlanosPorCiclo(ciclosOrdenados[0]);
 
-    // 🔹 7. Pré-seleção via URL (se vier ?planId=xyz)
+    // 🔹 7. Pré-seleção via URL
     if (_planIdUrl) {
       const planoUrl = await carregarPlano(_planIdUrl);
       if (planoUrl) {
         const cicloDisp = Array.isArray(planoUrl.ciclos_disponiveis) ? planoUrl.ciclos_disponiveis.map(String) : ['3'];
         const cicloParaAbrir = cicloDisp[0];
-        // Ativar aba correta
         const tabBtn = tabsWrap.querySelector(`button[data-ciclo="${cicloParaAbrir}"]`);
         if (tabBtn) tabBtn.click();
-        // Espera o DOM atualizar e clica no card
         setTimeout(() => {
           const match = gridContainer.querySelector(`.plano-card[data-id="${_planIdUrl}"]`);
           if (match) match.click();
@@ -284,7 +293,6 @@ async function _onPlanoSelecionado(planId, cicloInicial = null) {
 
   document.getElementById('planId').value = planId;
   
-  // Marca visualmente o card selecionado
   document.querySelectorAll('.plano-card').forEach(c => {
     const isSelected = c.dataset.id === planId && String(c.dataset.ciclo) === String(_planoAtual.cicloSelecionado);
     c.classList.toggle('selecionado', isSelected);
