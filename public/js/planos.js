@@ -345,7 +345,9 @@ async function abrirModalPlano(id = null, editar = false) {
   body.innerHTML = '';
 
   // Seção: Identificação
-  body.appendChild(_secLabel('📋 Identificação do Plano'));
+  const secIdent = _secLabel('📋 Identificação do Plano');
+  secIdent.style.marginTop = '130px'; // Ajuste o valor (10 linhas ≈ 120px a 150px)
+  body.appendChild(secIdent);
 
   // Slug (select canônico)
   body.appendChild(_field('Slug do plano', `
