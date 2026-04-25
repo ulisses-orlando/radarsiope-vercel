@@ -2,340 +2,277 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Termos de Uso — Radar SIOPE</title>
-  <meta name="description" content="Termos de Contrato de Assinatura do Radar SIOPE: planos, pagamento, vigência, cancelamento e responsabilidades." />
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&family=Lora:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet" />
-  <style>
-    :root {
-      --navy:    #07172e;
-      --navy2:   #0d2145;
-      --blue:    #1a5fd4;
-      --blue2:   #2e7cf6;
-      --sky:     #e8f1ff;
-      --gold:    #f5c842;
-      --white:   #ffffff;
-      --gray50:  #f7f9fc;
-      --gray100: #eef1f7;
-      --gray400: #8a96ac;
-      --gray700: #3d4a5c;
-      --text:    #1a2332;
-      --radius:  10px;
-      --shadow:  0 4px 24px rgba(7,23,46,.10);
-      --shadowM: 0 8px 40px rgba(7,23,46,.16);
-      --font-head: 'Sora', sans-serif;
-      --font-body: 'Lora', Georgia, serif;
-    }
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    html { scroll-behavior: smooth; }
-    body { font-family: var(--font-body); font-size: 16px; color: var(--text); background: var(--white); -webkit-font-smoothing: antialiased; }
-    a { color: var(--blue); text-decoration: none; }
-    a:hover { text-decoration: underline; }
-    .container { max-width: 1080px; margin: 0 auto; padding: 0 24px; }
-
-    /* NAV */
-    .nav { position: sticky; top: 0; z-index: 100; background: var(--navy); box-shadow: 0 2px 16px rgba(0,0,0,.25); }
-    .nav__inner { display: flex; align-items: center; justify-content: space-between; height: 60px; }
-    .nav__logo { display: flex; align-items: center; gap: 10px; font-family: var(--font-head); font-weight: 800; font-size: 1.15rem; color: var(--white); letter-spacing: -.01em; text-decoration: none; }
-    .nav__logo-icon { width: 34px; height: 34px; background: var(--blue2); border-radius: 8px; display: grid; place-items: center; font-size: 18px; }
-    .nav__logo span { color: var(--gold); }
-    .nav__toggle { display: none; background: none; border: none; cursor: pointer; padding: 6px; color: var(--white); font-size: 22px; }
-    .nav__menu { display: flex; align-items: center; gap: 4px; list-style: none; }
-    .nav__menu a { font-family: var(--font-head); font-size: .82rem; font-weight: 600; color: rgba(255,255,255,.78); padding: 6px 11px; border-radius: 6px; transition: color .18s, background .18s; white-space: nowrap; }
-    .nav__menu a:hover, .nav__menu a.active { color: var(--white); background: rgba(255,255,255,.10); text-decoration: none; }
-    .nav__menu .nav__cta a { background: var(--blue2); color: var(--white); padding: 7px 16px; }
-    .nav__menu .nav__cta a:hover { background: #4890ff; }
-    .nav__item--drop { position: relative; }
-    .nav__dropdown { display: none; position: absolute; top: calc(100% + 6px); left: 0; background: var(--white); border: 1px solid var(--gray100); border-radius: var(--radius); box-shadow: var(--shadowM); min-width: 200px; overflow: hidden; }
-    .nav__item--drop:hover .nav__dropdown { display: block; }
-    .nav__dropdown a { display: block; color: var(--gray700) !important; padding: 10px 16px !important; font-size: .83rem !important; border-radius: 0 !important; background: none !important; }
-    .nav__dropdown a:hover { background: var(--gray50) !important; color: var(--blue) !important; }
-    .nav__dropdown a.active { background: var(--sky) !important; color: var(--blue) !important; font-weight: 700; }
-
-    /* PAGE HEADER */
-    .page-header { background: linear-gradient(135deg, var(--navy) 0%, var(--navy2) 55%, #0e3170 100%); padding: 52px 0 44px; position: relative; overflow: hidden; }
-    .page-header::before { content: ''; position: absolute; inset: 0; background: radial-gradient(ellipse 50% 100% at 90% 50%, rgba(42,110,220,.18), transparent 70%); pointer-events: none; }
-    .page-header__inner { position: relative; }
-    .page-header__badge { display: inline-flex; align-items: center; gap: 8px; font-family: var(--font-head); font-size: .72rem; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--gold); background: rgba(245,200,66,.12); border: 1px solid rgba(245,200,66,.28); padding: 4px 12px; border-radius: 999px; margin-bottom: 16px; }
-    .page-header h1 { font-family: var(--font-head); font-weight: 800; font-size: clamp(1.6rem, 3.5vw, 2.2rem); color: var(--white); line-height: 1.2; margin-bottom: 10px; }
-    .page-header__meta { font-family: var(--font-head); font-size: .82rem; color: rgba(255,255,255,.55); }
-
-    /* LAYOUT */
-    .page-body { display: grid; grid-template-columns: 240px 1fr; gap: 48px; padding: 56px 0 80px; align-items: start; }
-
-    /* SIDEBAR TOC */
-    .toc { position: sticky; top: 80px; background: var(--gray50); border: 1px solid var(--gray100); border-radius: 12px; padding: 20px; }
-    .toc__title { font-family: var(--font-head); font-weight: 700; font-size: .78rem; text-transform: uppercase; letter-spacing: .1em; color: var(--navy); margin-bottom: 14px; }
-    .toc__list { list-style: none; display: flex; flex-direction: column; gap: 2px; }
-    .toc__list a { display: block; font-family: var(--font-head); font-size: .8rem; color: var(--gray700); padding: 6px 10px; border-radius: 6px; transition: background .15s, color .15s; text-decoration: none; }
-    .toc__list a:hover { background: var(--sky); color: var(--blue); }
-
-    /* CONTENT */
-    .content { min-width: 0; }
-    .content section { margin-bottom: 40px; }
-    .content h2 { font-family: var(--font-head); font-weight: 700; font-size: 1.2rem; color: var(--navy); border-left: 3px solid var(--blue2); padding-left: 12px; margin-bottom: 14px; }
-    .content p { line-height: 1.72; color: var(--gray700); margin-bottom: 12px; }
-    .content ul, .content ol { padding-left: 20px; color: var(--gray700); line-height: 1.7; }
-    .content li { margin-bottom: 6px; }
-    .content strong { color: var(--navy); }
-    .content hr { border: none; border-top: 1px solid var(--gray100); margin: 32px 0; }
-
-    /* TERMS BANNER */
-    .terms-banner { background: linear-gradient(90deg, #07172e 0%, #0d2145 100%); border-radius: 12px; padding: 28px; color: var(--white); margin-bottom: 40px; display: flex; align-items: center; gap: 16px; }
-    .terms-banner__icon { font-size: 36px; flex-shrink: 0; }
-    .terms-banner h2 { font-family: var(--font-head); font-weight: 800; font-size: 1.1rem; margin-bottom: 6px; color: var(--gold); border: none; padding: 0; }
-    .terms-banner p { color: rgba(255,255,255,.78); margin: 0; font-size: .9rem; line-height: 1.55; }
-
-    /* NOTICE BOX */
-    .notice { background: var(--sky); border-left: 4px solid var(--blue2); border-radius: 0 8px 8px 0; padding: 14px 18px; margin-bottom: 16px; font-size: .9rem; color: var(--navy2); line-height: 1.6; }
-
-    /* FAQ */
-    .faq-section { background: var(--gray50); border-radius: 12px; padding: 32px 28px; margin-top: 48px; }
-    .faq-section h2 { font-family: var(--font-head); font-weight: 800; font-size: 1.1rem; color: var(--navy); margin-bottom: 6px; border: none; padding: 0; }
-    .faq-section .faq-lead { font-size: .88rem; color: var(--gray400); margin-bottom: 24px; }
-    .faq-item { border-bottom: 1px solid var(--gray100); padding: 16px 0; }
-    .faq-item:last-child { border-bottom: none; }
-    .faq-item h3 { font-family: var(--font-head); font-weight: 700; font-size: .92rem; color: var(--navy2); margin-bottom: 6px; }
-    .faq-item p { font-size: .88rem; color: var(--gray700); line-height: 1.6; margin: 0; }
-
-    /* FOOTER */
-    footer { background: var(--navy); padding: 48px 0 28px; color: rgba(255,255,255,.6); }
-    .footer__top { display: grid; grid-template-columns: 1.4fr 1fr 1fr 1fr; gap: 40px; margin-bottom: 40px; }
-    .footer__brand p { font-size: .85rem; line-height: 1.6; margin-top: 12px; max-width: 240px; }
-    .footer__col-title { font-family: var(--font-head); font-weight: 700; font-size: .78rem; text-transform: uppercase; letter-spacing: .1em; color: var(--white); margin-bottom: 14px; }
-    .footer__links { list-style: none; display: flex; flex-direction: column; gap: 8px; }
-    .footer__links a { font-size: .84rem; color: rgba(255,255,255,.55); transition: color .15s; text-decoration: none; }
-    .footer__links a:hover { color: var(--white); }
-    .footer__bottom { border-top: 1px solid rgba(255,255,255,.1); padding-top: 24px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; font-size: .8rem; }
-    .footer__bottom a { color: rgba(255,255,255,.5); }
-    .footer__bottom a:hover { color: var(--white); }
-
-    /* RESPONSIVE */
-    @media (max-width: 860px) {
-      .page-body { grid-template-columns: 1fr; }
-      .toc { position: static; }
-      .footer__top { grid-template-columns: 1fr 1fr; }
-    }
-    @media (max-width: 640px) {
-      .nav__toggle { display: block; }
-      .nav__menu { display: none; position: absolute; top: 60px; left: 0; right: 0; background: var(--navy2); flex-direction: column; align-items: stretch; padding: 12px 16px 16px; gap: 2px; border-bottom: 2px solid var(--blue); }
-      .nav__menu.open { display: flex; }
-      .nav__menu a { padding: 10px 12px; }
-      .nav__dropdown { position: static; box-shadow: none; border: none; background: rgba(255,255,255,.05); }
-      .nav__item--drop:hover .nav__dropdown { display: none; }
-      .nav__item--drop.open .nav__dropdown { display: block; }
-      .nav__dropdown a { color: rgba(255,255,255,.7) !important; }
-      .terms-banner { flex-direction: column; gap: 10px; }
-      .footer__top { grid-template-columns: 1fr; }
-    }
-  </style>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="icon" href="/icons/icon-192x192.png" />
+  <link rel="stylesheet" href="/styles.css" />
 </head>
 <body>
-
-  <nav class="nav">
-    <div class="container nav__inner">
-      <a href="/" class="nav__logo">
-        <span class="nav__logo-icon">📡</span>
-        Radar <span>SIOPE</span>
-      </a>
-      <button class="nav__toggle" id="nav-toggle" aria-label="Abrir menu">☰</button>
-      <ul class="nav__menu" id="nav-menu">
-        <li><a href="/">Início</a></li>
-        <li><a href="newsletter.html">Newsletters</a></li>
-        <li><a href="noticias.html">Notícias</a></li>
-        <li class="nav__item--drop" id="drop-privacidade">
-          <a href="#" class="active">Privacidade e Termos ▾</a>
-          <ul class="nav__dropdown">
-            <li><a href="privacidade.html">Política de Privacidade</a></li>
-            <li><a href="termos.html" class="active">Termos de Uso</a></li>
-          </ul>
-        </li>
-        <li><a href="capturaLead.html">Entre em contato</a></li>
-        <li class="nav__cta"><a href="acesso.html">Área do assinante</a></li>
-      </ul>
-    </div>
-  </nav>
-
-  <header class="page-header">
-    <div class="container page-header__inner">
-      <div class="page-header__badge">📜 Contrato de Assinatura</div>
-      <h1>Termos de Uso</h1>
-      <p class="page-header__meta">Última atualização: 01/01/2026 &nbsp;·&nbsp; Radar SIOPE</p>
+  <header class="site-header">
+    <div class="container" style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
+      <a href="/" class="brand">📡 <span>Radar</span> <span>SIOPE</span></a>
+      <nav class="nav-desktop">
+        <a href="/">Início</a>
+        <a href="/newsletter.html">Newsletters</a>
+        <a href="/noticias.html">Notícias</a>
+        <div class="dropdown">
+          <button class="dropbtn">Privacidade e Termos ▾</button>
+          <div class="dropdown-content">
+            <a href="/privacidade.html">Política de Privacidade</a>
+            <a href="/termos.html" class="active">Termos de Uso</a>
+          </div>
+        </div>
+        <a href="/capturaLead.html">Entre em contato</a>
+        <a href="/acesso.html" class="btn-primary">Área do assinante</a>
+      </nav>
     </div>
   </header>
 
-  <main>
-    <div class="container page-body">
+  <main class="container" style="max-width:900px;margin:32px auto;padding:0 16px">
+    <article class="termos-content">
+      <h1>📜 Contrato de Assinatura — Radar SIOPE</h1>
+      <p class="subtitle">Ao confirmar sua assinatura, você declara ter lido e concordado com estes Termos. Leia com atenção antes de prosseguir.</p>
+      
+      <div class="toc">
+        <h2>📑 Nesta página</h2>
+        <ol>
+          <li><a href="#objeto">Objeto</a></li>
+          <li><a href="#adesao">Adesão e Capacidade</a></li>
+          <li><a href="#planos">Planos, Valores e Descontos</a></li>
+          <li><a href="#fidelizacao">Fidelização e Descontos</a></li>
+          <li><a href="#pagamento">Forma de Pagamento</a></li>
+          <li><a href="#vigencia">Vigência e Renovação</a></li>
+          <li><a href="#cancelamento">Cancelamento e Reembolso</a></li>
+          <li><a href="#direito-arrependimento">Direito de Arrependimento</a></li>
+          <li><a href="#propriedade">Propriedade Intelectual</a></li>
+          <li><a href="#responsabilidades">Responsabilidades</a></li>
+          <li><a href="#privacidade">Privacidade e Dados</a></li>
+          <li><a href="#suporte">Suporte e Contato</a></li>
+          <li><a href="#foro">Foro</a></li>
+          <li><a href="#faq">FAQ Assinatura</a></li>
+        </ol>
+      </div>
 
-      <aside>
-        <nav class="toc" aria-label="Índice">
-          <p class="toc__title">Nesta página</p>
-          <ul class="toc__list">
-            <li><a href="#objeto">Objeto</a></li>
-            <li><a href="#adesao">Adesão</a></li>
-            <li><a href="#planos">Planos e valores</a></li>
-            <li><a href="#pagamento">Forma de pagamento</a></li>
-            <li><a href="#vigencia">Vigência e renovação</a></li>
-            <li><a href="#cancelamento">Cancelamento</a></li>
-            <li><a href="#responsabilidades">Responsabilidades</a></li>
-            <li><a href="#privacidade">Privacidade e dados</a></li>
-            <li><a href="#suporte">Suporte e contato</a></li>
-            <li><a href="#foro">Foro</a></li>
-            <li><a href="#faq">FAQ Assinatura</a></li>
-          </ul>
-        </nav>
-      </aside>
+      <section id="objeto">
+        <h2>1. Objeto</h2>
+        <p>Este contrato regula a assinatura do serviço <strong>Radar SIOPE</strong>, que disponibiliza acesso à revista eletrônica, à central técnica, às newsletters, aos alertas legislativos e às demais funcionalidades descritas no plano escolhido pelo assinante, conforme divulgado no site oficial e materiais de contratação.</p>
+      </section>
 
-      <article class="content">
+      <section id="adesao">
+        <h2>2. Adesão e Capacidade</h2>
+        <p><strong>2.1.</strong> Ao confirmar a assinatura, o usuário declara ter lido e concordado com estes Termos, bem como com o resumo apresentado no formulário de contratação, incluindo valores, eventuais descontos e condições de pagamento.</p>
+        <p><strong>2.2.</strong> A contratação é realizada exclusivamente por pessoas com capacidade civil plena (maiores de 18 anos). Administradores públicos municipais devem verificar se a contratação está em conformidade com as normas de sua entidade.</p>
+        <p><strong>2.3.</strong> O assinante é responsável por manter seus dados cadastrais atualizados, incluindo e-mail e telefone para contato.</p>
+      </section>
 
-        <div class="terms-banner">
-          <div class="terms-banner__icon">📜</div>
-          <div>
-            <h2>Contrato de Assinatura — Radar SIOPE</h2>
-            <p>Ao confirmar sua assinatura, você declara ter lido e concordado com estes Termos. Leia com atenção antes de prosseguir.</p>
-          </div>
+      <section id="planos">
+        <h2>3. Planos, Valores e Descontos</h2>
+        <p><strong>3.1.</strong> <strong>Escolha do plano:</strong> o assinante seleciona o plano desejado entre as opções disponíveis no site, podendo optar por diferentes ciclos de contratação (mensal, trimestral, semestral ou anual).</p>
+        <p><strong>3.2.</strong> <strong>Transparência de preço:</strong> o valor original e eventuais descontos (cupons, pacotes ou fidelização) são exibidos de forma clara antes da confirmação da assinatura.</p>
+        <p><strong>3.3.</strong> <strong>Valor final:</strong> o valor final da assinatura é aquele informado no resumo e confirmado pelo usuário. Não há cobranças adicionais ocultas.</p>
+        <p><strong>3.4.</strong> <strong>Alteração de valores:</strong> o Radar SIOPE reserva-se o direito de alterar os valores dos planos, mediante comunicação prévia de pelo menos 30 (trinta) dias aos assinantes ativos.</p>
+      </section>
+
+      <section id="fidelizacao">
+        <h2>4. Fidelização e Descontos</h2>
+        <p><strong>4.1.</strong> <strong>Descontos por fidelização:</strong> planos com ciclos superiores a 3 (três) meses podem oferecer descontos progressivos em razão do período de fidelização contratado.</p>
+        <p><strong>4.2.</strong> <strong>Período de fidelidade:</strong> ao contratar planos com desconto de fidelização (6 ou 12 meses), o assinante concorda em permanecer vinculado ao serviço pelo período contratado.</p>
+        <p><strong>4.3.</strong> <strong>Quebra de fidelidade:</strong> em caso de cancelamento antecipado antes do término do período de fidelização, será cobrada multa proporcional equivalente à devolução dos descontos concedidos, calculada da seguinte forma:</p>
+        <ul>
+          <li>Multa = (Valor do desconto mensal × Número de meses utilizados)</li>
+          <li>O cálculo considera mês iniciado como mês completo</li>
+        </ul>
+        <p><strong>4.4.</strong> <strong>Exemplo:</strong> se o assinante contratou plano anual com 20% de desconto (R$ 20,00/mês de desconto) e cancelar após 4 meses, deverá pagar R$ 80,00 (4 × R$ 20,00) a título de multa por quebra de fidelidade.</p>
+        <p><strong>4.5.</strong> <strong>Isenção de multa:</strong> não haverá cobrança de multa por quebra de fidelidade nos seguintes casos:</p>
+        <ul>
+          <li>Cancelamento dentro do período de arrependimento (7 dias)</li>
+          <li>Falha na prestação do serviço por mais de 72 horas consecutivas</li>
+          <li>Mudança de endereço para local sem cobertura do serviço (quando aplicável)</li>
+        </ul>
+      </section>
+
+      <section id="pagamento">
+        <h2>5. Forma de Pagamento</h2>
+        <p><strong>5.1.</strong> <strong>Opções:</strong> cartão de crédito, boleto bancário ou PIX, processados via Mercado Pago, conforme escolha do usuário no momento da contratação.</p>
+        <p><strong>5.2.</strong> <strong>Parcelamento:</strong> em caso de parcelamento no cartão de crédito, serão geradas parcelas mensais com vencimentos sucessivos, registradas na subcoleção de pagamentos vinculada à assinatura.</p>
+        <p><strong>5.3.</strong> <strong>Inadimplência:</strong> o não pagamento de qualquer parcela ou ciclo contratado poderá implicar na:</p>
+        <ul>
+          <li>Suspensão do acesso ao serviço após 5 (cinco) dias do vencimento</li>
+          <li>Cancelamento automático da assinatura após 30 (trinta) dias de inadimplência</li>
+          <li>Cobrança de multa por quebra de fidelidade, se aplicável</li>
+        </ul>
+        <p><strong>5.4.</strong> <strong>Reativação:</strong> assinaturas canceladas por inadimplência poderão ser reativadas mediante regularização dos valores pendentes, acrescidos de multa de 2% (dois por cento) e juros de 0,033% (zero vírgula zero trinta e três por cento) ao dia.</p>
+      </section>
+
+      <section id="vigencia">
+        <h2>6. Vigência e Renovação</h2>
+        <p><strong>6.1.</strong> <strong>Vigência:</strong> a assinatura tem duração pelo período contratado (ciclo escolhido), conforme indicado no plano selecionado no momento da contratação.</p>
+        <p><strong>6.2.</strong> <strong>Renovação automática:</strong> a assinatura NÃO renova automaticamente. O assinante será comunicado sobre o fim do ciclo contratado e poderá optar pela renovação manual.</p>
+        <p><strong>6.3.</strong> <strong>Comunicação prévia:</strong> o Radar SIOPE enviará e-mail de lembrete 7 (sete) dias antes do término do ciclo vigente, informando sobre as opções de renovação.</p>
+        <p><strong>6.4.</strong> <strong>Renovação:</strong> caso o assinante opte pela renovação, será aplicado o valor vigente na data da renovação, podendo haver alteração em relação ao ciclo anterior.</p>
+      </section>
+
+      <section id="cancelamento">
+        <h2>7. Cancelamento e Reembolso</h2>
+        <p><strong>7.1.</strong> <strong>Solicitação:</strong> o assinante pode solicitar cancelamento a qualquer momento pelos canais oficiais de suporte (e-mail, formulário no site ou área do assinante).</p>
+        <p><strong>7.2.</strong> <strong>Processamento:</strong> o cancelamento será processado em até 2 (dois) dias úteis após a solicitação, com confirmação enviada por e-mail.</p>
+        <p><strong>7.3.</strong> <strong>Reembolsos:</strong> em cancelamentos antes do término do período contratado:</p>
+        <ul>
+          <li><strong>Com fidelização:</strong> será cobrada multa proporcional conforme item 4.3</li>
+          <li><strong>Sem fidelização:</strong> não há restituição proporcional do valor já pago</li>
+          <li><strong>Direito de arrependimento:</strong> reembolso integral conforme item 8</li>
+        </ul>
+        <p><strong>7.4.</strong> <strong>Cancelamento por uso indevido:</strong> o Radar SIOPE pode cancelar a assinatura imediatamente, sem direito a restituição, nos seguintes casos:</p>
+        <ul>
+          <li>Violação destes Termos de Uso</li>
+          <li>Compartilhamento indevido de credenciais</li>
+          <li>Uso do serviço para fins ilícitos</li>
+          <li>Inadimplência superior a 30 dias</li>
+        </ul>
+      </section>
+
+      <section id="direito-arrependimento">
+        <h2>8. Direito de Arrependimento</h2>
+        <p><strong>8.1.</strong> Nos termos do artigo 49 do Código de Defesa do Consumidor (Lei 8.078/90), o assinante tem o direito de se arrepender da contratação no prazo de 7 (sete) dias corridos, contados da data de confirmação do pagamento.</p>
+        <p><strong>8.2.</strong> O exercício do direito de arrependimento deve ser formalizado por escrito através dos canais de suporte, com identificação completa do assinante.</p>
+        <p><strong>8.3.</strong> Em caso de arrependimento, será realizado reembolso integral do valor pago, em até 10 (dez) dias úteis, sem qualquer tipo de multa ou penalidade.</p>
+      </section>
+
+      <section id="propriedade">
+        <h2>9. Propriedade Intelectual</h2>
+        <p><strong>9.1.</strong> Todo o conteúdo disponibilizado pelo Radar SIOPE (textos, imagens, infográficos, áudios, vídeos, newsletters, alertas) é de propriedade exclusiva da plataforma ou de seus licenciadores, estando protegido pela Lei de Direitos Autorais (Lei 9.610/98).</p>
+        <p><strong>9.2.</strong> É vedada a reprodução, distribuição, modificação ou compartilhamento do conteúdo sem autorização prévia e por escrito do Radar SIOPE.</p>
+        <p><strong>9.3.</strong> O acesso concedido é pessoal, intransferível e limitado ao uso individual do assinante.</p>
+      </section>
+
+      <section id="responsabilidades">
+        <h2>10. Responsabilidades</h2>
+        <p><strong>10.1.</strong> <strong>Disponibilidade:</strong> o Radar SIOPE busca manter o serviço disponível continuamente (99% de uptime mensal), com interrupções apenas para manutenção programada (comunicada com 24h de antecedência) ou em situações de força maior.</p>
+        <p><strong>10.2.</strong> <strong>Uso adequado:</strong> o assinante se compromete a utilizar o serviço de forma ética e em conformidade com a legislação vigente, não se responsabilizando o Radar SIOPE por usos indevidos.</p>
+        <p><strong>10.3.</strong> <strong>Acesso pessoal:</strong> o acesso é pessoal e intransferível; é vedado o compartilhamento de credenciais com terceiros. Em caso de violação, a assinatura será cancelada sem direito a reembolso.</p>
+        <p><strong>10.4.</strong> <strong>Limitação de responsabilidade:</strong> o Radar SIOPE não se responsabiliza por:</p>
+        <ul>
+          <li>Decisões tomadas com base nas informações disponibilizadas</li>
+          <li>Erros ou omissões em legislações citadas (sempre consultar fontes oficiais)</li>
+          <li>Problemas técnicos decorrentes de falhas na internet do assinante</li>
+          <li>Conteúdo de terceiros linkado a partir da plataforma</li>
+        </ul>
+      </section>
+
+      <section id="privacidade">
+        <h2>11. Privacidade e Proteção de Dados</h2>
+        <p><strong>11.1.</strong> Os dados fornecidos pelo assinante são utilizados exclusivamente para:</p>
+        <ul>
+          <li>Gestão da assinatura e cobranças</li>
+          <li>Envio do conteúdo contratado</li>
+          <li>Comunicações relacionadas ao serviço</li>
+          <li>Melhoria contínua da plataforma</li>
+        </ul>
+        <p><strong>11.2.</strong> O Radar SIOPE adota medidas de segurança compatíveis com as melhores práticas e em conformidade com a Lei Geral de Proteção de Dados (LGPD — Lei 13.709/18).</p>
+        <p><strong>11.3.</strong> O assinante tem direito a:</p>
+        <ul>
+          <li>Acessar seus dados pessoais</li>
+          <li>Solicitar correção de dados incompletos ou desatualizados</li>
+          <li>Solicitar exclusão de dados (respeitados os prazos legais de guarda)</li>
+          <li>Revogar consentimentos a qualquer momento</li>
+        </ul>
+        <p><strong>11.4.</strong> Para exercer seus direitos ou obter mais informações, consulte nossa <a href="/privacidade.html">Política de Privacidade</a> completa ou entre em contato pelo e-mail privacidade@radarsiope.com.br.</p>
+      </section>
+
+      <section id="suporte">
+        <h2>12. Suporte e Contato</h2>
+        <p><strong>12.1.</strong> Em caso de dúvidas, suporte técnico ou solicitações relacionadas à assinatura, utilize os canais oficiais:</p>
+        <ul>
+          <li>E-mail: suporte@radarsiope.com.br</li>
+          <li>Formulário: <a href="/capturaLead.html">Entre em contato</a></li>
+          <li>Área do assinante: seção "Suporte"</li>
+        </ul>
+        <p><strong>12.2.</strong> <strong>Prazo de resposta:</strong> retornamos em até 2 (dois) dias úteis.</p>
+        <p><strong>12.3.</strong> <strong>Horário de atendimento:</strong> segunda a sexta-feira, das 9h às 18h (horário de Brasília).</p>
+      </section>
+
+      <section id="foro">
+        <h2>13. Foro</h2>
+        <p><strong>13.1.</strong> Fica eleito o foro da comarca de <strong>Brasília/DF</strong> para dirimir quaisquer dúvidas ou controvérsias oriundas destes Termos, com renúncia a qualquer outro, por mais privilegiado que seja.</p>
+        <p><strong>13.2.</strong> Estes Termos são regidos pela legislação brasileira, em especial pelo Código de Defesa do Consumidor (Lei 8.078/90) e pela Lei Geral de Proteção de Dados (Lei 13.709/18).</p>
+      </section>
+
+      <section id="faq">
+        <h2>❓ FAQ — Perguntas frequentes sobre a assinatura</h2>
+        <p class="subtitle">Resumo em linguagem simples para facilitar sua consulta.</p>
+        
+        <div class="faq-item">
+          <h3>O que estou contratando?</h3>
+          <p>Acesso ao Radar SIOPE: revista eletrônica, central técnica, newsletters, alertas legislativos e recursos do plano escolhido.</p>
         </div>
 
-        <section id="objeto">
-          <h2>1. Objeto</h2>
-          <p>Este contrato regula a assinatura do serviço <strong>Radar SIOPE</strong>, que disponibiliza acesso à revista eletrônica, à central técnica, às newsletters, aos alertas legislativos e às demais funcionalidades descritas no plano escolhido pelo assinante, conforme divulgado no site oficial e materiais de contratação.</p>
-        </section>
+        <div class="faq-item">
+          <h3>Como são definidos os valores?</h3>
+          <p>O valor original e eventuais descontos (como cupons ou fidelização) são mostrados no resumo antes da confirmação. O total final é exatamente o que você vê antes de pagar — sem taxas ocultas.</p>
+        </div>
 
-        <section id="adesao">
-          <h2>2. Adesão</h2>
-          <p>Ao confirmar a assinatura, o usuário declara ter lido e concordado com estes Termos, bem como com o resumo apresentado no formulário de contratação, incluindo valores, eventuais descontos e condições de pagamento.</p>
-          <div class="notice">A contratação é realizada exclusivamente por pessoas com capacidade civil plena (maiores de 18 anos). Administradores públicos municipais devem verificar se a contratação está em conformidade com as normas de sua entidade.</div>
-        </section>
+        <div class="faq-item">
+          <h3>Quais formas de pagamento posso usar?</h3>
+          <p>Cartão de crédito (com parcelamento), boleto bancário ou PIX, via Mercado Pago. Se optar por parcelar no cartão, as parcelas são geradas com vencimentos mensais sucessivos.</p>
+        </div>
 
-        <section id="planos">
-          <h2>3. Planos e valores</h2>
-          <ul>
-            <li><strong>Escolha do plano:</strong> o assinante seleciona o plano desejado entre as opções disponíveis no site;</li>
-            <li><strong>Transparência de preço:</strong> o valor original e eventuais descontos (cupons ou pacotes) são exibidos antes da confirmação;</li>
-            <li><strong>Valor final:</strong> o valor final da assinatura é aquele informado no resumo e confirmado pelo usuário. Não há cobranças adicionais ocultas.</li>
-          </ul>
-        </section>
+        <div class="faq-item">
+          <h3>O que acontece se eu não pagar uma parcela?</h3>
+          <p>O acesso é suspenso após 5 dias do vencimento. Após 30 dias de inadimplência, a assinatura é cancelada automaticamente e pode haver cobrança de multa por quebra de fidelidade, se aplicável.</p>
+        </div>
 
-        <section id="pagamento">
-          <h2>4. Forma de pagamento</h2>
-          <ul>
-            <li><strong>Opções:</strong> cartão de crédito, boleto bancário ou PIX, processados via <strong>Mercado Pago</strong>, conforme escolha do usuário;</li>
-            <li><strong>Parcelamento:</strong> em caso de parcelamento, serão geradas parcelas mensais com vencimentos sucessivos, registradas na subcoleção de pagamentos vinculada à assinatura;</li>
-            <li><strong>Inadimplência:</strong> o não pagamento de qualquer parcela poderá implicar na suspensão ou cancelamento do acesso ao serviço até regularização.</li>
-          </ul>
-        </section>
+        <div class="faq-item">
+          <h3>Posso cancelar quando quiser?</h3>
+          <p>Sim. O cancelamento pode ser solicitado a qualquer momento pelos canais oficiais. Nos primeiros 7 dias após a contratação, o CDC garante o direito de arrependimento com reembolso integral. Após esse período, se houver fidelização, será cobrada multa proporcional aos descontos recebidos.</p>
+        </div>
 
-        <section id="vigencia">
-          <h2>5. Vigência e renovação</h2>
-          <ul>
-            <li><strong>Vigência:</strong> a assinatura tem duração pelo período contratado, conforme indicado no plano escolhido;</li>
-            <li><strong>Renovação:</strong> caso aplicável, o assinante será informado previamente e poderá optar pela continuidade ou pelo cancelamento;</li>
-            <li><strong>Renovação automática:</strong> somente mediante consentimento expresso do assinante no momento da contratação.</li>
-          </ul>
-        </section>
+        <div class="faq-item">
+          <h3>Como funciona a fidelização?</h3>
+          <p>Planos de 6 ou 12 meses oferecem descontos progressivos. Em troca, você concorda em permanecer assinante pelo período contratado. Se cancelar antes, devolve proporcionalmente os descontos recebidos (exemplo: R$ 20/mês de desconto × meses utilizados).</p>
+        </div>
 
-        <section id="cancelamento">
-          <h2>6. Cancelamento</h2>
-          <ul>
-            <li><strong>Solicitação:</strong> o assinante pode solicitar cancelamento a qualquer momento pelos canais oficiais de suporte;</li>
-            <li><strong>Reembolsos:</strong> em cancelamentos antes do término do período contratado, não há restituição proporcional, salvo disposição legal em contrário (ex.: direito de arrependimento previsto no CDC, exercível em até 7 dias da contratação);</li>
-            <li><strong>Cancelamento por uso indevido:</strong> o Radar SIOPE pode cancelar a assinatura por inadimplência ou violação destes Termos, sem direito a restituição.</li>
-          </ul>
-        </section>
+        <div class="faq-item">
+          <h3>A assinatura renova automaticamente?</h3>
+          <p>Não. Você será avisado 7 dias antes do término e decidirá se quer renovar. Se renovar, será aplicado o valor vigente na data da renovação.</p>
+        </div>
 
-        <section id="responsabilidades">
-          <h2>7. Responsabilidades</h2>
-          <ul>
-            <li><strong>Disponibilidade:</strong> o Radar SIOPE busca manter o serviço disponível continuamente, com interrupções apenas para manutenção programada ou em situações de força maior;</li>
-            <li><strong>Uso adequado:</strong> o assinante se compromete a utilizar o serviço de forma ética e em conformidade com a legislação vigente;</li>
-            <li><strong>Acesso pessoal:</strong> o acesso é pessoal e intransferível; é vedado o compartilhamento de credenciais com terceiros.</li>
-          </ul>
-        </section>
+        <div class="faq-item">
+          <h3>Meus dados estão protegidos?</h3>
+          <p>Sim. Usamos medidas de segurança adequadas e operamos em conformidade com a LGPD. Você pode solicitar acesso, correção ou exclusão dos seus dados a qualquer momento. Veja detalhes na <a href="/privacidade.html">Política de Privacidade</a>.</p>
+        </div>
 
-        <section id="privacidade">
-          <h2>8. Privacidade e proteção de dados</h2>
-          <p>Os dados fornecidos pelo assinante são utilizados exclusivamente para gestão da assinatura, envio de conteúdo contratado e comunicações relacionadas ao serviço. O Radar SIOPE adota medidas de segurança compatíveis com as melhores práticas e em conformidade com a LGPD. Consulte nossa <a href="privacidade.html">Política de Privacidade</a> para detalhes completos.</p>
-        </section>
+        <div class="faq-item">
+          <h3>Como entro em contato?</h3>
+          <p>Pelo formulário em <a href="/capturaLead.html">Entre em contato</a> ou e-mail suporte@radarsiope.com.br. Retornamos em até 2 dias úteis.</p>
+        </div>
+      </section>
 
-        <section id="suporte">
-          <h2>9. Suporte e contato</h2>
-          <p>Em caso de dúvidas, suporte técnico ou solicitações relacionadas à assinatura, utilize os canais oficiais disponíveis em <a href="capturaLead.html">Entre em contato</a>. O prazo de resposta é de até 2 dias úteis.</p>
-        </section>
-
-        <section id="foro">
-          <h2>10. Foro</h2>
-          <p>Fica eleito o foro da comarca de <strong>Brasília/DF</strong> para dirimir quaisquer dúvidas ou controvérsias oriundas destes Termos, com renúncia a qualquer outro, por mais privilegiado que seja.</p>
-        </section>
-
-        <hr />
-
-        <!-- FAQ -->
-        <section id="faq" class="faq-section">
-          <h2>❓ FAQ — Perguntas frequentes sobre a assinatura</h2>
-          <p class="faq-lead">Resumo em linguagem simples para facilitar sua consulta.</p>
-
-          <div class="faq-item">
-            <h3>O que estou contratando?</h3>
-            <p>Acesso ao Radar SIOPE: revista eletrônica, central técnica, newsletters, alertas legislativos e recursos do plano escolhido.</p>
-          </div>
-          <div class="faq-item">
-            <h3>Como são definidos os valores?</h3>
-            <p>O valor original e eventuais descontos (como cupons) são mostrados no resumo antes da confirmação. O total final é exatamente o que você vê antes de pagar — sem taxas ocultas.</p>
-          </div>
-          <div class="faq-item">
-            <h3>Quais formas de pagamento posso usar?</h3>
-            <p>Cartão de crédito, boleto bancário ou PIX, via Mercado Pago. Se optar por parcelar, as parcelas são geradas com vencimentos mensais sucessivos.</p>
-          </div>
-          <div class="faq-item">
-            <h3>O que acontece se eu não pagar uma parcela?</h3>
-            <p>O acesso pode ser suspenso até a regularização do pagamento em aberto.</p>
-          </div>
-          <div class="faq-item">
-            <h3>Posso cancelar quando quiser?</h3>
-            <p>Sim. O cancelamento pode ser solicitado a qualquer momento pelos canais oficiais. Nos primeiros 7 dias após a contratação, o CDC garante o direito de arrependimento com reembolso integral.</p>
-          </div>
-          <div class="faq-item">
-            <h3>A assinatura renova automaticamente?</h3>
-            <p>Apenas se você autorizar expressamente no momento da contratação. Quando aplicável, avisamos previamente para você decidir.</p>
-          </div>
-          <div class="faq-item">
-            <h3>Meus dados estão protegidos?</h3>
-            <p>Sim. Usamos medidas de segurança adequadas e operamos em conformidade com a LGPD. Veja detalhes na <a href="privacidade.html">Política de Privacidade</a>.</p>
-          </div>
-          <div class="faq-item">
-            <h3>Como entro em contato?</h3>
-            <p>Pelo formulário em <a href="capturaLead.html">Entre em contato</a>. Retornamos em até 2 dias úteis.</p>
-          </div>
-        </section>
-
-      </article>
-    </div>
+      <div class="ultima-atualizacao">
+        <p><strong>Última atualização:</strong> 25 de abril de 2026</p>
+        <p><strong>Versão:</strong> 2.0</p>
+      </div>
+    </article>
   </main>
 
-  <footer>
+  <footer class="site-footer">
     <div class="container">
-      <div class="footer__top">
-        <div class="footer__brand">
-          <a href="/" class="nav__logo" style="color:#fff; text-decoration:none;">
-            <span class="nav__logo-icon">📡</span>
-            Radar <span style="color:var(--gold)">SIOPE</span>
-          </a>
+      <div class="footer-grid">
+        <div>
+          <h3>📡 Radar SIOPE</h3>
           <p>Revista eletrônica e central técnica para gestores e profissionais da educação pública municipal.</p>
         </div>
         <div>
-          <p class="footer__col-title">Plataforma</p>
-          <ul class="footer__links">
-            <li><a href="newsletter.html">Newsletters</a></li>
-            <li><a href="noticias.html">Notícias</a></li>
-            <li><a href="assinatura.html?origem=site">Assinar</a></li>
-            <li><a href="acesso.html">Área do assinante</a></li>
+          <h4>Plataforma</h4>
+          <ul>
+            <li><a href="/newsletter.html">Newsletters</a></li>
+            <li><a href="/noticias.html">Notícias</a></li>
+            <li><a href="/assinatura.html?origem=site">Assinar</a></li>
+            <li><a href="/acesso.html">Área do assinante</a></li>
           </ul>
         </div>
         <div>
-          <p class="footer__col-title">Temas</p>
-          <ul class="footer__links">
+          <h4>Temas</h4>
+          <ul>
             <li><a href="#">Fundeb</a></li>
             <li><a href="#">SIOPE</a></li>
             <li><a href="#">CACS-Fundeb</a></li>
@@ -343,34 +280,126 @@
           </ul>
         </div>
         <div>
-          <p class="footer__col-title">Legal</p>
-          <ul class="footer__links">
-            <li><a href="privacidade.html">Política de Privacidade</a></li>
-            <li><a href="termos.html">Termos de Uso</a></li>
-            <li><a href="capturaLead.html">Contato</a></li>
+          <h4>Legal</h4>
+          <ul>
+            <li><a href="/privacidade.html">Política de Privacidade</a></li>
+            <li><a href="/termos.html">Termos de Uso</a></li>
+            <li><a href="/capturaLead.html">Contato</a></li>
           </ul>
         </div>
       </div>
-      <div class="footer__bottom">
-        <span>© 2026 Radar SIOPE. Todos os direitos reservados.</span>
-        <span>Brasília/DF — Brasil &nbsp;·&nbsp; <a href="privacidade.html">Privacidade</a> &nbsp;·&nbsp; <a href="termos.html">Termos</a></span>
+      <div class="footer-bottom">
+        <p>© 2026 Radar SIOPE. Todos os direitos reservados.<br>Brasília/DF — Brasil</p>
+        <p><a href="/privacidade.html">Privacidade</a> · <a href="/termos.html">Termos</a></p>
       </div>
     </div>
   </footer>
 
-  <script>
-    const toggle = document.getElementById('nav-toggle');
-    const menu   = document.getElementById('nav-menu');
-    toggle.addEventListener('click', () => {
-      const open = menu.classList.toggle('open');
-      toggle.setAttribute('aria-expanded', open);
-      toggle.textContent = open ? '✕' : '☰';
-    });
-    document.querySelectorAll('.nav__item--drop').forEach(item => {
-      item.querySelector('a').addEventListener('click', e => {
-        if (window.innerWidth < 640) { e.preventDefault(); item.classList.toggle('open'); }
-      });
-    });
-  </script>
+  <style>
+    .termos-content {
+      background: #fff;
+      padding: 32px;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    }
+    .termos-content h1 {
+      color: #0A3D62;
+      margin-bottom: 8px;
+    }
+    .subtitle {
+      color: #64748b;
+      font-size: 15px;
+      margin-bottom: 24px;
+    }
+    .toc {
+      background: #f8fafc;
+      padding: 16px 20px;
+      border-radius: 6px;
+      margin: 24px 0;
+      border-left: 4px solid #0A3D62;
+    }
+    .toc h2 {
+      margin: 0 0 12px 0;
+      font-size: 14px;
+      color: #0A3D62;
+    }
+    .toc ol {
+      margin: 0;
+      padding-left: 20px;
+      columns: 2;
+    }
+    .toc li {
+      margin-bottom: 4px;
+      break-inside: avoid;
+    }
+    .toc a {
+      color: #0284c7;
+      text-decoration: none;
+    }
+    .toc a:hover {
+      text-decoration: underline;
+    }
+    section {
+      margin: 32px 0;
+      padding-bottom: 24px;
+      border-bottom: 1px solid #e2e8f0;
+    }
+    section:last-of-type {
+      border-bottom: none;
+    }
+    section h2 {
+      color: #0A3D62;
+      font-size: 20px;
+      margin-bottom: 16px;
+    }
+    section h3 {
+      color: #1e293b;
+      font-size: 16px;
+      margin: 20px 0 8px 0;
+    }
+    section p {
+      line-height: 1.7;
+      color: #334155;
+      margin: 12px 0;
+    }
+    section ul {
+      margin: 12px 0;
+      padding-left: 24px;
+    }
+    section li {
+      margin: 6px 0;
+      color: #334155;
+      line-height: 1.6;
+    }
+    .faq-item {
+      background: #f8fafc;
+      padding: 16px 20px;
+      border-radius: 6px;
+      margin: 12px 0;
+      border-left: 4px solid #22c55e;
+    }
+    .faq-item h3 {
+      margin: 0 0 8px 0;
+      color: #0A3D62;
+    }
+    .faq-item p {
+      margin: 0;
+    }
+    .ultima-atualizacao {
+      background: #fef3c7;
+      padding: 16px 20px;
+      border-radius: 6px;
+      margin-top: 32px;
+      border-left: 4px solid #f59e0b;
+    }
+    @media (max-width: 768px) {
+      .toc ol {
+        columns: 1;
+      }
+      .termos-content {
+        padding: 20px;
+      }
+    }
+  </style>
 </body>
 </html>
