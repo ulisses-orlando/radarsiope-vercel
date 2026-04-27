@@ -430,7 +430,6 @@ async function carregarListaPlanos() {
 // ─── Helper: Cria um card de plano para um ciclo específico ───────────────────
 function _criarCardPlano(plano, ciclo, allFeatures) {
   const cor = plano.cor_destaque || '#0A3D62';
-
   const featuresHtml = allFeatures.map(f => {
     const val = features[f.id];
     const ativo = !!val;
