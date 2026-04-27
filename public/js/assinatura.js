@@ -24,6 +24,93 @@ let _planoAtual    = null;       // objeto completo do plano selecionado + ciclo
 let _tiposMap      = {};         // id -> nome dos tipos de newsletter
 let _cupomAplicado = null;       // objeto cupom validado
 
+// ─── Estado de seleção extra de municípios ──────────────────────────────────────
+let _municipiosDisponiveis = [];
+let _municipiosExtrasSelecionados = [];
+
+async function configurarUIMunicipiosExtra() {
+  const container = document.getElementById('container-municipios-extra');
+  if (!container) {
+    // Cria container automaticamente se não existir no HTML
+    const wrap = document.createElement('div');
+    wrap.id = 'container-municipios-extra';
+    wrap.style.marginTop = '16px';
+    const refNode = document.getElementById('campo-uf-municipio')?.parentNode || document.body;
+    refNode.appendChild(wrap);
+  }
+  document.getElementById('container-municipios-extra').innerHTML = `
+    <label style="font-weight:600;margin-bottom:4px;display:block;">📍 Municípios adicionais do plano</label>
+    <input type="text" id="municipios-busca" placeholder="Buscar por nome ou código..." style="width:100%;padding:8px;margin-bottom:8px;border:1px solid #cbd5e1;border-radius:6px;">
+    <div id="municipios-grid" style="display:grid;grid-template-columns:repeat(auto-fill, minmax(240px, 1fr));gap:8px;max-height:220px;overflow-y:auto;padding:8px;border:1px solid #e2e8f0;border-radius:6px;background:#f8fafc;"></div>
+    <div id="municipios-limit-info" style="font-size:11px;color:#64748b;margin-top:6px;"></div>
+  `;
+
+  const buscaEl = document.getElementById('municipios-busca');
+  const gridEl  = document.getElementById('municipios-grid');
+  const infoEl  = document.getElementById('municipios-limit-info');
+
+  try {
+    const snap = await db.collection('municipio').orderBy('nome').get();
+    _municipiosDisponiveis = snap.docs.map(d => ({ cod_municipio: d.id, ...d.data() }));
+  } catch(e) { console.error('[municipios] Erro ao carregar:', e); }
+
+  const renderGrid = (termo = '') => {
+    const maxExtras = Math.max(0, (_planoAtual?.features?.max_municipios || 1) - 1);
+    const principal = document.getElementById('cod-municipio-principal')?.value || window._lastCodMunicipio || null;
+    const filtro = termo.toLowerCase();
+    const lista = _municipiosDisponiveis.filter(m => 
+      (m.nome || '').toLowerCase().includes(filtro) || (m.cod_municipio || '').includes(filtro)
+    );
+
+    gridEl.innerHTML = lista.map(m => `
+      <label style="display:flex;align-items:center;gap:6px;font-size:12px;padding:4px 0;cursor:pointer;">
+        <input type="checkbox" value="${m.cod_municipio}" ${_municipiosExtrasSelecionados.includes(m.cod_municipio) ? 'checked' : ''}>
+        <span>${m.nome || m.cod_municipio}${m.uf ? ` - ${m.uf}` : ''}</span>
+      </label>
+    `).join('');
+
+    infoEl.textContent = `Selecionados: ${_municipiosExtrasSelecionados.length} / ${maxExtras} máximo(s)`;
+
+    gridEl.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+      cb.addEventListener('change', (e) => {
+        const val = e.target.value;
+        if (val === principal) {
+          e.target.checked = false;
+          mostrarMensagem('O município principal já está incluído automaticamente.');
+          return;
+        }
+        if (e.target.checked) {
+          if (_municipiosExtrasSelecionados.length >= maxExtras) {
+            e.target.checked = false;
+            mostrarMensagem(`Limite de ${maxExtras} município(s) adicional(is) atingido.`);
+            return;
+          }
+          _municipiosExtrasSelecionados.push(val);
+        } else {
+          _municipiosExtrasSelecionados = _municipiosExtrasSelecionados.filter(v => v !== val);
+        }
+        renderGrid(termo);
+      });
+    });
+  };
+
+  buscaEl.addEventListener('input', (e) => renderGrid(e.target.value));
+
+  // Limpar extras se o município principal mudar
+  const observer = new MutationObserver(() => {
+    const novoPrincipal = document.getElementById('cod-municipio-principal')?.value || window._lastCodMunicipio;
+    if (window._watchedPrincipalMun && window._watchedPrincipalMun !== novoPrincipal) {
+      _municipiosExtrasSelecionados = [];
+      gridEl.querySelectorAll('input:checked').forEach(c => c.checked = false);
+      renderGrid(buscaEl.value);
+    }
+    window._watchedPrincipalMun = novoPrincipal;
+  });
+  observer.observe(document.getElementById('campo-uf-municipio') || document.body, { subtree: true, childList: true, attributes: true, characterData: true });
+  
+  renderGrid();
+}
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function fmtBRL(v) {
   const n = Number(v);
@@ -288,6 +375,18 @@ async function _onPlanoSelecionado(planId, cicloInicial = null) {
   _planoAtual = plano;
   _planoAtual.cicloSelecionado = Number(cicloInicial || ciclosDisp[0]);
 
+    // Controle de exibição do campo extra de municípios
+  const maxMun = Number(_planoAtual?.features?.max_municipios) || 1;
+  const containerMun = document.getElementById('container-municipios-extra');
+  if (maxMun > 1) {
+    if (!containerMun) configurarUIMunicipiosExtra();
+    else containerMun.style.display = 'block';
+    document.getElementById('municipios-limit-info') && (document.getElementById('municipios-limit-info').textContent = `Selecione até ${maxMun - 1} município(s) adicional(is).`);
+  } else {
+    if (containerMun) containerMun.style.display = 'none';
+    _municipiosExtrasSelecionados = [];
+  }
+
   document.getElementById('planId').value = planId;
   
   document.querySelectorAll('.plano-card').forEach(c => {
@@ -301,6 +400,12 @@ async function _onPlanoSelecionado(planId, cicloInicial = null) {
   _mostrarWhatsappOptin();
   await carregarTiposNewsletter(Array.isArray(plano.tipos_inclusos) ? plano.tipos_inclusos : []);
   await atualizarPreview();
+    // Se já houver cupom de 100% aplicado, mantém extras bloqueados
+  if (_cupomAplicado?.valor === 100) {
+    _municipiosExtrasSelecionados = [];
+    const munC = document.getElementById('container-municipios-extra');
+    if (munC) { munC.style.display = 'none'; munC.style.pointerEvents = 'none'; munC.style.opacity = '0.5'; }
+  }
 }
 
 // ─── Parcelas ────────────────────────────────────────────────────────────────
@@ -557,6 +662,11 @@ async function registrarAssinatura(userId, payload, preview) {
   const renovacao = new Date(agora);
   renovacao.setMonth(renovacao.getMonth() + cicloMeses);
 
+  const principalCod = payload.cod_municipio || null;
+  const extras = Array.isArray(payload.municipiosExtras) ? payload.municipiosExtras : [];
+  // O primeiro elemento é sempre o município principal do assinante
+  const municipiosPlano = principalCod ? [principalCod, ...extras.filter(e => e !== principalCod)] : [];
+
   const data = {
     planId: payload.planId || null, plano_slug: payload.plano_slug || null, plano_nome: payload.plano_nome || null,
     ciclo: String(cicloMeses), ciclo_meses: cicloMeses,
@@ -567,6 +677,7 @@ async function registrarAssinatura(userId, payload, preview) {
     desconto_pct: preview.desconto_pct ?? 0, tem_fidelizacao: preview.tem_fidelizacao ?? false,
     data_fim_fidelizacao: preview.tem_fidelizacao ? firebase.firestore.Timestamp.fromDate(preview.data_fim_fidelizacao) : null,
     cupom: payload.cupom || null, features_snapshot: payload.features || null,
+    municipios_plano: municipiosPlano, // NOVO CAMPO
     data_inicio: firebase.firestore.Timestamp.fromDate(agora),
     data_proxima_renovacao: firebase.firestore.Timestamp.fromDate(renovacao),
     status: 'pendente_pagamento', paymentProvider: 'mercadopago', orderId: payload.orderId || null,
@@ -702,10 +813,20 @@ async function processarEnvioAssinatura(e) {
     btn.disabled = false;
     return;
   }
-  if (!preview || preview.amountCentavos <= 0) {
-    setStatus('Valor inválido para pagamento.', '#c00');
-    btn.disabled = false;
-    return;
+
+  const isGratuidade = (_cupomAplicado?.valor === 100) || preview.amountCentavos === 0;
+  const maxMun = Number(_planoAtual?.features?.max_municipios) || 1;
+  
+  if (maxMun > 1 && _municipiosExtrasSelecionados.length === 0) {
+    setStatus('Selecione pelo menos 1 município adicional para este plano.', '#c00');
+    btn.disabled = false; return;
+  }
+
+  // Se for gratuidade, força limpeza dos extras e esconde container
+  if (isGratuidade) {
+    _municipiosExtrasSelecionados = [];
+    const munC = document.getElementById('container-municipios-extra');
+    if (munC) { munC.style.display = 'none'; munC.style.pointerEvents = 'none'; }
   }
 
   setStatus('Registrando dados...', '#555');
@@ -715,31 +836,41 @@ async function processarEnvioAssinatura(e) {
       cod_uf: dadosUf?.cod_uf, cod_municipio: dadosUf?.cod_municipio, nome_municipio: dadosUf?.nome_municipio,
       plano_slug: _planoAtual.plano_slug, ciclo, features: _planoAtual.features || null,
     });
-
     const assinaturaId = await registrarAssinatura(userId, {
       planId: _planoAtual.id, plano_slug: _planoAtual.plano_slug || null, plano_nome: _planoAtual.nome || null,
       tipos_selecionados: tiposSelecionados, cupom: cupomCod || null, features: _planoAtual.features || null,
+      cod_municipio: dadosUf?.cod_municipio, municipiosExtras: _municipiosExtrasSelecionados
     }, preview);
 
-    setStatus('Iniciando pagamento...', '#555');
-    const backendResp = await criarPedidoBackend({
-      userId, assinaturaId, amountCentavos: preview.amountCentavos, cpf, nome, email,
+    setStatus(isGratuidade ? 'Ativando gratuidade...' : 'Iniciando pagamento...', '#555');
+    
+    const backendPayload = {
+      userId, assinaturaId, amountCentavos: isGratuidade ? 0 : preview.amountCentavos, cpf, nome, email,
       descricao: `${_planoAtual.nome || 'Assinatura Radar SIOPE'} — ${preview.ciclo_meses} meses`,
       installmentsMax: _planoAtual.parcelas_sem_juros || preview.ciclo_meses,
       dataPrimeiroVencimento: new Date().toISOString().split('T')[0], ciclo_meses: preview.ciclo_meses,
       plano_slug: _planoAtual.plano_slug || null,
       metodosPagamento: Array.isArray(_planoAtual.metodos_pagamento) && _planoAtual.metodos_pagamento.length ? _planoAtual.metodos_pagamento : ['credit_card'],
-    });
+      tipoAssinatura: isGratuidade ? 'gratuidade' : 'padrao',
+      cupomCodigo: _cupomAplicado?.codigo || null // 🔹 ENVIADO PARA BACKEND DESATIVAR CUPOM
+    };
+
+    const backendResp = await criarPedidoBackend(backendPayload);
 
     if (backendResp?.pedidoId) {
       db.collection('usuarios').doc(userId).collection('assinaturas').doc(assinaturaId)
         .update({ pedidoId: backendResp.pedidoId, updatedAt: firebase.firestore.FieldValue.serverTimestamp() }).catch(() => {});
     }
 
-    if (backendResp?.redirectUrl) {
+    if (backendResp?.ativadoDireto) {
+      setStatus('✅ Assinatura ativada com sucesso! Verifique seu e-mail.', '#16a34a');
+      setTimeout(() => {
+        window.location.href = backendResp.redirectSucesso || `${process.env.NEXT_PUBLIC_BASE_URL}/area-assinante.html`;
+      }, 2000);
+    } else if (backendResp?.redirectUrl) {
       window.location.href = backendResp.redirectUrl;
     } else {
-      document.getElementById('modalConfirmacao').style.display = 'flex';
+      document.getElementById('modalConfirmacao')?.style.display = 'flex';
     }
   } catch (err) {
     console.error('[assinatura] Erro no processamento:', err);
@@ -790,15 +921,44 @@ async function initAssinatura() {
     if (cupom) {
       _cupomAplicado = cupom;
       if (fb) { fb.textContent = `✅ Cupom "${codigo}" aplicado!`; fb.style.color = '#16a34a'; }
+      
+      // 🔒 BLOQUEIO DE MUNICÍPIOS EXTRAS SE CUPOM FOR 100%
+      const isGratuidade = cupom.valor === 100;
+      const munContainer = document.getElementById('container-municipios-extra');
+      if (isGratuidade) {
+        _municipiosExtrasSelecionados = [];
+        if (munContainer) {
+          munContainer.style.display = 'none';
+          munContainer.style.pointerEvents = 'none';
+          munContainer.style.opacity = '0.5';
+        }
+        mostrarMensagem('Cupom de gratuidade aplicado. Seleção de municípios adicionais desativada.');
+      } else {
+        if (munContainer) {
+          munContainer.style.display = 'block';
+          munContainer.style.pointerEvents = 'auto';
+          munContainer.style.opacity = '1';
+        }
+      }
       await atualizarPreview();
     } else {
       _cupomAplicado = null;
       if (fb) fb.textContent = '';
+      // Restaura container caso removam o cupom
+      const munContainer = document.getElementById('container-municipios-extra');
+      if (munContainer && _planoAtual?.features?.max_municipios > 1) {
+        munContainer.style.display = 'block';
+        munContainer.style.pointerEvents = 'auto';
+        munContainer.style.opacity = '1';
+      }
     }
   });
 
   document.getElementById('parcelas')?.addEventListener('change', atualizarPreview);
   document.getElementById('form-assinatura')?.addEventListener('submit', processarEnvioAssinatura);
+
+  // Inicializa seletor de municípios extras
+  configurarUIMunicipiosExtra();
 }
 
 // ── Auto-init ──
