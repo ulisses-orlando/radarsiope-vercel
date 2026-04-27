@@ -27,11 +27,11 @@ let _cupomAplicado = null;       // objeto cupom validado
 // ─── Estado de seleção extra de municípios ──────────────────────────────────────
 let _municipiosDisponiveis = [];
 let _municipiosExtrasSelecionados = [];
+let _ufAtual = null;
 
 async function configurarUIMunicipiosExtra() {
   const container = document.getElementById('container-municipios-extra');
   if (!container) {
-    // Cria container automaticamente se não existir no HTML
     const wrap = document.createElement('div');
     wrap.id = 'container-municipios-extra';
     wrap.style.marginTop = '16px';
@@ -40,7 +40,8 @@ async function configurarUIMunicipiosExtra() {
   }
   document.getElementById('container-municipios-extra').innerHTML = `
     <label style="font-weight:600;margin-bottom:4px;display:block;">📍 Municípios adicionais do plano</label>
-    <input type="text" id="municipios-busca" placeholder="Buscar por nome ou código..." style="width:100%;padding:8px;margin-bottom:8px;border:1px solid #cbd5e1;border-radius:6px;">
+    <div id="municipios-aviso-uf" style="font-size:12px;color:#64748b;margin-bottom:8px;">Selecione um estado para carregar os municípios.</div>
+    <input type="text" id="municipios-busca" placeholder="Buscar por nome ou código..." style="width:100%;padding:8px;margin-bottom:8px;border:1px solid #cbd5e1;border-radius:6px;display:none;">
     <div id="municipios-grid" style="display:grid;grid-template-columns:repeat(auto-fill, minmax(240px, 1fr));gap:8px;max-height:220px;overflow-y:auto;padding:8px;border:1px solid #e2e8f0;border-radius:6px;background:#f8fafc;"></div>
     <div id="municipios-limit-info" style="font-size:11px;color:#64748b;margin-top:6px;"></div>
   `;
@@ -48,15 +49,35 @@ async function configurarUIMunicipiosExtra() {
   const buscaEl = document.getElementById('municipios-busca');
   const gridEl  = document.getElementById('municipios-grid');
   const infoEl  = document.getElementById('municipios-limit-info');
+  const avisoEl = document.getElementById('municipios-aviso-uf');
 
-  try {
-    const snap = await db.collection('municipio').orderBy('nome').get();
-    _municipiosDisponiveis = snap.docs.map(d => ({ cod_municipio: d.id, ...d.data() }));
-  } catch(e) { console.error('[municipios] Erro ao carregar:', e); }
+  async function carregarMunicipiosPorUF(ufId) {
+    if (!ufId) {
+      avisoEl.style.display = 'block';
+      buscaEl.style.display = 'none';
+      gridEl.innerHTML = '';
+      infoEl.textContent = '';
+      _municipiosDisponiveis = [];
+      return;
+    }
+    avisoEl.style.display = 'none';
+    buscaEl.style.display = 'block';
+    gridEl.innerHTML = '<div style="padding:8px;color:#666;font-size:12px;">Carregando...</div>';
+    try {
+      // 🔹 NOVA ESTRUTURA: UF/{ufId}/Municipio
+      const snap = await db.collection('UF').doc(ufId.trim().toUpperCase()).collection('Municipio').orderBy('nome').get();
+      _municipiosDisponiveis = snap.docs.map(d => ({ cod_municipio: d.id, ...d.data() }));
+      renderGrid(buscaEl.value);
+    } catch(e) {
+      console.error('[municipios] Erro ao carregar:', e);
+      gridEl.innerHTML = '<div style="padding:8px;color:#c00;font-size:12px;">Erro ao carregar municípios.</div>';
+      _municipiosDisponiveis = [];
+    }
+  }
 
   const renderGrid = (termo = '') => {
     const maxExtras = Math.max(0, (_planoAtual?.features?.max_municipios || 1) - 1);
-    const principal = document.getElementById('cod-municipio-principal')?.value || window._lastCodMunicipio || null;
+    const principal = window._lastCodMunicipio || null;
     const filtro = termo.toLowerCase();
     const lista = _municipiosDisponiveis.filter(m => 
       (m.nome || '').toLowerCase().includes(filtro) || (m.cod_municipio || '').includes(filtro)
@@ -96,9 +117,35 @@ async function configurarUIMunicipiosExtra() {
 
   buscaEl.addEventListener('input', (e) => renderGrid(e.target.value));
 
+  // Recarrega municípios ao trocar de estado
+  const triggerLoad = async () => {
+    let ufId = null;
+    const ufInputs = document.querySelectorAll('select[name="uf"], #uf, select.uf, input[name="uf"]');
+    ufInputs.forEach(el => {
+      if (!ufId) ufId = el.value || el.options?.[el.selectedIndex]?.dataset?.cod || el.dataset?.cod;
+    });
+    if (!ufId && typeof window.validarUfMunicipio === 'function') {
+      const validado = window.validarUfMunicipio();
+      if (validado?.cod_uf) ufId = validado.cod_uf;
+    }
+    if (ufId && ufId !== _ufAtual) {
+      _ufAtual = ufId;
+      _municipiosExtrasSelecionados = []; // Limpa seleção ao trocar de estado
+      await carregarMunicipiosPorUF(_ufAtual);
+    }
+  };
+
+  document.querySelectorAll('select[name="uf"], #uf, select.uf, input[name="uf"]').forEach(el => {
+    el.addEventListener('change', triggerLoad);
+    el.addEventListener('blur', triggerLoad);
+  });
+
+  // Carrega inicial se já houver UF preenchido
+  triggerLoad();
+
   // Limpar extras se o município principal mudar
   const observer = new MutationObserver(() => {
-    const novoPrincipal = document.getElementById('cod-municipio-principal')?.value || window._lastCodMunicipio;
+    const novoPrincipal = window._lastCodMunicipio || null;
     if (window._watchedPrincipalMun && window._watchedPrincipalMun !== novoPrincipal) {
       _municipiosExtrasSelecionados = [];
       gridEl.querySelectorAll('input:checked').forEach(c => c.checked = false);
@@ -107,8 +154,6 @@ async function configurarUIMunicipiosExtra() {
     window._watchedPrincipalMun = novoPrincipal;
   });
   observer.observe(document.getElementById('campo-uf-municipio') || document.body, { subtree: true, childList: true, attributes: true, characterData: true });
-  
-  renderGrid();
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
