@@ -51,6 +51,7 @@ async function configurarUIMunicipiosExtra() {
   const infoEl  = document.getElementById('municipios-limit-info');
   const avisoEl = document.getElementById('municipios-aviso-uf');
 
+  // 🔹 Função que carrega municípios da subcoleção UF/{ufId}/Municipio
   async function carregarMunicipiosPorUF(ufId) {
     if (!ufId) {
       avisoEl.style.display = 'block';
@@ -64,9 +65,9 @@ async function configurarUIMunicipiosExtra() {
     buscaEl.style.display = 'block';
     gridEl.innerHTML = '<div style="padding:8px;color:#666;font-size:12px;">Carregando...</div>';
     try {
-      // 🔹 NOVA ESTRUTURA: UF/{ufId}/Municipio
-      const snap = await db.collection('UF').doc(ufId.trim().toUpperCase()).collection('Municipio').orderBy('nome').get();
-      _municipiosDisponiveis = snap.docs.map(d => ({ cod_municipio: d.id, ...d.data() }));
+      // 🔹 ESTRUTURA CORRETA: UF/{ufId}/Municipio (igual a inserirCamposUfMunicipio)
+      const snap = await db.collection('UF').doc(ufId.trim().toUpperCase()).collection('Municipio').get();
+      _municipiosDisponiveis = snap.docs.map(d => ({ cod_municipio: d.data().cod_municipio || d.id, nome: d.data().nome_municipio, ...d.data() }));
       renderGrid(buscaEl.value);
     } catch(e) {
       console.error('[municipios] Erro ao carregar:', e);
@@ -77,7 +78,12 @@ async function configurarUIMunicipiosExtra() {
 
   const renderGrid = (termo = '') => {
     const maxExtras = Math.max(0, (_planoAtual?.features?.max_municipios || 1) - 1);
-    const principal = window._lastCodMunicipio || null;
+    // Obtém o município principal via validarUfMunicipio (já disponível no escopo)
+    let principal = null;
+    if (typeof window.validarUfMunicipio === 'function') {
+      const validado = window.validarUfMunicipio();
+      if (validado?.cod_municipio) principal = validado.cod_municipio;
+    }
     const filtro = termo.toLowerCase();
     const lista = _municipiosDisponiveis.filter(m => 
       (m.nome || '').toLowerCase().includes(filtro) || (m.cod_municipio || '').includes(filtro)
@@ -117,13 +123,15 @@ async function configurarUIMunicipiosExtra() {
 
   buscaEl.addEventListener('input', (e) => renderGrid(e.target.value));
 
-  // Recarrega municípios ao trocar de estado
+  // 🔹 Recarrega municípios ao trocar de estado (integração com inserirCamposUfMunicipio)
   const triggerLoad = async () => {
     let ufId = null;
+    // Tenta pegar UF de vários seletores possíveis
     const ufInputs = document.querySelectorAll('select[name="uf"], #uf, select.uf, input[name="uf"]');
     ufInputs.forEach(el => {
       if (!ufId) ufId = el.value || el.options?.[el.selectedIndex]?.dataset?.cod || el.dataset?.cod;
     });
+    // Fallback: usar validarUfMunicipio se disponível
     if (!ufId && typeof window.validarUfMunicipio === 'function') {
       const validado = window.validarUfMunicipio();
       if (validado?.cod_uf) ufId = validado.cod_uf;
@@ -135,17 +143,22 @@ async function configurarUIMunicipiosExtra() {
     }
   };
 
+  // Observa mudança nos selects de UF
   document.querySelectorAll('select[name="uf"], #uf, select.uf, input[name="uf"]').forEach(el => {
     el.addEventListener('change', triggerLoad);
     el.addEventListener('blur', triggerLoad);
   });
 
-  // Carrega inicial se já houver UF preenchido
+  // Carrega inicial se já houver UF preenchida
   triggerLoad();
 
-  // Limpar extras se o município principal mudar
+  // 🔹 Limpar extras se o município principal mudar (via MutationObserver)
   const observer = new MutationObserver(() => {
-    const novoPrincipal = window._lastCodMunicipio || null;
+    let novoPrincipal = null;
+    if (typeof window.validarUfMunicipio === 'function') {
+      const validado = window.validarUfMunicipio();
+      if (validado?.cod_municipio) novoPrincipal = validado.cod_municipio;
+    }
     if (window._watchedPrincipalMun && window._watchedPrincipalMun !== novoPrincipal) {
       _municipiosExtrasSelecionados = [];
       gridEl.querySelectorAll('input:checked').forEach(c => c.checked = false);
