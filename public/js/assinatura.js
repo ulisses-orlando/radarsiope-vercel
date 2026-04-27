@@ -19,6 +19,12 @@ const _origem      = getParam('origem') || 'direto';
 const _planIdUrl   = getParam('planId') || null;
 const _leadIdUrl   = getParam('leadId') || getParam('idLead') || null;
 
+// ─── Estado global da sessão ──────────────────────────────────────────────────
+let _planoAtual    = null;       // objeto completo do plano selecionado + cicloSelecionado
+let _tiposMap      = {};         // id -> nome dos tipos de newsletter
+let _cupomAplicado = null;       // objeto cupom validado
+
+
 // ─── Estado de seleção extra de municípios ──────────────────────────────────────
 let _municipiosDisponiveis = [];
 let _municipiosExtrasSelecionados = [];
