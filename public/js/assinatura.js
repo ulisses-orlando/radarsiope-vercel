@@ -748,16 +748,13 @@ function validarCPF(cpf) {
 }
 
 // ─── Submissão do formulário ──────────────────────────────────────────────────
-// ─── Submissão do formulário ──────────────────────────────────────────────────
 async function processarEnvioAssinatura(e) {
   e.preventDefault();
   clearErrors();
   const btn = document.getElementById('btn-assinar');
-  const statusEl = document.getElementById('status-envio');
-  const setStatus = (msg, cor = '#555') => { 
-    if (statusEl) { statusEl.textContent = msg; statusEl.style.color = cor; } 
-  };
-  
+  const status = document.getElementById('status-envio');
+  const setStatus = (msg, cor = '#555') => { if (status) { status.textContent = msg; status.style.color = cor; } };
+
   const nome = document.getElementById('nome')?.value.trim() || '';
   const cpf = document.getElementById('cpf')?.value.trim() || '';
   const email = document.getElementById('email')?.value.trim() || '';
@@ -770,16 +767,14 @@ async function processarEnvioAssinatura(e) {
   const cupomCod = document.getElementById('cupom')?.value.trim() || '';
   const aceita = !!document.getElementById('aceita-termos')?.checked;
   const ciclo = _planoAtual?.cicloSelecionado || 3;
-  
   const tiposSelecionados = [...document.querySelectorAll('#grupo-newsletters input[type="checkbox"]:checked')].map(cb => cb.value);
-  
+
   let temErro = false;
   const erro = (campo, msg) => { setError(campo, msg); temErro = true; };
-  
   if (nome.length < 3) erro('nome', 'Nome deve ter pelo menos 3 caracteres.');
   if (!validarCPF(cpf)) erro('cpf', 'CPF inválido.');
   if (!validarEmail(email)) erro('email', 'E-mail inválido.');
-  
+
   const temFeatureWhatsApp = !!(_planoAtual?.features?.alertas_prioritarios || _planoAtual?.features?.grupo_whatsapp_vip);
   if (temFeatureWhatsApp) {
     if (!whatsapp || !validarTelefoneFormato(whatsapp)) erro('whatsapp', 'WhatsApp é obrigatório para receber alertas ou acessar o grupo VIP.');
@@ -787,7 +782,6 @@ async function processarEnvioAssinatura(e) {
   } else if (whatsapp && !validarTelefoneFormato(whatsapp)) {
     erro('whatsapp', 'Formato de WhatsApp inválido.');
   }
-  
   if (!perfil) { mostrarMensagem('Selecione seu perfil.'); temErro = true; }
   if (!aceita) { setError('aceita_termos', 'Você precisa aceitar os termos.'); temErro = true; }
   if (!tiposSelecionados.length) { mostrarMensagem('Selecione pelo menos um tipo de newsletter.'); temErro = true; }
@@ -811,7 +805,6 @@ async function processarEnvioAssinatura(e) {
 
   btn.disabled = true;
   setStatus('Calculando valores...', '#555');
-  
   let preview;
   try {
     preview = await calcularPreview(_planoAtual, tiposSelecionados, _cupomAplicado);
@@ -821,25 +814,19 @@ async function processarEnvioAssinatura(e) {
     return;
   }
 
-  // 🔹 LÓGICA DE GRATUIDADE E MUNICÍPIOS
-  const isGratuidade = (_cupomAplicado?.valor === 100) || (preview && preview.amountCentavos === 0);
+  const isGratuidade = (_cupomAplicado?.valor === 100) || preview.amountCentavos === 0;
   const maxMun = Number(_planoAtual?.features?.max_municipios) || 1;
   
-  // Validação de municípios extras (obrigatório se maxMun > 1 e NÃO for gratuidade)
-  if (maxMun > 1 && !isGratuidade && _municipiosExtrasSelecionados.length === 0) {
+  if (maxMun > 1 && _municipiosExtrasSelecionados.length === 0) {
     setStatus('Selecione pelo menos 1 município adicional para este plano.', '#c00');
-    btn.disabled = false; 
-    return;
+    btn.disabled = false; return;
   }
 
   // Se for gratuidade, força limpeza dos extras e esconde container
   if (isGratuidade) {
     _municipiosExtrasSelecionados = [];
     const munC = document.getElementById('container-municipios-extra');
-    if (munC) { 
-      munC.style.display = 'none'; 
-      munC.style.pointerEvents = 'none'; 
-    }
+    if (munC) { munC.style.display = 'none'; munC.style.pointerEvents = 'none'; }
   }
 
   setStatus('Registrando dados...', '#555');
@@ -849,7 +836,6 @@ async function processarEnvioAssinatura(e) {
       cod_uf: dadosUf?.cod_uf, cod_municipio: dadosUf?.cod_municipio, nome_municipio: dadosUf?.nome_municipio,
       plano_slug: _planoAtual.plano_slug, ciclo, features: _planoAtual.features || null,
     });
-    
     const assinaturaId = await registrarAssinatura(userId, {
       planId: _planoAtual.id, plano_slug: _planoAtual.plano_slug || null, plano_nome: _planoAtual.nome || null,
       tipos_selecionados: tiposSelecionados, cupom: cupomCod || null, features: _planoAtual.features || null,
@@ -884,7 +870,7 @@ async function processarEnvioAssinatura(e) {
     } else if (backendResp?.redirectUrl) {
       window.location.href = backendResp.redirectUrl;
     } else {
-      document.getElementById('modalConfirmacao')?.style.display = 'flex';
+      document.getElementById('modalConfirmacao').style.display = 'flex';
     }
   } catch (err) {
     console.error('[assinatura] Erro no processamento:', err);
