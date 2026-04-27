@@ -927,10 +927,11 @@ export default async function handler(req, res) {
       if (!userId || !assinaturaId) {
         return json(res, 400, { ok: false, message: 'userId e assinaturaId são obrigatórios.' });
       }
-      if (!amountCentavos || isNaN(amountCentavos) || amountCentavos < 50) {
-        return json(res, 400, { ok: false, message: 'amountCentavos deve ser um número ≥ 50 (mínimo R$ 0,50).' });
-      }
 
+      if (isNaN(amountCentavos) || amountCentavos < 0) {
+        return json(res, 400, { ok: false, message: 'amountCentavos inválido.' });
+      }
+      
       // fix #9: validar back_urls antes de chamar o MP
       const backUrlSuccess = process.env.MP_BACK_URL_SUCCESS;
       const backUrlFailure = process.env.MP_BACK_URL_FAILURE;
@@ -972,6 +973,67 @@ export default async function handler(req, res) {
 
       const external_reference = montarExternalReference(userId, assinaturaId, novoPedidoRef.id);
       const cpfNormalizado = (cpf || '').replace(/\D/g, '');
+
+      // 🔹 BLOCO NOVO: Fluxo de Gratuidade (Total Zero)
+      if (amountCentavos === 0 && body.tipoAssinatura === 'gratuidade') {
+        await registrarPagamentoPendente(userId, assinaturaId, 0, 1, 'cupom_gratuito', novoPedidoRef.id);
+        await novoPedidoRef.set({
+          status: 'pago', mpStatus: 'approved', mpPaymentMethod: 'cupom_gratuito',
+          atualizadoEm: admin.firestore.FieldValue.serverTimestamp()
+        }, { merge: true });
+
+        const assinRef = db.collection('usuarios').doc(userId).collection('assinaturas').doc(assinaturaId);
+        await assinRef.set({
+          status: 'ativa', paymentProvider: 'cupom_gratuito',
+          orderId: `GRAT-${novoPedidoRef.id.slice(0,8)}`, pedidoId: novoPedidoRef.id,
+          ativadoEm: admin.firestore.FieldValue.serverTimestamp(),
+          atualizadoEm: admin.firestore.FieldValue.serverTimestamp()
+        }, { merge: true });
+        await db.collection('usuarios').doc(userId).update({ ativo: true });
+
+        // 3. 🔥 DESATIVA CUPOM E REGISTRA QUEM USOU
+        const cupomSnap = await db.collection('cupons').where('codigo', '==', body.cupomCodigo).limit(1).get();
+        if (!cupomSnap.empty) {
+          await cupomSnap.docs[0].ref.update({
+            status: 'inativo',
+            historico_usos: admin.firestore.FieldValue.arrayUnion({
+              userId,
+              email: email || null,
+              cpf: cpf || null,
+              assinaturaId,
+              dataUso: new Date().toISOString()
+            })
+          });
+        }
+        
+        const _sessionToken = crypto.randomBytes(32).toString('hex');
+        await db.collection('usuarios').doc(userId).set({
+          pending_session_token: {
+            token: _sessionToken, exp: Date.now() + 72*60*60*1000, assinaturaId,
+            usado: false, criado_em: admin.firestore.FieldValue.serverTimestamp()
+          }
+        }, { merge: true });
+
+        // Disparo idempotente (mesma lógica do webhook pago)
+        const usuarioData = (await db.collection('usuarios').doc(userId).get()).data() || {};
+        const assinaturaData = (await assinRef.get()).data() || {};
+        let nomePlano = '(plano não informado)';
+        if (assinaturaData.planId) {
+          try { const pd = await db.collection('planos').doc(assinaturaData.planId).get(); if(pd.exists) nomePlano = pd.data().nome || nomePlano; } catch(e){}
+        }
+
+        const linkAtivacao = `${process.env.NEXT_PUBLIC_BASE_URL}/verNewsletterComToken.html?ativar=${_sessionToken}&uid=${userId}`;
+        await dispararMensagemAutomatica('pos_cadastro_assinante', {
+          userId, assinaturaId, nome: usuarioData.nome || nome, email: usuarioData.email || email,
+          plano: nomePlano, data_assinatura: new Date(), link_ativacao: linkAtivacao
+        });
+
+        return json(res, 200, { ok: true, redirectUrl: null, pedidoId: novoPedidoRef.id, ativadoDireto: true, redirectSucesso: process.env.MP_BACK_URL_SUCCESS });
+      }
+
+      if (amountCentavos < 50) {
+        return json(res, 400, { ok: false, message: 'amountCentavos deve ser um número ≥ 50 (mínimo R$ 0,50).' });
+      }
 
       // fix #12: extrair primeiro nome e sobrenome do nome completo
       const nomePartes = nome.trim().split(' ');
