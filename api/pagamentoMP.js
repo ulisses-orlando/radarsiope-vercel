@@ -441,6 +441,7 @@ async function _handleAtivarSessao(req, res) {
       segmento:       'assinante',
       plano_slug:     assinaturaData.plano_slug   || null,
       features:       assinaturaData.features_snapshot || assinaturaData.features || {},
+      municipios_plano: assinaturaData.municipios_plano || [],
       nome:           usuarioData.nome            || '',
       email:          usuarioData.email           || '',
       cod_uf:         usuarioData.cod_uf          || '',
@@ -458,6 +459,8 @@ async function _handleAtivarSessao(req, res) {
 // ─── Validação periódica de sessão (chamado a cada 24h pelo app) ───────────
 async function _handleValidarSessao(req, res) {
   if (req.method !== 'POST') return json(res, 405, { ok: false, message: 'Método não permitido.' });
+
+  let municipiosPlano = [];
  
   const { uid, session_id } = req.body || {};
   if (!uid || !session_id) {
@@ -510,6 +513,7 @@ async function _handleValidarSessao(req, res) {
           plano_slug = d.plano_slug || null;
           features   = d.features_snapshot || d.features || {};
           statusAss  = d.status || null;
+          municipiosPlano = d.municipios_plano || [];
         }
       } catch (e) { /* não fatal */ }
     }
@@ -521,7 +525,7 @@ async function _handleValidarSessao(req, res) {
       return json(res, 200, { valido: false, motivo: 'assinatura_inativa' });
     }
  
-    return json(res, 200, { valido: true, plano_slug, features, assinaturaId });
+    return json(res, 200, { valido: true, plano_slug, features, assinaturaId,  municipios_plano: municipiosPlano });
  
   } catch (err) {
     console.error('[validar-sessao] Erro:', err.message);
@@ -598,8 +602,9 @@ async function _handleCriarSessao(req, res) {
       uid,
       assinaturaId,
       segmento:       'assinante',
-      plano_slug:     assinaturaData.plano_slug                          || null,
+      plano_slug:     assinaturaData.plano_slug        || null,
       features:       assinaturaData.features_snapshot || assinaturaData.features || {},
+      municipios_plano: assinaturaData.municipios_plano || [],
       nome:           usuarioData.nome            || '',
       email:          usuarioData.email           || '',
       cod_uf:         usuarioData.cod_uf          || '',
@@ -1005,7 +1010,7 @@ export default async function handler(req, res) {
             })
           });
         }
-        
+
         const _sessionToken = crypto.randomBytes(32).toString('hex');
         await db.collection('usuarios').doc(userId).set({
           pending_session_token: {
