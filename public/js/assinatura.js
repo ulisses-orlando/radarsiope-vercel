@@ -23,6 +23,7 @@ const _leadIdUrl   = getParam('leadId') || getParam('idLead') || null;
 let _planoAtual    = null;       // objeto completo do plano selecionado + cicloSelecionado
 let _tiposMap      = {};         // id -> nome dos tipos de newsletter
 let _cupomAplicado = null;       // objeto cupom validado
+let _planosCache = {}; // ─── Cache local de planos (evita leituras redundantes no Firestore) ──────────
 
 
 // ─── Estado de seleção extra de municípios ──────────────────────────────────────
@@ -257,9 +258,14 @@ function getTotalCiclo(plano, cicloMeses) {
 // ─── Carregar plano por ID ────────────────────────────────────────────────────
 async function carregarPlano(planId) {
   if (!planId) return null;
+  // 🔹 Retorna do cache se já carregado (elimina erro de "offline" e economiza leitura)
+  if (_planosCache[planId]) return { ..._planosCache[planId] };
+  
   try {
     const doc = await db.collection('planos').doc(planId).get();
-    return doc.exists ? { id: doc.id, ...doc.data() } : null;
+    const data = doc.exists ? { id: doc.id, ...doc.data() } : null;
+    if (data) _planosCache[planId] = data; // Armazena no cache
+    return data;
   } catch (err) {
     console.error('[assinatura] Erro ao carregar plano:', err);
     return null;
@@ -320,6 +326,9 @@ async function carregarListaPlanos() {
 
     wrap.innerHTML = '';
     const planos = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+    // 🔹 Preenche cache local para evitar novas chamadas ao Firestore no clique
+    planos.forEach(p => { _planosCache[p.id] = p; });
 
     // 🔹 1. Extrair ciclos únicos disponíveis (apenas se houver planos habilitados)
     const ciclosSet = new Set();
