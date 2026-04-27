@@ -430,13 +430,19 @@ async function carregarListaPlanos() {
 // ─── Helper: Cria um card de plano para um ciclo específico ───────────────────
 function _criarCardPlano(plano, ciclo, allFeatures) {
   const cor = plano.cor_destaque || '#0A3D62';
+  
   const features = plano.features || {};
-  const featuresHtml = allFeatures.map(f => {
+    const featuresHtml = allFeatures.map(f => {
     const val = features[f.id];
     const ativo = !!val;
     let label = f.nome || f.id;
-    if (f.id === 'sugestao_tema_quota' && Number(val) > 0) label = `${val} sugestão${Number(val)>1?'ões':''}/mês`;
-    else if (f.id === 'consultoria_horas_mes' && Number(val) > 0) label = `Consultoria ${val}h/mês`;
+
+    // 🔹 LÓGICA GENÉRICA: Se a feature tiver valor numérico > 0, adiciona "(valor/mês)"
+    const numVal = Number(val);
+    if (!isNaN(numVal) && numVal > 0) {
+      label += ` (${numVal}/mês)`;
+    }
+
     return `<li class="${ativo ? '' : 'inativo'}">${label}</li>`;
   }).join('');
 
