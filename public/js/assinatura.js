@@ -172,10 +172,9 @@ async function configurarUIMunicipiosExtra() {
   
   // Observa mudanças no container de UF/Município
   const campoUF = document.getElementById('campo-uf-municipio');
+
   if (campoUF) {
     observerUF.observe(campoUF, { subtree: true, childList: true, attributes: true, characterData: true });
-    // Dispara carga inicial se já houver UF preenchida
-    setTimeout(() => observerUF.takeRecords(), 100);
   }
 
   // 🔹 Limpar extras se o município principal mudar
@@ -941,11 +940,6 @@ async function processarEnvioAssinatura(e) {
   const isGratuidade = (_cupomAplicado?.valor === 100) || preview.amountCentavos === 0;
   const maxMun = Number(_planoAtual?.features?.max_municipios) || 1;
   
-  if (maxMun > 1 && _municipiosExtrasSelecionados.length === 0) {
-    setStatus('Selecione pelo menos 1 município adicional para este plano.', '#c00');
-    btn.disabled = false; return;
-  }
-
   // Se for gratuidade, força limpeza dos extras e esconde container
   if (isGratuidade) {
     _municipiosExtrasSelecionados = [];
@@ -989,7 +983,7 @@ async function processarEnvioAssinatura(e) {
     if (backendResp?.ativadoDireto) {
       setStatus('✅ Assinatura ativada com sucesso! Verifique seu e-mail.', '#16a34a');
       setTimeout(() => {
-        window.location.href = backendResp.redirectSucesso || `${process.env.NEXT_PUBLIC_BASE_URL}/area-assinante.html`;
+        window.location.href = backendResp.redirectSucesso || '/area-assinante.html';
       }, 2000);
     } else if (backendResp?.redirectUrl) {
       window.location.href = backendResp.redirectUrl;
