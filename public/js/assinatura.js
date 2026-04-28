@@ -81,7 +81,12 @@ async function configurarUIMunicipiosExtra() {
     gridEl.innerHTML = '<div style="padding:8px;color:#666;font-size:12px;">Carregando...</div>';
     try {
       const snap = await db.collection('UF').doc(ufId.trim().toUpperCase()).collection('Municipio').get();
-      
+      // DEBUG — remover depois
+console.log('[DEBUG] Total docs:', snap.docs.length);
+if (snap.docs.length > 0) {
+  console.log('[DEBUG] Primeiro doc id:', snap.docs[0].id);
+  console.log('[DEBUG] Primeiro doc data:', JSON.stringify(snap.docs[0].data()));
+}
       _municipiosDisponiveis = snap.docs.map(d => {
         const data = d.data();
         // Ajuste o campo 'nome_municipio' conforme identificado no debug
