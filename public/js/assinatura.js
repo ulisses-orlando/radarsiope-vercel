@@ -92,7 +92,8 @@ async function configurarUIMunicipiosExtra() {
           uf: data.uf || ufId
         };
       });
-      
+        console.log('[DEBUG Municipio] Primeiros itens mapeados:', _municipiosDisponiveis.slice(0, 3));
+
       renderGrid();
     } catch(e) {
       console.error('[municipios-extra] Erro ao carregar:', e);
