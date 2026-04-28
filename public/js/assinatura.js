@@ -85,7 +85,7 @@ async function configurarUIMunicipiosExtra() {
         const data = d.data();
         return {
           cod_municipio: String(data.cod_municipio || d.id),
-          nome: String(data.nome_municipio || data.nome || data.municipio || `Município ${d.id}`),
+          nome: String(data.nome_municipio || data.nome || data.municipio ),
           uf: data.uf || ufId
         };
       });
