@@ -80,15 +80,19 @@ async function configurarUIMunicipiosExtra() {
     gridEl.innerHTML = '<div style="padding:8px;color:#666;font-size:12px;">Carregando...</div>';
     try {
       const snap = await db.collection('UF').doc(ufId.trim().toUpperCase()).collection('Municipio').get();
-      // 🔹 MAPEAMENTO ROBUSTO (evita nome em branco)
+      
       _municipiosDisponiveis = snap.docs.map(d => {
         const data = d.data();
+        // Ajuste o campo 'nome_municipio' conforme identificado no debug
+        const nomeValor = data.nome_municipio || data.nome || data.municipio || data.nomeMunicipio || '';
+        
         return {
-          cod_municipio: String(data.cod_municipio || d.id),
-          nome: String(data.nome_municipio || data.nome || data.municipio ),
+          cod_municipio: String(data.cod_municipio || data.codigo || d.id),
+          nome: String(nomeValor).trim() || `Município ${d.id}`,
           uf: data.uf || ufId
         };
       });
+      
       renderGrid();
     } catch(e) {
       console.error('[municipios-extra] Erro ao carregar:', e);
