@@ -47,8 +47,9 @@ async function configurarUIMunicipiosExtra() {
     st.id = 'css-mun-grid-fix';
     st.textContent = `
       #municipios-grid { display: grid !important; grid-template-columns: repeat(3, 1fr) !important; gap: 8px !important; max-height: 220px !important; overflow-y: auto !important; padding: 8px !important; border: 1px solid #e2e8f0 !important; border-radius: 6px !important; background: #f8fafc !important; }
-      #municipios-grid label { display: flex !important; align-items: center !important; gap: 6px !important; font-size: 12px !important; padding: 4px 0 !important; cursor: pointer !important; white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important; }
-      #municipios-grid input[type="checkbox"] { flex-shrink: 0; }
+      #municipios-grid label { display: flex !important; align-items: center !important; gap: 6px !important; font-size: 12px !important; padding: 4px 0 !important; cursor: pointer !important; white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important; color: #1e293b !important; }
+      #municipios-grid input[type="checkbox"] { flex-shrink: 0; accent-color: #0A3D62; }
+      #municipios-grid span { color: #1e293b !important; font-weight: 400 !important; }
       @media (max-width: 768px) { #municipios-grid { grid-template-columns: repeat(2, 1fr) !important; } }
     `;
     document.head.appendChild(st);
@@ -124,9 +125,9 @@ async function configurarUIMunicipiosExtra() {
     } else {
       // 🔹 GERAÇÃO LIMPA (NOME GARANTIDO)
       gridEl.innerHTML = lista.map(m => `
-        <label>
+        <label style="color:#1e293b !important;">
           <input type="checkbox" value="${m.cod_municipio}" ${_municipiosExtrasSelecionados.includes(m.cod_municipio) ? 'checked' : ''}>
-          <span>${m.nome}</span>
+          <span style="color:#1e293b !important;">${m.nome || m.cod_municipio}</span>
         </label>
       `).join('');
     }
