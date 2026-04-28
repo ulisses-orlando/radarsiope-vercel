@@ -41,21 +41,25 @@ async function configurarUIMunicipiosExtra() {
     refNode.appendChild(wrap);
   }
 
-  // 🔹 HTML: Sem busca, aviso neutro, grid oculto até escolher estado
+  // 🔹 CSS injetado para garantir 3 colunas (2 em mobile) sem conflito com estilos globais
+  if (!document.getElementById('css-mun-grid-fix')) {
+    const st = document.createElement('style');
+    st.id = 'css-mun-grid-fix';
+    st.textContent = `
+      #municipios-grid { display: grid !important; grid-template-columns: repeat(3, 1fr) !important; gap: 8px; max-height: 220px; overflow-y: auto; padding: 8px; border: 1px solid #e2e8f0; border-radius: 6px; background: #f8fafc; }
+      #municipios-grid label { display: flex; align-items: center; gap: 6px; font-size: 12px; padding: 4px 0; cursor: pointer; }
+      @media (max-width: 768px) { #municipios-grid { grid-template-columns: repeat(2, 1fr) !important; } }
+    `;
+    document.head.appendChild(st);
+  }
+
+  // 🔹 HTML inicial: OCULTO e neutro (sem validar nada)
   document.getElementById('container-municipios-extra').innerHTML = `
     <label style="font-weight:600;margin-bottom:4px;display:block;">📍 Municípios adicionais do plano</label>
     <div id="municipios-aviso" style="font-size:12px;color:#64748b;margin-bottom:8px;">Selecione seu estado acima para liberar a escolha.</div>
-    <div id="municipios-grid" style="display:none;grid-template-columns:repeat(3, 1fr);gap:8px;max-height:220px;overflow-y:auto;padding:8px;border:1px solid #e2e8f0;border-radius:6px;background:#f8fafc;"></div>
+    <div id="municipios-grid" style="display:none;"></div>
     <div id="municipios-limit-info" style="font-size:11px;color:#64748b;margin-top:6px;"></div>
   `;
-
-  // CSS responsivo (3 colunas desktop, 2 mobile)
-  if (!document.getElementById('css-mun-grid')) {
-    const st = document.createElement('style');
-    st.id = 'css-mun-grid';
-    st.textContent = `@media(max-width:768px){#municipios-grid{grid-template-columns:repeat(2,1fr)!important;}}`;
-    document.head.appendChild(st);
-  }
 
   const gridEl  = document.getElementById('municipios-grid');
   const infoEl  = document.getElementById('municipios-limit-info');
@@ -71,14 +75,16 @@ async function configurarUIMunicipiosExtra() {
       return;
     }
     avisoEl.style.display = 'none';
-    gridEl.style.display = 'grid';
+    gridEl.style.display = 'grid'; // Garante display grid
     gridEl.innerHTML = '<div style="padding:8px;color:#666;font-size:12px;">Carregando...</div>';
     try {
       const snap = await db.collection('UF').doc(ufId.trim().toUpperCase()).collection('Municipio').get();
-      _municipiosDisponiveis = snap.docs.map(d => {
-        const data = d.data();
-        return { cod_municipio: data.cod_municipio || d.id, nome: data.nome_municipio || data.nome, ...data };
-      });
+      _municipiosDisponiveis = snap.docs.map(d => ({
+        cod_municipio: d.data().cod_municipio || d.id,
+        nome: d.data().nome_municipio || d.data().nome,
+        uf: d.data().uf || ufId,
+        ...d.data()
+      }));
       renderGrid();
     } catch(e) {
       console.error('[municipios-extra] Erro ao carregar:', e);
@@ -89,25 +95,31 @@ async function configurarUIMunicipiosExtra() {
 
   const renderGrid = () => {
     const maxExtras = Math.max(0, (_planoAtual?.features?.max_municipios || 1) - 1);
+    if (maxExtras <= 0) {
+      gridEl.innerHTML = '<div style="padding:8px;color:#666;font-size:12px;grid-column:1/-1;">Este plano não permite extras.</div>';
+      infoEl.textContent = '';
+      _municipiosExtrasSelecionados = [];
+      return;
+    }
+
+    // Filtra município principal
     let principal = null;
     if (typeof window.validarUfMunicipio === 'function') {
       try {
-        const validado = window.validarUfMunicipio();
-        if (validado?.cod_municipio) principal = validado.cod_municipio;
+        const v = window.validarUfMunicipio();
+        if (v?.cod_municipio) principal = v.cod_municipio;
       } catch(_) {}
     }
 
-    // 🔹 Filtra o município principal da lista
     const lista = _municipiosDisponiveis.filter(m => m.cod_municipio !== principal);
-
     if (lista.length === 0 && _municipiosDisponiveis.length > 0) {
-      gridEl.innerHTML = '<div style="padding:8px;color:#666;font-size:12px;grid-column:1/-1;">Município principal já selecionado. Nenhum adicional disponível nesta UF.</div>';
+      gridEl.innerHTML = '<div style="padding:8px;color:#666;font-size:12px;grid-column:1/-1;">Município principal selecionado.</div>';
     } else if (_municipiosDisponiveis.length === 0) {
       gridEl.innerHTML = '';
     } else {
-      // 🔹 SEM sufixo /UF na listagem
+      // 🔹 SEM /UF, SEM BUSCA, APENAS NOME
       gridEl.innerHTML = lista.map(m => `
-        <label style="display:flex;align-items:center;gap:6px;font-size:12px;padding:4px 0;cursor:pointer;">
+        <label>
           <input type="checkbox" value="${m.cod_municipio}" ${_municipiosExtrasSelecionados.includes(m.cod_municipio) ? 'checked' : ''}>
           <span>${m.nome || m.cod_municipio}</span>
         </label>
@@ -116,12 +128,11 @@ async function configurarUIMunicipiosExtra() {
     infoEl.textContent = `Selecionados: ${_municipiosExtrasSelecionados.length} / ${maxExtras}`;
   };
 
-  // 🔹 Delegação de eventos (evita múltiplos listeners e conflitos)
+  // 🔹 Delegação de eventos (performático e seguro)
   gridEl.addEventListener('change', (e) => {
     if (e.target.type !== 'checkbox') return;
-    const val = e.target.value;
     const maxExtras = Math.max(0, (_planoAtual?.features?.max_municipios || 1) - 1);
-
+    const val = e.target.value;
     if (e.target.checked) {
       if (_municipiosExtrasSelecionados.length >= maxExtras) {
         e.target.checked = false;
@@ -135,7 +146,7 @@ async function configurarUIMunicipiosExtra() {
     infoEl.textContent = `Selecionados: ${_municipiosExtrasSelecionados.length} / ${maxExtras}`;
   });
 
-  // 🔹 Carrega apenas quando o usuário seleciona uma UF
+  // 🔹 Só carrega quando a UF muda (sem validar nem mostrar erros)
   const triggerLoad = async () => {
     let novaUF = null;
     const ufSelect = document.getElementById('uf');
@@ -148,7 +159,7 @@ async function configurarUIMunicipiosExtra() {
     }
     if (novaUF && novaUF !== _ufAtual) {
       _ufAtual = novaUF;
-      _municipiosExtrasSelecionados = []; // Limpa extras ao trocar de estado
+      _municipiosExtrasSelecionados = [];
       await carregarMunicipiosPorUF(_ufAtual);
     }
   };
@@ -164,8 +175,8 @@ async function configurarUIMunicipiosExtra() {
     waitUF.observe(document.body, { childList: true, subtree: true });
   }
 
-  // Tenta carregar se já houver UF pré-preenchida (ex: lead)
-  setTimeout(triggerLoad, 200);
+  window._atualizarGridMunicipios = () => renderGrid();
+  setTimeout(triggerLoad, 150);
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -448,22 +459,17 @@ async function _onPlanoSelecionado(planId, cicloInicial = null) {
   _planoAtual = plano;
   _planoAtual.cicloSelecionado = Number(cicloInicial || ciclosDisp[0]);
 
-    // Controle de exibição do campo extra de municípios (NÃO recarrega, apenas ajusta limites)
+  // Controle de exibição do campo extra de municípios (NÃO VALIDA, APENAS EXIBE/OCULTA)
   const maxMun = Number(_planoAtual?.features?.max_municipios) || 1;
   const containerMun = document.getElementById('container-municipios-extra');
+  
   if (maxMun > 1) {
-    if (!containerMun) configurarUIMunicipiosExtra();
-    else {
-      containerMun.style.display = 'block';
-      document.getElementById('municipios-limit-info') && (document.getElementById('municipios-limit-info').textContent = `Selecione até ${maxMun - 1} município(s) adicional(is).`);
-      // Atualiza o grid com o novo limite do plano
-      window._atualizarGridMunicipios?.();
-    }
+    if (!containerMun) await configurarUIMunicipiosExtra();
+    else containerMun.style.display = 'block';
+    document.getElementById('municipios-limit-info') && (document.getElementById('municipios-limit-info').textContent = `Selecione até ${maxMun - 1} município(s) adicional(is).`);
+    window._atualizarGridMunicipios?.();
   } else {
-    if (containerMun) {
-      containerMun.style.display = 'none';
-      containerMun.style.pointerEvents = 'none';
-    }
+    if (containerMun) containerMun.style.display = 'none';
     _municipiosExtrasSelecionados = [];
   }
 
@@ -897,13 +903,7 @@ async function processarEnvioAssinatura(e) {
   const isGratuidade = (_cupomAplicado?.valor === 100) || preview.amountCentavos === 0;
   const maxMun = Number(_planoAtual?.features?.max_municipios) || 1;
   
-  // Validação: só exige extras se UF foi selecionada E não for gratuidade
-  if (maxMun > 1 && !isGratuidade && dadosUf?.cod_uf && _municipiosExtrasSelecionados.length === 0) {
-    setStatus('Selecione pelo menos 1 município adicional para este plano.', '#c00');
-    btn.disabled = false; return;
-  }
-
-  // Se for gratuidade, força limpeza dos extras e esconde container
+  // Se for gratuidade, limpa e oculta
   if (isGratuidade) {
     _municipiosExtrasSelecionados = [];
     const munC = document.getElementById('container-municipios-extra');
