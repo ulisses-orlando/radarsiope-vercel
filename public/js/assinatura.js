@@ -67,6 +67,40 @@ async function configurarUIMunicipiosExtra() {
   const infoEl  = document.getElementById('municipios-limit-info');
   const avisoEl = document.getElementById('municipios-aviso');
 
+  function _injetarEstiloGrid() {
+  if (document.getElementById('rs-municipios-grid-style')) return;
+  const s = document.createElement('style');
+  s.id = 'rs-municipios-grid-style';
+  s.textContent = `
+    #municipios-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+      gap: 4px 8px;
+    }
+    #municipios-grid label {
+      display: flex !important;
+      align-items: center !important;
+      gap: 6px !important;
+      padding: 4px 6px !important;
+      cursor: pointer !important;
+      border-radius: 6px !important;
+      background: #f8fafc !important;
+      border: 1px solid #e2e8f0 !important;
+    }
+    #municipios-grid label span {
+      font-size: 12px !important;
+      color: #1e293b !important;
+      line-height: 1.3 !important;
+    }
+    #municipios-grid label input[type="checkbox"] {
+      flex-shrink: 0;
+    }
+  `;
+  document.head.appendChild(s);
+}
+
+_injetarEstiloGrid();
+
   async function carregarMunicipiosPorUF(ufId) {
     if (!ufId) {
       avisoEl.style.display = 'block';
@@ -126,20 +160,12 @@ async function configurarUIMunicipiosExtra() {
     } else if (_municipiosDisponiveis.length === 0) {
       gridEl.innerHTML = '';
     } else {
-      // DEBUG — remover depois
-    console.log('[DEBUG renderGrid] lista[0]:', lista[0]);
-    console.log('[DEBUG renderGrid] HTML gerado:', lista.slice(0,1).map(m => 
-      `nome=[${m.nome}] cod=[${m.cod_municipio}]`
-    ));
       gridEl.style.cssText = 'display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:4px 8px;';
       gridEl.innerHTML = lista.map(m => `
-        <label style="display:flex;align-items:center;gap:6px;padding:4px 6px;cursor:pointer;
-                      border-radius:6px;background:#f8fafc;border:1px solid #e2e8f0;">
+        <label>
           <input type="checkbox" value="${m.cod_municipio}"
             ${_municipiosExtrasSelecionados.includes(m.cod_municipio) ? 'checked' : ''}>
-          <span style="font-size:12px;color:#1e293b;line-height:1.3;">
-            ${m.nome || m.cod_municipio}${m.uf ? ` - ${m.uf}` : ''}
-          </span>
+          <span>${m.nome || m.cod_municipio}${m.uf ? ` - ${m.uf}` : ''}</span>
         </label>
       `).join('');
     }
