@@ -41,7 +41,7 @@ async function configurarUIMunicipiosExtra() {
     refNode.appendChild(wrap);
   }
 
-  // 🔹 CSS injetado com !important para garantir layout (3 colunas desktop / 2 mobile)
+  // 🔹 CSS INJETADO (3 colunas desktop / 2 mobile)
   if (!document.getElementById('css-mun-grid-fix')) {
     const st = document.createElement('style');
     st.id = 'css-mun-grid-fix';
@@ -54,7 +54,7 @@ async function configurarUIMunicipiosExtra() {
     document.head.appendChild(st);
   }
 
-  // 🔹 HTML limpo e neutro (sem validação, sem busca)
+  // 🔹 HTML neutro (sem busca, sem validação prematura)
   document.getElementById('container-municipios-extra').innerHTML = `
     <label style="font-weight:600;margin-bottom:4px;display:block;">📍 Municípios adicionais do plano</label>
     <div id="municipios-aviso" style="font-size:12px;color:#64748b;margin-bottom:8px;">Selecione seu estado acima para liberar a escolha.</div>
@@ -80,9 +80,14 @@ async function configurarUIMunicipiosExtra() {
     gridEl.innerHTML = '<div style="padding:8px;color:#666;font-size:12px;">Carregando...</div>';
     try {
       const snap = await db.collection('UF').doc(ufId.trim().toUpperCase()).collection('Municipio').get();
+      // 🔹 MAPEAMENTO ROBUSTO (evita nome em branco)
       _municipiosDisponiveis = snap.docs.map(d => {
         const data = d.data();
-        return { cod_municipio: data.cod_municipio || d.id, nome: data.nome_municipio || data.nome, ...data };
+        return {
+          cod_municipio: String(data.cod_municipio || d.id),
+          nome: String(data.nome_municipio || data.nome || data.municipio || `Município ${d.id}`),
+          uf: data.uf || ufId
+        };
       });
       renderGrid();
     } catch(e) {
@@ -92,7 +97,6 @@ async function configurarUIMunicipiosExtra() {
     }
   }
 
-  // 🔹 LÊ DIRETO DO DOM para NÃO DISPARAR VALIDAÇÃO
   const renderGrid = () => {
     const maxExtras = Math.max(0, (_planoAtual?.features?.max_municipios || 1) - 1);
     if (maxExtras <= 0) {
@@ -102,7 +106,10 @@ async function configurarUIMunicipiosExtra() {
       return;
     }
 
+    // 🔍 PEGA MUNICÍPIO PRINCIPAL DIRETO DO DOM (SEM DISPARAR VALIDAÇÃO)
     const principal = document.getElementById('municipio')?.value || null;
+
+    // 🔹 FILTRA O PRINCIPAL DA LISTA
     const lista = _municipiosDisponiveis.filter(m => m.cod_municipio !== principal);
 
     if (lista.length === 0 && _municipiosDisponiveis.length > 0) {
@@ -110,17 +117,18 @@ async function configurarUIMunicipiosExtra() {
     } else if (_municipiosDisponiveis.length === 0) {
       gridEl.innerHTML = '';
     } else {
+      // 🔹 GERAÇÃO LIMPA (NOME GARANTIDO)
       gridEl.innerHTML = lista.map(m => `
         <label>
           <input type="checkbox" value="${m.cod_municipio}" ${_municipiosExtrasSelecionados.includes(m.cod_municipio) ? 'checked' : ''}>
-          <span>${m.nome || m.cod_municipio}</span>
+          <span>${m.nome}</span>
         </label>
       `).join('');
     }
     infoEl.textContent = `Selecionados: ${_municipiosExtrasSelecionados.length} / ${maxExtras}`;
   };
 
-  // 🔹 Delegação de eventos (performático)
+  // 🔹 DELEGAÇÃO DE EVENTOS (EVITA MULTIPLOS LISTENERS)
   gridEl.addEventListener('change', (e) => {
     if (e.target.type !== 'checkbox') return;
     const maxExtras = Math.max(0, (_planoAtual?.features?.max_municipios || 1) - 1);
@@ -138,7 +146,21 @@ async function configurarUIMunicipiosExtra() {
     infoEl.textContent = `Selecionados: ${_municipiosExtrasSelecionados.length} / ${maxExtras}`;
   });
 
-  // 🔹 Carrega quando a UF muda
+  // 🔹 RE-RENDERIZA QUANDO O MUNICÍPIO PRINCIPAL MUDA
+  const bindMunListener = () => {
+    const munSelect = document.getElementById('municipio');
+    if (munSelect) {
+      munSelect.addEventListener('change', renderGrid);
+      return true;
+    }
+    return false;
+  };
+  if (!bindMunListener()) {
+    const waitMun = new MutationObserver(() => { if (bindMunListener()) waitMun.disconnect(); });
+    waitMun.observe(document.body, { childList: true, subtree: true });
+  }
+
+  // 🔹 CARREGA QUANDO A UF MUDA
   const triggerLoad = async () => {
     const novaUF = document.getElementById('uf')?.value || null;
     if (novaUF && novaUF !== _ufAtual) {
@@ -157,18 +179,6 @@ async function configurarUIMunicipiosExtra() {
       if (s) { s.addEventListener('change', triggerLoad); waitUF.disconnect(); }
     });
     waitUF.observe(document.body, { childList: true, subtree: true });
-  }
-
-  // 🔹 Re-renderiza quando o município principal muda (remove ele da lista extra)
-  const munSelect = document.getElementById('municipio');
-  if (munSelect) {
-    munSelect.addEventListener('change', renderGrid);
-  } else {
-    const waitMun = new MutationObserver(() => {
-      const s = document.getElementById('municipio');
-      if (s) { s.addEventListener('change', renderGrid); waitMun.disconnect(); }
-    });
-    waitMun.observe(document.body, { childList: true, subtree: true });
   }
 
   // Expõe para atualizar limites ao trocar de plano
