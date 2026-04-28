@@ -23,17 +23,17 @@ const _leadIdUrl   = getParam('leadId') || getParam('idLead') || null;
 let _planoAtual    = null;       // objeto completo do plano selecionado + cicloSelecionado
 let _tiposMap      = {};         // id -> nome dos tipos de newsletter
 let _cupomAplicado = null;       // objeto cupom validado
-let _planosCache = {}; // ─── Cache local de planos (evita leituras redundantes no Firestore) ──────────
+let _planosCache   = {};         // cache local de planos
 
-
-// ─── Estado de seleção extra de municípios ──────────────────────────────────────
-let _municipiosDisponiveis = [];
+// ─── Estado de seleção extra de municípios ────────────────────────────────────
+let _municipiosDisponiveis        = [];
 let _municipiosExtrasSelecionados = [];
-let _ufAtual = null;
+let _ufAtual                      = null;
 
+// ─── UI de municípios adicionais (dropdown com busca) ─────────────────────────
 async function configurarUIMunicipiosExtra() {
-  const container = document.getElementById('container-municipios-extra');
-  if (!container) {
+  // Garante container
+  if (!document.getElementById('container-municipios-extra')) {
     const wrap = document.createElement('div');
     wrap.id = 'container-municipios-extra';
     wrap.style.marginTop = '16px';
@@ -41,160 +41,192 @@ async function configurarUIMunicipiosExtra() {
     refNode.appendChild(wrap);
   }
 
-  // 🔹 CSS INJETADO (3 colunas desktop / 2 mobile)
-  if (!document.getElementById('css-mun-grid-fix')) {
-    const st = document.createElement('style');
-    st.id = 'css-mun-grid-fix';
-    st.textContent = `
-      #municipios-grid { display: grid !important; grid-template-columns: repeat(3, 1fr) !important; gap: 8px !important; max-height: 220px !important; overflow-y: auto !important; padding: 8px !important; border: 1px solid #e2e8f0 !important; border-radius: 6px !important; background: #f8fafc !important; }
-      #municipios-grid label { display: flex !important; align-items: center !important; gap: 6px !important; font-size: 12px !important; padding: 4px 0 !important; cursor: pointer !important; white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important; color: #1e293b !important; }
-      #municipios-grid input[type="checkbox"] { flex-shrink: 0; accent-color: #0A3D62; }
-      #municipios-grid span { color: #1e293b !important; font-weight: 400 !important; }
-      @media (max-width: 768px) { #municipios-grid { grid-template-columns: repeat(2, 1fr) !important; } }
-    `;
-    document.head.appendChild(st);
-  }
-
-  // 🔹 HTML neutro (sem busca, sem validação prematura)
+  // HTML do dropdown
   document.getElementById('container-municipios-extra').innerHTML = `
-    <label style="font-weight:600;margin-bottom:4px;display:block;">📍 Municípios adicionais do plano</label>
-    <div id="municipios-aviso" style="font-size:12px;color:#64748b;margin-bottom:8px;">Selecione seu estado acima para liberar a escolha.</div>
-    <div id="municipios-grid" style="display:none;"></div>
+    <label style="font-weight:600;margin-bottom:6px;display:block;font-size:14px;">
+      📍 Municípios adicionais do plano
+    </label>
+    <div id="municipios-aviso" style="font-size:12px;color:#64748b;margin-bottom:8px;">
+      Selecione seu estado acima para liberar a escolha.
+    </div>
+    <div id="municipios-dropdown-wrap" style="position:relative;width:100%;">
+      <button type="button" id="municipios-trigger" style="
+        width:100%;text-align:left;padding:9px 32px 9px 12px;
+        border:1px solid #cbd5e1;border-radius:8px;background:#ffffff;
+        font-size:13px;color:#1e293b;cursor:pointer;position:relative;
+        font-family:inherit;">
+        Nenhum município adicional selecionado
+        <span style="position:absolute;right:10px;top:50%;transform:translateY(-50%);
+                     font-size:10px;color:#64748b;pointer-events:none;">▼</span>
+      </button>
+      <div id="municipios-panel" style="
+        display:none;position:absolute;top:calc(100% + 4px);left:0;right:0;z-index:9999;
+        background:#ffffff;border:1px solid #cbd5e1;border-radius:8px;
+        box-shadow:0 4px 16px rgba(0,0,0,0.12);max-height:240px;
+        overflow:hidden;display:none;flex-direction:column;">
+        <div style="padding:8px;border-bottom:1px solid #e2e8f0;flex-shrink:0;">
+          <input type="text" id="municipios-busca" placeholder="Buscar município…" style="
+            width:100%;padding:6px 10px;border:1px solid #cbd5e1;border-radius:6px;
+            font-size:13px;color:#1e293b;background:#f8fafc;
+            box-sizing:border-box;outline:none;font-family:inherit;">
+        </div>
+        <div id="municipios-lista" style="overflow-y:auto;max-height:180px;"></div>
+      </div>
+    </div>
     <div id="municipios-limit-info" style="font-size:11px;color:#64748b;margin-top:6px;"></div>
   `;
 
-  const gridEl  = document.getElementById('municipios-grid');
-  const infoEl  = document.getElementById('municipios-limit-info');
-  const avisoEl = document.getElementById('municipios-aviso');
+  const triggerEl = document.getElementById('municipios-trigger');
+  const panelEl   = document.getElementById('municipios-panel');
+  const listaEl   = document.getElementById('municipios-lista');
+  const buscaEl   = document.getElementById('municipios-busca');
+  const infoEl    = document.getElementById('municipios-limit-info');
+  const avisoEl   = document.getElementById('municipios-aviso');
 
-  function _injetarEstiloGrid() {
-  if (document.getElementById('rs-municipios-grid-style')) return;
-  const s = document.createElement('style');
-  s.id = 'rs-municipios-grid-style';
-  s.textContent = `
-    #municipios-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-      gap: 4px 8px;
-    }
-    #municipios-grid label {
-      display: flex !important;
-      align-items: center !important;
-      gap: 6px !important;
-      padding: 4px 6px !important;
-      cursor: pointer !important;
-      border-radius: 6px !important;
-      background: #f8fafc !important;
-      border: 1px solid #e2e8f0 !important;
-    }
-    #municipios-grid label span {
-      font-size: 12px !important;
-      color: #1e293b !important;
-      line-height: 1.3 !important;
-    }
-    #municipios-grid label input[type="checkbox"] {
-      flex-shrink: 0;
-    }
-  `;
-  document.head.appendChild(s);
-}
+  // ── Abre/fecha painel ────────────────────────────────────────────────────────
+  triggerEl.addEventListener('click', () => {
+    const aberto = panelEl.style.display === 'flex';
+    panelEl.style.display = aberto ? 'none' : 'flex';
+    if (!aberto) setTimeout(() => buscaEl.focus(), 50);
+  });
 
-_injetarEstiloGrid();
+  // Fecha ao clicar fora
+  document.addEventListener('click', (e) => {
+    if (!document.getElementById('municipios-dropdown-wrap')?.contains(e.target)) {
+      panelEl.style.display = 'none';
+    }
+  });
 
+  // ── Atualiza label do trigger ────────────────────────────────────────────────
+  function _atualizarTrigger() {
+    const maxExtras = Math.max(0, (_planoAtual?.features?.max_municipios || 1) - 1);
+    const n = _municipiosExtrasSelecionados.length;
+    // Atualiza só o texto (primeiro filho text node)
+    triggerEl.childNodes[0].textContent = n === 0
+      ? 'Nenhum município adicional selecionado'
+      : `${n} município(s) adicional(is) selecionado(s)`;
+    infoEl.textContent = `Selecionados: ${n} / ${maxExtras}`;
+  }
+
+  // ── Carrega municípios do Firestore por UF ───────────────────────────────────
   async function carregarMunicipiosPorUF(ufId) {
     if (!ufId) {
       avisoEl.style.display = 'block';
-      gridEl.style.display = 'none';
-      gridEl.innerHTML = '';
+      panelEl.style.display = 'none';
+      listaEl.innerHTML = '';
       infoEl.textContent = '';
       _municipiosDisponiveis = [];
       return;
     }
     avisoEl.style.display = 'none';
-    gridEl.style.display = 'grid';
-    gridEl.innerHTML = '<div style="padding:8px;color:#666;font-size:12px;">Carregando...</div>';
+    listaEl.innerHTML = '<div style="padding:10px 12px;font-size:12px;color:#64748b;">Carregando…</div>';
     try {
       const snap = await db.collection('UF').doc(ufId.trim().toUpperCase()).collection('Municipio').get();
-
       _municipiosDisponiveis = snap.docs.map(d => {
         const data = d.data();
-        // Ajuste o campo 'nome_municipio' conforme identificado no debug
-        const nomeValor = data.nome_municipio || data.nome || data.municipio || data.nomeMunicipio || '';
-        
+        const nome = data.nome_municipio || data.nome || data.municipio || data.nomeMunicipio || '';
         return {
           cod_municipio: String(data.cod_municipio || data.codigo || d.id),
-          nome: String(nomeValor).trim() || `Município ${d.id}`,
-          uf: data.uf || ufId
+          nome: String(nome).trim() || `Município ${d.id}`,
+          uf: data.uf || ufId,
         };
       });
-
       renderGrid();
-    } catch(e) {
+    } catch (e) {
       console.error('[municipios-extra] Erro ao carregar:', e);
-      gridEl.innerHTML = '<div style="padding:8px;color:#c00;font-size:12px;">Erro ao carregar.</div>';
+      listaEl.innerHTML = '<div style="padding:10px 12px;font-size:12px;color:#c00;">Erro ao carregar.</div>';
       _municipiosDisponiveis = [];
     }
   }
 
-  const renderGrid = () => {
-      // DEBUG — remover depois
-  console.log('[DEBUG renderGrid] _municipiosDisponiveis:', _municipiosDisponiveis.slice(0,2));
-  console.log('[DEBUG renderGrid] _planoAtual features:', _planoAtual?.features?.max_municipios);
-
+  // ── Renderiza lista do painel ────────────────────────────────────────────────
+  const renderGrid = (termo = '') => {
     const maxExtras = Math.max(0, (_planoAtual?.features?.max_municipios || 1) - 1);
+
     if (maxExtras <= 0) {
-      gridEl.innerHTML = '<div style="padding:8px;color:#666;font-size:12px;grid-column:1/-1;">Este plano não permite extras.</div>';
-      infoEl.textContent = '';
+      listaEl.innerHTML = '<div style="padding:10px 12px;font-size:12px;color:#64748b;">Este plano não permite municípios adicionais.</div>';
       _municipiosExtrasSelecionados = [];
       return;
     }
 
-    // 🔍 PEGA MUNICÍPIO PRINCIPAL DIRETO DO DOM (SEM DISPARAR VALIDAÇÃO)
     const principal = document.getElementById('municipio')?.value || null;
+    const filtro    = termo.toLowerCase();
+    const lista     = _municipiosDisponiveis.filter(m =>
+      m.cod_municipio !== principal &&
+      (!filtro || m.nome.toLowerCase().includes(filtro) || m.cod_municipio.includes(filtro))
+    );
 
-    // 🔹 FILTRA O PRINCIPAL DA LISTA
-    const lista = _municipiosDisponiveis.filter(m => m.cod_municipio !== principal);
-
-    if (lista.length === 0 && _municipiosDisponiveis.length > 0) {
-      gridEl.innerHTML = '<div style="padding:8px;color:#666;font-size:12px;grid-column:1/-1;">Município principal já selecionado.</div>';
-    } else if (_municipiosDisponiveis.length === 0) {
-      gridEl.innerHTML = '';
-    } else {
-      gridEl.style.cssText = 'display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:4px 8px;';
-      gridEl.innerHTML = lista.map(m => `
-        <label>
-          <input type="checkbox" value="${m.cod_municipio}"
-            ${_municipiosExtrasSelecionados.includes(m.cod_municipio) ? 'checked' : ''}>
-          <span>${m.nome || m.cod_municipio}${m.uf ? ` - ${m.uf}` : ''}</span>
-        </label>
-      `).join('');
+    if (_municipiosDisponiveis.length === 0) {
+      listaEl.innerHTML = '';
+      return;
     }
-    infoEl.textContent = `Selecionados: ${_municipiosExtrasSelecionados.length} / ${maxExtras}`;
-  };
+    if (lista.length === 0) {
+      listaEl.innerHTML = '<div style="padding:10px 12px;font-size:12px;color:#64748b;">Nenhum resultado.</div>';
+      return;
+    }
 
-  // 🔹 DELEGAÇÃO DE EVENTOS (EVITA MULTIPLOS LISTENERS)
-  gridEl.addEventListener('change', (e) => {
-    if (e.target.type !== 'checkbox') return;
-    const maxExtras = Math.max(0, (_planoAtual?.features?.max_municipios || 1) - 1);
-    const val = e.target.value;
-    if (e.target.checked) {
-      if (_municipiosExtrasSelecionados.length >= maxExtras) {
-        e.target.checked = false;
-        mostrarMensagem(`Limite de ${maxExtras} município(s) atingido.`);
+    listaEl.innerHTML = lista.map(m => {
+      const selecionado = _municipiosExtrasSelecionados.includes(m.cod_municipio);
+      const limitingindo = !selecionado && _municipiosExtrasSelecionados.length >= maxExtras;
+      return `
+        <div data-cod="${m.cod_municipio}" style="
+          display:flex;align-items:center;gap:10px;
+          padding:8px 12px;cursor:${limitingindo ? 'not-allowed' : 'pointer'};
+          background:${selecionado ? '#eff6ff' : '#ffffff'};
+          opacity:${limitingindo ? '0.45' : '1'};
+          border-bottom:1px solid #f1f5f9;
+          user-select:none;">
+          <input type="checkbox"
+            ${selecionado ? 'checked' : ''}
+            ${limitingindo ? 'disabled' : ''}
+            style="width:15px;height:15px;flex-shrink:0;accent-color:#0A3D62;cursor:pointer;"
+            onclick="event.stopPropagation()">
+          <span style="font-size:13px;color:#1e293b;font-family:inherit;line-height:1.4;">
+            ${m.nome}
+            <span style="font-size:11px;color:#64748b;">— ${m.uf}</span>
+          </span>
+        </div>`;
+    }).join('');
+
+    // Delegação de eventos — um único listener na lista
+    listaEl._handler && listaEl.removeEventListener('click', listaEl._handler);
+    listaEl._handler = (e) => {
+      const row = e.target.closest('[data-cod]');
+      if (!row) return;
+      const cod = row.dataset.cod;
+      const cb  = row.querySelector('input[type="checkbox"]');
+      if (cb?.disabled) {
+        mostrarMensagem(`Limite de ${maxExtras} município(s) adicional(is) atingido.`);
         return;
       }
-      _municipiosExtrasSelecionados.push(val);
-    } else {
-      _municipiosExtrasSelecionados = _municipiosExtrasSelecionados.filter(v => v !== val);
-    }
-    infoEl.textContent = `Selecionados: ${_municipiosExtrasSelecionados.length} / ${maxExtras}`;
-  });
+      const idx = _municipiosExtrasSelecionados.indexOf(cod);
+      if (idx >= 0) {
+        _municipiosExtrasSelecionados.splice(idx, 1);
+      } else {
+        if (_municipiosExtrasSelecionados.length >= maxExtras) {
+          mostrarMensagem(`Limite de ${maxExtras} município(s) adicional(is) atingido.`);
+          return;
+        }
+        _municipiosExtrasSelecionados.push(cod);
+      }
+      _atualizarTrigger();
+      renderGrid(buscaEl.value);
+    };
+    listaEl.addEventListener('click', listaEl._handler);
+  };
 
-  // 🔹 RE-RENDERIZA QUANDO O MUNICÍPIO PRINCIPAL MUDA
+  // Busca em tempo real
+  buscaEl.addEventListener('input', (e) => renderGrid(e.target.value));
+
+  // ── Re-renderiza quando município principal muda ──────────────────────────────
   const bindMunListener = () => {
     const munSelect = document.getElementById('municipio');
     if (munSelect) {
-      munSelect.addEventListener('change', renderGrid);
+      munSelect.addEventListener('change', () => {
+        _municipiosExtrasSelecionados = [];
+        _atualizarTrigger();
+        renderGrid(buscaEl.value);
+      });
       return true;
     }
     return false;
@@ -204,12 +236,13 @@ _injetarEstiloGrid();
     waitMun.observe(document.body, { childList: true, subtree: true });
   }
 
-  // 🔹 CARREGA QUANDO A UF MUDA
+  // ── Dispara carga ao trocar UF ────────────────────────────────────────────────
   const triggerLoad = async () => {
     const novaUF = document.getElementById('uf')?.value || null;
     if (novaUF && novaUF !== _ufAtual) {
       _ufAtual = novaUF;
       _municipiosExtrasSelecionados = [];
+      _atualizarTrigger();
       await carregarMunicipiosPorUF(_ufAtual);
     }
   };
@@ -226,7 +259,11 @@ _injetarEstiloGrid();
   }
 
   // Expõe para atualizar limites ao trocar de plano
-  window._atualizarGridMunicipios = renderGrid;
+  window._atualizarGridMunicipios = () => {
+    _atualizarTrigger();
+    renderGrid(buscaEl?.value || '');
+  };
+
   setTimeout(triggerLoad, 150);
 }
 
@@ -243,7 +280,6 @@ function safeNum(v) {
   return Number.isFinite(n) ? n : null;
 }
 
-// Retorna o percentual de desconto configurado no plano para o ciclo
 function getDescontoPct(plano, cicloMeses) {
   if (!plano) return 0;
   const c = String(cicloMeses);
@@ -269,13 +305,11 @@ function getTotalCiclo(plano, cicloMeses) {
 // ─── Carregar plano por ID ────────────────────────────────────────────────────
 async function carregarPlano(planId) {
   if (!planId) return null;
-  // 🔹 Retorna do cache se já carregado (elimina erro de "offline" e economiza leitura)
   if (_planosCache[planId]) return { ..._planosCache[planId] };
-  
   try {
     const doc = await db.collection('planos').doc(planId).get();
     const data = doc.exists ? { id: doc.id, ...doc.data() } : null;
-    if (data) _planosCache[planId] = data; // Armazena no cache
+    if (data) _planosCache[planId] = data;
     return data;
   } catch (err) {
     console.error('[assinatura] Erro ao carregar plano:', err);
@@ -289,7 +323,6 @@ async function carregarListaPlanos() {
   if (!wrap) return;
   wrap.innerHTML = '<div style="color:#555;font-size:13px;padding:12px">Carregando planos...</div>';
 
-  // 🔹 BLINDAGEM DE LAYOUT: Reseta qualquer grid/flex herdado pelo container pai
   wrap.style.display = 'block';
   wrap.style.gridTemplateColumns = 'none';
   wrap.style.flexDirection = 'none';
@@ -305,20 +338,20 @@ async function carregarListaPlanos() {
     }
 
     let allFeatures = [];
-    try { allFeatures = await window.FeaturesManager.carregarFeatures() || []; } 
+    try { allFeatures = await window.FeaturesManager.carregarFeatures() || []; }
     catch (err) { console.error('[assinatura] Erro ao carregar features:', err); }
     allFeatures = allFeatures.filter(f => f.ativo !== false);
 
     if (allFeatures.length === 0) {
       allFeatures = [
-        { id: 'newsletter_texto', nome: 'Newsletter em texto' },
-        { id: 'newsletter_audio', nome: 'Newsletter em áudio (podcast)' },
-        { id: 'newsletter_video', nome: 'Newsletter em vídeo' },
-        { id: 'newsletter_infografico', nome: 'Infográfico por edição' },
-        { id: 'alertas_prioritarios', nome: 'Alertas prioritários' },
-        { id: 'grupo_whatsapp_vip', nome: 'Grupo VIP WhatsApp' },
-        { id: 'biblioteca_acesso', nome: 'Biblioteca vitalícia' },
-        { id: 'sugestao_tema_quota', nome: 'Sugestão de tema' },
+        { id: 'newsletter_texto',      nome: 'Newsletter em texto' },
+        { id: 'newsletter_audio',      nome: 'Newsletter em áudio (podcast)' },
+        { id: 'newsletter_video',      nome: 'Newsletter em vídeo' },
+        { id: 'newsletter_infografico',nome: 'Infográfico por edição' },
+        { id: 'alertas_prioritarios',  nome: 'Alertas prioritários' },
+        { id: 'grupo_whatsapp_vip',    nome: 'Grupo VIP WhatsApp' },
+        { id: 'biblioteca_acesso',     nome: 'Biblioteca vitalícia' },
+        { id: 'sugestao_tema_quota',   nome: 'Sugestão de tema' },
         { id: 'consultoria_horas_mes', nome: 'Consultoria direta' },
       ];
     }
@@ -337,11 +370,9 @@ async function carregarListaPlanos() {
 
     wrap.innerHTML = '';
     const planos = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-
-    // 🔹 Preenche cache local para evitar novas chamadas ao Firestore no clique
     planos.forEach(p => { _planosCache[p.id] = p; });
 
-    // 🔹 1. Extrair ciclos únicos disponíveis (apenas se houver planos habilitados)
+    // Ciclos únicos disponíveis
     const ciclosSet = new Set();
     planos.forEach(p => {
       if (Array.isArray(p.ciclos_disponiveis)) p.ciclos_disponiveis.forEach(c => ciclosSet.add(String(c)));
@@ -352,71 +383,62 @@ async function carregarListaPlanos() {
       return;
     }
 
-    // 🔹 2. Container de abas (SEMPRE horizontal, ocupa 100% da largura)
+    // Container de abas
     const tabsWrap = document.createElement('div');
     tabsWrap.id = 'ciclo-tabs';
-    tabsWrap.style.cssText = 'display:flex; gap:12px; margin-bottom:24px; width:100%; align-items:stretch;';
+    tabsWrap.style.cssText = 'display:flex;gap:12px;margin-bottom:24px;width:100%;align-items:stretch;';
     wrap.appendChild(tabsWrap);
 
-    // 🔹 3. Container dinâmico para os planos (sempre 2 colunas)
+    // Grid de planos
     const gridContainer = document.createElement('div');
     gridContainer.id = 'grid-planos-dinamico';
-    gridContainer.style.cssText = 'display:grid;grid-template-columns:repeat(2, 1fr);gap:16px;min-height:200px;width:100%;';
-    
+    gridContainer.style.cssText = 'display:grid;grid-template-columns:repeat(2,1fr);gap:16px;min-height:200px;width:100%;';
     if (!document.getElementById('css-assinatura-dinamico')) {
       const style = document.createElement('style');
       style.id = 'css-assinatura-dinamico';
-      style.textContent = `@media (max-width: 768px) { #grid-planos-dinamico { grid-template-columns: 1fr !important; } }`;
+      style.textContent = `@media(max-width:768px){#grid-planos-dinamico{grid-template-columns:1fr !important;}}`;
       document.head.appendChild(style);
     }
     wrap.appendChild(gridContainer);
 
-    // 🔹 4. Função que renderiza os planos de um ciclo específico
     function renderPlanosPorCiclo(cicloAtivo) {
       gridContainer.innerHTML = '';
-      const planosFiltrados = planos.filter(p => 
+      const planosFiltrados = planos.filter(p =>
         Array.isArray(p.ciclos_disponiveis) && p.ciclos_disponiveis.map(String).includes(cicloAtivo)
       );
-
       if (planosFiltrados.length === 0) {
         gridContainer.innerHTML = '<div style="color:#999;text-align:center;grid-column:1/-1;padding:30px;font-size:14px">Nenhum plano disponível para este ciclo.</div>';
         return;
       }
-
-      planosFiltrados.forEach(p => {
-        const card = _criarCardPlano(p, cicloAtivo, allFeatures);
-        gridContainer.appendChild(card);
-      });
+      planosFiltrados.forEach(p => gridContainer.appendChild(_criarCardPlano(p, cicloAtivo, allFeatures)));
     }
 
-    // 🔹 5. Criar botões das abas (LARGURA IGUAL E OCUPA A LINHA TODA)
     ciclosOrdenados.forEach((ciclo, idx) => {
       const btn = document.createElement('button');
       btn.type = 'button';
       btn.textContent = `${ciclo} Meses`;
       btn.dataset.ciclo = ciclo;
       const isDefault = idx === 0;
-      
-      btn.style.cssText = `flex:1; min-width:0; display:flex; align-items:center; justify-content:center; padding:14px 12px; border:1px solid ${isDefault ? '#0A3D62' : '#cbd5e1'}; border-radius:10px; font-size:14px; font-weight:600; cursor:pointer; background:${isDefault ? '#0A3D62' : '#ffffff'}; color:${isDefault ? '#ffffff' : '#475569'}; transition:all 0.2s; box-shadow:0 1px 2px rgba(0,0,0,0.05); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;`;
-      
+      btn.style.cssText = `flex:1;min-width:0;display:flex;align-items:center;justify-content:center;
+        padding:14px 12px;border:1px solid ${isDefault ? '#0A3D62' : '#cbd5e1'};border-radius:10px;
+        font-size:14px;font-weight:600;cursor:pointer;
+        background:${isDefault ? '#0A3D62' : '#ffffff'};
+        color:${isDefault ? '#ffffff' : '#475569'};
+        transition:all 0.2s;box-shadow:0 1px 2px rgba(0,0,0,0.05);
+        white-space:nowrap;overflow:hidden;text-overflow:ellipsis;`;
       btn.addEventListener('click', () => {
         tabsWrap.querySelectorAll('button').forEach(b => {
-          b.style.background = '#fff';
-          b.style.color = '#475569';
-          b.style.borderColor = '#cbd5e1';
+          b.style.background = '#fff'; b.style.color = '#475569'; b.style.borderColor = '#cbd5e1';
         });
-        btn.style.background = '#0A3D62';
-        btn.style.color = '#fff';
-        btn.style.borderColor = '#0A3D62';
+        btn.style.background = '#0A3D62'; btn.style.color = '#fff'; btn.style.borderColor = '#0A3D62';
         renderPlanosPorCiclo(ciclo);
       });
       tabsWrap.appendChild(btn);
     });
 
-    // 🔹 6. Renderizar ciclo padrão
     renderPlanosPorCiclo(ciclosOrdenados[0]);
 
-    // 🔹 7. Pré-seleção via URL
+    // Pré-seleção via URL
     if (_planIdUrl) {
       const planoUrl = await carregarPlano(_planIdUrl);
       if (planoUrl) {
@@ -438,37 +460,32 @@ async function carregarListaPlanos() {
   }
 }
 
-// ─── Helper: Cria um card de plano para um ciclo específico ───────────────────
+// ─── Helper: Cria card de plano ───────────────────────────────────────────────
 function _criarCardPlano(plano, ciclo, allFeatures) {
-  const cor = plano.cor_destaque || '#0A3D62';
+  const cor      = plano.cor_destaque || '#0A3D62';
   const features = plano.features || {};
 
   const featuresHtml = allFeatures.map(f => {
-    const val = features[f.id];
+    const val   = features[f.id];
     const ativo = !!val;
-    let label = f.nome || f.id;
-
-    // 🔹 APLICA SUFIXO APENAS SE O TIPO DA FEATURE FOR 'number'
+    let label   = f.nome || f.id;
     if (f.tipo === 'number') {
       const numVal = Number(val);
-      if (!isNaN(numVal) && numVal > 0) {
-        label += ` (${numVal}/mês)`;
-      }
+      if (!isNaN(numVal) && numVal > 0) label += ` (${numVal}/mês)`;
     }
-
     return `<li class="${ativo ? '' : 'inativo'}">${label}</li>`;
   }).join('');
 
-  const val = getPrecoPlano(plano, ciclo);
+  const val   = getPrecoPlano(plano, ciclo);
   const total = getTotalCiclo(plano, ciclo);
 
   const card = document.createElement('label');
-  card.className = `plano-card${plano.destaque ? ' destaque' : ''}${plano.em_breve ? ' em-breve' : ''}`;
-  card.dataset.id    = plano.id;
+  card.className   = `plano-card${plano.destaque ? ' destaque' : ''}${plano.em_breve ? ' em-breve' : ''}`;
+  card.dataset.id   = plano.id;
   card.dataset.ciclo = ciclo;
   card.style.setProperty('--plano-cor', cor);
-  card._planoData = plano;
-  card._cicloAtual = Number(ciclo);
+  card._planoData   = plano;
+  card._cicloAtual  = Number(ciclo);
 
   card.innerHTML = `
     ${plano.em_breve ? '<div class="plano-badge-em-breve">🚀 Em breve</div>' : ''}
@@ -479,7 +496,7 @@ function _criarCardPlano(plano, ciclo, allFeatures) {
       <div class="plano-preco-wrap">
         <span class="plano-preco-valor" style="color:${cor}">${fmtBRL(val)}</span>
         <div class="plano-preco-total" style="font-size:11px;color:#666;margin-top:1px">
-          ${Number(ciclo)>1 ? `Total: ${fmtBRL(total)}` : ''}
+          ${Number(ciclo) > 1 ? `Total: ${fmtBRL(total)}` : ''}
         </div>
         <span class="plano-preco-ciclo">/mês</span>
       </div>
@@ -503,21 +520,20 @@ async function _onPlanoSelecionado(planId, cicloInicial = null) {
   const plano = await carregarPlano(planId);
   if (!plano || plano.em_breve) return;
 
-  const ciclosDisp = Array.isArray(plano.ciclos_disponiveis) && plano.ciclos_disponiveis.length 
-    ? plano.ciclos_disponiveis 
-    : ['3'];
-  
+  const ciclosDisp = Array.isArray(plano.ciclos_disponiveis) && plano.ciclos_disponiveis.length
+    ? plano.ciclos_disponiveis : ['3'];
+
   _planoAtual = plano;
   _planoAtual.cicloSelecionado = Number(cicloInicial || ciclosDisp[0]);
 
-  // Controle de exibição do campo extra de municípios (NÃO VALIDA, APENAS AJUSTA UI)
-  const maxMun = Number(_planoAtual?.features?.max_municipios) || 1;
+  const maxMun       = Number(_planoAtual?.features?.max_municipios) || 1;
   const containerMun = document.getElementById('container-municipios-extra');
-  
+
   if (maxMun > 1) {
     if (!containerMun) await configurarUIMunicipiosExtra();
     else containerMun.style.display = 'block';
-    document.getElementById('municipios-limit-info') && (document.getElementById('municipios-limit-info').textContent = `Selecione até ${maxMun - 1} município(s) adicional(is).`);
+    const info = document.getElementById('municipios-limit-info');
+    if (info) info.textContent = `Selecione até ${maxMun - 1} município(s) adicional(is).`;
     window._atualizarGridMunicipios?.();
   } else {
     if (containerMun) containerMun.style.display = 'none';
@@ -525,7 +541,7 @@ async function _onPlanoSelecionado(planId, cicloInicial = null) {
   }
 
   document.getElementById('planId').value = planId;
-  
+
   document.querySelectorAll('.plano-card').forEach(c => {
     const isSelected = c.dataset.id === planId && String(c.dataset.ciclo) === String(_planoAtual.cicloSelecionado);
     c.classList.toggle('selecionado', isSelected);
@@ -537,7 +553,8 @@ async function _onPlanoSelecionado(planId, cicloInicial = null) {
   _mostrarWhatsappOptin();
   await carregarTiposNewsletter(Array.isArray(plano.tipos_inclusos) ? plano.tipos_inclusos : []);
   await atualizarPreview();
-    // Se já houver cupom de 100% aplicado, mantém extras bloqueados
+
+  // Mantém extras bloqueados se cupom de gratuidade estiver ativo
   if (_cupomAplicado?.valor === 100) {
     _municipiosExtrasSelecionados = [];
     const munC = document.getElementById('container-municipios-extra');
@@ -565,11 +582,10 @@ function _mostrarWhatsappOptin() {
   const wpInput   = document.getElementById('whatsapp');
   const optinWrap = document.getElementById('whatsapp-optin-wrap');
   if (!wpInput || !optinWrap) return;
-  
   const mostrar = () => {
     const planoTemFeatureAlvo = !!(_planoAtual?.features?.alertas_prioritarios || _planoAtual?.features?.grupo_whatsapp_vip);
-    const numOk               = wpInput.value.replace(/\D/g, '').length >= 10;
-    optinWrap.style.display   = (planoTemFeatureAlvo && numOk) ? 'flex' : 'none';
+    const numOk = wpInput.value.replace(/\D/g, '').length >= 10;
+    optinWrap.style.display = (planoTemFeatureAlvo && numOk) ? 'flex' : 'none';
   };
   wpInput.removeEventListener('input', mostrar);
   wpInput.addEventListener('input', mostrar);
@@ -594,10 +610,14 @@ async function carregarTiposNewsletter(preselected = []) {
     const planFixado = !!(_planoAtual && Array.isArray(_planoAtual.tipos_inclusos) && _planoAtual.tipos_inclusos.length);
 
     container.innerHTML = `
-      ${planFixado ? '<p style="font-size:12px;color:#666;margin:0 0 8px">Tipos incluídos no seu plano:</p>' : '<p style="font-size:12px;color:#666;margin:0 0 8px">Selecione seu(s) interesse(s):</p>'}
+      ${planFixado
+        ? '<p style="font-size:12px;color:#666;margin:0 0 8px">Tipos incluídos no seu plano:</p>'
+        : '<p style="font-size:12px;color:#666;margin:0 0 8px">Selecione seu(s) interesse(s):</p>'}
       <div id="grupo-newsletters" style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
         ${tipos.map(t => {
-          const incl = planFixado ? _planoAtual.tipos_inclusos.map(String).includes(String(t.id)) : preselected.includes(t.id);
+          const incl = planFixado
+            ? _planoAtual.tipos_inclusos.map(String).includes(String(t.id))
+            : preselected.includes(t.id);
           const disabled = planFixado ? 'disabled' : '';
           return `<label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:${planFixado ? 'default' : 'pointer'}">
             <input type="checkbox" value="${t.id}" id="tipo-${t.id}" ${incl ? 'checked' : ''} ${disabled} style="width:15px;height:15px">
@@ -605,7 +625,9 @@ async function carregarTiposNewsletter(preselected = []) {
           </label>`;
         }).join('')}
       </div>
-      ${!planFixado ? `<button type="button" id="btn-sel-todos" style="margin-top:8px;padding:5px 12px;font-size:12px;background:#f0f4f8;border:1px solid #d1d9e0;border-radius:6px;cursor:pointer">Selecionar todos</button>` : '<p style="font-size:12px;color:#0A3D62;margin:8px 0 0">✓ Tipos definidos pelo seu plano</p>'}
+      ${!planFixado
+        ? `<button type="button" id="btn-sel-todos" style="margin-top:8px;padding:5px 12px;font-size:12px;background:#f0f4f8;border:1px solid #d1d9e0;border-radius:6px;cursor:pointer">Selecionar todos</button>`
+        : '<p style="font-size:12px;color:#0A3D62;margin:8px 0 0">✓ Tipos definidos pelo seu plano</p>'}
     `;
 
     if (!planFixado) {
@@ -650,14 +672,14 @@ async function validarCupom(codigo) {
 
 // ─── Calcular preview ─────────────────────────────────────────────────────────
 async function calcularPreview(plano, tiposSelecionados = [], cupomObj = null) {
-  const cicloMeses   = plano.cicloSelecionado || 3;
-  const baseMensal   = Number(plano.valor_mensal) || Number(plano.valor) || 0;
-  const pct          = getDescontoPct(plano, cicloMeses);
-  const basePrice    = getPrecoPlano(plano, cicloMeses);
+  const cicloMeses     = plano.cicloSelecionado || 3;
+  const baseMensal     = Number(plano.valor_mensal) || Number(plano.valor) || 0;
+  const pct            = getDescontoPct(plano, cicloMeses);
+  const basePrice      = getPrecoPlano(plano, cicloMeses);
   const descontoMensal = Math.round((baseMensal - basePrice) * 100) / 100;
-  const tiposIncl    = Array.isArray(plano.tipos_inclusos) ? plano.tipos_inclusos.map(String) : [];
-  const allowMulti   = !!plano.allow_multi_select;
-  const bundles      = Array.isArray(plano.bundles) ? plano.bundles : [];
+  const tiposIncl      = Array.isArray(plano.tipos_inclusos) ? plano.tipos_inclusos.map(String) : [];
+  const allowMulti     = !!plano.allow_multi_select;
+  const bundles        = Array.isArray(plano.bundles) ? plano.bundles : [];
 
   const items = tiposSelecionados.map(id => ({
     id,
@@ -685,8 +707,7 @@ async function calcularPreview(plano, tiposSelecionados = [], cupomObj = null) {
   }
   const totalMensalFinal = Math.max(0, totalMensalBruto - descontoCupom);
   const totalCiclo       = Math.round(totalMensalFinal * cicloMeses * 100) / 100;
-
-  const temFidelizacao = cicloMeses >= 6 && pct > 0;
+  const temFidelizacao   = cicloMeses >= 6 && pct > 0;
   const agora = new Date();
   const dataFimFidelizacao = new Date(agora);
   dataFimFidelizacao.setMonth(dataFimFidelizacao.getMonth() + cicloMeses);
@@ -702,22 +723,24 @@ async function calcularPreview(plano, tiposSelecionados = [], cupomObj = null) {
 
 // ─── Atualizar preview no DOM ─────────────────────────────────────────────────
 async function atualizarPreview() {
-  const wrap = document.getElementById('preview-breakdown');
+  const wrap    = document.getElementById('preview-breakdown');
   const itemsEl = document.getElementById('preview-items');
   const totalEl = document.getElementById('preview-total');
   if (!wrap) return;
   if (!_planoAtual) { wrap.style.display = 'none'; return; }
 
   const checks = [...document.querySelectorAll('#grupo-newsletters input[type="checkbox"]:checked')];
-  const tipos = checks.map(cb => cb.value);
+  const tipos  = checks.map(cb => cb.value);
   if (!tipos.length) { wrap.style.display = 'none'; return; }
 
   const pv = await calcularPreview(_planoAtual, tipos, _cupomAplicado);
   wrap.style.display = 'block';
 
   if (itemsEl) {
-    itemsEl.innerHTML = pv.items.map(it => 
-      `<div class="preview-row"><span>${it.nome}</span><span>${it.included ? '<span style="color:#16a34a">Incluído</span>' : fmtBRL(it.price)}</span></div>`
+    itemsEl.innerHTML = pv.items.map(it =>
+      `<div class="preview-row"><span>${it.nome}</span><span>${it.included
+        ? '<span style="color:#16a34a">Incluído</span>'
+        : fmtBRL(it.price)}</span></div>`
     ).join('');
   }
 
@@ -728,8 +751,8 @@ async function atualizarPreview() {
     }
 
     const parcelasEl = document.getElementById('parcelas');
-    const parcelas = parcelasEl ? Number(parcelasEl.value) || 1 : 1;
-    const semJuros = _planoAtual.permitir_sem_juros && parcelas <= (_planoAtual.parcelas_sem_juros || 1);
+    const parcelas   = parcelasEl ? Number(parcelasEl.value) || 1 : 1;
+    const semJuros   = _planoAtual.permitir_sem_juros && parcelas <= (_planoAtual.parcelas_sem_juros || 1);
 
     if (pv.desconto_pct > 0 && pv.desconto_mensal > 0) {
       html += `<div class="preview-row desconto"><span>🏷 Desconto ${pv.ciclo_meses} meses (${pv.desconto_pct}% off)</span><span>− ${fmtBRL(pv.desconto_mensal)}/mês</span></div>`;
@@ -739,12 +762,10 @@ async function atualizarPreview() {
     if (pv.ciclo_meses > 1) {
       textoTotal = `${fmtBRL(pv.valor_mensal_contratado)}/mês × ${pv.ciclo_meses} = ${fmtBRL(pv.total)}`;
     } else if (parcelas > 1) {
-      const parcVal = pv.total / parcelas;
-      textoTotal = `${parcelas}× de ${fmtBRL(parcVal)}${semJuros ? ' sem juros' : ''}`;
+      textoTotal = `${parcelas}× de ${fmtBRL(pv.total / parcelas)}${semJuros ? ' sem juros' : ''}`;
     } else {
       textoTotal = fmtBRL(pv.total);
     }
-
     html += `<div class="preview-row total"><span>Total do período</span><span>${textoTotal}</span></div>`;
 
     if (pv.tem_fidelizacao) {
@@ -761,18 +782,20 @@ async function atualizarPreview() {
 
 // ─── Upsert usuário no Firestore ──────────────────────────────────────────────
 async function upsertUsuario(dados) {
-  const { nome, cpf, email, telefone, whatsapp, whatsappOptin, perfil, mensagem, preferencia, cod_uf, cod_municipio, nome_municipio, plano_slug, ciclo, features } = dados;
-  const cpfNorm = (cpf || '').replace(/\D/g, '');
-  const waRaw = whatsapp;
-  const waNumber = waRaw ? String(waRaw).replace(/\D/g, '') : '';
+  const { nome, cpf, email, telefone, whatsapp, whatsappOptin, perfil, mensagem, preferencia,
+          cod_uf, cod_municipio, nome_municipio, plano_slug, ciclo, features } = dados;
+  const cpfNorm  = (cpf || '').replace(/\D/g, '');
+  const waNumber = whatsapp ? String(whatsapp).replace(/\D/g, '') : '';
 
   const base = {
-    nome, cpfNormalizado: cpfNorm, telefone: telefone || null, whatsapp: whatsapp || null,
-    whatsapp_number: waNumber, whatsapp_optin: whatsapp ? (whatsappOptin ?? true) : false,
+    nome, cpfNormalizado: cpfNorm, telefone: telefone || null,
+    whatsapp: whatsapp || null, whatsapp_number: waNumber,
+    whatsapp_optin: whatsapp ? (whatsappOptin ?? true) : false,
     whatsapp_optin_em: whatsapp ? firebase.firestore.FieldValue.serverTimestamp() : null,
     tipo_perfil: perfil || null, ativo: false, mensagem: mensagem || null,
-    preferencia_contato: preferencia || null, cod_uf: cod_uf || null, cod_municipio: cod_municipio || null,
-    nome_municipio: nome_municipio || null, origem: _origem, updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+    preferencia_contato: preferencia || null,
+    cod_uf: cod_uf || null, cod_municipio: cod_municipio || null, nome_municipio: nome_municipio || null,
+    origem: _origem, updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
   };
 
   try {
@@ -794,7 +817,7 @@ async function upsertUsuario(dados) {
 // ─── Registrar assinatura (subcoleção) ───────────────────────────────────────
 async function registrarAssinatura(userId, payload, preview) {
   if (!userId || !payload || !preview) throw new Error('Parâmetros obrigatórios ausentes.');
-  const agora = new Date();
+  const agora     = new Date();
   const cicloMeses = preview.ciclo_meses || 3;
   const renovacao = new Date(agora);
   renovacao.setMonth(renovacao.getMonth() + cicloMeses);
@@ -803,12 +826,7 @@ async function registrarAssinatura(userId, payload, preview) {
   const extrasObjs   = Array.isArray(payload.municipiosExtras) ? payload.municipiosExtras : [];
   const municipiosPlano = principalCod
     ? [
-        {
-          cod_municipio: principalCod,
-          nome:          payload.nome_municipio || principalCod,
-          uf:            payload.cod_uf         || '',
-        },
-        // extras já vêm como objetos; filtra caso o principal tenha sido marcado também
+        { cod_municipio: principalCod, nome: payload.nome_municipio || principalCod, uf: payload.cod_uf || '' },
         ...extrasObjs.filter(e => e.cod_municipio !== principalCod),
       ]
     : [];
@@ -821,15 +839,18 @@ async function registrarAssinatura(userId, payload, preview) {
     amountCentavos: preview.amountCentavos ?? 0, valor_base_mensal: preview.baseMensal ?? 0,
     valor_mensal_contratado: preview.valor_mensal_contratado ?? 0, desconto_mensal: preview.desconto_mensal ?? 0,
     desconto_pct: preview.desconto_pct ?? 0, tem_fidelizacao: preview.tem_fidelizacao ?? false,
-    data_fim_fidelizacao: preview.tem_fidelizacao ? firebase.firestore.Timestamp.fromDate(preview.data_fim_fidelizacao) : null,
+    data_fim_fidelizacao: preview.tem_fidelizacao
+      ? firebase.firestore.Timestamp.fromDate(preview.data_fim_fidelizacao) : null,
     cupom: payload.cupom || null, features_snapshot: payload.features || null,
-    municipios_plano: municipiosPlano, // NOVO CAMPO
+    municipios_plano: municipiosPlano,
     data_inicio: firebase.firestore.Timestamp.fromDate(agora),
     data_proxima_renovacao: firebase.firestore.Timestamp.fromDate(renovacao),
     status: 'pendente_pagamento', paymentProvider: 'mercadopago', orderId: payload.orderId || null,
-    pedidoId: null, origem: _origem, createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+    pedidoId: null, origem: _origem,
+    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
     updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
   };
+
   try {
     return (await db.collection('usuarios').doc(userId).collection('assinaturas').add(data)).id;
   } catch (err) { console.error('[assinatura] Erro em registrarAssinatura:', err); throw err; }
@@ -837,10 +858,13 @@ async function registrarAssinatura(userId, payload, preview) {
 
 // ─── Criar pedido no backend (Mercado Pago) ───────────────────────────────────
 async function criarPedidoBackend(payload) {
-  const ctrl = new AbortController();
+  const ctrl    = new AbortController();
   const timeout = setTimeout(() => ctrl.abort(), 30000);
   try {
-    const resp = await fetch('/api/pagamentoMP?acao=criar-pedido', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload), signal: ctrl.signal });
+    const resp = await fetch('/api/pagamentoMP?acao=criar-pedido', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload), signal: ctrl.signal,
+    });
     clearTimeout(timeout);
     if (!resp.ok) throw new Error(`Backend ${resp.status}: ${await resp.text().catch(() => '')}`);
     return await resp.json();
@@ -854,11 +878,10 @@ async function prefillFromLead() {
     const doc = await db.collection('leads').doc(_leadIdUrl).get();
     if (!doc.exists) return null;
     const lead = doc.data();
-    const set = (id, val) => { if (val && document.getElementById(id)) document.getElementById(id).value = val; };
+    const set  = (id, val) => { if (val && document.getElementById(id)) document.getElementById(id).value = val; };
     set('nome', lead.nome); set('email', lead.email); set('telefone', lead.telefone);
     set('whatsapp', lead.whatsapp || lead.telefone); set('perfil', lead.perfil);
     set('preferencia-contato', lead.preferencia_contato);
-
     if (Array.isArray(lead.interesses)) {
       lead.interesses.forEach(v => {
         const cb = document.getElementById(`tipo-${v}`) || document.querySelector(`#grupo-newsletters input[value="${v}"]`);
@@ -874,7 +897,9 @@ async function prefillFromLead() {
 
 // ─── Validações do formulário ─────────────────────────────────────────────────
 function clearErrors() {
-  document.querySelectorAll('#form-assinatura .field-error').forEach(el => { el.textContent = ''; el.style.display = 'none'; });
+  document.querySelectorAll('#form-assinatura .field-error').forEach(el => {
+    el.textContent = ''; el.style.display = 'none';
+  });
 }
 function setError(id, msg) {
   const el = document.getElementById(`error-${id}`);
@@ -897,22 +922,22 @@ function validarCPF(cpf) {
 async function processarEnvioAssinatura(e) {
   e.preventDefault();
   clearErrors();
-  const btn = document.getElementById('btn-assinar');
-  const status = document.getElementById('status-envio');
+  const btn       = document.getElementById('btn-assinar');
+  const status    = document.getElementById('status-envio');
   const setStatus = (msg, cor = '#555') => { if (status) { status.textContent = msg; status.style.color = cor; } };
 
-  const nome = document.getElementById('nome')?.value.trim() || '';
-  const cpf = document.getElementById('cpf')?.value.trim() || '';
-  const email = document.getElementById('email')?.value.trim() || '';
-  const telefone = document.getElementById('telefone')?.value.trim() || '';
-  const whatsapp = document.getElementById('whatsapp')?.value.trim() || '';
-  const wpOptin = !!document.getElementById('whatsapp-optin')?.checked;
-  const perfil = document.getElementById('perfil')?.value || '';
-  const mensagem = document.getElementById('mensagem')?.value.trim() || '';
-  const preferencia = document.getElementById('preferencia-contato')?.value || '';
-  const cupomCod = document.getElementById('cupom')?.value.trim() || '';
-  const aceita = !!document.getElementById('aceita-termos')?.checked;
-  const ciclo = _planoAtual?.cicloSelecionado || 3;
+  const nome       = document.getElementById('nome')?.value.trim()              || '';
+  const cpf        = document.getElementById('cpf')?.value.trim()               || '';
+  const email      = document.getElementById('email')?.value.trim()             || '';
+  const telefone   = document.getElementById('telefone')?.value.trim()          || '';
+  const whatsapp   = document.getElementById('whatsapp')?.value.trim()          || '';
+  const wpOptin    = !!document.getElementById('whatsapp-optin')?.checked;
+  const perfil     = document.getElementById('perfil')?.value                   || '';
+  const mensagem   = document.getElementById('mensagem')?.value.trim()          || '';
+  const preferencia= document.getElementById('preferencia-contato')?.value      || '';
+  const cupomCod   = document.getElementById('cupom')?.value.trim()             || '';
+  const aceita     = !!document.getElementById('aceita-termos')?.checked;
+  const ciclo      = _planoAtual?.cicloSelecionado || 3;
   const tiposSelecionados = [...document.querySelectorAll('#grupo-newsletters input[type="checkbox"]:checked')].map(cb => cb.value);
 
   let temErro = false;
@@ -928,18 +953,23 @@ async function processarEnvioAssinatura(e) {
   } else if (whatsapp && !validarTelefoneFormato(whatsapp)) {
     erro('whatsapp', 'Formato de WhatsApp inválido.');
   }
-  if (!perfil) { mostrarMensagem('Selecione seu perfil.'); temErro = true; }
-  if (!aceita) { setError('aceita_termos', 'Você precisa aceitar os termos.'); temErro = true; }
+  if (!perfil)              { mostrarMensagem('Selecione seu perfil.');                            temErro = true; }
+  if (!aceita)              { setError('aceita_termos', 'Você precisa aceitar os termos.');        temErro = true; }
   if (!tiposSelecionados.length) { mostrarMensagem('Selecione pelo menos um tipo de newsletter.'); temErro = true; }
-  if (!_planoAtual) { mostrarMensagem('Selecione um plano.'); temErro = true; }
+  if (!_planoAtual)         { mostrarMensagem('Selecione um plano.');                              temErro = true; }
   if (temErro) return;
 
+  // Verifica assinatura ativa existente
   try {
     const exSnap = await db.collection('usuarios').where('email', '==', email.toLowerCase()).limit(1).get();
     if (!exSnap.empty) {
-      const uid = exSnap.docs[0].id;
-      const assSnap = await db.collection('usuarios').doc(uid).collection('assinaturas').where('status', 'in', ['ativa', 'aprovada']).get();
-      if (!assSnap.empty) { mostrarMensagem('Você já possui uma assinatura ativa. Acesse a Área do Assinante.'); return; }
+      const uid     = exSnap.docs[0].id;
+      const assSnap = await db.collection('usuarios').doc(uid).collection('assinaturas')
+        .where('status', 'in', ['ativa', 'aprovada']).get();
+      if (!assSnap.empty) {
+        mostrarMensagem('Você já possui uma assinatura ativa. Acesse a Área do Assinante.');
+        return;
+      }
     }
   } catch (err) { console.warn('[assinatura] Verificação de ativo falhou:', err); }
 
@@ -961,8 +991,6 @@ async function processarEnvioAssinatura(e) {
   }
 
   const isGratuidade = (_cupomAplicado?.valor === 100) || preview.amountCentavos === 0;
-  
-  // Se for gratuidade, limpa e oculta
   if (isGratuidade) {
     _municipiosExtrasSelecionados = [];
     const munC = document.getElementById('container-municipios-extra');
@@ -976,52 +1004,52 @@ async function processarEnvioAssinatura(e) {
       cod_uf: dadosUf?.cod_uf, cod_municipio: dadosUf?.cod_municipio, nome_municipio: dadosUf?.nome_municipio,
       plano_slug: _planoAtual.plano_slug, ciclo, features: _planoAtual.features || null,
     });
+
     const assinaturaId = await registrarAssinatura(userId, {
-      planId:            _planoAtual.id,
-      plano_slug:        _planoAtual.plano_slug  || null,
-      plano_nome:        _planoAtual.nome         || null,
+      planId:             _planoAtual.id,
+      plano_slug:         _planoAtual.plano_slug  || null,
+      plano_nome:         _planoAtual.nome        || null,
       tipos_selecionados: tiposSelecionados,
-      cupom:             cupomCod                 || null,
-      features:          _planoAtual.features     || null,
-      cod_uf:            dadosUf?.cod_uf          || '',
-      cod_municipio:     dadosUf?.cod_municipio   || null,
-      nome_municipio:    dadosUf?.nome_municipio  || '',
-      // Extras: array de objetos com nome/uf vindos de _municipiosDisponiveis
+      cupom:              cupomCod                || null,
+      features:           _planoAtual.features    || null,
+      cod_uf:             dadosUf?.cod_uf         || '',
+      cod_municipio:      dadosUf?.cod_municipio  || null,
+      nome_municipio:     dadosUf?.nome_municipio || '',
+      // Extras: array de objetos {cod_municipio, nome, uf}
       municipiosExtras: _municipiosExtrasSelecionados.map(cod => {
         const det = _municipiosDisponiveis.find(m => m.cod_municipio === cod);
-        return {
-          cod_municipio: cod,
-          nome:          det?.nome || cod,
-          uf:            det?.uf   || dadosUf?.cod_uf || '',
-        };
+        return { cod_municipio: cod, nome: det?.nome || cod, uf: det?.uf || dadosUf?.cod_uf || '' };
       }),
     }, preview);
 
     setStatus(isGratuidade ? 'Ativando gratuidade...' : 'Iniciando pagamento...', '#555');
-    
+
     const backendPayload = {
-      userId, assinaturaId, amountCentavos: isGratuidade ? 0 : preview.amountCentavos, cpf, nome, email,
+      userId, assinaturaId,
+      amountCentavos: isGratuidade ? 0 : preview.amountCentavos,
+      cpf, nome, email,
       descricao: `${_planoAtual.nome || 'Assinatura Radar SIOPE'} — ${preview.ciclo_meses} meses`,
       installmentsMax: _planoAtual.parcelas_sem_juros || preview.ciclo_meses,
-      dataPrimeiroVencimento: new Date().toISOString().split('T')[0], ciclo_meses: preview.ciclo_meses,
+      dataPrimeiroVencimento: new Date().toISOString().split('T')[0],
+      ciclo_meses: preview.ciclo_meses,
       plano_slug: _planoAtual.plano_slug || null,
-      metodosPagamento: Array.isArray(_planoAtual.metodos_pagamento) && _planoAtual.metodos_pagamento.length ? _planoAtual.metodos_pagamento : ['credit_card'],
+      metodosPagamento: Array.isArray(_planoAtual.metodos_pagamento) && _planoAtual.metodos_pagamento.length
+        ? _planoAtual.metodos_pagamento : ['credit_card'],
       tipoAssinatura: isGratuidade ? 'gratuidade' : 'padrao',
-      cupomCodigo: _cupomAplicado?.codigo || null // 🔹 ENVIADO PARA BACKEND DESATIVAR CUPOM
+      cupomCodigo: _cupomAplicado?.codigo || null,
     };
 
     const backendResp = await criarPedidoBackend(backendPayload);
 
     if (backendResp?.pedidoId) {
       db.collection('usuarios').doc(userId).collection('assinaturas').doc(assinaturaId)
-        .update({ pedidoId: backendResp.pedidoId, updatedAt: firebase.firestore.FieldValue.serverTimestamp() }).catch(() => {});
+        .update({ pedidoId: backendResp.pedidoId, updatedAt: firebase.firestore.FieldValue.serverTimestamp() })
+        .catch(() => {});
     }
 
     if (backendResp?.ativadoDireto) {
       setStatus('✅ Assinatura ativada com sucesso! Verifique seu e-mail.', '#16a34a');
-      setTimeout(() => {
-        window.location.href = backendResp.redirectSucesso || '/area-assinante.html';
-      }, 2000);
+      setTimeout(() => { window.location.href = backendResp.redirectSucesso || '/area-assinante.html'; }, 2000);
     } else if (backendResp?.redirectUrl) {
       window.location.href = backendResp.redirectUrl;
     } else {
@@ -1055,7 +1083,12 @@ async function initAssinatura() {
       if (d.exists) leadPreload = d.data();
     } catch (e) {}
   }
-  window.validarUfMunicipio = await inserirCamposUfMunicipio(document.getElementById('campo-uf-municipio'), leadPreload?.cod_uf || '', leadPreload?.cod_municipio || '');
+
+  window.validarUfMunicipio = await inserirCamposUfMunicipio(
+    document.getElementById('campo-uf-municipio'),
+    leadPreload?.cod_uf     || '',
+    leadPreload?.cod_municipio || ''
+  );
 
   if (_planIdUrl) {
     const plano = await carregarPlano(_planIdUrl);
@@ -1069,42 +1102,41 @@ async function initAssinatura() {
 
   document.getElementById('aplicar-cupom')?.addEventListener('click', async () => {
     const codigo = document.getElementById('cupom')?.value.trim();
-    const fb = document.getElementById('cupom-feedback');
+    const fb     = document.getElementById('cupom-feedback');
     if (!_planoAtual) { mostrarMensagem('Selecione um plano antes de aplicar o cupom.'); return; }
-    if (!codigo) { mostrarMensagem('Digite um código de cupom.'); return; }
+    if (!codigo)      { mostrarMensagem('Digite um código de cupom.'); return; }
+
     const cupom = await validarCupom(codigo);
     if (cupom) {
       _cupomAplicado = cupom;
       if (fb) { fb.textContent = `✅ Cupom "${codigo}" aplicado!`; fb.style.color = '#16a34a'; }
-      
-      // 🔒 BLOQUEIO DE MUNICÍPIOS EXTRAS SE CUPOM FOR 100%
-      const isGratuidade = cupom.valor === 100;
-      const munContainer = document.getElementById('container-municipios-extra');
+
+      const isGratuidade  = cupom.valor === 100;
+      const munContainer  = document.getElementById('container-municipios-extra');
       if (isGratuidade) {
         _municipiosExtrasSelecionados = [];
         if (munContainer) {
-          munContainer.style.display = 'none';
+          munContainer.style.display      = 'none';
           munContainer.style.pointerEvents = 'none';
-          munContainer.style.opacity = '0.5';
+          munContainer.style.opacity       = '0.5';
         }
         mostrarMensagem('Cupom de gratuidade aplicado. Seleção de municípios adicionais desativada.');
       } else {
         if (munContainer) {
-          munContainer.style.display = 'block';
+          munContainer.style.display      = 'block';
           munContainer.style.pointerEvents = 'auto';
-          munContainer.style.opacity = '1';
+          munContainer.style.opacity       = '1';
         }
       }
       await atualizarPreview();
     } else {
       _cupomAplicado = null;
       if (fb) fb.textContent = '';
-      // Restaura container caso removam o cupom
       const munContainer = document.getElementById('container-municipios-extra');
       if (munContainer && _planoAtual?.features?.max_municipios > 1) {
-        munContainer.style.display = 'block';
+        munContainer.style.display      = 'block';
         munContainer.style.pointerEvents = 'auto';
-        munContainer.style.opacity = '1';
+        munContainer.style.opacity       = '1';
       }
     }
   });
@@ -1113,7 +1145,7 @@ async function initAssinatura() {
   document.getElementById('form-assinatura')?.addEventListener('submit', processarEnvioAssinatura);
 }
 
-// ── Auto-init ──
+// ── Auto-init ──────────────────────────────────────────────────────────────────
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', initAssinatura);
 } else {
