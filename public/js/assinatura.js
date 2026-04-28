@@ -81,12 +81,7 @@ async function configurarUIMunicipiosExtra() {
     gridEl.innerHTML = '<div style="padding:8px;color:#666;font-size:12px;">Carregando...</div>';
     try {
       const snap = await db.collection('UF').doc(ufId.trim().toUpperCase()).collection('Municipio').get();
-      // DEBUG — remover depois
-console.log('[DEBUG] Total docs:', snap.docs.length);
-if (snap.docs.length > 0) {
-  console.log('[DEBUG] Primeiro doc id:', snap.docs[0].id);
-  console.log('[DEBUG] Primeiro doc data:', JSON.stringify(snap.docs[0].data()));
-}
+
       _municipiosDisponiveis = snap.docs.map(d => {
         const data = d.data();
         // Ajuste o campo 'nome_municipio' conforme identificado no debug
@@ -108,6 +103,10 @@ if (snap.docs.length > 0) {
   }
 
   const renderGrid = () => {
+      // DEBUG — remover depois
+  console.log('[DEBUG renderGrid] _municipiosDisponiveis:', _municipiosDisponiveis.slice(0,2));
+  console.log('[DEBUG renderGrid] _planoAtual features:', _planoAtual?.features?.max_municipios);
+
     const maxExtras = Math.max(0, (_planoAtual?.features?.max_municipios || 1) - 1);
     if (maxExtras <= 0) {
       gridEl.innerHTML = '<div style="padding:8px;color:#666;font-size:12px;grid-column:1/-1;">Este plano não permite extras.</div>';
@@ -127,6 +126,11 @@ if (snap.docs.length > 0) {
     } else if (_municipiosDisponiveis.length === 0) {
       gridEl.innerHTML = '';
     } else {
+      // DEBUG — remover depois
+    console.log('[DEBUG renderGrid] lista[0]:', lista[0]);
+    console.log('[DEBUG renderGrid] HTML gerado:', lista.slice(0,1).map(m => 
+      `nome=[${m.nome}] cod=[${m.cod_municipio}]`
+    ));
       gridEl.style.cssText = 'display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:4px 8px;';
       gridEl.innerHTML = lista.map(m => `
         <label style="display:flex;align-items:center;gap:6px;padding:4px 6px;cursor:pointer;
