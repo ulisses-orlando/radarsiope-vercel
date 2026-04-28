@@ -93,7 +93,6 @@ async function configurarUIMunicipiosExtra() {
           uf: data.uf || ufId
         };
       });
-        console.log('[DEBUG Municipio] Primeiros itens mapeados:', _municipiosDisponiveis.slice(0, 3));
 
       renderGrid();
     } catch(e) {
@@ -762,9 +761,18 @@ async function registrarAssinatura(userId, payload, preview) {
   renovacao.setMonth(renovacao.getMonth() + cicloMeses);
 
   const principalCod = payload.cod_municipio || null;
-  const extras = Array.isArray(payload.municipiosExtras) ? payload.municipiosExtras : [];
-  // O primeiro elemento é sempre o município principal do assinante
-  const municipiosPlano = principalCod ? [principalCod, ...extras.filter(e => e !== principalCod)] : [];
+  const extrasObjs   = Array.isArray(payload.municipiosExtras) ? payload.municipiosExtras : [];
+  const municipiosPlano = principalCod
+    ? [
+        {
+          cod_municipio: principalCod,
+          nome:          payload.nome_municipio || principalCod,
+          uf:            payload.cod_uf         || '',
+        },
+        // extras já vêm como objetos; filtra caso o principal tenha sido marcado também
+        ...extrasObjs.filter(e => e.cod_municipio !== principalCod),
+      ]
+    : [];
 
   const data = {
     planId: payload.planId || null, plano_slug: payload.plano_slug || null, plano_nome: payload.plano_nome || null,
@@ -930,9 +938,24 @@ async function processarEnvioAssinatura(e) {
       plano_slug: _planoAtual.plano_slug, ciclo, features: _planoAtual.features || null,
     });
     const assinaturaId = await registrarAssinatura(userId, {
-      planId: _planoAtual.id, plano_slug: _planoAtual.plano_slug || null, plano_nome: _planoAtual.nome || null,
-      tipos_selecionados: tiposSelecionados, cupom: cupomCod || null, features: _planoAtual.features || null,
-      cod_municipio: dadosUf?.cod_municipio, municipiosExtras: _municipiosExtrasSelecionados
+      planId:            _planoAtual.id,
+      plano_slug:        _planoAtual.plano_slug  || null,
+      plano_nome:        _planoAtual.nome         || null,
+      tipos_selecionados: tiposSelecionados,
+      cupom:             cupomCod                 || null,
+      features:          _planoAtual.features     || null,
+      cod_uf:            dadosUf?.cod_uf          || '',
+      cod_municipio:     dadosUf?.cod_municipio   || null,
+      nome_municipio:    dadosUf?.nome_municipio  || '',
+      // Extras: array de objetos com nome/uf vindos de _municipiosDisponiveis
+      municipiosExtras: _municipiosExtrasSelecionados.map(cod => {
+        const det = _municipiosDisponiveis.find(m => m.cod_municipio === cod);
+        return {
+          cod_municipio: cod,
+          nome:          det?.nome || cod,
+          uf:            det?.uf   || dadosUf?.cod_uf || '',
+        };
+      }),
     }, preview);
 
     setStatus(isGratuidade ? 'Ativando gratuidade...' : 'Iniciando pagamento...', '#555');
