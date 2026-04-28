@@ -122,11 +122,15 @@ async function configurarUIMunicipiosExtra() {
     } else if (_municipiosDisponiveis.length === 0) {
       gridEl.innerHTML = '';
     } else {
-      // 🔹 GERAÇÃO LIMPA (NOME GARANTIDO)
+      gridEl.style.cssText = 'display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:4px 8px;';
       gridEl.innerHTML = lista.map(m => `
-        <label style="color:#1e293b !important;">
-          <input type="checkbox" value="${m.cod_municipio}" ${_municipiosExtrasSelecionados.includes(m.cod_municipio) ? 'checked' : ''}>
-          <span style="color:#1e293b !important;">${m.nome || m.cod_municipio}</span>
+        <label style="display:flex;align-items:center;gap:6px;padding:4px 6px;cursor:pointer;
+                      border-radius:6px;background:#f8fafc;border:1px solid #e2e8f0;">
+          <input type="checkbox" value="${m.cod_municipio}"
+            ${_municipiosExtrasSelecionados.includes(m.cod_municipio) ? 'checked' : ''}>
+          <span style="font-size:12px;color:#1e293b;line-height:1.3;">
+            ${m.nome || m.cod_municipio}${m.uf ? ` - ${m.uf}` : ''}
+          </span>
         </label>
       `).join('');
     }
