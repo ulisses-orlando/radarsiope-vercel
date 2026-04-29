@@ -121,17 +121,23 @@ async function configurarUIMunicipiosExtra() {
     if (e.target.type !== 'checkbox') return;
     const maxExtras = Math.max(0, (_planoAtual?.features?.max_municipios || 1) - 1);
     const val = e.target.value;
+
     if (e.target.checked) {
       if (_municipiosExtrasSelecionados.length >= maxExtras) {
-        e.target.checked = false;
-        mostrarMensagem(`Limite de ${maxExtras} município(s) atingido.`);
+        e.target.checked = false; // Desmarca visualmente para evitar confusão
+        mostrarMensagem(`Limite atingido: você só pode selecionar até ${maxExtras} município(s) adicional(is).`);
         return;
       }
-      _municipiosExtrasSelecionados.push(val);
+      // Evita duplicatas no array
+      if (!_municipiosExtrasSelecionados.includes(val)) {
+        _municipiosExtrasSelecionados.push(val);
+      }
     } else {
       _municipiosExtrasSelecionados = _municipiosExtrasSelecionados.filter(v => v !== val);
     }
-    infoEl.textContent = `Selecionados: ${_municipiosExtrasSelecionados.length} / ${maxExtras}`;
+
+    // ✅ Contador e UI atualizados em um único lugar (garante sincronia)
+    renderGrid(buscaEl.value);
   });
 
   // 🔹 OBSERVA O SELECT #municipio PARA ATUALIZAR A GRID INSTANTANEAMENTE
