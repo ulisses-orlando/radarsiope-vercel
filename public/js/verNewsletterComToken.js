@@ -18,6 +18,8 @@ let dadosMunicipioAtual = {
 };
 // ─── Contexto dinâmico para o Chat (evita referência a edição antiga) ─────
 window._chatContext = { nid: null, uid: null, edicaoNum: null };
+// ─── Município ativo no seletor multi-município ────────────────────────────
+let _municipioAtivo = null; // { _uid, cod_municipio, nome_municipio, cod_uf }
 
 // ─── Parâmetros da URL ────────────────────────────────────────────────────────
 // ─── Buscar config pública via API (variáveis de ambiente) ──────────────────
@@ -355,14 +357,41 @@ async function renderModoCompleto(newsletter, dados, segmento, acesso) {
 
 async function renderMunicipio(destinatario, acesso, newsletter) {
   const container = document.getElementById('municipio-conteudo');
-  const titulo = document.getElementById('municipio-titulo');
-  const nome = destinatario.nome_municipio || '';
-  const uf = destinatario.cod_uf || '';
-  const cod = destinatario.cod_municipio || null;
+  const titulo    = document.getElementById('municipio-titulo');
 
-  if (titulo && nome) titulo.textContent = `${nome}/${uf}`;
+  // ── Lê municipios_plano da sessão ────────────────────────────────────────
+  let municipiosPlano = [];
+  try {
+    const sess = JSON.parse(localStorage.getItem('rs_pwa_session') || '{}');
+    municipiosPlano = sess.municipios_plano || [];
+  } catch (_) {}
 
-  // Aguarda SupabaseMunicipio estar pronto (carrega após o JS principal)
+  const temMultiplos = acesso.isAssinante && municipiosPlano.length > 1;
+
+  // Inicializa _municipioAtivo apenas na primeira chamada ou ao trocar de assinante
+  if (!_municipioAtivo || _municipioAtivo._uid !== destinatario._uid) {
+    _municipioAtivo = {
+      _uid:           destinatario._uid,
+      cod_municipio:  destinatario.cod_municipio  || null,
+      nome_municipio: destinatario.nome_municipio || '',
+      cod_uf:         destinatario.cod_uf         || '',
+    };
+  }
+
+  const cod  = _municipioAtivo.cod_municipio;
+  const nome = _municipioAtivo.nome_municipio;
+  const uf   = _municipioAtivo.cod_uf;
+
+  // ── Título ou seletor (ocupa o mesmo espaço) ──────────────────────────────
+  if (titulo) {
+    if (temMultiplos) {
+      _renderSeletorMunicipio(titulo, municipiosPlano, destinatario, acesso, newsletter);
+    } else {
+      titulo.textContent = nome ? `${nome}/${uf}` : '';
+    }
+  }
+
+  // ── Aguarda módulo Supabase ───────────────────────────────────────────────
   await new Promise(resolve => {
     if (window.SupabaseMunicipio) return resolve();
     let n = 0;
@@ -374,8 +403,6 @@ async function renderMunicipio(destinatario, acesso, newsletter) {
   const SM = window.SupabaseMunicipio;
   if (!SM || !container) return;
 
-  // Sempre esconde o botão de histórico antes de buscar — evita herdar estado
-  // de edição anterior caso esta não tenha dados de município
   const btn = document.getElementById('btn-toggle-historico');
   if (btn) btn.style.display = 'none';
 
@@ -386,23 +413,104 @@ async function renderMunicipio(destinatario, acesso, newsletter) {
     SM.renderSecaoMunicipio({ container, blur: acesso.blurMunicipio, resumo, nomeMunicipio: nome, uf });
 
     if (resumo && cod && (acesso.isAssinante || acesso.acessoProTemp)) {
-      dadosMunicipioAtual = {
-        cod_municipio: cod,
-        nome: nome,
-        uf: uf,
-        vitrine: newsletter?.vitrine || null
-      };
+      dadosMunicipioAtual = { cod_municipio: cod, nome, uf, vitrine: newsletter?.vitrine || null };
       if (btn) btn.style.display = 'block';
     } else {
-      // Sem dados — garante que dadosMunicipioAtual não fica com valores antigos
       dadosMunicipioAtual = { cod_municipio: null, nome: null, uf: null };
     }
-
   } catch (err) {
     console.warn('[verNL] Município falhou (não fatal):', err);
     container.innerHTML = '';
     if (btn) btn.style.display = 'none';
   }
+}
+
+// ─── Seletor inline de município (multi-município) ───────────────────────────
+function _renderSeletorMunicipio(tituloEl, municipiosPlano, destinatario, acesso, newsletter) {
+  // municipiosPlano já é array de objetos: [{ cod_municipio, nome, uf }]
+  // Garante retrocompatibilidade se ainda vier como array de strings
+  const detalhes = municipiosPlano.map(m =>
+    typeof m === 'object' ? m : { cod_municipio: String(m), nome: String(m), uf: '' }
+  );
+
+  const ativo = _municipioAtivo.cod_municipio;
+
+  tituloEl.innerHTML = `
+    <select id="rs-seletor-municipio" style="
+      background: transparent;
+      border: none;
+      border-bottom: 1px dashed currentColor;
+      color: inherit;
+      font: inherit;
+      font-weight: inherit;
+      cursor: pointer;
+      padding: 0 18px 0 0;
+      appearance: none; -webkit-appearance: none;
+      background-image: url('data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%2210%22 height=%226%22 viewBox=%220 0 10 6%22><path d=%22M1 1l4 4 4-4%22 stroke=%22currentColor%22 stroke-width=%221.5%22 fill=%22none%22 stroke-linecap=%22round%22/></svg>');
+      background-repeat: no-repeat;
+      background-position: right 2px center;
+      max-width: 100%;
+      outline: none;
+    ">
+      ${detalhes.map(m => `
+        <option value="${_esc(m.cod_municipio)}" ${m.cod_municipio === ativo ? 'selected' : ''}>
+          ${_esc(m.nome)}${m.uf ? `/${_esc(m.uf)}` : ''}
+        </option>
+      `).join('')}
+    </select>`;
+
+  document.getElementById('rs-seletor-municipio')?.addEventListener('change', async (e) => {
+    const novoCod = e.target.value;
+    const novo    = detalhes.find(m => m.cod_municipio === novoCod);
+    if (!novo) return;
+
+    _municipioAtivo = {
+      _uid:           destinatario._uid,
+      cod_municipio:  novo.cod_municipio,
+      nome_municipio: novo.nome,
+      cod_uf:         novo.uf || '',
+    };
+
+    const container   = document.getElementById('municipio-conteudo');
+    const btn         = document.getElementById('btn-toggle-historico');
+    const resumoEl    = document.getElementById('municipio-resumo');
+    const historicoEl = document.getElementById('municipio-historico');
+    const SM          = window.SupabaseMunicipio;
+    if (!SM || !container) return;
+
+    // Volta ao resumo se estava no histórico
+    if (resumoEl)     resumoEl.style.display    = 'block';
+    if (historicoEl)  historicoEl.style.display = 'none';
+    if (btn) { btn.style.display = 'none'; btn.innerHTML = '📈 Ver série histórica completa'; }
+
+    SM.renderSkeleton(container);
+
+    try {
+      const resumo = await SM.getResumoMunicipio(novo.cod_municipio);
+      SM.renderSecaoMunicipio({
+        container,
+        blur:          acesso.blurMunicipio,
+        resumo,
+        nomeMunicipio: novo.nome,
+        uf:            novo.uf || '',
+      });
+
+      if (resumo && (acesso.isAssinante || acesso.acessoProTemp)) {
+        dadosMunicipioAtual = {
+          cod_municipio: novo.cod_municipio,
+          nome:          novo.nome,
+          uf:            novo.uf || '',
+          vitrine:       newsletter?.vitrine || null,
+        };
+        if (btn) btn.style.display = 'block';
+      } else {
+        dadosMunicipioAtual = { cod_municipio: null, nome: null, uf: null };
+      }
+    } catch (err) {
+      console.warn('[verNL] Erro ao trocar município:', err);
+      container.innerHTML = '';
+    }
+  });
 }
 
 // ─── MODAL DE MÍDIA INTERNA (Vídeo / Infográfico) ─────────────────────────
@@ -1249,6 +1357,7 @@ async function _executarAtivacaoSessao(token, uid) {
         cod_municipio:  data.cod_municipio,
         nome_municipio: data.nome_municipio,
         perfil:         data.perfil,
+        municipios_plano: data.municipios_plano || [],
         validado_em:    Date.now(),
       }));
     } catch (e) { /* ignora se localStorage bloqueado */ }
