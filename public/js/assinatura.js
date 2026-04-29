@@ -97,16 +97,27 @@ async function configurarUIMunicipiosExtra() {
     }
   });
 
-  // ── Atualiza label do trigger ────────────────────────────────────────────────
-  function _atualizarTrigger() {
-    const maxExtras = Math.max(0, (_planoAtual?.features?.max_municipios || 1) - 1);
-    const n = _municipiosExtrasSelecionados.length;
-    // Atualiza só o texto (primeiro filho text node)
-    triggerEl.childNodes[0].textContent = n === 0
-      ? 'Nenhum município adicional selecionado'
-      : `${n} município(s) adicional(is) selecionado(s)`;
+// ── Atualiza label do trigger ────────────────────────────────────────────────
+function _atualizarTrigger() {
+  const maxExtras = Math.max(0, (_planoAtual?.features?.max_municipios || 1) - 1);
+  const n = _municipiosExtrasSelecionados.length;
+
+  // 1. Atualiza texto do botão
+  triggerEl.childNodes[0].textContent = n === 0
+    ? 'Nenhum município adicional selecionado'
+    : `${n} município(s) adicional(is) selecionado(s)`;
+
+  // 2. Atualiza info de limite + mensagem de alerta quando atinge o teto
+  if (maxExtras > 0 && n >= maxExtras) {
+    infoEl.textContent = `⚠️ Limite atingido: ${n} / ${maxExtras}`;
+    infoEl.style.color = '#dc2626';
+    infoEl.style.fontWeight = '600';
+  } else {
     infoEl.textContent = `Selecionados: ${n} / ${maxExtras}`;
+    infoEl.style.color = '#64748b';
+    infoEl.style.fontWeight = 'normal';
   }
+}
 
   // ── Carrega municípios do Firestore por UF ───────────────────────────────────
   async function carregarMunicipiosPorUF(ufId) {
@@ -195,20 +206,30 @@ async function configurarUIMunicipiosExtra() {
       if (!row) return;
       const cod = row.dataset.cod;
       const cb  = row.querySelector('input[type="checkbox"]');
+
+      // Se o checkbox já está desabilitado (limite visual atingido), mostra aviso e sai
       if (cb?.disabled) {
-        mostrarMensagem(`Limite de ${maxExtras} município(s) adicional(is) atingido.`);
+        mostrarMensagem(`⚠️ Limite de ${maxExtras} município(s) adicional(is) atingido.`);
         return;
       }
+
       const idx = _municipiosExtrasSelecionados.indexOf(cod);
       if (idx >= 0) {
+        // Desmarcar: remove do array
         _municipiosExtrasSelecionados.splice(idx, 1);
       } else {
+        // Marcar: verifica limite rígido antes de adicionar
         if (_municipiosExtrasSelecionados.length >= maxExtras) {
-          mostrarMensagem(`Limite de ${maxExtras} município(s) adicional(is) atingido.`);
+          mostrarMensagem(`⚠️ Limite de ${maxExtras} município(s) adicional(is) atingido.`);
+          // Atualiza UI para refletir o bloqueio imediato
+          _atualizarTrigger();
+          renderGrid(buscaEl.value);
           return;
         }
         _municipiosExtrasSelecionados.push(cod);
       }
+
+      // Atualiza contador e re-renderiza a lista com novos estados
       _atualizarTrigger();
       renderGrid(buscaEl.value);
     };
