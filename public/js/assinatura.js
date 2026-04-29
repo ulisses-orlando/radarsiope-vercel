@@ -140,58 +140,80 @@ async function configurarUIMunicipiosExtra() {
   }
 
   // ── Renderiza lista do painel ────────────────────────────────────────────────
-  // 🔹 BLOCO UNIFICADO: renderização + validação de limite + contador sincronizado
   const renderGrid = (termo = '') => {
     const maxExtras = Math.max(0, (_planoAtual?.features?.max_municipios || 1) - 1);
-    const principal = document.getElementById('municipio')?.value || null;
-    const filtro = termo.toLowerCase();
 
-    // Filtra o município principal e aplica busca
-    const lista = _municipiosDisponiveis.filter(m =>
+    if (maxExtras <= 0) {
+      listaEl.innerHTML = '<div style="padding:10px 12px;font-size:12px;color:#64748b;">Este plano não permite municípios adicionais.</div>';
+      _municipiosExtrasSelecionados = [];
+      return;
+    }
+
+    const principal = document.getElementById('municipio')?.value || null;
+    const filtro    = termo.toLowerCase();
+    const lista     = _municipiosDisponiveis.filter(m =>
       m.cod_municipio !== principal &&
-      ((m.nome || '').toLowerCase().includes(filtro) || (m.cod_municipio || '').includes(filtro))
+      (!filtro || m.nome.toLowerCase().includes(filtro) || m.cod_municipio.includes(filtro))
     );
 
     if (_municipiosDisponiveis.length === 0) {
-      gridEl.innerHTML = '';
-    } else if (lista.length === 0) {
-      gridEl.innerHTML = '<div style="padding:8px;color:#666;font-size:12px;">Nenhum município disponível.</div>';
-    } else {
-      // ✅ SEM campo UF na listagem, apenas nome
-      gridEl.innerHTML = lista.map(m => `
-        <label style="display:flex;align-items:center;gap:6px;font-size:12px;padding:4px 0;cursor:pointer;">
-          <input type="checkbox" value="${m.cod_municipio}" ${_municipiosExtrasSelecionados.includes(m.cod_municipio) ? 'checked' : ''}>
-          <span>${m.nome || m.cod_municipio}</span>
-        </label>
-      `).join('');
+      listaEl.innerHTML = '';
+      return;
     }
-    // ✅ Contador atualizado em UM ÚNICO LUGAR (evita dessincronização)
-    infoEl.textContent = `Selecionados: ${_municipiosExtrasSelecionados.length} / ${maxExtras}`;
-  };
+    if (lista.length === 0) {
+      listaEl.innerHTML = '<div style="padding:10px 12px;font-size:12px;color:#64748b;">Nenhum resultado.</div>';
+      return;
+    }
 
-  // ✅ Listener único para validar limite, evitar duplicatas e atualizar UI
-  gridEl.addEventListener('change', (e) => {
-    if (e.target.type !== 'checkbox') return;
-    const maxExtras = Math.max(0, (_planoAtual?.features?.max_municipios || 1) - 1);
-    const val = e.target.value;
+    listaEl.innerHTML = lista.map(m => {
+      const selecionado = _municipiosExtrasSelecionados.includes(m.cod_municipio);
+      const limitingindo = !selecionado && _municipiosExtrasSelecionados.length >= maxExtras;
+      return `
+        <div data-cod="${m.cod_municipio}" style="
+          display:flex;align-items:center;gap:10px;
+          padding:8px 12px;cursor:${limitingindo ? 'not-allowed' : 'pointer'};
+          background:${selecionado ? '#eff6ff' : '#ffffff'};
+          opacity:${limitingindo ? '0.45' : '1'};
+          border-bottom:1px solid #f1f5f9;
+          user-select:none;">
+          <input type="checkbox"
+            ${selecionado ? 'checked' : ''}
+            ${limitingindo ? 'disabled' : ''}
+            style="width:15px;height:15px;flex-shrink:0;accent-color:#0A3D62;cursor:pointer;"
+            onclick="event.stopPropagation()">
+          <span style="font-size:13px;color:#1e293b;font-family:inherit;line-height:1.4;">
+            ${m.nome}
+            <span style="font-size:11px;color:#64748b;">— ${m.uf}</span>
+          </span>
+        </div>`;
+    }).join('');
 
-    if (e.target.checked) {
-      // Evita que o mesmo código entre duas vezes no array (quebraria o contador)
-      if (_municipiosExtrasSelecionados.includes(val)) return;
-      
-      if (_municipiosExtrasSelecionados.length >= maxExtras) {
-        e.target.checked = false; // Desmarca visualmente
+    // Delegação de eventos — um único listener na lista
+    listaEl._handler && listaEl.removeEventListener('click', listaEl._handler);
+    listaEl._handler = (e) => {
+      const row = e.target.closest('[data-cod]');
+      if (!row) return;
+      const cod = row.dataset.cod;
+      const cb  = row.querySelector('input[type="checkbox"]');
+      if (cb?.disabled) {
         mostrarMensagem(`Limite de ${maxExtras} município(s) adicional(is) atingido.`);
         return;
       }
-      _municipiosExtrasSelecionados.push(val);
-    } else {
-      _municipiosExtrasSelecionados = _municipiosExtrasSelecionados.filter(v => v !== val);
-    }
-
-    // Chama renderGrid para atualizar checkboxes visuais + contador no rodapé
-    renderGrid(buscaEl.value);
-  });
+      const idx = _municipiosExtrasSelecionados.indexOf(cod);
+      if (idx >= 0) {
+        _municipiosExtrasSelecionados.splice(idx, 1);
+      } else {
+        if (_municipiosExtrasSelecionados.length >= maxExtras) {
+          mostrarMensagem(`Limite de ${maxExtras} município(s) adicional(is) atingido.`);
+          return;
+        }
+        _municipiosExtrasSelecionados.push(cod);
+      }
+      _atualizarTrigger();
+      renderGrid(buscaEl.value);
+    };
+    listaEl.addEventListener('click', listaEl._handler);
+  };
 
   // Busca em tempo real
   buscaEl.addEventListener('input', (e) => renderGrid(e.target.value));
