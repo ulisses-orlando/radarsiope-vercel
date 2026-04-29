@@ -183,7 +183,7 @@ async function configurarUIMunicipiosExtra() {
             onclick="event.stopPropagation()">
           <span style="font-size:13px;color:#1e293b;font-family:inherit;line-height:1.4;">
             ${m.nome}
-            <span style="font-size:11px;color:#64748b;">— ${m.uf}</span>
+            <span style="font-size:11px;color:#64748b;"></span>
           </span>
         </div>`;
     }).join('');
