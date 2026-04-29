@@ -30,6 +30,9 @@ let _municipiosDisponiveis        = [];
 let _municipiosExtrasSelecionados = [];
 let _ufAtual                      = null;
 
+// Normaliza código IBGE para 6 dígitos (Firestore tem 7, Supabase usa 6)
+const cod6 = (c) => String(c || '').replace(/\D/g, '').slice(0, 6);
+
 // ─── UI de municípios adicionais (dropdown com busca) ─────────────────────────
 async function configurarUIMunicipiosExtra() {
   // Garante container
@@ -124,7 +127,7 @@ async function configurarUIMunicipiosExtra() {
         const data = d.data();
         const nome = data.nome_municipio || data.nome || data.municipio || data.nomeMunicipio || '';
         return {
-          cod_municipio: String(data.cod_municipio || data.codigo || d.id),
+          cod_municipio: cod6(data.cod_municipio || data.codigo || d.id),
           nome: String(nome).trim() || `Município ${d.id}`,
           uf: data.uf || ufId,
         };
@@ -791,7 +794,8 @@ async function upsertUsuario(dados) {
     whatsapp_optin_em: whatsapp ? firebase.firestore.FieldValue.serverTimestamp() : null,
     tipo_perfil: perfil || null, ativo: false, mensagem: mensagem || null,
     preferencia_contato: preferencia || null,
-    cod_uf: cod_uf || null, cod_municipio: cod_municipio || null, nome_municipio: nome_municipio || null,
+    cod_uf: cod_uf || null, cod_municipio: cod6(cod_municipio) || null, 
+    nome_municipio: nome_municipio || null,
     origem: _origem, updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
   };
 
@@ -821,10 +825,13 @@ async function registrarAssinatura(userId, payload, preview) {
 
   const principalCod = payload.cod_municipio || null;
   const extrasObjs   = Array.isArray(payload.municipiosExtras) ? payload.municipiosExtras : [];
-  const municipiosPlano = principalCod
+  const principalCod6 = cod6(payload.cod_municipio);
+  const municipiosPlano = principalCod6
     ? [
-        { cod_municipio: principalCod, nome: payload.nome_municipio || principalCod, uf: payload.cod_uf || '' },
-        ...extrasObjs.filter(e => e.cod_municipio !== principalCod),
+        { cod_municipio: principalCod6, nome: payload.nome_municipio || principalCod6, uf: payload.cod_uf || '' },
+        ...extrasObjs
+            .map(e => ({ ...e, cod_municipio: cod6(e.cod_municipio) }))
+            .filter(e => e.cod_municipio !== principalCod6),
       ]
     : [];
 
