@@ -50,14 +50,10 @@ async function configurarUIMunicipiosExtra() {
       Selecione seu estado acima para liberar a escolha.
     </div>
     <div id="municipios-dropdown-wrap" style="position:relative;width:100%;">
-      <button type="button" id="municipios-trigger" style="
-        width:100%;text-align:left;padding:9px 32px 9px 12px;
-        border:1px solid #cbd5e1;border-radius:8px;background:#ffffff;
-        font-size:13px;color:#1e293b;cursor:pointer;position:relative;
-        font-family:inherit;">
-        Nenhum município adicional selecionado
+      <button type="button" id="municipios-trigger" ...>
+        <span id="municipios-trigger-label">Nenhum município adicional selecionado</span>
         <span style="position:absolute;right:10px;top:50%;transform:translateY(-50%);
-                     font-size:10px;color:#64748b;pointer-events:none;">▼</span>
+                    font-size:10px;color:#64748b;pointer-events:none;">▼</span>
       </button>
       <div id="municipios-panel" style="
         display:none;position:absolute;top:calc(100% + 4px);left:0;right:0;z-index:9999;
@@ -101,10 +97,12 @@ async function configurarUIMunicipiosExtra() {
   function _atualizarTrigger() {
     const maxExtras = Math.max(0, (_planoAtual?.features?.max_municipios || 1) - 1);
     const n = _municipiosExtrasSelecionados.length;
-    // Atualiza só o texto (primeiro filho text node)
-    triggerEl.childNodes[0].textContent = n === 0
-      ? 'Nenhum município adicional selecionado'
-      : `${n} município(s) adicional(is) selecionado(s)`;
+    const labelEl = document.getElementById('municipios-trigger-label');
+    if (labelEl) {
+      labelEl.textContent = n === 0
+        ? 'Nenhum município adicional selecionado'
+        : `${n} município(s) adicional(is) selecionado(s)`;
+    }
     infoEl.textContent = `Selecionados: ${n} / ${maxExtras}`;
   }
 
@@ -149,10 +147,10 @@ async function configurarUIMunicipiosExtra() {
       return;
     }
 
-    const principal = document.getElementById('municipio')?.value || null;
+    const principal = String(document.getElementById('municipio')?.value || '').trim() || null;
     const filtro    = termo.toLowerCase();
-    const lista     = _municipiosDisponiveis.filter(m =>
-      m.cod_municipio !== principal &&
+    const lista = _municipiosDisponiveis.filter(m =>
+      String(m.cod_municipio).trim() !== principal &&
       (!filtro || m.nome.toLowerCase().includes(filtro) || m.cod_municipio.includes(filtro))
     );
 
@@ -178,9 +176,8 @@ async function configurarUIMunicipiosExtra() {
           user-select:none;">
           <input type="checkbox"
             ${selecionado ? 'checked' : ''}
-            ${limitingindo ? 'disabled' : ''}
-            style="width:15px;height:15px;flex-shrink:0;accent-color:#0A3D62;cursor:pointer;"
-            onclick="event.stopPropagation()">
+            style="width:15px;height:15px;flex-shrink:0;accent-color:#0A3D62;
+                  cursor:${limitingindo ? 'not-allowed' : 'pointer'};pointer-events:none;">
           <span style="font-size:13px;color:#1e293b;font-family:inherit;line-height:1.4;">
             ${m.nome}
             <span style="font-size:11px;color:#64748b;">— ${m.uf}</span>
