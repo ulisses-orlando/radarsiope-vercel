@@ -377,7 +377,7 @@
           hour: '2-digit', minute: '2-digit'
         })
       : '—';
-    const titulo = alerta.titulo || '—';
+    const titulo = alerta.titulo || alerta.canal || '—';
     const corpo  = alerta.corpo  || alerta.mensagem || '';
     const dot    = !jaLido ? '<div class="rs-alerta-novo-dot"></div>' : '';
     const cls    = !jaLido ? 'rs-alerta-card rs-nao-lido' : 'rs-alerta-card';
