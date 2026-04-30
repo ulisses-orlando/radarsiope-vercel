@@ -1430,23 +1430,6 @@ async function _tentarModoAlerta() {
           const assinaturaData = assinaturaSnap.data();
           destinatario.features  = assinaturaData.features_snapshot || assinaturaData.features || destinatario.features || {};
           destinatario.plano_slug = assinaturaData.plano_slug || destinatario.plano_slug || null;
-
-          // ── Verifica status antes de abrir o app ─────────────────────────────
-          const _status = assinaturaData.status || '';
-          const _BLOQUEADOS = ['pendente_pagamento', 'inativo', 'cancelado', 'suspenso'];
-          if (_BLOQUEADOS.includes(_status)) {
-            const _msgStatus = {
-              pendente_pagamento: 'Seu pagamento está sendo processado. Assim que confirmado, você terá acesso completo.',
-              cancelado:          'Sua assinatura foi cancelada. Entre em contato para reativá-la.',
-              suspenso:           'Sua assinatura está suspensa. Entre em contato com o suporte.',
-              inativo:            'Sua assinatura está inativa. Entre em contato para reativá-la.',
-            };
-            mostrarErro(
-              '<strong>Acesso indisponível.</strong>',
-              _msgStatus[_status] || 'Entre em contato com o suporte.'
-            );
-            return;
-          }
         }
       } catch (e) { /* ignora, continua sem features */ }
     }
@@ -3568,4 +3551,3 @@ window._fecharUpgradePanel = _fecharUpgradePanel;
 
 // ─── Inicia ───────────────────────────────────────────────────────────────────
 VerNewsletterComToken();
-
