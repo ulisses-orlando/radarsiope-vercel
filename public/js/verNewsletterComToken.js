@@ -1408,8 +1408,59 @@ async function _tentarModoAlerta() {
     }
     return;
   }
- 
-  // ── Lead (ou sessão legada sem session_id) → comportamento original ──────
+
+  // ── Assinante sem session_id (sessão mínima pós-cadastro) ─────────────────
+  // Cria sessão no servidor — ele já valida status e retorna mensagem específica.
+  if (sessao.segmento === 'assinante' && sessao.assinaturaId) {
+    try {
+      const _respSessao = await fetch('/api/pagamentoMP?acao=criar-sessao', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ uid: sessao.uid, assinaturaId: sessao.assinaturaId }),
+      });
+
+      if (!_respSessao.ok) {
+        const _errData = await _respSessao.json().catch(() => ({}));
+        // 403 = status bloqueado (pendente_pagamento, inativo, etc.)
+        mostrarErro(
+          '<strong>Acesso indisponível.</strong>',
+          _errData.message || 'Entre em contato com o suporte.'
+        );
+        return;
+      }
+
+      const _sessaoNova = await _respSessao.json();
+      if (_sessaoNova.ok) {
+        const _sessaoCompleta = {
+          uid:              _sessaoNova.uid,
+          assinaturaId:     _sessaoNova.assinaturaId,
+          segmento:         'assinante',
+          session_id:       _sessaoNova.session_id,
+          plano_slug:       _sessaoNova.plano_slug,
+          features:         _sessaoNova.features,
+          municipios_plano: _sessaoNova.municipios_plano || [],
+          nome:             _sessaoNova.nome,
+          email:            _sessaoNova.email,
+          cod_uf:           _sessaoNova.cod_uf,
+          cod_municipio:    _sessaoNova.cod_municipio,
+          nome_municipio:   _sessaoNova.nome_municipio,
+          perfil:           _sessaoNova.perfil,
+          validado_em:      Date.now(),
+        };
+        try { localStorage.setItem('rs_pwa_session', JSON.stringify(_sessaoCompleta)); } catch (e) { /* ignora */ }
+        const ok = await _tentarModoAssinante(_sessaoCompleta);
+        if (!ok) mostrarErro('Erro ao carregar sua área.', 'Tente novamente em instantes.');
+      } else {
+        mostrarErro('<strong>Não foi possível iniciar sua sessão.</strong>', 'Tente novamente em instantes.');
+      }
+    } catch (err) {
+      console.error('[verNL] Erro ao criar sessão (modo alerta):', err);
+      mostrarErro('Erro ao carregar seus dados.', err.message);
+    }
+    return;
+  }
+
+  // ── Lead → comportamento original ─────────────────────────────────────────
   try {
     const userSnap = await db.collection('usuarios').doc(sessao.uid).get();
     if (!userSnap.exists) {
@@ -1419,26 +1470,11 @@ async function _tentarModoAlerta() {
       );
       return;
     }
- 
     const destinatario = { _uid: userSnap.id, ...userSnap.data() };
- 
-    if (sessao.assinaturaId) {
-      try {
-        const assinaturaSnap = await db.collection('usuarios').doc(sessao.uid)
-          .collection('assinaturas').doc(sessao.assinaturaId).get();
-        if (assinaturaSnap.exists) {
-          const assinaturaData = assinaturaSnap.data();
-          destinatario.features  = assinaturaData.features_snapshot || assinaturaData.features || destinatario.features || {};
-          destinatario.plano_slug = assinaturaData.plano_slug || destinatario.plano_slug || null;
-        }
-      } catch (e) { /* ignora, continua sem features */ }
-    }
- 
-    publicarRadarUser(destinatario, sessao.segmento === 'assinante' ? 'assinantes' : 'leads', sessao.assinaturaId);
-    _exibirAppSemEdicao(destinatario, sessao.assinaturaId);
- 
+    publicarRadarUser(destinatario, 'leads', null);
+    _exibirAppSemEdicao(destinatario, null);
   } catch (err) {
-    console.error('[verNL] Erro no modo alerta:', err);
+    console.error('[verNL] Erro no modo alerta (lead):', err);
     mostrarErro('Erro ao carregar seus dados.', err.message);
   }
 }
@@ -1627,11 +1663,9 @@ async function VerNewsletterComToken() {
           if (!_respSessao.ok) {
             const _errData = await _respSessao.json().catch(() => ({}));
             if (_respSessao.status === 403) {
-              // 403 = assinatura inativa → bloqueia acesso
-              mostrarErro(
-                '<strong>Assinatura inativa.</strong>',
-                'Para reativar sua assinatura, entre em contato com o suporte.'
-              );
+              // 403 = assinatura bloqueada → mensagem específica do servidor
+              const _msgErr = _errData.message || 'Para reativar sua assinatura, entre em contato com o suporte.';
+              mostrarErro('<strong>Acesso indisponível.</strong>', _msgErr);
               return;
             }
             // 4xx/5xx inesperado: continua sem sessão (benefício da dúvida)
@@ -1641,19 +1675,20 @@ async function VerNewsletterComToken() {
             if (_sessaoNova.ok) {
               try {
                 localStorage.setItem('rs_pwa_session', JSON.stringify({
-                  uid:            _sessaoNova.uid,
-                  assinaturaId:   _sessaoNova.assinaturaId,
-                  segmento:       'assinante',
-                  session_id:     _sessaoNova.session_id,
-                  plano_slug:     _sessaoNova.plano_slug,
-                  features:       _sessaoNova.features,
-                  nome:           _sessaoNova.nome,
-                  email:          _sessaoNova.email,
-                  cod_uf:         _sessaoNova.cod_uf,
-                  cod_municipio:  _sessaoNova.cod_municipio,
-                  nome_municipio: _sessaoNova.nome_municipio,
-                  perfil:         _sessaoNova.perfil,
-                  validado_em:    Date.now(),
+                  uid:              _sessaoNova.uid,
+                  assinaturaId:     _sessaoNova.assinaturaId,
+                  segmento:         'assinante',
+                  session_id:       _sessaoNova.session_id,
+                  plano_slug:       _sessaoNova.plano_slug,
+                  features:         _sessaoNova.features,
+                  municipios_plano: _sessaoNova.municipios_plano || [],
+                  nome:             _sessaoNova.nome,
+                  email:            _sessaoNova.email,
+                  cod_uf:           _sessaoNova.cod_uf,
+                  cod_municipio:    _sessaoNova.cod_municipio,
+                  nome_municipio:   _sessaoNova.nome_municipio,
+                  perfil:           _sessaoNova.perfil,
+                  validado_em:      Date.now(),
                 }));
               } catch (e) { /* ignora se localStorage bloqueado */ }
             }
@@ -3551,3 +3586,4 @@ window._fecharUpgradePanel = _fecharUpgradePanel;
 
 // ─── Inicia ───────────────────────────────────────────────────────────────────
 VerNewsletterComToken();
+
