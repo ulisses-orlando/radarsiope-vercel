@@ -385,11 +385,11 @@
     return `
       <div class="${cls}" data-id="${alerta.id}">
         <div class="rs-alerta-card-topo">
-          <span class="rs-alerta-tipo">${tipo}</span>
+          <span class="rs-alerta-titulo">${titulo}</span>
           <span class="rs-alerta-data">${data}</span>
           ${dot}
         </div>
-        <div class="rs-alerta-titulo">${titulo}</div>
+        
         ${corpo ? `<div class="rs-alerta-corpo">${corpo}</div>` : ''}
       </div>`;
   }
