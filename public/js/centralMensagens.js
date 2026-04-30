@@ -378,7 +378,7 @@
         })
       : '—';
     const titulo = alerta.titulo || '—';
-    const corpo  = alerta.corpo  || '';
+    const corpo  = alerta.corpo  || alerta.mensagem || '';
     const dot    = !jaLido ? '<div class="rs-alerta-novo-dot"></div>' : '';
     const cls    = !jaLido ? 'rs-alerta-card rs-nao-lido' : 'rs-alerta-card';
  
