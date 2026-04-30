@@ -182,70 +182,41 @@
       const { uid, assinaturaId, segmento } = sessao;
 
       try {
-        let envio = null;
-        let nid = null;
-        let env = null;
-        let token = null;
+        // ── Assinante → delega inteiramente ao verNewsletterComToken ─────────────
+        // Toda a lógica de sessão, plano e acesso fica em verNewsletterComToken.js:
+        //   • com session_id  → _tentarModoAssinante (carrega edição mais recente)
+        //   • sem session_id  → _tentarModoAlerta    (legacy / verifica status)
+        //   • pendente_pagamento / inativo → exibe mensagem adequada
+        // Não depende mais de documentos em envios/.
+        if (segmento === 'assinante') {
+          window.location.replace('/verNewsletterComToken.html');
+          return;
+        }
 
-        if (segmento === 'assinante' && assinaturaId) {
-          // ── Assinante → Firestore ─────────────────────────────────────────────
-          atualizarMsg('Buscando sua edição mais recente…');
-          const snap = await window.db
-            .collection('usuarios').doc(uid)
-            .collection('assinaturas').doc(assinaturaId)
-            .collection('envios')
-            .orderBy('data_envio', 'desc')
-            .limit(1)
-            .get();
+        // ── Lead → Supabase ───────────────────────────────────────────────────
+        atualizarMsg('Buscando sua edição mais recente…');
+        const { data, error } = await window.supabase
+          .from('leads_envios')
+          .select('*')
+          .eq('lead_id', uid)
+          .order('data_envio', { ascending: false })
+          .limit(1)
+          .maybeSingle();
 
-          if (snap.empty) {
-            mostrarErro(
-              '<strong>Nenhuma edição disponível ainda.</strong><br>Você receberá por e-mail assim que uma edição for publicada.',
-              '<a href="/login.html" class="btn-outline">Área do assinante</a>'
-            );
-            return;
-          }
-
-          const doc = snap.docs[0];
-          envio = doc.data();
-          env = doc.id;
-          nid = envio.newsletter_id || envio.nid;
-          token = envio.token_acesso;
-
-        } else {
-          // ── Lead → Supabase ───────────────────────────────────────────────────
-          atualizarMsg('Buscando sua edição mais recente…');
-          const { data, error } = await window.supabase
-            .from('leads_envios')
-            .select('*')
-            .eq('lead_id', uid)
-            .order('data_envio', { ascending: false })
-            .limit(1)
-            .maybeSingle();
-
-          if (error || !data) {
-            mostrarErro(
-              '<strong>Nenhuma edição disponível.</strong><br>Acesse pelo link enviado por e-mail.',
-              '<a href="/login.html" class="btn-outline">Fazer login</a>'
-            );
-            return;
-          }
-
-          envio = data;
-          env = String(data.id);
-          nid = data.newsletter_id || data.nid;
-          token = data.token_acesso;
+        if (error || !data) {
+          mostrarErro(
+            '<strong>Nenhuma edição disponível.</strong><br>Acesse pelo link enviado por e-mail.',
+            '<a href="/login.html" class="btn-outline">Fazer login</a>'
+          );
+          return;
         }
 
         // ── 3. Verificar expiração ────────────────────────────────────────────
-        const expiraEm = envio.expira_em
-          ? (envio.expira_em.toDate ? envio.expira_em.toDate() : new Date(envio.expira_em))
-          : null;
-
+        const expiraEm = data.expira_em ? new Date(data.expira_em) : null;
         if (expiraEm && new Date() > expiraEm) {
           mostrarErro(
-            '<strong>Seu acesso a esta edição expirou.</strong><br>Acesse pelo último link recebido por e-mail ou entre na sua área.',
-            `<a href="/login.html" class="btn">Acessar minha área</a>`
+            '<strong>Seu acesso a esta edição expirou.</strong><br>Acesse pelo último link recebido por e-mail.',
+            '<a href="/login.html" class="btn">Fazer login</a>'
           );
           return;
         }
@@ -253,10 +224,9 @@
         // ── 4. Montar URL e redirecionar ──────────────────────────────────────
         const destParams = new URLSearchParams({
           uid,
-          env,
-          nid,
-          token,
-          ...(segmento === 'assinante' && assinaturaId ? { assinaturaId } : {})
+          env:   String(data.id),
+          nid:   data.newsletter_id || data.nid,
+          token: data.token_acesso,
         });
 
         window.location.replace('/verNewsletterComToken.html?' + destParams.toString());
