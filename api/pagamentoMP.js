@@ -564,7 +564,14 @@ async function _handleCriarSessao(req, res) {
     const usuarioData    = usuarioSnap.data();
 
     if (assinaturaData.status !== 'ativa') {
-      return json(res, 403, { ok: false, message: 'Assinatura inativa.' });
+      const _msgPorStatus = {
+        pendente_pagamento: 'Seu pagamento está sendo processado. Assim que confirmado, você terá acesso completo.',
+        cancelado:          'Sua assinatura foi cancelada. Entre em contato para reativá-la.',
+        suspenso:           'Sua assinatura está suspensa. Entre em contato com o suporte.',
+        inativo:            'Sua assinatura está inativa. Entre em contato para reativá-la.',
+      };
+      const _msg = _msgPorStatus[assinaturaData.status] || 'Assinatura inativa.';
+      return json(res, 403, { ok: false, status: assinaturaData.status, message: _msg });
     }
 
     // Controle de sessões ativas: máximo 3 por assinante
