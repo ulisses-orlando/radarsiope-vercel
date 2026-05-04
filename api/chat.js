@@ -183,27 +183,29 @@ function extrairTrechosRelevantes(texto, pergunta, maxChars = 20000) {
 
   if (paragrafos.length === 0) return texto.slice(0, maxChars);
 
-  // Pontua cada parágrafo por sobreposição de palavras-chave
-  const pontuados = paragrafos.map(p => {
+  // Pontua cada parágrafo por sobreposição de palavras-chave, mantendo índice original
+  const pontuados = paragrafos.map((p, idx) => {
     const pLower = p.toLowerCase();
     const score = palavras.reduce((acc, w) => acc + (pLower.includes(w) ? 1 : 0), 0);
-    return { p, score };
+    return { p, score, idx };
   });
 
-  // Preserva ordem original, filtrando apenas parágrafos com alguma relevância
-  const comIndice = pontuados.map((item, idx) => ({ ...item, idx }));
-  const relevantes = comIndice.filter(item => item.score > 0).sort((a, b) => a.idx - b.idx);
+  // 1. Seleciona os parágrafos mais relevantes por score até preencher maxChars
+  const selecionados = [...pontuados]
+    .sort((a, b) => b.score - a.score)   // mais relevantes primeiro
+    .reduce((acc, item) => {
+      if (acc.chars + item.p.length + 2 <= maxChars) {
+        acc.items.push(item);
+        acc.chars += item.p.length + 2;
+      }
+      return acc;
+    }, { items: [], chars: 0 })
+    .items;
 
-  // Fallback: se nenhum parágrafo tem score > 0, usa os primeiros até o limite
-  const fonte = relevantes.length > 0 ? relevantes : comIndice;
+  // 2. Reordena pela posição original do documento antes de montar o contexto
+  selecionados.sort((a, b) => a.idx - b.idx);
 
-  // Monta o contexto até o limite de caracteres
-  let resultado = '';
-  for (const { p } of fonte) {
-    if (resultado.length + p.length + 2 > maxChars) break;
-    resultado += p + '\n\n';
-  }
-
+  const resultado = selecionados.map(({ p }) => p).join('\n\n');
   return resultado.trim() || texto.slice(0, maxChars);
 }
 
