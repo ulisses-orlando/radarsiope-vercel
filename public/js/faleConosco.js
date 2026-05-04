@@ -147,6 +147,8 @@
         if (assinSnap.exists) {
           const feat = assinSnap.data().features_snapshot || {};
           quotaTema = feat.sugestao_tema_quota || 0;
+          const raw = assinSnap.data().createdAt;
+          if (raw) user._assinaturaCreatedAt = raw.seconds ? new Date(raw.seconds * 1000) : new Date(raw);
         }
         if (quotaTema > 0) {
           const inicioMes = new Date(); inicioMes.setDate(1); inicioMes.setHours(0, 0, 0, 0);
@@ -295,12 +297,18 @@
         });
 
         if (tipo === 'sugestao_tema') {
-          await _autoEncerrarMesAnterior();
-          const periodoAtual = new Date().toISOString().slice(0, 7);
+          const cicloSnap = await window.db.collection('ciclos_votacao')
+            .where('status', 'in', ['rascunho', 'indicacao'])
+            .orderBy('inicio_indicacao', 'desc').limit(1).get();
+          const cicloAtivo = cicloSnap.empty ? null : cicloSnap.docs[0];
           await window.db.collection('sugestoes_publicas').doc(`sugestao_${solicitacaoRef.id}`).set({
             solicitacao_ref: solicitacaoRef.path,
             texto_preview: texto.substring(0, 100) + (texto.length > 100 ? '...' : ''),
-            autor_uid: user.uid, votos: 0, votantes: [], status: 'ativa', periodo: periodoAtual, criado_em: new Date(), atualizado_em: new Date()
+            autor_uid: user.uid, votos: 0, votantes: [],
+            status: 'ativa',
+            ciclo_id: cicloAtivo?.id || null,
+            periodo: cicloAtivo ? cicloAtivo.data().titulo : new Date().toISOString().slice(0, 7),
+            criado_em: new Date(), atualizado_em: new Date()
           });
         }
         await window.db.collection('admin_contadores').doc('pendencias').set({ solicitacoes: firebase.firestore.FieldValue.increment(1) }, { merge: true });
@@ -325,10 +333,35 @@
   async function _buscarHistorico(user) {
     try {
       if (user.segmento === 'assinante') {
-        const snap = await window.db.collection('usuarios').doc(user.uid).collection('solicitacoes').where('tipo', 'in', ['mensagem', 'sugestao_tema']).orderBy('data_solicitacao', 'desc').limit(20).get();
-        return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        const dataCorte = user._assinaturaCreatedAt || null;
+        const snap = await window.db.collection('usuarios').doc(user.uid)
+          .collection('solicitacoes')
+          .where('tipo', 'in', ['mensagem', 'sugestao_tema'])
+          .orderBy('data_solicitacao', 'desc')
+          .limit(20).get();
+        const docs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        if (!dataCorte) return docs;
+        return docs.filter(d => {
+          const ds = d.data_solicitacao;
+          return ds && new Date(ds) >= dataCorte;
+        });
       } else {
-        const { data, error } = await window.supabase.from('leads_mensagens').select('*').eq('lead_id', parseInt(user.uid, 10)).order('criado_em', { ascending: false }).limit(20);
+        const leadId = parseInt(user.uid, 10);
+        if (!leadId) return [];
+
+        // Busca data_criacao do lead para usar como corte
+        let dataCorte = null;
+        try {
+          const { data: leadRow } = await window.supabase
+            .from('leads').select('data_criacao').eq('id', leadId).single();
+          if (leadRow?.data_criacao) dataCorte = new Date(leadRow.data_criacao);
+        } catch (e) { console.warn('[faleConosco] data_criacao lead:', e.message); }
+
+        let query = window.supabase.from('leads_mensagens').select('*')
+          .eq('lead_id', leadId).order('criado_em', { ascending: false }).limit(20);
+        if (dataCorte) query = query.gte('criado_em', dataCorte.toISOString());
+
+        const { data, error } = await query;
         if (error) throw new Error(error.message);
         return data || [];
       }
@@ -377,24 +410,6 @@
       const doc = await window.db.collection('usuarios').doc(parts[1]).collection('solicitacoes').doc(parts[3]).get();
       return doc.exists ? (doc.data().descricao || doc.data().texto || '') : '';
     } catch (e) { console.warn('[faleConosco] erro texto:', e.message); return ''; }
-  }
-
-  // ── AUTOMATIZAÇÃO: Encerrar mês anterior ──────────────────────────────────
-  async function _autoEncerrarMesAnterior() {
-    try {
-      const periodoAnterior = _getPeriodoAnterior();
-      const snap = await window.db.collection('sugestoes_publicas').where('status', '==', 'ativa').where('periodo', '==', periodoAnterior).get();
-      if (!snap.empty) {
-        const batch = window.db.batch();
-        const rankingFinal = [];
-        snap.docs.sort((a, b) => (b.data().votos || 0) - (a.data().votos || 0)).forEach((doc, i) => {
-          const d = doc.data();
-          rankingFinal.push({ posicao: i + 1, votos: d.votos, texto_preview: d.texto_preview, solicitacao_ref: d.solicitacao_ref });
-          batch.update(doc.ref, { status: 'encerrada', ranking_final: rankingFinal, encerrado_em: new Date() });
-        });
-        await batch.commit();
-      }
-    } catch (err) { console.warn('[faleConosco] auto-encerrar:', err); }
   }
 
   // ── RENDER: Votação Atual ─────────────────────────────────────────────────
