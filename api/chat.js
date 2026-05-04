@@ -96,7 +96,7 @@ async function chamarGemini(systemPrompt, historico, pergunta, tentativas = 3) {
         contents,
         generationConfig: {
           temperature: 0.2,
-          maxOutputTokens: 300,
+          maxOutputTokens: 600,
           topP: 0.8,
         },
       };
@@ -157,7 +157,7 @@ function htmlParaTexto(html = '') {
 }
 
 // ── Extrai trechos mais relevantes para a pergunta (RAG simples) ─────────────
-function extrairTrechosRelevantes(texto, pergunta, maxChars = 6000) {
+function extrairTrechosRelevantes(texto, pergunta, maxChars = 20000) {
   if (!texto || texto.length <= maxChars) return texto;
 
   // Tokeniza a pergunta em palavras significativas (≥4 chars)
@@ -190,14 +190,16 @@ function extrairTrechosRelevantes(texto, pergunta, maxChars = 6000) {
     return { p, score };
   });
 
-  // Ordena por relevância, mantém ordem original entre empates
-  const ordenados = [...pontuados]
-    .map((item, idx) => ({ ...item, idx }))
-    .sort((a, b) => b.score - a.score || a.idx - b.idx);
+  // Preserva ordem original, filtrando apenas parágrafos com alguma relevância
+  const comIndice = pontuados.map((item, idx) => ({ ...item, idx }));
+  const relevantes = comIndice.filter(item => item.score > 0).sort((a, b) => a.idx - b.idx);
 
-  // Monta o contexto priorizando os mais relevantes até o limite
+  // Fallback: se nenhum parágrafo tem score > 0, usa os primeiros até o limite
+  const fonte = relevantes.length > 0 ? relevantes : comIndice;
+
+  // Monta o contexto até o limite de caracteres
   let resultado = '';
-  for (const { p } of ordenados) {
+  for (const { p } of fonte) {
     if (resultado.length + p.length + 2 > maxChars) break;
     resultado += p + '\n\n';
   }
