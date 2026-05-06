@@ -307,7 +307,9 @@
             autor_uid: user.uid, votos: 0, votantes: [],
             status: 'ativa',
             ciclo_id: cicloAtivo?.id || null,
-            periodo: cicloAtivo ? cicloAtivo.data().titulo : new Date().toISOString().slice(0, 7),
+            periodo: cicloAtivo
+              ? cicloAtivo.data().inicio_indicacao.toDate().toISOString().slice(0, 7)
+              : new Date().toISOString().slice(0, 7),
             criado_em: new Date(), atualizado_em: new Date()
           });
         }
@@ -415,14 +417,29 @@
   // ── RENDER: Votação Atual ─────────────────────────────────────────────────
   async function _renderVotacaoAtual(user, temFeatureTema) {
     try {
+      // Busca o ciclo ativo (indicação ou votação aberta)
+      const cicloSnap = await window.db.collection('ciclos_votacao')
+        .where('status', 'in', ['rascunho', 'indicacao', 'votacao'])
+        .orderBy('inicio_indicacao', 'desc').limit(1).get();
+      const cicloDoc   = cicloSnap.empty ? null : cicloSnap.docs[0];
+      const cicloId    = cicloDoc?.id || null;
+      const cicloTitulo = cicloDoc ? cicloDoc.data().titulo : '';
+      const labelSep   = cicloTitulo ? `🗳️ Votação atual: ${cicloTitulo}` : '🗳️ Votação Atual';
+
       let snap;
       try {
-        snap = await window.db.collection('sugestoes_publicas').where('status', '==', 'ativa').where('periodo', '==', _getPeriodoAtual()).orderBy('votos', 'desc').limit(50).get();
+        const q = cicloId
+          ? window.db.collection('sugestoes_publicas').where('ciclo_id', '==', cicloId).orderBy('votos', 'desc').limit(50)
+          : window.db.collection('sugestoes_publicas').where('status', '==', 'ativa').where('periodo', '==', _getPeriodoAtual()).orderBy('votos', 'desc').limit(50);
+        snap = await q.get();
       } catch (e) {
-        snap = await window.db.collection('sugestoes_publicas').where('status', '==', 'ativa').where('periodo', '==', _getPeriodoAtual()).limit(50).get();
+        const q = cicloId
+          ? window.db.collection('sugestoes_publicas').where('ciclo_id', '==', cicloId).limit(50)
+          : window.db.collection('sugestoes_publicas').where('status', '==', 'ativa').where('periodo', '==', _getPeriodoAtual()).limit(50);
+        snap = await q.get();
       }
 
-      if (snap.empty) return `<div class="rs-fc-sep">🗳️ Votação Atual</div><div class="rs-fc-vazio">Nenhuma sugestão ativa ainda.</div>`;
+      if (snap.empty) return `<div class="rs-fc-sep">${labelSep}</div><div class="rs-fc-vazio">Nenhuma sugestão ativa ainda.</div>`;
 
       const docsArray = snap.docs.map(d => ({ id: d.id, ...d.data() }));
       docsArray.sort((a, b) => (b.votos || 0) - (a.votos || 0));
@@ -430,7 +447,7 @@
 
       const sugestoes = await Promise.all(top5.map(async d => ({ ...d, texto: await _buscarTextoSolicitacao(d.solicitacao_ref) })));
       const podeVotar = user.segmento === 'assinante' && temFeatureTema;
-      let html = `<div class="rs-fc-sep">🗳️ Votação Atual</div>`;
+      let html = `<div class="rs-fc-sep">${labelSep}</div>`;
 
       sugestoes.forEach((s, i) => {
         const jaVotou = podeVotar ? localStorage.getItem(`rs_voto_sugestao_${s.id}`) : null;
