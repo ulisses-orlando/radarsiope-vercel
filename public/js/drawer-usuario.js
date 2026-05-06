@@ -545,11 +545,15 @@ async function _renderPagamentos() {
 
 // ─── ABA: SOLICITAÇÕES ───────────────────────────────────────────────────────
 async function _renderSolicitacoes() {
-  const body = document.getElementById('drawer-usuario-body');
+  const body = document.getElementById('drawer-usuario-body'); 
   const uid = _drawerUid;
   try {
     const snap = await db.collection('usuarios').doc(uid)
-      .collection('solicitacoes').orderBy('data_solicitacao', 'desc').get();
+      .collection('solicitacoes')
+      .orderBy('data_solicitacao', 'desc')
+      .get();
+
+    // ✅ Remove botão "Enviar mensagem manual" conforme solicitado
     let html = '';
 
     if (snap.empty) {
@@ -558,19 +562,32 @@ async function _renderSolicitacoes() {
     }
 
     let pendentes = 0;
+
     snap.forEach(doc => {
       const s = doc.data();
       const status = (s.status || 'pendente').toLowerCase();
-      if (status === 'aberta' || status === 'pendente' || status === 'cancelamento_pendente_multa') pendentes++;
+      
+      // ✅ FILTRO 1: Ignorar completamente solicitações do tipo "sugestao_tema"
+      if (s.tipo === 'sugestao_tema') return;
+
+      // ✅ FILTRO 2: Contar pendentes apenas para tipos permitidos
+      const tiposPermitidos = ['mensagem', 'cancelamento'];
+      if (!tiposPermitidos.includes(s.tipo)) return;
+
+      if (status === 'aberta' || status === 'pendente' || status === 'cancelamento_pendente_multa') {
+        pendentes++;
+      }
+
       const c = _stColor(status);
       const isCancel = s.tipo === 'cancelamento';
-      const calculo  = s.calculo_multa || {};
+      const calculo = s.calculo_multa || {};
       const valorMulta = Number(calculo.valor_ajuste || 0);
 
-      // Botões padrão (outros tipos)
-      // Botões padrão (apenas para tipo 'mensagem')
+      // ✅ FILTRO 3: Botões de ação apenas para tipos permitidos
       let acoes = '';
-      if ((status === 'aberta' || status === 'pendente') && !isCancel && s.tipo === 'mensagem') {
+
+      // Botões para "mensagem" (com botão Responder)
+      if (s.tipo === 'mensagem' && (status === 'aberta' || status === 'pendente')) {
         acoes = `
           <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">
             <button class="btn-drawer-sm btn-verde" onclick="_drawerResponderSolicitacao('${uid}','${doc.id}','atendida')">✅ Atendida</button>
@@ -579,17 +596,17 @@ async function _renderSolicitacoes() {
           </div>`;
       }
 
-      // Botões exclusivos para CANCELAMENTO (usa APENAS calculo_multa)
+      // Botões exclusivos para CANCELAMENTO
       if (isCancel) {
         if (status === 'aberta' || status === 'pendente') {
           acoes = `
             <div style="margin-top:8px;padding:10px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;font-size:12px">
               <div style="font-weight:600;margin-bottom:6px;color:#0A3D62">⛔ Cálculo de Fidelização (Pré-aprovado)</div>
               <div style="display:grid;grid-template-columns:auto 1fr;gap:4px 8px;color:#475569;line-height:1.5">
-                <span>📅 Meses usados:</span> <strong>${calculo.meses_usados || '—'}</strong>
-                <span>🔒 Fidelização até:</span> <strong>${calculo.data_fim_fidelizacao ? new Date(calculo.data_fim_fidelizacao).toLocaleDateString('pt-BR') : 'Não se aplica'}</strong>
-                <span>💰 Desconto/mês:</span> <strong>${calculo.desconto_mensal ? calculo.desconto_mensal.toLocaleString('pt-BR',{style:'currency',currency:'BRL'}) : 'R$ 0,00'}</strong>
-                <span>🧾 Valor do ajuste:</span> <strong style="color:${valorMulta > 0 ? '#b45309' : '#16a34a'};font-size:13px">${valorMulta.toLocaleString('pt-BR',{style:'currency',currency:'BRL'})}</strong>
+                <span>📅 Meses usados:</span><strong>${calculo.meses_usados || '—'}</strong>
+                <span>🔒 Fidelização até:</span><strong>${calculo.data_fim_fidelizacao ? new Date(calculo.data_fim_fidelizacao).toLocaleDateString('pt-BR') : 'Não se aplica'}</strong>
+                <span>💰 Desconto/mês:</span><strong>${calculo.desconto_mensal ? calculo.desconto_mensal.toLocaleString('pt-BR',{style:'currency',currency:'BRL'}) : 'R$ 0,00'}</strong>
+                <span>🧾 Valor do ajuste:</span><strong style="color:${valorMulta > 0 ? '#b45309' : '#16a34a'};font-size:13px">${valorMulta.toLocaleString('pt-BR',{style:'currency',currency:'BRL'})}</strong>
               </div>
               ${valorMulta > 0 
                 ? `<button class="btn-drawer-sm" style="background:#2563eb;color:#fff;border:none;margin-top:8px;width:100%" onclick="_gerarLinkMulta('${uid}','${doc.id}',${valorMulta})">🔗 Gerar Link de Multa (MP)</button>`
@@ -606,13 +623,32 @@ async function _renderSolicitacoes() {
           acoes = `<div style="margin-top:6px;font-size:12px;color:#22c55e">✅ Processo finalizado</div>`;
         }
       }
+
+      // Renderização do card da solicitação
+      html += `
+        <div id="sol-card-${doc.id}" style="border-left:4px solid ${c};border-radius:8px;background:#f8fafc;padding:10px 12px;margin-bottom:10px">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start">
+            <div style="min-width:0;flex:1">
+              <div style="font-weight:700;font-size:13px">${s.tipo === 'mensagem' ? '💬 Mensagem' : '⛔ Cancelamento'}</div>
+              <div style="font-size:12px;color:#64748b;margin-top:2px">${s.descricao || s.texto || '—'}</div>
+              <div style="font-size:11px;color:#94a3b8;margin-top:4px">📅 ${_fmtHora(s.data_solicitacao)}</div>
+            </div>
+            <div style="margin-left:8px;flex-shrink:0">${_stBadge(status)}</div>
+          </div>
+          ${acoes}
+        </div>`;
     });
 
+    // Alerta de pendentes (apenas para tipos filtrados)
     if (pendentes) {
       html = `<div class="drawer-alerta amarelo">🟠 <strong>${pendentes}</strong> solicitação(ões) aguardando atendimento</div>` + html;
     }
-    body.innerHTML = html;
-  } catch (e) { body.innerHTML = `<p style="color:#ef4444">Erro: ${e.message}</p>`; }
+
+    body.innerHTML = html || '<p style="color:#94a3b8;font-size:13px">Nenhuma solicitação.</p>';
+
+  } catch (e) {
+    body.innerHTML = `<p style="color:#ef4444">Erro: ${e.message}</p>`;
+  }
 }
 
 // ─── Modal para gerar link MP usando o valor JÁ CALCULADO ─────────────────────
