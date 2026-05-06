@@ -1321,7 +1321,29 @@ function _exibirAppSemEdicao(destinatario, assinaturaId) {
     document.getElementById('rs-alertas-btn')?.click();
   }, 600);
 }
- 
+
+// ─── Aviso de limite de sessões simultâneas ────────────────────────────────
+function _mostrarAvisoSessoes() {
+  const aviso = document.createElement('div');
+  aviso.id = 'rs-aviso-sessoes';
+  aviso.style.cssText = [
+    'position:fixed;top:0;left:0;right:0;z-index:9999',
+    'background:#f59e0b;color:#fff;font-size:13px;font-weight:600',
+    'padding:12px 16px;text-align:center;line-height:1.5',
+    'box-shadow:0 2px 8px rgba(0,0,0,0.2)',
+  ].join(';');
+  aviso.innerHTML = `
+    ⚠️ Identificamos muitas sessões abertas para essa assinatura.
+    A sessão mais antiga foi desativada automaticamente.
+    <button onclick="document.getElementById('rs-aviso-sessoes').remove()"
+      style="margin-left:12px;background:rgba(255,255,255,0.3);border:none;
+             color:#fff;padding:2px 10px;border-radius:4px;cursor:pointer;font-size:12px">
+      OK
+    </button>`;
+  document.body.appendChild(aviso);
+  setTimeout(() => document.getElementById('rs-aviso-sessoes')?.remove(), 8000);
+}
+
 // ─── Ativação de sessão via link pós-pagamento (?ativar=TOKEN&uid=UID) ─────
 async function _executarAtivacaoSessao(token, uid) {
     mostrarLoading(true);
@@ -1392,6 +1414,8 @@ async function _executarAtivacaoSessao(token, uid) {
       window.history.replaceState({}, '', url.toString());
     } catch (e) { /* ignora */ }
  
+    if (data.aviso_limite_sessoes) _mostrarAvisoSessoes();
+
     // Carrega o app com a sessão recém-criada
     await _tentarModoAssinante(data);
  
@@ -1470,6 +1494,7 @@ async function _tentarModoAlerta() {
           validado_em:      Date.now(),
         };
         try { localStorage.setItem('rs_pwa_session', JSON.stringify(_sessaoCompleta)); } catch (e) { /* ignora */ }
+        if (_sessaoNova.aviso_limite_sessoes) _mostrarAvisoSessoes();
         const ok = await _tentarModoAssinante(_sessaoCompleta);
         if (!ok) mostrarErro('Erro ao carregar sua área.', 'Tente novamente em instantes.');
       } else {
@@ -1713,6 +1738,7 @@ async function VerNewsletterComToken() {
                   validado_em:      Date.now(),
                 }));
               } catch (e) { /* ignora se localStorage bloqueado */ }
+              if (_sessaoNova.aviso_limite_sessoes) _mostrarAvisoSessoes();
             }
           }
         } else {

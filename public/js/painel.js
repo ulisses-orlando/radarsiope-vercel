@@ -204,14 +204,14 @@ async function carregarBibliotecaNewsletters(uid) {
   const container = document.getElementById('biblioteca-tecnica');
   if (!container) return;
   container.innerHTML = '<p class="loading">Carregando newsletters...</p>';
- 
+
   try {
-    // Buscar todas as assinaturas do usuário
+    // Busca assinaturas ativas para obter assinaturaId e tipos_selecionados
     const assinSnap = await db.collection('usuarios').doc(uid)
       .collection('assinaturas')
       .where('status', 'in', ['ativa', 'ativo'])
       .get();
- 
+
     if (assinSnap.empty) {
       container.innerHTML = `
         <div class="empty-state">
@@ -220,128 +220,73 @@ async function carregarBibliotecaNewsletters(uid) {
         </div>`;
       return;
     }
- 
-    // Buscar envios e tipos_selecionados de todas as assinaturas em paralelo
-    const enviosPromises = assinSnap.docs.map(async doc => {
-      const assinData = doc.data();
-      const tiposSelecionados = Array.isArray(assinData.tipos_selecionados)
-        ? assinData.tipos_selecionados.map(String)
-        : [];
- 
-      const snap = await db.collection('usuarios').doc(uid)
-        .collection('assinaturas').doc(doc.id)
-        .collection('envios')
-        .orderBy('data_envio', 'desc')
-        .limit(100)
-        .get();
- 
-      return snap.docs.map(d => ({
-        ...d.data(),
-        envioId:          d.id,
-        assinaturaId:     doc.id,
-        tiposSelecionados, // carrega junto para filtrar depois
-      }));
-    });
- 
-    const enviosArrays = await Promise.all(enviosPromises);
-    const todosEnviosRaw = enviosArrays.flat();
- 
-    if (!todosEnviosRaw.length) {
+
+    // Usa a primeira assinatura ativa (caso comum — plano único)
+    const assinDoc     = assinSnap.docs[0];
+    const assinaturaId = assinDoc.id;
+    const assinData    = assinDoc.data();
+    const tiposSel     = Array.isArray(assinData.tipos_selecionados)
+      ? assinData.tipos_selecionados.map(String)
+      : [];
+
+    // Busca newsletters publicadas (modelo novo — sem envios)
+    const nlSnap = await db.collection('newsletters')
+      .where('enviada', '==', true)
+      .orderBy('data_publicacao', 'desc')
+      .limit(50)
+      .get();
+
+    if (nlSnap.empty) {
       container.innerHTML = `
         <div class="empty-state">
           <div style="font-size:32px">📭</div>
-          <p>Nenhuma newsletter recebida ainda.</p>
+          <p>Nenhuma edição publicada ainda.</p>
         </div>`;
       return;
     }
- 
-    // Buscar dados das newsletters em paralelo (deduplica por newsletter_id)
-    const nidsSet = [...new Set(todosEnviosRaw.map(e => e.newsletter_id).filter(Boolean))];
-    const nlsMap = {};
-    await Promise.all(nidsSet.map(async nid => {
-      try {
-        const snap = await db.collection('newsletters').doc(nid).get();
-        if (snap.exists) nlsMap[nid] = { id: snap.id, ...snap.data() };
-      } catch (e) { /* não crítico */ }
-    }));
- 
-    // Deduplicar por newsletter_id (mantém o envio mais recente de cada edição)
-    // e filtrar apenas newsletters cujo tipo está em tipos_selecionados da assinatura
-    const vistos = new Set();
-    const todosEnvios = todosEnviosRaw.filter(envio => {
-      const nid  = envio.newsletter_id;
-      if (!nid || vistos.has(nid)) return false;
-      vistos.add(nid);
- 
-      // Filtra por tipo: só mostra se o tipo da newsletter está nos tipos selecionados
-      const nl   = nlsMap[nid];
-      const tipo = nl?.tipo || nl?.Tipo;
-      const tiposSel = envio.tiposSelecionados || [];
- 
-      // Se a assinatura não tem tipos selecionados, mostra tudo
-      if (tiposSel.length === 0) return true;
-      // Se a newsletter não tem tipo, mostra (não bloqueia)
-      if (!tipo) return true;
-      // Verifica se o tipo está nos selecionados
-      return tiposSel.includes(String(tipo));
-    });
- 
-    // Ordenar por data_envio desc e montar cards
-    todosEnvios.sort((a, b) => {
-      const da = a.data_envio?.toDate ? a.data_envio.toDate() : new Date(a.data_envio || 0);
-      const db_ = b.data_envio?.toDate ? b.data_envio.toDate() : new Date(b.data_envio || 0);
-      return db_ - da;
-    });
- 
-    const cards = todosEnvios.map(envio => {
-      const nl = nlsMap[envio.newsletter_id] || {};
-      const titulo = nl.titulo || `Edição ${nl.numero || '—'}`;
-      const numero = nl.numero || '—';
-      const dataEnvio = fmtData(envio.data_envio);
-      const expirado = envio.expira_em && new Date() > new Date(
-        envio.expira_em?.toDate ? envio.expira_em.toDate() : envio.expira_em
-      );
-      // Se rodando dentro do iframe do app → usa postMessage para navegar sem abrir nova aba
-      const _noIframe = window.parent !== window;
-      const _nid = envio.newsletter_id;
-      const _bypassExp = !!expirado;
-      const url = montarUrlWebApp(
-        _nid,
-        envio.envioId,
-        uid,
-        envio.assinaturaId,
-        envio.token_acesso,
-        _bypassExp
-      );
-      const _btnAcao = _noIframe
-        ? `<button class="btn-ver-nl ${_bypassExp ? 'btn-ver-nl-exp' : ''}"
-             onclick="window.parent.postMessage({tipo:'rs:abrirEdicao',newsletterId:'${_nid}',bypassExp:${_bypassExp}}, '*')">
-             ${_bypassExp ? '⏰ Ver edição expirada →' : 'Ler edição →'}
-           </button>`
-        : `<a href="${url}" class="btn-ver-nl ${_bypassExp ? 'btn-ver-nl-exp' : ''}" target="_blank">
-             ${_bypassExp ? '⏰ Ver edição expirada →' : 'Ler edição →'}
-           </a>`;
- 
-      return `
-        <article class="nl-card ${expirado ? 'nl-card-expirado' : ''}">
-          <div class="nl-card-header">
-            <div>
-              <div class="nl-card-edicao">Edição ${numero}</div>
-              <div class="nl-card-titulo">${titulo}</div>
-              <div class="nl-card-data">📅 ${dataEnvio}</div>
+
+    const _noIframe = window.parent !== window;
+
+    const cards = nlSnap.docs
+      .filter(doc => {
+        // Filtra por tipo se a assinatura tem tipos_selecionados
+        if (!tiposSel.length) return true;
+        const tipo = doc.data().tipo || doc.data().Tipo;
+        return !tipo || tiposSel.includes(String(tipo));
+      })
+      .map(doc => {
+        const nl     = doc.data();
+        const nid    = doc.id;
+        const titulo = nl.titulo || `Edição ${nl.numero || '—'}`;
+        const numero = nl.numero || '—';
+        const data   = fmtData(nl.data_publicacao);
+
+        // URL sem token e sem envioId — assinante usa sessão
+        const qs  = [`nid=${nid}`, `uid=${uid}`, `assinaturaId=${assinaturaId}`].join('&');
+        const url = `https://app.radarsiope.com.br/verNewsletterComToken.html?d=${encodeURIComponent(btoa(qs))}`;
+
+        const _btnAcao = _noIframe
+          ? `<button class="btn-ver-nl"
+               onclick="window.parent.postMessage({tipo:'rs:abrirEdicao',newsletterId:'${nid}'}, '*')">
+               Ler edição →
+             </button>`
+          : `<a href="${url}" class="btn-ver-nl" target="_blank">Ler edição →</a>`;
+
+        return `
+          <article class="nl-card">
+            <div class="nl-card-header">
+              <div>
+                <div class="nl-card-edicao">Edição ${numero}</div>
+                <div class="nl-card-titulo">${titulo}</div>
+                <div class="nl-card-data">📅 ${data}</div>
+              </div>
             </div>
-          </div>
-          <div class="nl-card-footer">
-            ${expirado && !_noIframe
-              ? `<span class="nl-badge-expirado">⏰ Acesso expirado</span>${_btnAcao}`
-              : _btnAcao}
-          </div>
-        </article>`;
-    }).join('');
- 
-    container.innerHTML = `
-      <div class="nl-grid">${cards}</div>`;
- 
+            <div class="nl-card-footer">${_btnAcao}</div>
+          </article>`;
+      }).join('');
+
+    container.innerHTML = `<div class="nl-grid">${cards || '<p class="empty-state">Nenhuma edição disponível.</p>'}</div>`;
+
   } catch (err) {
     console.error('[biblioteca]', err);
     container.innerHTML = '<p class="erro">Erro ao carregar newsletters.</p>';

@@ -5,6 +5,9 @@
   'use strict';
   const MAX_CHARS = 250;
   const STORAGE_KEY_BADGE = 'rs_fc_respondidas_vistas';
+  let _historicoCache    = null;
+  let _historicoCacheTs  = 0;
+  const _HISTORICO_TTL   = 5 * 60 * 1000; // 5 min
 
   // ── Inicialização ─────────────────────────────────────────────────────────
   function init() {
@@ -138,28 +141,40 @@
     }
 
     const isAssinante = user.segmento === 'assinante';
-    let quotaTema = 0;
+    let quotaTema  = 0;
     let usoTemaMes = 0;
 
-    if (isAssinante && user.assinaturaId) {
+    // ── Features da sessão local (sem Firestore) ────────────────────────────
+    if (isAssinante) {
       try {
-        const assinSnap = await window.db.collection('usuarios').doc(user.uid).collection('assinaturas').doc(user.assinaturaId).get();
-        if (assinSnap.exists) {
-          const feat = assinSnap.data().features_snapshot || {};
-          quotaTema = feat.sugestao_tema_quota || 0;
-          const raw = assinSnap.data().createdAt;
-          if (raw) user._assinaturaCreatedAt = raw.seconds ? new Date(raw.seconds * 1000) : new Date(raw);
-        }
-        if (quotaTema > 0) {
-          const inicioMes = new Date(); inicioMes.setDate(1); inicioMes.setHours(0, 0, 0, 0);
-          const snap = await window.db.collection('usuarios').doc(user.uid).collection('solicitacoes').where('tipo', '==', 'sugestao_tema').get();
-          usoTemaMes = snap.docs.filter(d => { const ds = d.data().data_solicitacao; return ds && new Date(ds) >= inicioMes; }).length;
-        }
-      } catch (e) { console.warn('[faleConosco] quota:', e.message); }
+        const _sessao = JSON.parse(localStorage.getItem('rs_pwa_session') || '{}');
+        quotaTema = (_sessao.features || user.features || {}).sugestao_tema_quota || 0;
+      } catch (e) { /* ignora */ }
     }
 
-    const historico = await _buscarHistorico(user);
+    // ── Paraleliza: count de quota do mês + histórico ───────────────────────
+    const [historico] = await Promise.all([
+      _buscarHistorico(user),
+      quotaTema > 0
+        ? (async () => {
+            try {
+              const inicioMes = new Date();
+              inicioMes.setDate(1); inicioMes.setHours(0, 0, 0, 0);
+              const snap = await window.db.collection('usuarios').doc(user.uid)
+                .collection('solicitacoes').where('tipo', '==', 'sugestao_tema').get();
+              usoTemaMes = snap.docs.filter(d => {
+                const ds = d.data().data_solicitacao;
+                return ds && new Date(ds) >= inicioMes;
+              }).length;
+            } catch (e) { console.warn('[faleConosco] quota:', e.message); }
+          })()
+        : Promise.resolve(),
+    ]);
+
     _marcarRespostasVistas(historico);
+
+    const quotaEsgotada  = quotaTema > 0 && usoTemaMes >= quotaTema;
+    const temFeatureTema = isAssinante && quotaTema > 0;
 
     let html = '';
     const avisoTexto = tipoAtivo === 'sugestao_tema'
@@ -167,16 +182,12 @@
       : 'Área destinada para dúvidas sobre a sua assinatura e feedbacks.';
     html += `<div class="rs-fc-aviso">${avisoTexto}</div>`;
 
-    const quotaEsgotada = quotaTema > 0 && usoTemaMes >= quotaTema;
-    const temFeatureTema = isAssinante && quotaTema > 0;
-
-    // ABAS
+    // ── Abas ────────────────────────────────────────────────────────────────
     html += `<div class="rs-fc-tipos">`;
     html += `<button class="rs-fc-tipo-btn ${tipoAtivo === 'mensagem' ? 'ativo' : ''}" onclick="window._fcSelecionarTipo('mensagem')">💬 Mensagem</button>`;
     if (isAssinante) {
       if (temFeatureTema) {
-        const btnClass = `rs-fc-tipo-btn ${tipoAtivo === 'sugestao_tema' ? 'ativo' : ''}`;
-        html += `<button class="${btnClass}" onclick="window._fcSelecionarTipo('sugestao_tema')">💡 Sugerir tema</button>`;
+        html += `<button class="rs-fc-tipo-btn ${tipoAtivo === 'sugestao_tema' ? 'ativo' : ''}" onclick="window._fcSelecionarTipo('sugestao_tema')">💡 Sugerir tema</button>`;
       } else {
         html += `<button class="rs-fc-tipo-btn bloqueado" title="Disponível em planos superiores">💡 Sugerir tema 🔒</button>`;
       }
@@ -184,43 +195,39 @@
     html += `</div>`;
 
     if (tipoAtivo === 'sugestao_tema') {
-      // 1. Votação Atual
       html += await _renderVotacaoAtual(user, temFeatureTema);
 
-      // 2. Formulário (SEMPRE visível, adaptado ao estado da cota)
       const restantes = Math.max(0, quotaTema - usoTemaMes);
       const placeholderTxt = quotaEsgotada
         ? 'Cota de sugestões esgotada para este mês.'
         : `Descreva o tema que gostaria que fosse abordado… você ainda tem direito a ${restantes} sugestão(ões).`;
-
-      const isBlocked = quotaEsgotada;
-      const textareaAttrs = isBlocked ? 'disabled readonly style="opacity:0.6; cursor:not-allowed;"' : '';
-      const btnAttrs = isBlocked ? 'disabled' : '';
+      const textareaAttrs = quotaEsgotada ? 'disabled readonly style="opacity:0.6; cursor:not-allowed;"' : '';
 
       html += `
-          <div style="margin-top: 16px;">
-            <label class="rs-fc-label" for="rs-fc-txt">💡 Sugestão de tema</label>
-            <textarea id="rs-fc-txt" class="rs-fc-textarea" placeholder="${placeholderTxt}" maxlength="${MAX_CHARS}" ${textareaAttrs}></textarea>
-            <div class="rs-fc-chars" id="rs-fc-chars">0/${MAX_CHARS}</div>
-          </div>
-          <button class="rs-fc-enviar" id="rs-fc-enviar" disabled ${btnAttrs} onclick="window._fcEnviar('sugestao_tema')">Enviar</button>
-        `;
+        <div style="margin-top:16px">
+          <label class="rs-fc-label" for="rs-fc-txt">💡 Sugestão de tema</label>
+          <textarea id="rs-fc-txt" class="rs-fc-textarea" placeholder="${placeholderTxt}"
+            maxlength="${MAX_CHARS}" ${textareaAttrs}></textarea>
+          <div class="rs-fc-chars" id="rs-fc-chars">0/${MAX_CHARS}</div>
+        </div>
+        <button class="rs-fc-enviar" id="rs-fc-enviar" disabled ${quotaEsgotada ? 'disabled' : ''}
+          onclick="window._fcEnviar('sugestao_tema')">Enviar</button>`;
 
-      // 3. Resultado do Mês Anterior
       html += await _renderResultadoAnterior(user, temFeatureTema);
 
     } else {
       html += `
-      <div>
-        <label class="rs-fc-label" for="rs-fc-txt">💬 Nova mensagem</label>
-        <textarea id="rs-fc-txt" class="rs-fc-textarea" placeholder="Digite sua mensagem ou dúvida…" maxlength="${MAX_CHARS}"></textarea>
-        <div class="rs-fc-chars" id="rs-fc-chars">0/${MAX_CHARS}</div>
-      </div>
-      <button class="rs-fc-enviar" id="rs-fc-enviar" disabled onclick="window._fcEnviar('mensagem')">Enviar</button>
-    `;
+        <div>
+          <label class="rs-fc-label" for="rs-fc-txt">💬 Nova mensagem</label>
+          <textarea id="rs-fc-txt" class="rs-fc-textarea"
+            placeholder="Digite sua mensagem ou dúvida…" maxlength="${MAX_CHARS}"></textarea>
+          <div class="rs-fc-chars" id="rs-fc-chars">0/${MAX_CHARS}</div>
+        </div>
+        <button class="rs-fc-enviar" id="rs-fc-enviar" disabled
+          onclick="window._fcEnviar('mensagem')">Enviar</button>`;
     }
 
-    // HISTÓRICO COM DATA ROBUSTA
+    // ── Histórico ────────────────────────────────────────────────────────────
     const historicoFiltrado = tipoAtivo === 'mensagem'
       ? historico.filter(m => m.tipo !== 'sugestao_tema')
       : historico.filter(m => m.tipo === 'sugestao_tema');
@@ -229,8 +236,6 @@
       html += `<div class="rs-fc-sep">Histórico</div>`;
       historicoFiltrado.forEach(msg => {
         const respondida = !!msg.resposta;
-
-        // Extração segura da data (suporta Timestamp do Firestore e String ISO)
         let dataFormatada = '—';
         try {
           const rawDate = msg.criado_em || msg.data_solicitacao;
@@ -240,21 +245,25 @@
           }
         } catch (e) { }
 
-        const tipoLabel = msg.tipo === 'sugestao_tema' ? '💡 Sugestão de tema' : '💬 Mensagem';
-        const respostaHtml = respondida ? `<div class="rs-fc-msg-resposta"><div class="rs-fc-msg-resposta-label">✅ Resposta da equipe</div>${msg.resposta}</div>` : '';
+        const tipoLabel    = msg.tipo === 'sugestao_tema' ? '💡 Sugestão de tema' : '💬 Mensagem';
+        const respostaHtml = respondida
+          ? `<div class="rs-fc-msg-resposta"><div class="rs-fc-msg-resposta-label">✅ Resposta da equipe</div>${msg.resposta}</div>`
+          : '';
 
         html += `
-        <div class="rs-fc-msg-card ${respondida ? 'respondida' : ''}">
-          <div class="rs-fc-msg-topo">
-            <span class="rs-fc-msg-tipo">${tipoLabel}</span>
-            <div style="display:flex;gap:6px;align-items:center">
-              <span class="rs-fc-badge-status ${respondida ? 'respondida' : 'aberta'}">${msg.tipo === 'sugestao_tema' ? 'Enviada' : (respondida ? 'Respondida' : 'Aguardando')}</span>
-              <span class="rs-fc-msg-data">${dataFormatada}</span>
+          <div class="rs-fc-msg-card ${respondida ? 'respondida' : ''}">
+            <div class="rs-fc-msg-topo">
+              <span class="rs-fc-msg-tipo">${tipoLabel}</span>
+              <div style="display:flex;gap:6px;align-items:center">
+                <span class="rs-fc-badge-status ${respondida ? 'respondida' : 'aberta'}">
+                  ${msg.tipo === 'sugestao_tema' ? 'Enviada' : (respondida ? 'Respondida' : 'Aguardando')}
+                </span>
+                <span class="rs-fc-msg-data">${dataFormatada}</span>
+              </div>
             </div>
-          </div>
-          <div class="rs-fc-msg-texto">${msg.texto || msg.descricao || ''}</div>
-          ${respostaHtml}
-        </div>`;
+            <div class="rs-fc-msg-texto">${msg.texto || msg.descricao || ''}</div>
+            ${respostaHtml}
+          </div>`;
       });
     } else {
       html += `<div class="rs-fc-vazio"><span>💬</span>Nenhuma mensagem ainda.</div>`;
@@ -263,14 +272,13 @@
     body.innerHTML = html;
 
     const textarea = document.getElementById('rs-fc-txt');
-    const chars = document.getElementById('rs-fc-chars');
-    const btnEnv = document.getElementById('rs-fc-enviar');
+    const chars    = document.getElementById('rs-fc-chars');
+    const btnEnv   = document.getElementById('rs-fc-enviar');
     if (textarea) {
       textarea.addEventListener('input', () => {
         const n = textarea.value.length;
         chars.textContent = `${n}/${MAX_CHARS}`;
         chars.classList.toggle('limite', n >= MAX_CHARS);
-        // Só habilita o botão se a cota NÃO estiver esgotada
         if (btnEnv && !quotaEsgotada) btnEnv.disabled = n === 0;
       });
     }
@@ -323,6 +331,7 @@
       }
 
       if (btnEnv) { btnEnv.textContent = '✅ Enviado!'; btnEnv.disabled = true; }
+      _historicoCache = null;
       setTimeout(() => _renderDrawer(tipo), 700);
     } catch (e) {
       console.error('[faleConosco] enviar:', e);
@@ -332,7 +341,10 @@
   };
 
   // ── Buscar histórico ──────────────────────────────────────────────────────
-  async function _buscarHistorico(user) {
+  async function _buscarHistorico(user, forceRefresh = false) {
+    if (!forceRefresh && _historicoCache && (Date.now() - _historicoCacheTs) < _HISTORICO_TTL) {
+      return _historicoCache;
+    }
     try {
       if (user.segmento === 'assinante') {
         const dataCorte = user._assinaturaCreatedAt || null;
@@ -342,11 +354,12 @@
           .orderBy('data_solicitacao', 'desc')
           .limit(20).get();
         const docs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-        if (!dataCorte) return docs;
-        return docs.filter(d => {
+        const resultado = !dataCorte ? docs : docs.filter(d => {
           const ds = d.data_solicitacao;
           return ds && new Date(ds) >= dataCorte;
         });
+        _historicoCache = resultado; _historicoCacheTs = Date.now();
+        return resultado;
       } else {
         const leadId = parseInt(user.uid, 10);
         if (!leadId) return [];
@@ -365,7 +378,9 @@
 
         const { data, error } = await query;
         if (error) throw new Error(error.message);
-        return data || [];
+        const resultado = data || [];
+        _historicoCache = resultado; _historicoCacheTs = Date.now();
+        return resultado;
       }
     } catch (e) { console.warn('[faleConosco] histórico:', e.message); return []; }
   }
@@ -445,7 +460,7 @@
       docsArray.sort((a, b) => (b.votos || 0) - (a.votos || 0));
       const top5 = docsArray.slice(0, 5);
 
-      const sugestoes = await Promise.all(top5.map(async d => ({ ...d, texto: await _buscarTextoSolicitacao(d.solicitacao_ref) })));
+      const sugestoes = top5.map(d => ({ ...d, texto: d.texto_preview || d.texto || '(sem texto)' }));
       const podeVotar = user.segmento === 'assinante' && temFeatureTema;
       let html = `<div class="rs-fc-sep">${labelSep}</div>`;
 
@@ -484,7 +499,7 @@
         }).filter(Boolean);
       }
 
-      const top5 = await Promise.all(ordenado.slice(0, 5).map(async s => ({ ...s, texto: await _buscarTextoSolicitacao(s.solicitacao_ref) })));
+      const top5 = ordenado.slice(0, 5).map(s => ({ ...s, texto: s.texto_preview || s.texto || '(sem texto)' }));
       if (top5.length === 0) return '';
 
       let html = `<div class="rs-resultado-card">`;

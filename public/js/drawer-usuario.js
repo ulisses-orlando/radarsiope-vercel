@@ -6,7 +6,7 @@
 let _drawerUid = null;
 let _drawerDados = {};
 let _drawerTabAtual = 'resumo';
-let _drawerAcessoSel = {};
+// _drawerAcessoSel removido — modelo de envios substituído por sessões
 let _seedEmAndamento = false; // guard anti-loop
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -229,7 +229,6 @@ async function recalcularContadores() {
 async function abrirDrawerUsuario(uid) {
   _drawerUid = uid;
   _drawerTabAtual = 'resumo';
-  _drawerAcessoSel = {};
 
   const overlay = document.getElementById('drawer-usuario-overlay');
   const drawer = document.getElementById('drawer-usuario');
@@ -1005,131 +1004,156 @@ async function _salvarInteracaoUsuario(uid) {
 }
 
 // ─── ABA: ACESSO ─────────────────────────────────────────────────────────────
+// ─── ABA: ACESSOS (modelo de sessões) ────────────────────────────────────────
+// Exibe sessões ativas do assinante com opção de revogar individualmente
+// ou revogar todas de uma vez. Substitui o modelo antigo de envios/expiração.
 async function _renderAcesso() {
   const body = document.getElementById('drawer-usuario-body');
-  const uid = _drawerUid;
-  _drawerAcessoSel = {};
+  const uid  = _drawerUid;
+
   try {
-    const assinSnap = await db.collection('usuarios').doc(uid).collection('assinaturas').get();
-    if (assinSnap.empty) {
-      body.innerHTML = '<p style="color:#94a3b8;font-size:13px">Nenhuma assinatura.</p>'; return;
-    }
+    // ── Assinatura ativa ──────────────────────────────────────────────────────
+    const assinSnap = await db.collection('usuarios').doc(uid)
+      .collection('assinaturas').get();
 
-    let html = '';
-    const hoje = new Date();
-
+    let assinaturaHtml = '';
     for (const assinDoc of assinSnap.docs) {
-      const a = assinDoc.data();
-      const enviosSnap = await db.collection('usuarios').doc(uid)
-        .collection('assinaturas').doc(assinDoc.id)
-        .collection('envios').orderBy('data_envio', 'desc').get();
-      if (enviosSnap.empty) continue;
+      const a  = assinDoc.data();
+      const st = a.status || '—';
+      const corStatus = {
+        ativa: '#22c55e', ativo: '#22c55e',
+        pendente_pagamento: '#f59e0b',
+        cancelado: '#ef4444', cancelada: '#ef4444',
+        inativo: '#94a3b8', suspenso: '#f59e0b',
+      }[st] || '#94a3b8';
 
-      let itens = '';
-      for (const ed of enviosSnap.docs) {
-        const e = ed.data();
-        const expirou = e.expira_em &&
-          hoje > (e.expira_em?.toDate ? e.expira_em.toDate() : new Date(e.expira_em));
-
-        let titulo = e.newsletter_id || e.id_edicao || ed.id;
-        try {
-          const nlid = e.newsletter_id || e.id_edicao;
-          if (nlid) {
-            const nlDoc = await db.collection('newsletters').doc(nlid).get();
-            if (nlDoc.exists) titulo = nlDoc.data().titulo || titulo;
-          }
-        } catch (_) { }
-
-        itens += `
-          <div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px dashed #e2e8f0">
-            <input type="checkbox" id="acesso-${ed.id}"
-              data-assin="${assinDoc.id}" data-envio="${ed.id}"
-              onchange="_toggleAcessoSel('${assinDoc.id}','${ed.id}',this.checked)"
-              style="width:15px;height:15px;cursor:pointer;flex-shrink:0">
-            <div style="flex:1;min-width:0">
-              <div style="font-size:12px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${titulo}</div>
-              <div style="font-size:11px;color:#94a3b8">
-                Expira: ${_fmtData(e.expira_em)} · Acessos: ${e.acessos_totais || 0}
-              </div>
+      assinaturaHtml += `
+        <div style="display:flex;justify-content:space-between;align-items:center;
+          padding:8px 0;border-bottom:1px dashed #e2e8f0;gap:8px">
+          <div style="min-width:0">
+            <div style="font-size:12px;font-weight:700">
+              ${a.plano_nome || a.plano_slug || 'Plano'}
             </div>
-            ${expirou
-            ? '<span style="background:#fee2e2;color:#ef4444;border-radius:20px;padding:2px 8px;font-size:11px;flex-shrink:0">⛔ Expirado</span>'
-            : '<span style="background:#dcfce7;color:#22c55e;border-radius:20px;padding:2px 8px;font-size:11px;flex-shrink:0">✅ Ativo</span>'}
-          </div>`;
-      }
-
-      html += `
-        <div class="drawer-secao">
-          <div class="drawer-secao-titulo">${a.plano_nome || a.plano_slug || 'Assinatura'}</div>
-          ${itens || '<p style="color:#94a3b8;font-size:12px">Nenhum envio.</p>'}
+            <div style="font-size:11px;color:#64748b">
+              Renovação: ${_fmtData(a.data_proxima_renovacao)}
+            </div>
+          </div>
+          <span style="background:${corStatus}1a;color:${corStatus};border-radius:20px;
+            padding:2px 10px;font-size:11px;font-weight:700;white-space:nowrap">
+            ${st}
+          </span>
         </div>`;
     }
 
-    body.innerHTML = html + `
-      <div class="drawer-secao" style="position:sticky;bottom:0;background:#fff;
-        border-top:1px solid #e2e8f0;padding-top:12px;margin-top:4px">
-        <div class="drawer-secao-titulo">⏰ Prorrogar selecionados</div>
-        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">
-          <button class="btn-drawer-sm" onclick="_selecionarTodosAcesso(true)">☑️ Todos</button>
-          <button class="btn-drawer-sm" onclick="_selecionarTodosAcesso(false)">⬜ Nenhum</button>
-        </div>
-        <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
-          <button class="btn-drawer-sm" onclick="_confirmarProrrogacaoUsuario(7)">+7d</button>
-          <button class="btn-drawer-sm" onclick="_confirmarProrrogacaoUsuario(15)">+15d</button>
-          <button class="btn-drawer-sm" onclick="_confirmarProrrogacaoUsuario(30)">+30d</button>
-          <button class="btn-drawer-sm" onclick="_confirmarProrrogacaoUsuario(60)">+60d</button>
-          <input type="number" id="dias-custom" placeholder="Dias" min="1"
-            style="width:65px;padding:5px;border:1px solid #e2e8f0;border-radius:6px;font-size:12px">
-          <button class="btn-drawer-sm btn-verde"
-            onclick="_confirmarProrrogacaoUsuario()">✅ Aplicar</button>
-        </div>
-        <label style="display:flex;align-items:center;gap:6px;font-size:12px;margin-top:8px;cursor:pointer">
-          <input type="checkbox" id="resetar-acessos"> Resetar contador de acessos
-        </label>
-      </div>`;
+    // ── Sessões ativas ────────────────────────────────────────────────────────
+    const sessoesSnap = await db.collection('usuarios').doc(uid)
+      .collection('sessoes')
+      .where('ativo', '==', true)
+      .orderBy('ultimo_acesso', 'desc')
+      .get();
+
+    let sessoesHtml = '';
+    if (sessoesSnap.empty) {
+      sessoesHtml = '<p style="color:#94a3b8;font-size:12px;padding:8px 0">Nenhuma sessão ativa.</p>';
+    } else {
+      for (const sessDoc of sessoesSnap.docs) {
+        const s        = sessDoc.data();
+        const sessId   = sessDoc.id;
+        const criado   = _fmtData(s.criado_em);
+        const ultimo   = _fmtData(s.ultimo_acesso);
+        const origem   = s.origem === 'link_edicao' ? '🔗 Link de edição'
+                       : s.origem === 'ativar_sessao' ? '📧 Link de ativação'
+                       : '📱 App';
+        const suspeito = s.compartilhamento_suspeito
+          ? '<span style="background:#fee2e2;color:#ef4444;border-radius:20px;padding:1px 7px;font-size:10px;margin-left:4px">⚠️ Suspeito</span>'
+          : '';
+
+        sessoesHtml += `
+          <div id="sessao-row-${sessId}"
+            style="display:flex;align-items:center;gap:8px;padding:8px 0;
+              border-bottom:1px dashed #e2e8f0">
+            <div style="flex:1;min-width:0">
+              <div style="font-size:12px;font-weight:700">
+                ${origem}${suspeito}
+              </div>
+              <div style="font-size:11px;color:#64748b;margin-top:2px">
+                Criada: ${criado} · Último acesso: ${ultimo}
+              </div>
+              ${s.acessos_ua_distintos > 0
+                ? `<div style="font-size:10px;color:#f59e0b;margin-top:1px">
+                     UAs distintos: ${s.acessos_ua_distintos}
+                   </div>`
+                : ''}
+            </div>
+            <button class="btn-drawer-sm btn-vermelho"
+              onclick="_revogarSessao('${sessId}')"
+              style="flex-shrink:0;font-size:11px;padding:4px 10px">
+              🔌 Revogar
+            </button>
+          </div>`;
+      }
+    }
+
+    // ── Botão revogar todas ───────────────────────────────────────────────────
+    const totalAtivas = sessoesSnap.size;
+    const rodapeHtml = totalAtivas > 1 ? `
+      <div style="position:sticky;bottom:0;background:#fff;
+        border-top:1px solid #e2e8f0;padding:12px 0 4px">
+        <button class="btn-drawer-sm btn-vermelho" style="width:100%;font-size:12px"
+          onclick="_revogarTodasSessoes()">
+          🔌 Revogar todas as sessões (${totalAtivas})
+        </button>
+      </div>` : '';
+
+    body.innerHTML = `
+      <div class="drawer-secao">
+        <div class="drawer-secao-titulo">📋 Assinatura</div>
+        ${assinaturaHtml || '<p style="color:#94a3b8;font-size:12px">Nenhuma assinatura.</p>'}
+      </div>
+      <div class="drawer-secao">
+        <div class="drawer-secao-titulo">📱 Sessões ativas (${totalAtivas}/3)</div>
+        ${sessoesHtml}
+      </div>
+      ${rodapeHtml}`;
+
   } catch (e) {
     body.innerHTML = `<p style="color:#ef4444">Erro: ${e.message}</p>`;
   }
 }
 
-function _toggleAcessoSel(assinId, envioId, checked) {
-  const key = `${assinId}|${envioId}`;
-  if (checked) _drawerAcessoSel[key] = { assinId, envioId };
-  else delete _drawerAcessoSel[key];
-}
-
-function _selecionarTodosAcesso(sel) {
-  document.querySelectorAll('[id^="acesso-"]').forEach(cb => {
-    cb.checked = sel;
-    const key = `${cb.dataset.assin}|${cb.dataset.envio}`;
-    if (sel) _drawerAcessoSel[key] = { assinId: cb.dataset.assin, envioId: cb.dataset.envio };
-    else delete _drawerAcessoSel[key];
-  });
-}
-
-async function _confirmarProrrogacaoUsuario(diasFixo) {
-  const custom = parseInt(document.getElementById('dias-custom')?.value || '0');
-  const dias = diasFixo || custom;
-  const resetar = document.getElementById('resetar-acessos')?.checked;
+// Revoga uma sessão individual
+async function _revogarSessao(sessaoId) {
+  if (!confirm('Revogar esta sessão? O assinante precisará reabrir o app para criar uma nova.')) return;
   const uid = _drawerUid;
-  if (!dias || dias < 1) { mostrarMensagem('Informe quantos dias prorrogar.'); return; }
-  const selecionados = Object.values(_drawerAcessoSel);
-  if (!selecionados.length) { mostrarMensagem('Selecione ao menos um envio.'); return; }
   try {
+    await db.collection('usuarios').doc(uid)
+      .collection('sessoes').doc(sessaoId)
+      .update({
+        ativo:             false,
+        desativado_motivo: 'revogado_admin',
+        desativado_em:     firebase.firestore.FieldValue.serverTimestamp(),
+      });
+    mostrarMensagem('✅ Sessão revogada.');
+    _renderAcesso();
+  } catch (e) { mostrarMensagem('Erro: ' + e.message); }
+}
+
+// Revoga todas as sessões ativas do assinante
+async function _revogarTodasSessoes() {
+  if (!confirm('Revogar TODAS as sessões ativas? O assinante precisará reabrir o app.')) return;
+  const uid = _drawerUid;
+  try {
+    const snap = await db.collection('usuarios').doc(uid)
+      .collection('sessoes').where('ativo', '==', true).get();
+    if (snap.empty) { mostrarMensagem('Nenhuma sessão ativa.'); return; }
     const batch = db.batch();
-    const novaExp = new Date();
-    novaExp.setDate(novaExp.getDate() + dias);
-    const ts = firebase.firestore.Timestamp.fromDate(novaExp);
-    for (const { assinId, envioId } of selecionados) {
-      const ref = db.collection('usuarios').doc(uid)
-        .collection('assinaturas').doc(assinId)
-        .collection('envios').doc(envioId);
-      const upd = { expira_em: ts };
-      if (resetar) upd.acessos_totais = 0;
-      batch.update(ref, upd);
-    }
+    snap.docs.forEach(doc => batch.update(doc.ref, {
+      ativo:             false,
+      desativado_motivo: 'revogado_admin',
+      desativado_em:     firebase.firestore.FieldValue.serverTimestamp(),
+    }));
     await batch.commit();
-    mostrarMensagem(`✅ +${dias} dias aplicado em ${selecionados.length} envio(s).`);
+    mostrarMensagem(`✅ ${snap.size} sessão(ões) revogada(s).`);
     _renderAcesso();
   } catch (e) { mostrarMensagem('Erro: ' + e.message); }
 }
