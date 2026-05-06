@@ -586,13 +586,27 @@ async function _renderSolicitacoes() {
       // ✅ FILTRO 3: Botões de ação apenas para tipos permitidos
       let acoes = '';
 
+      // ✅ Resposta exibida quando status for "atendida"
+      let respostaHtml = '';
+      if (status === 'atendida' && s.resposta) {
+        respostaHtml = `
+          <div style="margin-top:8px;padding:8px 10px;background:#f0fdf4;
+            border-left:3px solid #22c55e;border-radius:0 6px 6px 0">
+            <div style="font-size:10px;font-weight:700;color:#16a34a;
+              text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px">
+              ✅ Resposta da equipe · ${_fmtHora(s.data_resposta)}
+            </div>
+            <div style="font-size:12px;color:#334155;line-height:1.4;white-space:pre-wrap">
+              ${s.resposta}
+            </div>
+          </div>`;
+      }
+
       // Botões para "mensagem" (com botão Responder)
       //if (s.tipo === 'mensagem' && (status === 'aberta' || status === 'pendente')) {
       if (status === 'aberta' || status === 'pendente') {
         acoes = `
           <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">
-            <button class="btn-drawer-sm btn-verde" onclick="_drawerResponderSolicitacao('${uid}','${doc.id}','atendida')">✅ Atendida</button>
-            <button class="btn-drawer-sm btn-vermelho" onclick="_drawerResponderSolicitacao('${uid}','${doc.id}','cancelada')">❌ Cancelar</button>
             <button class="btn-drawer-sm" onclick="_drawerResponderSolicitacao('${uid}','${doc.id}','atendida')">✍️ Responder</button>
           </div>`;
       }
@@ -637,6 +651,7 @@ async function _renderSolicitacoes() {
             <div style="margin-left:8px;flex-shrink:0">${_stBadge(status)}</div>
           </div>
           ${acoes}
+          ${respostaHtml}  
         </div>`;
     });
 
