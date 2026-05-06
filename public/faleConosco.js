@@ -2,31 +2,34 @@
 // Botão "Fale Conosco" no app verNewsletterComToken
 // ─────────────────────────────────────────────────────────────────────────────
 (function () {
-'use strict';
-const MAX_CHARS = 250;
-const STORAGE_KEY_BADGE = 'rs_fc_respondidas_vistas';
+  'use strict';
+  const MAX_CHARS = 250;
+  const STORAGE_KEY_BADGE = 'rs_fc_respondidas_vistas';
+  let _historicoCache    = null;
+  let _historicoCacheTs  = 0;
+  const _HISTORICO_TTL   = 5 * 60 * 1000; // 5 min
 
-// ── Inicialização ─────────────────────────────────────────────────────────
-function init() {
-  _injetarHTML();
-  _injetarCSS();
-  _bindEventos();
-  _atualizarBadge();
-}
+  // ── Inicialização ─────────────────────────────────────────────────────────
+  function init() {
+    _injetarHTML();
+    _injetarCSS();
+    _bindEventos();
+    _atualizarBadge();
+  }
 
-// ── HTML ──────────────────────────────────────────────────────────────────
-function _injetarHTML() {
-  const overlay = document.createElement('div');
-  overlay.id = 'rs-fc-overlay';
-  overlay.setAttribute('role', 'presentation');
-  document.body.appendChild(overlay);
+  // ── HTML ──────────────────────────────────────────────────────────────────
+  function _injetarHTML() {
+    const overlay = document.createElement('div');
+    overlay.id = 'rs-fc-overlay';
+    overlay.setAttribute('role', 'presentation');
+    document.body.appendChild(overlay);
 
-  const drawer = document.createElement('aside');
-  drawer.id = 'rs-fc-panel';
-  drawer.setAttribute('role', 'dialog');
-  drawer.setAttribute('aria-modal', 'true');
-  drawer.setAttribute('aria-label', 'Fale Conosco');
-  drawer.innerHTML = `
+    const drawer = document.createElement('aside');
+    drawer.id = 'rs-fc-panel';
+    drawer.setAttribute('role', 'dialog');
+    drawer.setAttribute('aria-modal', 'true');
+    drawer.setAttribute('aria-label', 'Fale Conosco');
+    drawer.innerHTML = `
      <div id="rs-fc-header">
        <span id="rs-fc-titulo">💬 Ações</span>
        <button id="rs-fc-fechar" type="button" aria-label="Fechar">×</button>
@@ -35,13 +38,13 @@ function _injetarHTML() {
        <div class="rs-fc-loading">Carregando…</div>
      </div>
   `;
-  document.body.appendChild(drawer);
-}
+    document.body.appendChild(drawer);
+  }
 
-// ── CSS ───────────────────────────────────────────────────────────────────
-function _injetarCSS() {
-  const style = document.createElement('style');
-  style.textContent = `
+  // ── CSS ───────────────────────────────────────────────────────────────────
+  function _injetarCSS() {
+    const style = document.createElement('style');
+    style.textContent = `
   #rs-fc-badge { min-width: 18px; height: 18px; padding: 0 5px; background: #22c55e; color: #fff; border-radius: 99px; font-size: 10px; font-weight: 800; line-height: 18px; text-align: center; margin-left: 2px; }
   #rs-fc-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.5); z-index: 600; opacity: 0; pointer-events: none; transition: opacity .25s; backdrop-filter: blur(2px); }
   #rs-fc-overlay.rs-fc-show { opacity: 1; pointer-events: all; }
@@ -80,386 +83,487 @@ function _injetarCSS() {
   .rs-fc-badge-status { font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 99px; text-transform: uppercase; }
   .rs-fc-badge-status.aberta { background: rgba(251,191,36,.15); color: #d97706; }
   .rs-fc-badge-status.respondida { background: rgba(34,197,94,.15); color: #16a34a; }
-  .rs-sugestao-card { background: var(--rs-card2, #162032); border: 1px solid var(--rs-borda, rgba(148,163,184,.12)); border-radius: 10px; padding: 14px; display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
-  .rs-sugestao-header { display: flex; justify-content: space-between; align-items: center; font-size: 12px; color: var(--rs-muted, #94a3b8); }
+  
+  .rs-sugestao-card { background: var(--rs-card2, #162032); border: 1px solid var(--rs-borda, rgba(148,163,184,.12)); border-radius: 10px; padding: 12px; display: flex; flex-direction: column; gap: 6px; margin-bottom: 8px; }
+  .rs-sugestao-header { display: flex; justify-content: space-between; align-items: center; font-size: 11px; color: var(--rs-muted, #94a3b8); }
   .rs-sugestao-posicao { font-weight: 700; color: #0e7490; }
   .rs-sugestao-votos { font-weight: 600; }
-  .rs-sugestao-texto { font-size: 13px; color: var(--rs-text, #f8fafc); line-height: 1.5; margin: 4px 0; }
+  .rs-sugestao-texto { font-size: 13px; color: var(--rs-text, #f8fafc); line-height: 1.4; }
+  .rs-sugestao-data { font-size: 10px; color: var(--rs-muted, #94a3b8); text-transform: uppercase; letter-spacing: .5px; }
   .rs-voto-btn { align-self: flex-start; padding: 6px 12px; background: var(--rs-card2, #162032); border: 2px solid var(--rs-borda, rgba(148,163,184,.12)); border-radius: 20px; color: var(--rs-text, #f8fafc); font-size: 12px; font-weight: 600; cursor: pointer; transition: all .15s; }
   .rs-voto-btn:hover { border-color: #0e7490; background: rgba(14,116,144,.1); }
   .rs-voto-btn.votado { border-color: #22c55e; background: rgba(34,197,94,.15); color: #22c55e; }
-  .rs-sugestao-card.encerrada { opacity: 0.8; border-color: #64748b; }
-  .rs-sugestao-card.encerrada .rs-sugestao-posicao { color: #64748b; }
+
+  .rs-resultado-card { background: var(--rs-card2, #162032); border: 1px solid var(--rs-borda, rgba(148,163,184,.12)); border-radius: 10px; padding: 14px; display: flex; flex-direction: column; gap: 10px; margin: 8px 0; }
+  .rs-resultado-header { font-size: 12px; font-weight: 700; color: #a78bfa; text-transform: uppercase; letter-spacing: .5px; border-bottom: 1px dashed var(--rs-borda); padding-bottom: 8px; margin-bottom: 2px; }
+  .rs-res-item { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid rgba(148,163,184,.08); }
+  .rs-res-item:last-child { border-bottom: none; }
+  .rs-res-pos { font-weight: 800; font-size: 14px; min-width: 28px; color: var(--rs-muted, #94a3b8); }
+  .rs-res-item.vencedor .rs-res-pos { color: #fbbf24; font-size: 16px; }
+  .rs-res-info { flex: 1; display: flex; flex-direction: column; gap: 2px; }
+  .rs-res-texto { font-size: 13px; color: var(--rs-text, #f8fafc); line-height: 1.3; }
+  .rs-res-item.vencedor .rs-res-texto { font-weight: 700; color: #fbbf24; }
+  .rs-res-meta { font-size: 10px; color: var(--rs-muted, #94a3b8); display: flex; gap: 8px; align-items: center; }
+  .rs-res-votos { background: rgba(14,116,144,.15); color: #0e7490; padding: 2px 6px; border-radius: 4px; font-weight: 700; }
   `;
-  document.head.appendChild(style);
-}
-
-// ── Eventos ───────────────────────────────────────────────────────────────
-function _bindEventos() {
-  document.getElementById('rs-fc-fechar').addEventListener('click', _fecharDrawer);
-  document.getElementById('rs-fc-overlay').addEventListener('click', _fecharDrawer);
-  document.addEventListener('keydown', e => { if (e.key === 'Escape') _fecharDrawer(); });
-}
-
-// ── Abrir / Fechar ────────────────────────────────────────────────────────
-function _abrirDrawer() {
-  document.getElementById('rs-fc-overlay').classList.add('rs-fc-show');
-  document.getElementById('rs-fc-panel').classList.add('rs-fc-show');
-  document.body.style.overflow = 'hidden';
-  _renderDrawer('mensagem');
-}
-function _fecharDrawer() {
-  document.getElementById('rs-fc-overlay').classList.remove('rs-fc-show');
-  document.getElementById('rs-fc-panel').classList.remove('rs-fc-show');
-  document.body.style.overflow = '';
-  _atualizarBadge();
-}
-
-// ── Render principal ──────────────────────────────────────────────────────
-async function _renderDrawer(tipoAtivo = 'mensagem') {
-  const body = document.getElementById('rs-fc-body');
-  body.innerHTML = '<div class="rs-fc-loading">Carregando…</div>';
-  const user = window._radarUser;
-  if (!user) {
-    body.innerHTML = '<div class="rs-fc-vazio"><span>🔒</span>Faça login para enviar mensagens.</div>';
-    return;
+    document.head.appendChild(style);
   }
 
-  const isAssinante = user.segmento === 'assinante';
-  let quotaTema = 0;
-  let usoTemaMes = 0;
-
-  if (isAssinante && user.assinaturaId) {
-    try {
-      const assinSnap = await window.db.collection('usuarios').doc(user.uid).collection('assinaturas').doc(user.assinaturaId).get();
-      if (assinSnap.exists) {
-        const feat = assinSnap.data().features_snapshot || {};
-        quotaTema = feat.sugestao_tema_quota || 0;
-      }
-      if (quotaTema > 0) {
-        const inicioMes = new Date();
-        inicioMes.setDate(1); inicioMes.setHours(0, 0, 0, 0);
-        const snap = await window.db.collection('usuarios').doc(user.uid).collection('solicitacoes').where('tipo', '==', 'sugestao_tema').get();
-        usoTemaMes = snap.docs.filter(d => {
-          const ds = d.data().data_solicitacao;
-          return ds && new Date(ds) >= inicioMes;
-        }).length;
-      }
-    } catch(e) { console.warn('[faleConosco] quota:', e.message); }
+  // ── Eventos ───────────────────────────────────────────────────────────────
+  function _bindEventos() {
+    document.getElementById('rs-fc-fechar').addEventListener('click', _fecharDrawer);
+    document.getElementById('rs-fc-overlay').addEventListener('click', _fecharDrawer);
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') _fecharDrawer(); });
   }
 
-  const historico = await _buscarHistorico(user);
-  _marcarRespostasVistas(historico);
+  // ── Abrir / Fechar ────────────────────────────────────────────────────────
+  function _abrirDrawer() {
+    document.getElementById('rs-fc-overlay').classList.add('rs-fc-show');
+    document.getElementById('rs-fc-panel').classList.add('rs-fc-show');
+    document.body.style.overflow = 'hidden';
+    _renderDrawer('mensagem');
+  }
+  function _fecharDrawer() {
+    document.getElementById('rs-fc-overlay').classList.remove('rs-fc-show');
+    document.getElementById('rs-fc-panel').classList.remove('rs-fc-show');
+    document.body.style.overflow = '';
+    _atualizarBadge();
+  }
 
-  let html = '';
-  const avisoTexto = tipoAtivo === 'sugestao_tema'
-    ? 'Esta área é destinada apenas para sugestão de temas para as próximas edições e para visualização do ranking mensal.'
-    : 'Este canal é para dúvidas sobre a sua assinatura e feedbacks. Para suporte técnico, consulte os planos disponíveis.';
-  html += `<div class="rs-fc-aviso">${avisoTexto}</div>`;
-
-  const quotaEsgotada = quotaTema > 0 && usoTemaMes >= quotaTema;
-  const temFeatureTema = isAssinante && quotaTema > 0;
-
-  // ABAS (sem Ranking Mensal, conforme solicitado)
-  html += `<div class="rs-fc-tipos">`;
-  html += `<button class="rs-fc-tipo-btn ${tipoAtivo === 'mensagem' ? 'ativo' : ''}" onclick="window._fcSelecionarTipo('mensagem')">💬 Mensagem</button>`;
-
-  if (isAssinante) {
-    if (temFeatureTema) {
-      const btnClass = `rs-fc-tipo-btn ${tipoAtivo === 'sugestao_tema' ? 'ativo' : ''} ${quotaEsgotada ? 'bloqueado' : ''}`;
-      const btnOnclick = quotaEsgotada ? '' : `onclick="window._fcSelecionarTipo('sugestao_tema')"`;
-      const btnText = quotaEsgotada ? '⛔ Cota esgotada' : '💡 Sugerir tema';
-      html += `<button class="${btnClass}" ${btnOnclick}>${btnText}</button>`;
-    } else {
-      html += `<button class="rs-fc-tipo-btn bloqueado" title="Disponível em planos superiores">💡 Sugerir tema 🔒</button>`;
+  // ── Render principal ──────────────────────────────────────────────────────
+  async function _renderDrawer(tipoAtivo = 'mensagem') {
+    const body = document.getElementById('rs-fc-body');
+    body.innerHTML = '<div class="rs-fc-loading">Carregando…</div>';
+    const user = window._radarUser;
+    if (!user) {
+      body.innerHTML = '<div class="rs-fc-vazio"><span>🔒</span>Faça login para enviar mensagens.</div>';
+      return;
     }
-  }
-  html += `</div>`;
 
-  // CONTEÚDO PRINCIPAL
-  if (tipoAtivo === 'sugestao_tema') {
-    // 1. Ranking no topo
-    html += await _renderRankingMensal(user, temFeatureTema);
-    // 2. Formulário abaixo
-    if (!quotaEsgotada) {
+    const isAssinante = user.segmento === 'assinante';
+    let quotaTema  = 0;
+    let usoTemaMes = 0;
+
+    // ── Features da sessão local (sem Firestore) ────────────────────────────
+    if (isAssinante) {
+      try {
+        const _sessao = JSON.parse(localStorage.getItem('rs_pwa_session') || '{}');
+        quotaTema = (_sessao.features || user.features || {}).sugestao_tema_quota || 0;
+      } catch (e) { /* ignora */ }
+    }
+
+    // ── Paraleliza: count de quota do mês + histórico ───────────────────────
+    const [historico] = await Promise.all([
+      _buscarHistorico(user),
+      quotaTema > 0
+        ? (async () => {
+            try {
+              const inicioMes = new Date();
+              inicioMes.setDate(1); inicioMes.setHours(0, 0, 0, 0);
+              const snap = await window.db.collection('usuarios').doc(user.uid)
+                .collection('solicitacoes').where('tipo', '==', 'sugestao_tema').get();
+              usoTemaMes = snap.docs.filter(d => {
+                const ds = d.data().data_solicitacao;
+                return ds && new Date(ds) >= inicioMes;
+              }).length;
+            } catch (e) { console.warn('[faleConosco] quota:', e.message); }
+          })()
+        : Promise.resolve(),
+    ]);
+
+    _marcarRespostasVistas(historico);
+
+    const quotaEsgotada  = quotaTema > 0 && usoTemaMes >= quotaTema;
+    const temFeatureTema = isAssinante && quotaTema > 0;
+
+    let html = '';
+    const avisoTexto = tipoAtivo === 'sugestao_tema'
+      ? 'Área destinada para sugestão de temas para as próximas edições e para visualização do resultado da votação.'
+      : 'Área destinada para dúvidas sobre a sua assinatura e feedbacks.';
+    html += `<div class="rs-fc-aviso">${avisoTexto}</div>`;
+
+    // ── Abas ────────────────────────────────────────────────────────────────
+    html += `<div class="rs-fc-tipos">`;
+    html += `<button class="rs-fc-tipo-btn ${tipoAtivo === 'mensagem' ? 'ativo' : ''}" onclick="window._fcSelecionarTipo('mensagem')">💬 Mensagem</button>`;
+    if (isAssinante) {
+      if (temFeatureTema) {
+        html += `<button class="rs-fc-tipo-btn ${tipoAtivo === 'sugestao_tema' ? 'ativo' : ''}" onclick="window._fcSelecionarTipo('sugestao_tema')">💡 Sugerir tema</button>`;
+      } else {
+        html += `<button class="rs-fc-tipo-btn bloqueado" title="Disponível em planos superiores">💡 Sugerir tema 🔒</button>`;
+      }
+    }
+    html += `</div>`;
+
+    if (tipoAtivo === 'sugestao_tema') {
+      html += await _renderVotacaoAtual(user, temFeatureTema);
+
+      const restantes = Math.max(0, quotaTema - usoTemaMes);
+      const placeholderTxt = quotaEsgotada
+        ? 'Cota de sugestões esgotada para este mês.'
+        : `Descreva o tema que gostaria que fosse abordado… você ainda tem direito a ${restantes} sugestão(ões).`;
+      const textareaAttrs = quotaEsgotada ? 'disabled readonly style="opacity:0.6; cursor:not-allowed;"' : '';
+
       html += `
-        <div style="margin-top: 16px;">
+        <div style="margin-top:16px">
           <label class="rs-fc-label" for="rs-fc-txt">💡 Sugestão de tema</label>
-          <textarea id="rs-fc-txt" class="rs-fc-textarea" placeholder="Descreva o tema que gostaria que fosse abordado…" maxlength="${MAX_CHARS}"></textarea>
+          <textarea id="rs-fc-txt" class="rs-fc-textarea" placeholder="${placeholderTxt}"
+            maxlength="${MAX_CHARS}" ${textareaAttrs}></textarea>
           <div class="rs-fc-chars" id="rs-fc-chars">0/${MAX_CHARS}</div>
         </div>
-        <button class="rs-fc-enviar" id="rs-fc-enviar" disabled onclick="window._fcEnviar('sugestao_tema')">Enviar</button>
-      `;
-    }
-  } else {
-    html += `
-      <div>
-        <label class="rs-fc-label" for="rs-fc-txt">💬 Nova mensagem</label>
-        <textarea id="rs-fc-txt" class="rs-fc-textarea" placeholder="Digite sua mensagem ou dúvida…" maxlength="${MAX_CHARS}"></textarea>
-        <div class="rs-fc-chars" id="rs-fc-chars">0/${MAX_CHARS}</div>
-      </div>
-      <button class="rs-fc-enviar" id="rs-fc-enviar" disabled onclick="window._fcEnviar('mensagem')">Enviar</button>
-    `;
-  }
+        <button class="rs-fc-enviar" id="rs-fc-enviar" disabled ${quotaEsgotada ? 'disabled' : ''}
+          onclick="window._fcEnviar('sugestao_tema')">Enviar</button>`;
 
-  // HISTÓRICO FILTRADO
-  const historicoFiltrado = tipoAtivo === 'mensagem'
-    ? historico.filter(m => m.tipo !== 'sugestao_tema')
-    : historico.filter(m => m.tipo === 'sugestao_tema');
+      html += await _renderResultadoAnterior(user, temFeatureTema);
 
-  if (historicoFiltrado.length > 0) {
-    html += `<div class="rs-fc-sep">Histórico</div>`;
-    historicoFiltrado.forEach(msg => {
-      const respondida = !!msg.resposta;
-      const data = msg.criado_em ? new Date(msg.criado_em?.seconds ? msg.criado_em.seconds * 1000 : msg.criado_em).toLocaleDateString('pt-BR', { day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' }) : '—';
-      const tipoLabel = msg.tipo === 'sugestao_tema' ? '💡 Sugestão de tema' : '💬 Mensagem';
-      const respostaHtml = respondida ? `<div class="rs-fc-msg-resposta"><div class="rs-fc-msg-resposta-label">✅ Resposta da equipe</div>${msg.resposta}</div>` : '';
+    } else {
       html += `
-        <div class="rs-fc-msg-card ${respondida ? 'respondida' : ''}">
-          <div class="rs-fc-msg-topo">
-            <span class="rs-fc-msg-tipo">${tipoLabel}</span>
-            <div style="display:flex;gap:6px;align-items:center">
-              <span class="rs-fc-badge-status ${respondida ? 'respondida' : 'aberta'}">${msg.tipo === 'sugestao_tema' ? 'Enviada' : (respondida ? 'Respondida' : 'Aguardando')}</span>
-              <span class="rs-fc-msg-data">${data}</span>
+        <div>
+          <label class="rs-fc-label" for="rs-fc-txt">💬 Nova mensagem</label>
+          <textarea id="rs-fc-txt" class="rs-fc-textarea"
+            placeholder="Digite sua mensagem ou dúvida…" maxlength="${MAX_CHARS}"></textarea>
+          <div class="rs-fc-chars" id="rs-fc-chars">0/${MAX_CHARS}</div>
+        </div>
+        <button class="rs-fc-enviar" id="rs-fc-enviar" disabled
+          onclick="window._fcEnviar('mensagem')">Enviar</button>`;
+    }
+
+    // ── Histórico ────────────────────────────────────────────────────────────
+    const historicoFiltrado = tipoAtivo === 'mensagem'
+      ? historico.filter(m => m.tipo !== 'sugestao_tema')
+      : historico.filter(m => m.tipo === 'sugestao_tema');
+
+    if (historicoFiltrado.length > 0) {
+      html += `<div class="rs-fc-sep">Histórico</div>`;
+      historicoFiltrado.forEach(msg => {
+        const respondida = !!msg.resposta;
+        let dataFormatada = '—';
+        try {
+          const rawDate = msg.criado_em || msg.data_solicitacao;
+          if (rawDate) {
+            const d = rawDate.seconds ? new Date(rawDate.seconds * 1000) : new Date(rawDate);
+            if (!isNaN(d.getTime())) dataFormatada = `em ${d.toLocaleDateString('pt-BR')}`;
+          }
+        } catch (e) { }
+
+        const tipoLabel    = msg.tipo === 'sugestao_tema' ? '💡 Sugestão de tema' : '💬 Mensagem';
+        const respostaHtml = respondida
+          ? `<div class="rs-fc-msg-resposta"><div class="rs-fc-msg-resposta-label">✅ Resposta da equipe</div>${msg.resposta}</div>`
+          : '';
+
+        html += `
+          <div class="rs-fc-msg-card ${respondida ? 'respondida' : ''}">
+            <div class="rs-fc-msg-topo">
+              <span class="rs-fc-msg-tipo">${tipoLabel}</span>
+              <div style="display:flex;gap:6px;align-items:center">
+                <span class="rs-fc-badge-status ${respondida ? 'respondida' : 'aberta'}">
+                  ${msg.tipo === 'sugestao_tema' ? 'Enviada' : (respondida ? 'Respondida' : 'Aguardando')}
+                </span>
+                <span class="rs-fc-msg-data">${dataFormatada}</span>
+              </div>
             </div>
-          </div>
-          <div class="rs-fc-msg-texto">${msg.texto || msg.descricao || ''}</div>
-          ${respostaHtml}
-        </div>`;
-    });
-  } else {
-    html += `<div class="rs-fc-vazio"><span>💬</span>Nenhuma mensagem ainda.</div>`;
-  }
-
-  body.innerHTML = html;
-
-  // Bind contador de caracteres
-  const textarea = document.getElementById('rs-fc-txt');
-  const chars = document.getElementById('rs-fc-chars');
-  const btnEnv = document.getElementById('rs-fc-enviar');
-  if (textarea) {
-    textarea.addEventListener('input', () => {
-      const n = textarea.value.length;
-      chars.textContent = `${n}/${MAX_CHARS}`;
-      chars.classList.toggle('limite', n >= MAX_CHARS);
-      if (btnEnv) btnEnv.disabled = n === 0;
-    });
-  }
-}
-
-// ── Selecionar tipo ───────────────────────────────────────────────────────
-window._fcSelecionarTipo = function(tipo) { _renderDrawer(tipo); };
-
-// ── Enviar mensagem ───────────────────────────────────────────────────────
-window._fcEnviar = async function(tipo) {
-  const textarea = document.getElementById('rs-fc-txt');
-  const btnEnv = document.getElementById('rs-fc-enviar');
-  const texto = textarea?.value?.trim();
-  if (!texto) return;
-  const user = window._radarUser;
-  if (!user) return;
-
-  if (btnEnv) { btnEnv.disabled = true; btnEnv.textContent = 'Enviando…'; }
-
-  try {
-    if (user.segmento === 'assinante') {
-      const solicitacaoRef = await window.db.collection('usuarios').doc(user.uid).collection('solicitacoes').add({
-        tipo, descricao: texto, status: 'aberta', data_solicitacao: new Date().toISOString()
+            <div class="rs-fc-msg-texto">${msg.texto || msg.descricao || ''}</div>
+            ${respostaHtml}
+          </div>`;
       });
+    } else {
+      html += `<div class="rs-fc-vazio"><span>💬</span>Nenhuma mensagem ainda.</div>`;
+    }
 
-      if (tipo === 'sugestao_tema') {
-        const periodoAtual = new Date().toISOString().slice(0, 7);
-        await _verificarEEncerrarMesAnterior(periodoAtual);
-        await window.db.collection('sugestoes_publicas').doc(`sugestao_${solicitacaoRef.id}`).set({
-          solicitacao_ref: solicitacaoRef.path,
-          texto_preview: texto.substring(0, 100) + (texto.length > 100 ? '...' : ''),
-          autor_uid: user.uid, votos: 0, votantes: [], status: 'ativa', periodo: periodoAtual, criado_em: new Date(), atualizado_em: new Date()
+    body.innerHTML = html;
+
+    // ── Configuração do campo de texto e botão enviar ────────────────────────
+    const textarea = document.getElementById('rs-fc-txt');
+    const chars    = document.getElementById('rs-fc-chars');
+    const btnEnv   = document.getElementById('rs-fc-enviar');
+
+    if (textarea) {
+      textarea.addEventListener('input', () => {
+        const n = textarea.value.length;
+        chars.textContent = `${n}/${MAX_CHARS}`;
+        chars.classList.toggle('limite', n >= MAX_CHARS);
+        
+        if (!btnEnv) return;
+        
+        // Lógica condicional por tipo de aba
+        if (tipoAtivo === 'sugestao_tema') {
+          // Para sugestão de tema: habilita só se tiver texto E quota disponível
+          btnEnv.disabled = (n === 0) || quotaEsgotada;
+        } else {
+          // Para mensagem comum: habilita apenas se tiver texto
+          btnEnv.disabled = (n === 0);
+        }
+      });
+    }
+  }
+
+  // ── Selecionar tipo ───────────────────────────────────────────────────────
+  window._fcSelecionarTipo = function (tipo) { _renderDrawer(tipo); };
+
+  // ── Enviar mensagem ───────────────────────────────────────────────────────
+  window._fcEnviar = async function (tipo) {
+    const textarea = document.getElementById('rs-fc-txt');
+    const btnEnv = document.getElementById('rs-fc-enviar');
+    const texto = textarea?.value?.trim();
+    if (!texto) return;
+    const user = window._radarUser;
+    if (!user) return;
+
+    if (btnEnv) { btnEnv.disabled = true; btnEnv.textContent = 'Enviando…'; }
+
+    try {
+      if (user.segmento === 'assinante') {
+        const solicitacaoRef = await window.db.collection('usuarios').doc(user.uid).collection('solicitacoes').add({
+          tipo, descricao: texto, status: 'aberta', data_solicitacao: new Date().toISOString()
         });
+
+        if (tipo === 'sugestao_tema') {
+          const cicloSnap = await window.db.collection('ciclos_votacao')
+            .where('status', 'in', ['rascunho', 'indicacao'])
+            .orderBy('inicio_indicacao', 'desc').limit(1).get();
+          const cicloAtivo = cicloSnap.empty ? null : cicloSnap.docs[0];
+          await window.db.collection('sugestoes_publicas').doc(`sugestao_${solicitacaoRef.id}`).set({
+            solicitacao_ref: solicitacaoRef.path,
+            texto_preview: texto.substring(0, 100) + (texto.length > 100 ? '...' : ''),
+            autor_uid: user.uid, votos: 0, votantes: [],
+            status: 'ativa',
+            ciclo_id: cicloAtivo?.id || null,
+            periodo: cicloAtivo
+              ? cicloAtivo.data().inicio_indicacao.toDate().toISOString().slice(0, 7)
+              : new Date().toISOString().slice(0, 7),
+            criado_em: new Date(), atualizado_em: new Date()
+          });
+        }
+        await window.db.collection('admin_contadores').doc('pendencias').set({ solicitacoes: firebase.firestore.FieldValue.increment(1) }, { merge: true });
+      } else {
+        const leadId = parseInt(user.uid, 10);
+        if (!leadId) throw new Error('ID do lead inválido.');
+        const { error } = await window.supabase.from('leads_mensagens').insert({ lead_id: leadId, texto, tipo });
+        if (error) throw new Error(error.message);
+        await window.db.collection('admin_contadores').doc('pendencias').set({ leads_mensagens: firebase.firestore.FieldValue.increment(1) }, { merge: true });
       }
-      await window.db.collection('admin_contadores').doc('pendencias').set({ solicitacoes: firebase.firestore.FieldValue.increment(1) }, { merge: true });
-    } else {
-      const leadId = parseInt(user.uid, 10);
-      if (!leadId) throw new Error('ID do lead inválido.');
-      const { error } = await window.supabase.from('leads_mensagens').insert({ lead_id: leadId, texto, tipo });
-      if (error) throw new Error(error.message);
-      await window.db.collection('admin_contadores').doc('pendencias').set({ leads_mensagens: firebase.firestore.FieldValue.increment(1) }, { merge: true });
-    }
 
-    if (btnEnv) { btnEnv.textContent = '✅ Enviado!'; btnEnv.disabled = true; }
-    setTimeout(() => _renderDrawer(tipo), 700);
-  } catch(e) {
-    console.error('[faleConosco] enviar:', e);
-    if (btnEnv) { btnEnv.disabled = false; btnEnv.textContent = 'Enviar'; }
-    alert('Erro ao enviar. Tente novamente.');
+      if (btnEnv) { btnEnv.textContent = '✅ Enviado!'; btnEnv.disabled = true; }
+      _historicoCache = null;
+      setTimeout(() => _renderDrawer(tipo), 700);
+    } catch (e) {
+      console.error('[faleConosco] enviar:', e);
+      if (btnEnv) { btnEnv.disabled = false; btnEnv.textContent = 'Enviar'; }
+      alert('Erro ao enviar. Tente novamente.');
+    }
+  };
+
+  // ── Buscar histórico ──────────────────────────────────────────────────────
+  async function _buscarHistorico(user, forceRefresh = false) {
+    if (!forceRefresh && _historicoCache && (Date.now() - _historicoCacheTs) < _HISTORICO_TTL) {
+      return _historicoCache;
+    }
+    try {
+      if (user.segmento === 'assinante') {
+        const dataCorte = user._assinaturaCreatedAt || null;
+        const snap = await window.db.collection('usuarios').doc(user.uid)
+          .collection('solicitacoes')
+          .where('tipo', 'in', ['mensagem', 'sugestao_tema'])
+          .orderBy('data_solicitacao', 'desc')
+          .limit(20).get();
+        const docs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        const resultado = !dataCorte ? docs : docs.filter(d => {
+          const ds = d.data_solicitacao;
+          return ds && new Date(ds) >= dataCorte;
+        });
+        _historicoCache = resultado; _historicoCacheTs = Date.now();
+        return resultado;
+      } else {
+        const leadId = parseInt(user.uid, 10);
+        if (!leadId) return [];
+
+        // Busca data_criacao do lead para usar como corte
+        let dataCorte = null;
+        try {
+          const { data: leadRow } = await window.supabase
+            .from('leads').select('data_criacao').eq('id', leadId).single();
+          if (leadRow?.data_criacao) dataCorte = new Date(leadRow.data_criacao);
+        } catch (e) { console.warn('[faleConosco] data_criacao lead:', e.message); }
+
+        let query = window.supabase.from('leads_mensagens').select('*')
+          .eq('lead_id', leadId).order('criado_em', { ascending: false }).limit(20);
+        if (dataCorte) query = query.gte('criado_em', dataCorte.toISOString());
+
+        const { data, error } = await query;
+        if (error) throw new Error(error.message);
+        const resultado = data || [];
+        _historicoCache = resultado; _historicoCacheTs = Date.now();
+        return resultado;
+      }
+    } catch (e) { console.warn('[faleConosco] histórico:', e.message); return []; }
   }
-};
 
-// ── Buscar histórico ──────────────────────────────────────────────────────
-async function _buscarHistorico(user) {
-  try {
-    if (user.segmento === 'assinante') {
-      const snap = await window.db.collection('usuarios').doc(user.uid).collection('solicitacoes').where('tipo', 'in', ['mensagem', 'sugestao_tema']).orderBy('data_solicitacao', 'desc').limit(20).get();
-      return snap.docs.map(d => ({ id: d.id, ...d.data() }));
-    } else {
-      const { data, error } = await window.supabase.from('leads_mensagens').select('*').eq('lead_id', parseInt(user.uid, 10)).order('criado_em', { ascending: false }).limit(20);
-      if (error) throw new Error(error.message);
-      return data || [];
-    }
-  } catch(e) { console.warn('[faleConosco] histórico:', e.message); return []; }
-}
-
-// ── Badge ─────────────────────────────────────────────────────────────────
-async function _atualizarBadge() {
-  const badge = document.getElementById('rs-fc-badge');
-  if (!badge) return;
-  const user = window._radarUser;
-  if (!user) { badge.style.display = 'none'; return; }
-  try {
-    const historico = await _buscarHistorico(user);
-    const vistas = _getVistas();
-    const novas = historico.filter(m => m.resposta && !vistas.has(String(m.id || m.data_solicitacao)));
-    badge.textContent = novas.length > 9 ? '9+' : String(novas.length);
-    badge.style.display = novas.length > 0 ? 'inline-block' : 'none';
-  } catch(e) { badge.style.display = 'none'; }
-}
-function _getVistas() { try { return new Set(JSON.parse(localStorage.getItem(STORAGE_KEY_BADGE) || '[]')); } catch { return new Set(); } }
-function _marcarRespostasVistas(historico) {
-  try {
-    const vistas = _getVistas();
-    historico.forEach(m => { if (m.resposta) vistas.add(String(m.id || m.data_solicitacao)); });
-    localStorage.setItem(STORAGE_KEY_BADGE, JSON.stringify([...vistas]));
-  } catch {}
-}
-
-// ── Renderizar ranking mensal ─────────────────────────────────────────────
-async function _renderRankingMensal(user, temFeatureTema) {
-  try {
-    const periodoAtual = new Date().toISOString().slice(0, 7);
-    const dataAtual = new Date();
-    const periodoAnterior = dataAtual.getMonth() === 0 ? `${dataAtual.getFullYear() - 1}-12` : `${dataAtual.getFullYear()}-${String(dataAtual.getMonth()).padStart(2, '0')}`;
-    let html = '';
-    html += `<div class="rs-fc-sep">🏆 Mês Atual (${_formatarPeriodo(periodoAtual)})</div>`;
-    html += await _renderRankingPeriodo(user, temFeatureTema, periodoAtual, 'ativa');
-    html += `<div class="rs-fc-sep">🏅 Mês Anterior (${_formatarPeriodo(periodoAnterior)})</div>`;
-    html += await _renderRankingPeriodo(user, temFeatureTema, periodoAnterior, 'encerrada');
-    return html;
-  } catch (err) {
-    console.error('[faleConosco] ranking:', err);
-    return `<div class="rs-fc-vazio"><span>⚠️</span>Erro ao carregar ranking.</div>`;
+  // ── Badge ─────────────────────────────────────────────────────────────────
+  async function _atualizarBadge() {
+    const badge = document.getElementById('rs-fc-badge');
+    if (!badge) return;
+    const user = window._radarUser;
+    if (!user) { badge.style.display = 'none'; return; }
+    try {
+      const historico = await _buscarHistorico(user);
+      const vistas = _getVistas();
+      const novas = historico.filter(m => m.resposta && !vistas.has(String(m.id || m.data_solicitacao)));
+      badge.textContent = novas.length > 9 ? '9+' : String(novas.length);
+      badge.style.display = novas.length > 0 ? 'inline-block' : 'none';
+    } catch (e) { badge.style.display = 'none'; }
   }
-}
+  function _getVistas() { try { return new Set(JSON.parse(localStorage.getItem(STORAGE_KEY_BADGE) || '[]')); } catch { return new Set(); } }
+  function _marcarRespostasVistas(historico) {
+    try {
+      const vistas = _getVistas();
+      historico.forEach(m => { if (m.resposta) vistas.add(String(m.id || m.data_solicitacao)); });
+      localStorage.setItem(STORAGE_KEY_BADGE, JSON.stringify([...vistas]));
+    } catch { }
+  }
 
-async function _renderRankingPeriodo(user, temFeatureTema, periodo, status) {
-  try {
-    let snap;
-    if (status === 'ativa') {
-      snap = await window.db.collection('sugestoes_publicas').where('status', '==', status).where('periodo', '==', periodo).orderBy('votos', 'desc').orderBy('criado_em', 'desc').limit(5).get();
-    } else {
-      snap = await window.db.collection('sugestoes_publicas').where('status', '==', status).where('periodo', '==', periodo).orderBy('votos', 'desc').orderBy('criado_em', 'desc').get();
-    }
+  // ── UTILITÁRIOS ───────────────────────────────────────────────────────────
+  function _getPeriodoAtual() { return new Date().toISOString().slice(0, 7); }
+  function _getPeriodoAnterior() {
+    const d = new Date(); return d.getMonth() === 0 ? `${d.getFullYear() - 1}-12` : `${d.getFullYear()}-${String(d.getMonth()).padStart(2, '0')}`;
+  }
+  function _formatarPeriodo(periodo) {
+    const [ano, mes] = periodo.split('-');
+    const meses = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
+    return `${meses[parseInt(mes) - 1]} ${ano}`;
+  }
+  function _esc(str) { if (!str) return ''; const d = document.createElement('div'); d.textContent = str; return d.innerHTML; }
+  async function _buscarTextoSolicitacao(solicitacaoPath) {
+    try {
+      if (!solicitacaoPath || typeof solicitacaoPath !== 'string') return '';
+      const parts = solicitacaoPath.split('/');
+      if (parts.length < 4) return '';
+      const doc = await window.db.collection('usuarios').doc(parts[1]).collection('solicitacoes').doc(parts[3]).get();
+      return doc.exists ? (doc.data().descricao || doc.data().texto || '') : '';
+    } catch (e) { console.warn('[faleConosco] erro texto:', e.message); return ''; }
+  }
 
-    if (snap.empty) return `<div class="rs-fc-vazio"><span>${status === 'ativa' ? '🗳️' : '🏅'}</span>Nenhuma sugestão ${status === 'ativa' ? 'ativa' : 'encerrada'} neste período.</div>`;
+  // ── RENDER: Votação Atual ─────────────────────────────────────────────────
+  async function _renderVotacaoAtual(user, temFeatureTema) {
+    try {
+      // Busca o ciclo ativo (indicação ou votação aberta)
+      const cicloSnap = await window.db.collection('ciclos_votacao')
+        .where('status', 'in', ['rascunho', 'indicacao', 'votacao'])
+        .orderBy('inicio_indicacao', 'desc').limit(1).get();
+      const cicloDoc   = cicloSnap.empty ? null : cicloSnap.docs[0];
+      const cicloId    = cicloDoc?.id || null;
+      const cicloTitulo = cicloDoc ? cicloDoc.data().titulo : '';
+      const labelSep   = cicloTitulo ? `🗳️ Votação atual: ${cicloTitulo}` : '🗳️ Votação Atual';
 
-    const metadados = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-    let rankingOrdenado = metadados;
-    if (status === 'encerrada' && metadados[0]?.ranking_final) {
-      rankingOrdenado = metadados[0].ranking_final.map(item => {
-        const original = metadados.find(m => m.solicitacao_ref === item.solicitacao_ref);
-        return original ? { ...original, posicao_fixa: item.posicao, votos_fixos: item.votos } : null;
-      }).filter(Boolean);
-    }
+      let snap;
+      try {
+        const q = cicloId
+          ? window.db.collection('sugestoes_publicas').where('ciclo_id', '==', cicloId).orderBy('votos', 'desc').limit(50)
+          : window.db.collection('sugestoes_publicas').where('status', '==', 'ativa').where('periodo', '==', _getPeriodoAtual()).orderBy('votos', 'desc').limit(50);
+        snap = await q.get();
+      } catch (e) {
+        const q = cicloId
+          ? window.db.collection('sugestoes_publicas').where('ciclo_id', '==', cicloId).limit(50)
+          : window.db.collection('sugestoes_publicas').where('status', '==', 'ativa').where('periodo', '==', _getPeriodoAtual()).limit(50);
+        snap = await q.get();
+      }
 
-    const sugestoesCompletas = await Promise.all(rankingOrdenado.slice(0, 5).map(async meta => {
-      const textoCompleto = await _buscarTextoSolicitacao(meta.solicitacao_ref);
-      return { ...meta, texto: textoCompleto };
-    }));
+      if (snap.empty) return `<div class="rs-fc-sep">${labelSep}</div><div class="rs-fc-vazio">Nenhuma sugestão ativa ainda.</div>`;
 
-    const podeVotar = user.segmento === 'assinante' && temFeatureTema;
-    let html = '';
-    sugestoesCompletas.forEach((sug, index) => {
-      const jaVotou = podeVotar ? localStorage.getItem(`rs_voto_sugestao_${sug.id}`) : null;
-      const posicao = status === 'encerrada' && sug.posicao_fixa ? sug.posicao_fixa : index + 1;
-      const votos = status === 'encerrada' && sug.votos_fixos !== undefined ? sug.votos_fixos : sug.votos;
-      
-      const voteBtn = podeVotar 
-        ? `<button class="rs-voto-btn ${jaVotou ? 'votado' : ''}" onclick="window.votarSugestao('${_esc(sug.id)}', '${_esc(user.uid)}')">${jaVotou ? '✅ Votado' : '👍 Votar'}</button>` 
-        : '';
+      const docsArray = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      docsArray.sort((a, b) => (b.votos || 0) - (a.votos || 0));
+      const top5 = docsArray.slice(0, 5);
 
-      html += `
-        <div class="rs-sugestao-card ${status === 'encerrada' ? 'encerrada' : ''}">
-          <div class="rs-sugestao-header">
-            <span class="rs-sugestao-posicao">#${posicao}</span>
-            <span class="rs-sugestao-votos">👍 ${votos} voto${votos !== 1 ? 's' : ''}</span>
-          </div>
-          <div class="rs-sugestao-texto">${_esc(sug.texto)}</div>
+      const sugestoes = top5.map(d => ({ ...d, texto: d.texto_preview || d.texto || '(sem texto)' }));
+      const podeVotar = user.segmento === 'assinante' && temFeatureTema;
+      let html = `<div class="rs-fc-sep">${labelSep}</div>`;
+
+      sugestoes.forEach((s, i) => {
+        const jaVotou = podeVotar ? localStorage.getItem(`rs_voto_sugestao_${s.id}`) : null;
+        const voteBtn = podeVotar ? `<button class="rs-voto-btn ${jaVotou ? 'votado' : ''}" onclick="window.votarSugestao('${_esc(s.id)}', '${_esc(user.uid)}')">${jaVotou ? '✅ Votado' : '👍 Votar'}</button>` : '';
+        const dataEnv = s.criado_em ? new Date(s.criado_em.seconds ? s.criado_em.seconds * 1000 : s.criado_em).toLocaleDateString('pt-BR') : '—';
+        html += `
+        <div class="rs-sugestao-card">
+          <div class="rs-sugestao-header"><span class="rs-sugestao-posicao">#${i + 1}</span><span class="rs-sugestao-votos">👍 ${s.votos || 0}</span></div>
+          <div class="rs-sugestao-texto">${_esc(s.texto)}</div>
+          <div class="rs-sugestao-data">ENVIADA em ${dataEnv}</div>
           ${voteBtn}
         </div>`;
-    });
-    return html;
-  } catch (err) {
-    console.error('[faleConosco] ranking período:', err);
-    return `<div class="rs-fc-vazio"><span>⚠️</span>Erro ao carregar ranking.</div>`;
-  }
-}
-
-// ── Utilitários ───────────────────────────────────────────────────────────
-function _formatarPeriodo(periodo) {
-  const [ano, mes] = periodo.split('-');
-  const meses = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
-  return `${meses[parseInt(mes) - 1]} ${ano}`;
-}
-async function _buscarTextoSolicitacao(solicitacaoPath) {
-  try {
-    const parts = solicitacaoPath.split('/');
-    const doc = await window.db.collection('usuarios').doc(parts[1]).collection('solicitacoes').doc(parts[3]).get();
-    return doc.exists ? (doc.data().descricao || doc.data().texto || '') : '';
-  } catch { return ''; }
-}
-function _esc(str) { if (!str) return ''; const d = document.createElement('div'); d.textContent = str; return d.innerHTML; }
-
-async function _verificarEEncerrarMesAnterior(periodoAtual) {
-  try {
-    const dataAtual = new Date();
-    const periodoAnterior = dataAtual.getMonth() === 0 ? `${dataAtual.getFullYear() - 1}-12` : `${dataAtual.getFullYear()}-${String(dataAtual.getMonth()).padStart(2, '0')}`;
-    const snap = await window.db.collection('sugestoes_publicas').where('status', '==', 'ativa').where('periodo', '==', periodoAnterior).orderBy('votos', 'desc').get();
-    if (!snap.empty) {
-      const batch = window.db.batch();
-      const rankingFinal = [];
-      snap.docs.forEach((doc, index) => {
-        const d = doc.data();
-        rankingFinal.push({ posicao: index + 1, votos: d.votos, texto_preview: d.texto_preview, solicitacao_ref: d.solicitacao_ref });
-        batch.update(doc.ref, { status: 'encerrada', ranking_final: rankingFinal, encerrado_em: new Date() });
       });
-      await batch.commit();
+      return html;
+    } catch (err) {
+      console.error('[faleConosco] Erro detalhado ao carregar votação:', err);
+      return `<div class="rs-fc-vazio"><span>⚠️</span>Erro ao carregar votação.</div>`;
     }
-  } catch (err) { console.warn('[faleConosco] encerrar mês:', err); }
-}
+  }
 
-window.votarSugestao = async function(sugestaoId, userId) {
-  try {
-    const lsKey = `rs_voto_sugestao_${sugestaoId}`;
-    const jaVotou = localStorage.getItem(lsKey);
-    const ref = window.db.collection('sugestoes_publicas').doc(sugestaoId);
-    if (jaVotou) {
-      await ref.update({ votos: firebase.firestore.FieldValue.increment(-1), votantes: firebase.firestore.FieldValue.arrayRemove(userId), atualizado_em: new Date() });
-      localStorage.removeItem(lsKey);
-    } else {
-      await ref.update({ votos: firebase.firestore.FieldValue.increment(1), votantes: firebase.firestore.FieldValue.arrayUnion(userId), atualizado_em: new Date() });
-      localStorage.setItem(lsKey, 'true');
-    }
-    const user = window._radarUser;
-    if (user) _renderDrawer('sugestao_tema');
-  } catch (err) { console.error('[faleConosco] voto:', err); alert('Erro ao registrar voto.'); }
-};
+  // ── RENDER: Resultado Mês Anterior ────────────────────────────────────────
+  async function _renderResultadoAnterior(user, temFeatureTema) {
+    try {
+      const periodoAnt = _getPeriodoAnterior();
+      const snap = await window.db.collection('sugestoes_publicas').where('periodo', '==', periodoAnt).orderBy('votos', 'desc').get();
+      if (snap.empty) return '';
 
-// ── Boot ──────────────────────────────────────────────────────────────────
-function _boot() {
-  if (window._radarUser && window.db) init();
-  else window.addEventListener('radarUserReady', () => setTimeout(init, 500), { once: true });
-}
-if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', _boot);
-else _boot();
+      const raw = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      let ordenado = raw;
+      if (raw[0]?.ranking_final) {
+        ordenado = raw[0].ranking_final.map(item => {
+          const orig = raw.find(r => r.solicitacao_ref === item.solicitacao_ref);
+          return orig ? { ...orig, posicao_fixa: item.posicao, votos_fixos: item.votos } : null;
+        }).filter(Boolean);
+      }
 
-window._rsFcAbrir = _abrirDrawer;
-window._rsFcBadgeAtualizar = _atualizarBadge;
+      const top5 = ordenado.slice(0, 5).map(s => ({ ...s, texto: s.texto_preview || s.texto || '(sem texto)' }));
+      if (top5.length === 0) return '';
+
+      let html = `<div class="rs-resultado-card">`;
+      html += `<div class="rs-resultado-header">🏁 VOTAÇÃO DE ${_formatarPeriodo(periodoAnt).toUpperCase()} ENCERRADA - Veja abaixo o resultado</div>`;
+
+      top5.forEach((s, i) => {
+        const isWinner = i === 0;
+        const votos = s.votos_fixos !== undefined ? s.votos_fixos : (s.votos || 0);
+        const pos = isWinner ? '🥇' : `#${i + 1}`;
+        const dataEnv = s.criado_em ? new Date(s.criado_em.seconds ? s.criado_em.seconds * 1000 : s.criado_em).toLocaleDateString('pt-BR') : '—';
+        html += `
+        <div class="rs-res-item ${isWinner ? 'vencedor' : ''}">
+          <div class="rs-res-pos">${pos}</div>
+          <div class="rs-res-info">
+            <div class="rs-res-texto">${_esc(s.texto)}</div>
+            <div class="rs-res-meta">
+              <span class="rs-res-votos">👍 ${votos}</span>
+              <span>ENVIADA em ${dataEnv}</span>
+            </div>
+          </div>
+        </div>`;
+      });
+      html += `</div>`;
+      return html;
+    } catch (err) { console.error('[faleConosco] resultado ant:', err); return ''; }
+  }
+
+  // ── Votar ─────────────────────────────────────────────────────────────────
+  window.votarSugestao = async function (sugestaoId, userId) {
+    try {
+      const lsKey = `rs_voto_sugestao_${sugestaoId}`;
+      const jaVotou = localStorage.getItem(lsKey);
+      const ref = window.db.collection('sugestoes_publicas').doc(sugestaoId);
+      if (jaVotou) {
+        await ref.update({ votos: firebase.firestore.FieldValue.increment(-1), votantes: firebase.firestore.FieldValue.arrayRemove(userId), atualizado_em: new Date() });
+        localStorage.removeItem(lsKey);
+      } else {
+        await ref.update({ votos: firebase.firestore.FieldValue.increment(1), votantes: firebase.firestore.FieldValue.arrayUnion(userId), atualizado_em: new Date() });
+        localStorage.setItem(lsKey, 'true');
+      }
+      _renderDrawer('sugestao_tema');
+    } catch (err) { console.error('[faleConosco] voto:', err); alert('Erro ao registrar voto.'); }
+  };
+
+  // ── Boot ──────────────────────────────────────────────────────────────────
+  function _boot() {
+    if (window._radarUser && window.db) init();
+    else window.addEventListener('radarUserReady', () => setTimeout(init, 500), { once: true });
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', _boot);
+  else _boot();
+
+  window._rsFcAbrir = _abrirDrawer;
+  window._rsFcBadgeAtualizar = _atualizarBadge;
 })();
