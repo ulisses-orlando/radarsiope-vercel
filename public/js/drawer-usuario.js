@@ -476,10 +476,10 @@ async function _renderPagamentos() {
       const a = assinDoc.data();
       const pagSnap = await db.collection('usuarios').doc(uid)
         .collection('assinaturas').doc(assinDoc.id)
-        .collection('pagamentos').orderBy('numero_parcela', 'asc').get();
-
+        .collection('pagamentos').get();
+console.log('Pagamentos para assinatura', assinDoc.id, pagSnap.size);
       if (pagSnap.empty) continue;
-
+console.log('Pagamentos encontrados:', pagSnap.docs.map(d => ({ id: d.id, ...d.data() })));
       let linhas = '';
       pagSnap.forEach(pd => {
         const p = pd.data();
