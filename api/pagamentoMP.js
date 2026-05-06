@@ -432,10 +432,13 @@ async function _handleAtivarSessao(req, res) {
  
     // Invalida o token de ativação (uso único)
     await usuarioRef.update({ 'pending_session_token.usado': true });
+
+    const _avisoSessoes = sessoesSnap.size >= 3; // true se desativou a mais antiga
  
     return json(res, 200, {
       ok:             true,
       session_id:     sessionId,
+      aviso_limite_sessoes: _avisoSessoes,
       uid,
       assinaturaId,
       segmento:       'assinante',
@@ -603,9 +606,12 @@ async function _handleCriarSessao(req, res) {
       origem:                    'link_edicao',
     });
 
+    const _avisoSessoes = sessoesSnap.size >= 3; // true se desativou a mais antiga
+
     return json(res, 200, {
       ok:             true,
       session_id:     sessionId,
+      aviso_limite_sessoes: _avisoSessoes,
       uid,
       assinaturaId,
       segmento:       'assinante',
@@ -624,6 +630,38 @@ async function _handleCriarSessao(req, res) {
   } catch (err) {
     console.error('[criar-sessao] Erro:', err.message);
     return json(res, 500, { ok: false, message: 'Erro interno ao criar sessão.' });
+  }
+}
+
+// ─── Encerramento de sessão (logout do assinante) ─────────────────────────
+async function _handleEncerrarSessao(req, res) {
+  if (req.method !== 'POST') return json(res, 405, { ok: false, message: 'Método não permitido.' });
+
+  const { uid, session_id } = req.body || {};
+  if (!uid || !session_id) {
+    return json(res, 400, { ok: false, message: 'uid e session_id obrigatórios.' });
+  }
+
+  try {
+    const sessaoRef = db.collection('usuarios').doc(uid)
+      .collection('sessoes').doc(session_id);
+    const sessaoSnap = await sessaoRef.get();
+
+    if (!sessaoSnap.exists) {
+      return json(res, 404, { ok: false, message: 'Sessão não encontrada.' });
+    }
+
+    await sessaoRef.update({
+      ativo:             false,
+      desativado_motivo: 'logout_usuario',
+      desativado_em:     admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    return json(res, 200, { ok: true });
+
+  } catch (err) {
+    console.error('[encerrar-sessao] Erro:', err.message);
+    return json(res, 500, { ok: false, message: 'Erro interno ao encerrar sessão.' });
   }
 }
 
@@ -855,7 +893,7 @@ export default async function handler(req, res) {
 
     // Validar assinatura apenas para webhooks (não para criar-pedido / status-pedido)
     const acao = (req.query && req.query.acao) ? String(req.query.acao) : null;
-    const acoesPublicas = ['criar-pedido', 'status-pedido', 'ativar-sessao', 'validar-sessao', 'criar-sessao', 'cancelar-assinatura', 'gerar-cobranca-cancelamento'];
+    const acoesPublicas = ['criar-pedido', 'status-pedido', 'ativar-sessao', 'validar-sessao', 'criar-sessao', 'encerrar-sessao', 'cancelar-assinatura', 'gerar-cobranca-cancelamento'];
 
     if (!acao || !acoesPublicas.includes(acao)) {
       const sigCheck = validateMpWebhookSignature(rawBody, req);
@@ -911,6 +949,11 @@ export default async function handler(req, res) {
     // ── POST ?acao=criar-sessao ───────────────────────────────────────────
     if (req.method === 'POST' && acao === 'criar-sessao') {
       return _handleCriarSessao(req, res);
+    }
+
+    // ── POST ?acao=encerrar-sessao ────────────────────────────────────────────
+    if (req.method === 'POST' && acao === 'encerrar-sessao') {
+      return _handleEncerrarSessao(req, res);
     }
 
     // ── POST ?acao=cancelar-assinatura ────────────────────────────────────────
