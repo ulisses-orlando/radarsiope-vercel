@@ -273,13 +273,18 @@
 
     const textarea = document.getElementById('rs-fc-txt');
     const chars    = document.getElementById('rs-fc-chars');
-    const btnEnv   = document.getElementById('rs-fc-enviar');
+    const btnEnv   = document.getElementById('rs-fc-enviar'); 
+
     if (textarea) {
       textarea.addEventListener('input', () => {
         const n = textarea.value.length;
         chars.textContent = `${n}/${MAX_CHARS}`;
         chars.classList.toggle('limite', n >= MAX_CHARS);
-        if (btnEnv && !quotaEsgotada) btnEnv.disabled = n === 0;
+        
+        // Habilita o botão se houver texto e a cota não estiver esgotada
+        if (btnEnv && !quotaEsgotada) {
+          btnEnv.disabled = (n === 0);
+        }
       });
     }
   }
