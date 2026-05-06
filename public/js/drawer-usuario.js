@@ -587,7 +587,8 @@ async function _renderSolicitacoes() {
       let acoes = '';
 
       // Botões para "mensagem" (com botão Responder)
-      if (s.tipo === 'mensagem' && (status === 'aberta' || status === 'pendente')) {
+      //if (s.tipo === 'mensagem' && (status === 'aberta' || status === 'pendente')) {
+      if (status === 'aberta' || status === 'pendente') {
         acoes = `
           <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">
             <button class="btn-drawer-sm btn-verde" onclick="_drawerResponderSolicitacao('${uid}','${doc.id}','atendida')">✅ Atendida</button>
@@ -629,7 +630,7 @@ async function _renderSolicitacoes() {
         <div id="sol-card-${doc.id}" style="border-left:4px solid ${c};border-radius:8px;background:#f8fafc;padding:10px 12px;margin-bottom:10px">
           <div style="display:flex;justify-content:space-between;align-items:flex-start">
             <div style="min-width:0;flex:1">
-              <div style="font-weight:700;font-size:13px">${s.tipo === 'mensagem' ? '💬 Mensagem' : '⛔ Cancelamento'}</div>
+              <div style="font-weight:700;font-size:13px">${s.tipo || '—'}</div>
               <div style="font-size:12px;color:#64748b;margin-top:2px">${s.descricao || s.texto || '—'}</div>
               <div style="font-size:11px;color:#94a3b8;margin-top:4px">📅 ${_fmtHora(s.data_solicitacao)}</div>
             </div>
