@@ -550,9 +550,7 @@ async function _renderSolicitacoes() {
   try {
     const snap = await db.collection('usuarios').doc(uid)
       .collection('solicitacoes').orderBy('data_solicitacao', 'desc').get();
-    let html = `<div style="margin-bottom:10px">
-      <button class="btn-drawer-sm" onclick="abrirModalEnvioManual('${uid}')">📧 Enviar mensagem manual</button>
-    </div>`;
+    let html = '';
 
     if (snap.empty) {
       body.innerHTML = html + '<p style="color:#94a3b8;font-size:13px">Nenhuma solicitação.</p>';
@@ -570,12 +568,16 @@ async function _renderSolicitacoes() {
       const valorMulta = Number(calculo.valor_ajuste || 0);
 
       // Botões padrão (outros tipos)
-      let acoes = (status === 'aberta' || status === 'pendente') && !isCancel ? `
-        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">
-          <button class="btn-drawer-sm btn-verde" onclick="_drawerResponderSolicitacao('${uid}','${doc.id}','atendida')">✅ Atendida</button>
-          <button class="btn-drawer-sm btn-vermelho" onclick="_drawerResponderSolicitacao('${uid}','${doc.id}','cancelada')">❌ Cancelar</button>
-          <button class="btn-drawer-sm" onclick="_drawerResponderSolicitacao('${uid}','${doc.id}','atendida')">✍️ Responder</button>
-        </div>` : '';
+      // Botões padrão (apenas para tipo 'mensagem')
+      let acoes = '';
+      if ((status === 'aberta' || status === 'pendente') && !isCancel && s.tipo === 'mensagem') {
+        acoes = `
+          <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">
+            <button class="btn-drawer-sm btn-verde" onclick="_drawerResponderSolicitacao('${uid}','${doc.id}','atendida')">✅ Atendida</button>
+            <button class="btn-drawer-sm btn-vermelho" onclick="_drawerResponderSolicitacao('${uid}','${doc.id}','cancelada')">❌ Cancelar</button>
+            <button class="btn-drawer-sm" onclick="_drawerResponderSolicitacao('${uid}','${doc.id}','atendida')">✍️ Responder</button>
+          </div>`;
+      }
 
       // Botões exclusivos para CANCELAMENTO (usa APENAS calculo_multa)
       if (isCancel) {

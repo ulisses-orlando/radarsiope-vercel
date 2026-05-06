@@ -271,9 +271,10 @@
 
     body.innerHTML = html;
 
+    // ── Configuração do campo de texto e botão enviar ────────────────────────
     const textarea = document.getElementById('rs-fc-txt');
     const chars    = document.getElementById('rs-fc-chars');
-    const btnEnv   = document.getElementById('rs-fc-enviar'); 
+    const btnEnv   = document.getElementById('rs-fc-enviar');
 
     if (textarea) {
       textarea.addEventListener('input', () => {
@@ -281,8 +282,14 @@
         chars.textContent = `${n}/${MAX_CHARS}`;
         chars.classList.toggle('limite', n >= MAX_CHARS);
         
-        // Habilita o botão se houver texto e a cota não estiver esgotada
-        if (btnEnv && !quotaEsgotada) {
+        if (!btnEnv) return;
+        
+        // Lógica condicional por tipo de aba
+        if (tipoAtivo === 'sugestao_tema') {
+          // Para sugestão de tema: habilita só se tiver texto E quota disponível
+          btnEnv.disabled = (n === 0) || quotaEsgotada;
+        } else {
+          // Para mensagem comum: habilita apenas se tiver texto
           btnEnv.disabled = (n === 0);
         }
       });
