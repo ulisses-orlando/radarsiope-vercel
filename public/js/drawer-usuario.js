@@ -477,9 +477,9 @@ async function _renderPagamentos() {
       const pagSnap = await db.collection('usuarios').doc(uid)
         .collection('assinaturas').doc(assinDoc.id)
         .collection('pagamentos').get();
-console.log('Pagamentos para assinatura', assinDoc.id, pagSnap.size);
+
       if (pagSnap.empty) continue;
-console.log('Pagamentos encontrados:', pagSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+
       let linhas = '';
       pagSnap.forEach(pd => {
         const p = pd.data();
@@ -571,8 +571,8 @@ async function _renderSolicitacoes() {
       if (s.tipo === 'sugestao_tema') return;
 
       // ✅ FILTRO 2: Contar pendentes apenas para tipos permitidos
-      const tiposPermitidos = ['mensagem', 'cancelamento'];
-      if (!tiposPermitidos.includes(s.tipo)) return;
+      //const tiposPermitidos = ['mensagem', 'cancelamento','treinamento'];
+      //if (!tiposPermitidos.includes(s.tipo)) return;
 
       if (status === 'aberta' || status === 'pendente' || status === 'cancelamento_pendente_multa') {
         pendentes++;
