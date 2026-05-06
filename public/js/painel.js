@@ -337,45 +337,6 @@ async function enviarSolicitacao() {
   }
 }
 
-async function _processarSolicitacaoCancelamento(uid, descricao) {
-  const snap = await db.collection('usuarios').doc(uid).collection('assinaturas').where('status', 'in', ['ativa', 'aprovada']).limit(1).get();
-  if (snap.empty) return alert('⚠️ Nenhuma assinatura ativa encontrada.');
-
-  const assin  = snap.docs[0].data();
-  const assinId = snap.docs[0].id;
-  const agora = new Date();
-  const dataInicio = assin.data_inicio?.toDate?.() || new Date(assin.data_inicio);
-  const dataFimFid = assin.data_fim_fidelizacao?.toDate?.() || null;
-  const temFid     = !!assin.tem_fidelizacao && !!dataFimFid;
-  const dentroFid  = temFid && agora < dataFimFid;
-  const mesesUsados = Math.max(1, Math.ceil((agora - dataInicio) / (30*24*60*60*1000)));
-  const descMensal  = Number(assin.desconto_mensal) || 0;
-  const valorMulta  = dentroFid ? Math.round(descMensal * mesesUsados * 100) / 100 : 0;
-
-  _abrirModalConfirmacaoCancelamento({
-    plano: assin.plano_nome || assin.plano_slug || 'Plano',
-    ciclo: assin.ciclo_meses || assin.ciclo || '—',
-    inicio: dataInicio.toLocaleDateString('pt-BR'),
-    fimFid: dataFimFid ? dataFimFid.toLocaleDateString('pt-BR') : 'Não se aplica',
-    mesesUsados, valorMulta, temFid,
-    onConfirm: async () => {
-      try {
-        await db.collection('usuarios').doc(uid).collection('solicitacoes').add({
-          tipo: 'cancelamento', descricao: descricao || 'Solicitação via painel', status: 'aberta',
-          data_solicitacao: new Date().toISOString(), assinaturaId: assinId,
-          calculo_multa: { tem_fidelizacao: temFid, meses_usados: mesesUsados, desconto_mensal: descMensal, valor_ajuste: valorMulta, dentro_periodo: dentroFid, data_fim_fidelizacao: dataFimFid?.toISOString() }
-        });
-        await db.collection('admin_contadores').doc('pendencias').set({ solicitacoes: firebase.firestore.FieldValue.increment(1) }, { merge: true });
-        alert('✅ Solicitação enviada! Aguarde análise da equipe.');
-        document.getElementById('mensagem-suporte').value = '';
-        carregarHistoricoSolicitacoes(uid);
-        _fecharModalCancelamento();
-      } catch (e) { alert('❌ Erro ao registrar.'); }
-    },
-    onCancel: _fecharModalCancelamento
-  });
-}
-
 function _abrirModalConfirmacaoCancelamento(d) {
   _fecharModalCancelamento();
   const multaHtml = d.temFid
@@ -416,27 +377,27 @@ async function _processarSolicitacaoCancelamento(uid, descricao) {
     return;
   }
 
-  const assin  = snap.docs[0].data();
+  const assin = snap.docs[0].data();
   const assinId = snap.docs[0].id;
 
   // 2. Calcular valores da multa
   const agora = new Date();
-  const dataInicio   = assin.data_inicio?.toDate?.() || new Date(assin.data_inicio);
-  const dataFimFid   = assin.data_fim_fidelizacao?.toDate?.() || null;
-  const temFid       = !!assin.tem_fidelizacao && !!dataFimFid;
-  const dentroFid    = temFid && agora < dataFimFid;
+  const dataInicio = assin.data_inicio?.toDate?.() || new Date(assin.data_inicio);
+  const dataFimFid = assin.data_fim_fidelizacao?.toDate?.() || null;
+  const temFid = !!assin.tem_fidelizacao && !!dataFimFid;
+  const dentroFid = temFid && agora < dataFimFid;
 
-  const msUsados     = agora - dataInicio;
-  const mesesUsados  = Math.max(1, Math.ceil(msUsados / (30 * 24 * 60 * 60 * 1000)));
+  const msUsados = agora - dataInicio;
+  const mesesUsados = Math.max(1, Math.ceil(msUsados / (30 * 24 * 60 * 60 * 1000)));
   const descontoMensal = Number(assin.desconto_mensal) || 0;
-  const valorMulta   = dentroFid ? Math.round(descontoMensal * mesesUsados * 100) / 100 : 0;
+  const valorMulta = dentroFid ? Math.round(descontoMensal * mesesUsados * 100) / 100 : 0;
 
   // 3. Exibir modal de confirmação
   _abrirModalConfirmacaoCancelamento({
-    plano:        assin.plano_nome || assin.plano_slug || 'Plano',
-    ciclo:        assin.ciclo_meses || assin.ciclo || '—',
-    inicio:       dataInicio.toLocaleDateString('pt-BR'),
-    fimFid:       dataFimFid ? dataFimFid.toLocaleDateString('pt-BR') : 'Não se aplica',
+    plano: assin.plano_nome || assin.plano_slug || 'Plano',
+    ciclo: assin.ciclo_meses || assin.ciclo || '—',
+    inicio: dataInicio.toLocaleDateString('pt-BR'),
+    fimFid: dataFimFid ? dataFimFid.toLocaleDateString('pt-BR') : 'Não se aplica',
     mesesUsados,
     valorMulta,
     temFid,
@@ -454,19 +415,20 @@ async function _processarSolicitacaoCancelamento(uid, descricao) {
             meses_usados: mesesUsados,
             desconto_mensal: descontoMensal,
             valor_ajuste: valorMulta,
-            dentro_periodo: dentroFid
+            dentro_periodo: dentroFid,
+            data_fim_fidelizacao: dataFimFid?.toISOString() // ✅ Campo essencial da F1
           }
         });
         await db.collection('admin_contadores').doc('pendencias').set({
           solicitacoes: firebase.firestore.FieldValue.increment(1)
         }, { merge: true });
 
-        alert('✅ Solicitação enviada! Nossa equipe analisará e enviará o link de pagamento da multa, se houver.');
+        alert('✅ Solicitação enviada! Nossa equipe analisará e entrará em contato, se necessário.');
         document.getElementById('mensagem-suporte').value = '';
         carregarHistoricoSolicitacoes(uid);
         _fecharModalCancelamento();
       } catch (err) {
-        console.error(err);
+        console.error('[cancelamento] Erro ao registrar:', err); // ✅ Debug da F2
         alert('❌ Erro ao registrar solicitação. Tente novamente.');
       }
     },
