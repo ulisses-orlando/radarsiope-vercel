@@ -337,46 +337,16 @@ async function enviarSolicitacao() {
   }
 }
 
-function _abrirModalConfirmacaoCancelamento(d) {
-  _fecharModalCancelamento();
-  const multaHtml = d.temFid
-    ? `<div style="background:#fffbeb;border:1px solid #fde68a;padding:14px;border-radius:8px;margin:14px 0;font-size:13px"><strong>⚖️ Cláusula Aplicada</strong><br>Ajuste: ${d.mesesUsados}m × ${d.valorMulta.toLocaleString('pt-BR',{style:'currency',currency:'BRL'})}/m = <span style="color:#b45309;font-weight:700">${(d.valorMulta * d.mesesUsados).toLocaleString('pt-BR',{style:'currency',currency:'BRL'})}</span></div>`
-    : `<div style="background:#f0fdf4;border:1px solid #bbf7d0;padding:14px;border-radius:8px;margin:14px 0;font-size:13px"><strong>✅ Sem Multa</strong><br>Fora do período de fidelização ou plano sem ajuste.</div>`;
-
-  const modal = document.createElement('div');
-  modal.id = 'modal-cancelamento';
-  modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;z-index:9999;';
-  modal.innerHTML = `<div style="background:#fff;padding:24px;border-radius:12px;max-width:500px;width:92%">
-    <h3 style="margin:0 0 16px">⛔ Solicitar Cancelamento</h3>
-    <div style="background:#f8fafc;padding:12px;border-radius:8px;font-size:13px;line-height:1.7">
-      <strong>Plano:</strong> ${d.plano} (${d.ciclo}m) | <strong>Início:</strong> ${d.inicio} | <strong>Usados:</strong> ${d.mesesUsados}
-    </div>${multaHtml}
-    <p style="font-size:12px;color:#64748b;margin-top:8px">Ao prosseguir, a equipe analisará e enviará o link de pagamento, se aplicável.</p>
-    <div style="display:flex;gap:12px;margin-top:20px;justify-content:flex-end">
-      <button id="btn-desistir-cancel" style="padding:9px 16px;border:1px solid #cbd5e1;background:#fff;border-radius:6px;cursor:pointer">❌ Desistir</button>
-      <button id="btn-prosseguir-cancel" style="padding:9px 16px;border:none;background:#0A3D62;color:#fff;border-radius:6px;cursor:pointer">✅ Prosseguir</button>
-    </div></div>`;
-  document.body.appendChild(modal);
-  document.getElementById('btn-desistir-cancel').onclick = d.onCancel;
-  document.getElementById('btn-prosseguir-cancel').onclick = d.onConfirm;
-}
-
-function _fecharModalCancelamento() {
-  const el = document.getElementById('modal-cancelamento');
-  if (el) el.remove();
-}
-
 // ─── MODAL + CÁLCULO DE CANCELAMENTO ──────────────────────────────────────────
 async function _processarSolicitacaoCancelamento(uid, descricao) {
   // 1. Buscar assinatura ativa
   const snap = await db.collection('usuarios').doc(uid)
     .collection('assinaturas').where('status', 'in', ['ativa', 'aprovada']).limit(1).get();
-  console.log('[cancelamento] Assinatura snap:', snap); // ✅ Debug da F1
-  if (snap.empty) {
+
+    if (snap.empty) {
     alert('⚠️ Nenhuma assinatura ativa encontrada para solicitar cancelamento.');
     return;
   }
-  console.log('[cancelamento] Assinatura encontrada:', snap.docs[0].data()); // ✅ Debug da F1
 
   const assin = snap.docs[0].data();
   const assinId = snap.docs[0].id;
@@ -441,13 +411,18 @@ async function _processarSolicitacaoCancelamento(uid, descricao) {
 
 // ─── RENDERIZAÇÃO DO MODAL ────────────────────────────────────────────────────
 function _abrirModalConfirmacaoCancelamento(dados) {
-  _fecharModalCancelamento(); // Garante que não haja duplicata
+  _fecharModalCancelamento();
+
+  // ✅ Protege chamadas de toLocaleString com fallback numérico
+  const fmtBRL = (v) => Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+  const descontoMensal = Number(dados.desconto_mensal) || 0;
+  const valorMulta = Number(dados.valorMulta) || 0;
 
   const multaHtml = dados.temFid
     ? `<div style="background:#fffbeb;border:1px solid #fde68a;padding:14px;border-radius:8px;margin:14px 0;font-size:13px">
          <strong>⚖️ Cláusula de Fidelização Aplicada</strong><br>
-         Ajuste proporcional: ${dados.mesesUsados} meses × ${dados.desconto_mensal.toLocaleString('pt-BR', {style:'currency',currency:'BRL'})} = 
-         <span style="color:#b45309;font-weight:700;font-size:15px">${dados.valorMulta.toLocaleString('pt-BR', {style:'currency',currency:'BRL'})}</span>
+         Ajuste proporcional: ${dados.mesesUsados} meses × ${fmtBRL(descontoMensal)} = 
+         <span style="color:#b45309;font-weight:700;font-size:15px">${fmtBRL(valorMulta)}</span>
        </div>`
     : `<div style="background:#f0fdf4;border:1px solid #bbf7d0;padding:14px;border-radius:8px;margin:14px 0;font-size:13px">
          <strong>✅ Sem Multa</strong><br>
@@ -469,7 +444,7 @@ function _abrirModalConfirmacaoCancelamento(dados) {
       ${multaHtml}
       <p style="font-size:12px;color:#64748b;margin-top:8px;line-height:1.5">
         Ao prosseguir, sua solicitação será enviada para análise administrativa. 
-        ${dados.valorMulta > 0 ? 'Se aplicável, você receberá um link de pagamento da multa para concluir o encerramento.' : 'O cancelamento será processado após confirmação da equipe.'}
+        ${valorMulta > 0 ? 'Se aplicável, você receberá um link de pagamento da multa para concluir o encerramento.' : 'O cancelamento será processado após confirmação da equipe.'}
       </p>
       <div style="display:flex;gap:12px;margin-top:20px;justify-content:flex-end">
         <button id="btn-desistir-cancel" style="padding:9px 16px;border:1px solid #cbd5e1;background:#fff;border-radius:6px;cursor:pointer;font-weight:600;color:#475569;transition:all .2s">❌ Desistir</button>
