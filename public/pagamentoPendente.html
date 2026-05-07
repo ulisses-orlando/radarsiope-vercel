@@ -1,5 +1,147 @@
-<!-- /assinatura/pendente -->
-<!doctype html><html lang="pt-BR"><body>
-  <h1>Pagamento pendente</h1>
-  <p>Seu pagamento está pendente. Aguarde a confirmação ou verifique instruções do boleto/Pix.</p>
-</body></html>
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Pagamento Pendente • Radar SIOPE</title>
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --warning: #f59e0b;
+      --warning-bg: #fffbeb;
+      --warning-border: #fde68a;
+      --text: #0f172a;
+      --muted: #64748b;
+      --card: #ffffff;
+      --primary: #0A3D62;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Syne', system-ui, -apple-system, sans-serif;
+      background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      color: var(--text);
+    }
+    .card {
+      background: var(--card);
+      border-radius: 16px;
+      padding: 32px 28px;
+      max-width: 480px;
+      width: 100%;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.08);
+      text-align: center;
+      border: 1px solid #e2e8f0;
+    }
+    .icon {
+      width: 72px; height: 72px;
+      background: var(--warning-bg);
+      border: 2px solid var(--warning-border);
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      margin: 0 auto 20px;
+      font-size: 32px;
+    }
+    h1 {
+      font-size: 22px; font-weight: 700; margin-bottom: 8px; color: var(--primary);
+    }
+    .subtitle {
+      font-size: 14px; color: var(--muted); margin-bottom: 24px; line-height: 1.5;
+    }
+    .info-box {
+      background: #f8fafc;
+      border-radius: 10px;
+      padding: 16px;
+      margin: 20px 0;
+      border: 1px solid #e2e8f0;
+      text-align: left;
+    }
+    .info-box p {
+      font-size: 13px; color: var(--text); margin-bottom: 8px; line-height: 1.5;
+    }
+    .info-box strong { color: var(--primary); }
+    .btn {
+      display: inline-block;
+      background: var(--primary);
+      color: #fff;
+      padding: 12px 28px;
+      border-radius: 10px;
+      text-decoration: none;
+      font-weight: 600;
+      font-size: 14px;
+      margin-top: 8px;
+      transition: background 0.2s;
+      border: none;
+      cursor: pointer;
+    }
+    .btn:hover { background: #082f4a; }
+    .btn-outline {
+      background: transparent;
+      border: 2px solid #cbd5e1;
+      color: var(--text);
+    }
+    .btn-outline:hover { border-color: var(--primary); color: var(--primary); }
+    .timer {
+      font-size: 12px; color: var(--muted); margin: 16px 0;
+    }
+    .footer {
+      margin-top: 24px;
+      font-size: 12px;
+      color: var(--muted);
+      border-top: 1px solid #e2e8f0;
+      padding-top: 16px;
+    }
+    .footer a { color: var(--primary); text-decoration: none; }
+    .footer a:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="icon">⏳</div>
+    <h1>Pagamento Pendente</h1>
+    <p class="subtitle">
+      Seu pagamento está sendo processado. Assim que for confirmado, sua assinatura será ativada automaticamente.
+    </p>
+
+    <div class="info-box">
+      <p><strong>O que pode estar acontecendo:</strong></p>
+      <p>• Boleto: aguardando compensação bancária (1-3 dias úteis)</p>
+      <p>• Pix: confirme o pagamento no seu app do banco</p>
+      <p>• Cartão: verifique se a transação foi autorizada</p>
+    </div>
+
+    <div class="timer" id="timer-msg">
+      🔍 Verificando status a cada 30 segundos...
+    </div>
+
+    <a href="#" class="btn" onclick="window.location.reload()">🔄 Verificar Agora</a>
+    <br>
+     <a href="https://www.radarsiope.com.br/capturaLead.html" class="btn btn-outline">💬 Falar com Suporte</a>
+    <div class="footer">
+      Dúvidas? <a href="mailto:suporte@radarsiope.com.br">Fale com nosso suporte</a>
+      <br><br>
+      © 2026 Radar SIOPE. Todos os direitos reservados.
+    </div>
+  </div>
+
+  <script>
+    // Auto-refresh suave a cada 30s
+    let seconds = 30;
+    const timerEl = document.getElementById('timer-msg');
+    const interval = setInterval(() => {
+      seconds--;
+      if (seconds <= 0) {
+        window.location.reload();
+      } else {
+        timerEl.textContent = `🔍 Próxima verificação em ${seconds}s...`;
+      }
+    }, 1000);
+
+    // Limpa o timer se o usuário interagir
+    document.addEventListener('click', () => clearInterval(interval), { once: true });
+  </script>
+</body>
+</html>

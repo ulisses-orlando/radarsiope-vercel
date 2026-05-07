@@ -1,5 +1,125 @@
-<!-- /assinatura/sucesso -->
-<!doctype html><html lang="pt-BR"><body>
-  <h1>Pagamento confirmado</h1>
-  <p>Obrigado! Sua assinatura foi ativada. Em breve você receberá um e-mail de confirmação.</p>
-</body></html>
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Assinatura Ativada • Radar SIOPE</title>
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --success: #16a34a;
+      --success-bg: #f0fdf4;
+      --success-border: #bbf7d0;
+      --text: #0f172a;
+      --muted: #64748b;
+      --card: #ffffff;
+      --primary: #0A3D62;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Syne', system-ui, -apple-system, sans-serif;
+      background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      color: var(--text);
+    }
+    .card {
+      background: var(--card);
+      border-radius: 16px;
+      padding: 32px 28px;
+      max-width: 480px;
+      width: 100%;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.08);
+      text-align: center;
+      border: 1px solid #e2e8f0;
+    }
+    .icon {
+      width: 72px; height: 72px;
+      background: var(--success-bg);
+      border: 2px solid var(--success-border);
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      margin: 0 auto 20px;
+      font-size: 32px;
+    }
+    h1 {
+      font-size: 22px; font-weight: 700; margin-bottom: 8px; color: var(--primary);
+    }
+    .subtitle {
+      font-size: 14px; color: var(--muted); margin-bottom: 24px; line-height: 1.5;
+    }
+    .checklist {
+      text-align: left;
+      background: #f8fafc;
+      border-radius: 10px;
+      padding: 16px;
+      margin: 20px 0;
+      border: 1px solid #e2e8f0;
+    }
+    .checklist-item {
+      display: flex; align-items: flex-start; gap: 10px;
+      font-size: 13px; margin-bottom: 10px; color: var(--text);
+    }
+    .checklist-item:last-child { margin-bottom: 0; }
+    .checklist-item::before {
+      content: "✅"; flex-shrink: 0; margin-top: 2px;
+    }
+    .btn {
+      display: inline-block;
+      background: var(--primary);
+      color: #fff;
+      padding: 12px 28px;
+      border-radius: 10px;
+      text-decoration: none;
+      font-weight: 600;
+      font-size: 14px;
+      margin-top: 8px;
+      transition: background 0.2s;
+      border: none;
+      cursor: pointer;
+    }
+    .btn:hover { background: #082f4a; }
+    .btn-outline {
+      background: transparent;
+      border: 2px solid #cbd5e1;
+      color: var(--text);
+    }
+    .btn-outline:hover { border-color: var(--primary); color: var(--primary); }
+    .footer {
+      margin-top: 24px;
+      font-size: 12px;
+      color: var(--muted);
+      border-top: 1px solid #e2e8f0;
+      padding-top: 16px;
+    }
+    .footer a { color: var(--primary); text-decoration: none; }
+    .footer a:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="icon">✅</div>
+    <h1>Assinatura Ativada!</h1>
+    <p class="subtitle">
+      Seu pagamento foi confirmado com sucesso. Em instantes você receberá um e-mail com os detalhes da sua assinatura.
+    </p>
+
+    <div class="checklist">
+      <div class="checklist-item">Acesso liberado ao app Radar SIOPE</div>
+      <div class="checklist-item">Conteúdos exclusivos disponíveis</div>
+    </div>
+
+    <br>
+    <a href="https://www.radarsiope.com.br/login.html" class="btn btn-outline">📚 Central do Assinante</a>
+
+    <div class="footer">
+      Precisa de ajuda? <a href="mailto:suporte@radarsiope.com.br">Fale com nosso suporte</a>
+      <br><br>
+      © 2026 Radar SIOPE. Todos os direitos reservados.
+    </div>
+  </div>
+</body>
+</html>
