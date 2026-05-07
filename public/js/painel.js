@@ -371,6 +371,7 @@ async function _processarSolicitacaoCancelamento(uid, descricao) {
     fimFid: dataFimFid ? dataFimFid.toLocaleDateString('pt-BR') : 'Não se aplica',
     mesesUsados,
     valorMulta,
+    descontoMensal,
     temFid,
     onConfirm: async () => {
       // 4. Salvar no Firestore APÓS confirmação
@@ -444,7 +445,7 @@ function _abrirModalConfirmacaoCancelamento(dados) {
       ${multaHtml}
       <p style="font-size:12px;color:#64748b;margin-top:8px;line-height:1.5">
         Ao prosseguir, sua solicitação será enviada para análise administrativa. 
-        ${valorMulta > 0 ? 'Se aplicável, você receberá um link de pagamento da multa para concluir o encerramento.' : 'O cancelamento será processado após confirmação da equipe.'}
+        ${valorMulta > 0 ? 'Se aplicável, você receberá um link de pagamento para concluir o encerramento.' : 'O cancelamento será processado após confirmação da equipe.'}
       </p>
       <div style="display:flex;gap:12px;margin-top:20px;justify-content:flex-end">
         <button id="btn-desistir-cancel" style="padding:9px 16px;border:1px solid #cbd5e1;background:#fff;border-radius:6px;cursor:pointer;font-weight:600;color:#475569;transition:all .2s">❌ Desistir</button>
