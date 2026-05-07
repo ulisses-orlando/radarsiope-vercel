@@ -371,11 +371,12 @@ async function _processarSolicitacaoCancelamento(uid, descricao) {
   // 1. Buscar assinatura ativa
   const snap = await db.collection('usuarios').doc(uid)
     .collection('assinaturas').where('status', 'in', ['ativa', 'aprovada']).limit(1).get();
-  
+  console.log('[cancelamento] Assinatura snap:', snap); // ✅ Debug da F1
   if (snap.empty) {
     alert('⚠️ Nenhuma assinatura ativa encontrada para solicitar cancelamento.');
     return;
   }
+  console.log('[cancelamento] Assinatura encontrada:', snap.docs[0].data()); // ✅ Debug da F1
 
   const assin = snap.docs[0].data();
   const assinId = snap.docs[0].id;
