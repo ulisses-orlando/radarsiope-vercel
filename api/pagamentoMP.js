@@ -380,12 +380,10 @@ async function _handleAtivarSessao(req, res) {
     const pst         = usuarioData.pending_session_token;
  
     // Validações do token de ativação
-    if (!pst || pst.usado) {
-      return json(res, 400, { ok: false, message: 'Token inválido ou já utilizado.' });
+    if (!pst) {
+      return json(res, 400, { ok: false, message: 'Token de ativação não encontrado.' });
     }
-    if (pst.exp < Date.now()) {
-      return json(res, 400, { ok: false, message: 'Link expirado. Entre em contato para solicitar um novo acesso.' });
-    }
+
     if (pst.token !== session_token) {
       return json(res, 400, { ok: false, message: 'Token inválido.' });
     }
@@ -430,9 +428,6 @@ async function _handleAtivarSessao(req, res) {
       compartilhamento_suspeito: false,
     });
  
-    // Invalida o token de ativação (uso único)
-    await usuarioRef.update({ 'pending_session_token.usado': true });
-
     const _avisoSessoes = sessoesSnap.size >= 3; // true se desativou a mais antiga
  
     return json(res, 200, {
