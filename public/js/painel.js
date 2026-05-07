@@ -416,15 +416,9 @@ function _abrirModalConfirmacaoCancelamento(dados) {
 
   // ✅ Protege chamadas de toLocaleString com fallback numérico
   const fmtBRL = (v) => Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-  const descontoMensal = Number(dados.desconto_mensal) || 0;
+  const descontoMensal = Number(dados.descontoMensal) || 0;
   const valorMulta = Number(dados.valorMulta) || 0;
-console.log('[cancelamento] DEBUG dados para modal:', {
-  'dados.desconto_mensal': dados.desconto_mensal,
-  'dados.descontoMensal': dados.descontoMensal,
-  'dados.valor_multa': dados.valor_multa,
-  'dados.valorMulta': dados.valorMulta,
-  'typeof desconto_mensal': typeof dados.desconto_mensal,
-});
+
   const multaHtml = dados.temFid
     ? `<div style="background:#fffbeb;border:1px solid #fde68a;padding:14px;border-radius:8px;margin:14px 0;font-size:13px">
          <strong>⚖️ Cláusula de Fidelização Aplicada</strong><br>
