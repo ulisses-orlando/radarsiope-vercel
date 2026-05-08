@@ -1178,6 +1178,13 @@ async function buscarPorNumero(numero) {
 // Cache para evitar múltiplas chamadas à API em cliques rápidos (janela de 1 min)
 let _validacaoCriticaCache = { ts: 0, status: true };
 
+// Invalida cache ao voltar a aba (para testes e produção)
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') {
+    _validacaoCriticaCache.ts = 0; // Força revalidação
+  }
+});
+
 async function _checarSessaoCritica() {
   // 🔒 Cache reduzido para 30s (segurança > performance)
   if (Date.now() - _validacaoCriticaCache.ts < 30 * 1000) {
@@ -1190,6 +1197,8 @@ async function _checarSessaoCritica() {
 
     // 🔍 DEBUG TEMPORÁRIO (remova após validar)
     console.log('[🛡️ Sessão] Validando via API...');
+    console.log('[🔍 Debug] session_id no localStorage:', sess.session_id);
+console.log('[🔍 Debug] uid no localStorage:', sess.uid);
 
     const resp = await fetch('/api/pagamentoMP?acao=validar-sessao', {
       method: 'POST',
@@ -1295,6 +1304,16 @@ async function _validarSessaoBackground(sessao) {
 // Carrega a edição mais recente para assinantes que chegam via PWA/ícone.
 async function _tentarModoAssinante(dadosSessao) {
   try {
+    // Antes de criar nova sessão, verifica se a atual ainda é válida
+    if (sessao?.session_id) {
+      // Tenta validar a sessão existente primeiro
+      const valida = await _checarSessaoCritica(sessao);
+      if (valida.ok) {
+        // Sessão ainda válida → usa ela
+        return true;
+      }
+    }
+
     const sessao = dadosSessao || (() => {
       try { return JSON.parse(localStorage.getItem('rs_pwa_session')); } catch { return null; }
     })();
@@ -1523,7 +1542,11 @@ async function _tentarModoAlerta() {
   if (sessao.segmento === 'assinante' && sessao.session_id) {
     const ok = await _tentarModoAssinante(sessao);
     if (!ok) {
-      mostrarErro('Erro ao carregar sua área.', 'Tente novamente em instantes.');
+      // Se o erro de bloqueio já foi exibido (rs-erro visível), não sobrescreve
+      const erroBloqueioVisivel = document.getElementById('rs-erro')?.style.display === 'block';
+      if (!erroBloqueioVisivel) {
+        mostrarErro('Erro ao carregar sua área.', 'Tente novamente em instantes.');
+      }
     }
     return;
   }
