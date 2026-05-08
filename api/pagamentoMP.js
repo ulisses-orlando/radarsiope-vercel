@@ -439,13 +439,12 @@ async function _handleAtivarSessao(req, res) {
       segmento:       'assinante',
       plano_slug:     assinaturaData.plano_slug   || null,
       features:       assinaturaData.features_snapshot || assinaturaData.features || {},
-      municipios_plano: assinaturaData.municipios_plano || [],
       nome:           usuarioData.nome            || '',
       email:          usuarioData.email           || '',
       cod_uf:         usuarioData.cod_uf          || '',
       cod_municipio:  usuarioData.cod_municipio   || '',
       nome_municipio: usuarioData.nome_municipio  || '',
-      perfil:         usuarioData.perfil          || '',
+      perfil:         usuarioData.tipo_perfil     || '',
       municipios_plano: assinaturaData.municipios_plano || [],
     });
  
