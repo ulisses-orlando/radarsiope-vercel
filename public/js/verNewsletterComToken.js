@@ -363,12 +363,11 @@ async function renderMunicipio(destinatario, acesso, newsletter) {
   let municipiosPlano = [];
   try {
     const sess = JSON.parse(localStorage.getItem('rs_pwa_session') || '{}');
-    console.log('[verNL] Sessão do localStorage:', sess);
     municipiosPlano = sess.municipios_plano || [];
   } catch (_) {}
 
   const temMultiplos = acesso.isAssinante && municipiosPlano.length > 1;
-console.log('[verNL] Municipios do plano:', municipiosPlano, ' - Destinatário:', destinatario);
+
   // Inicializa _municipioAtivo apenas na primeira chamada ou ao trocar de assinante
   if (!_municipioAtivo || _municipioAtivo._uid !== destinatario._uid) {
     _municipioAtivo = {
