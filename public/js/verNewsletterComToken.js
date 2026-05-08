@@ -1193,17 +1193,18 @@ async function _checarSessaoCritica() {
 
   try {
     const sess = JSON.parse(localStorage.getItem('rs_pwa_session') || '{}');
-    if (!sess?.session_id || !sess?.uid) return false;
+    if (!sess?.uid) return false;
 
-    // 🔍 DEBUG TEMPORÁRIO (remova após validar)
-    console.log('[🛡️ Sessão] Validando via API...');
-    console.log('[🔍 Debug] session_id no localStorage:', sess.session_id);
-console.log('[🔍 Debug] uid no localStorage:', sess.uid);
+    // session_id: usa sessionStorage (tab-isolated) — evita que outra aba sobrescreva
+    const session_id = sessionStorage.getItem('rs_tab_session_id') || sess.session_id;
+    if (!session_id) return false;
+
+    console.log('[🛡️ Sessão] Validando via API | tab session_id:', session_id.slice(0,8) + '…');
 
     const resp = await fetch('/api/pagamentoMP?acao=validar-sessao', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ uid: sess.uid, session_id: sess.session_id }),
+      body: JSON.stringify({ uid: sess.uid, session_id }),
     });
 
     const data = await resp.json().catch(() => ({}));
@@ -1310,6 +1311,10 @@ async function _tentarModoAssinante(dadosSessao) {
     if (!sessao || sessao.segmento !== 'assinante' || !sessao.uid) return false;
 
     // 🔒 BLOQUEANTE: Valida sessão antes de renderizar qualquer coisa
+    // Inicializa session_id no sessionStorage (tab-isolated) antes de validar
+    if (sessao.session_id) {
+      try { sessionStorage.setItem('rs_tab_session_id', sessao.session_id); } catch(e) {}
+    }
     if (!(await _checarSessaoCritica())) return false;
 
     // Inicia validação em background (silenciosa para atualizar features)
@@ -1487,6 +1492,9 @@ async function _executarAtivacaoSessao(token, uid) {
         validado_em:    Date.now(),
       }));
     } catch (e) { /* ignora se localStorage bloqueado */ }
+
+    // Grava session_id isolado por aba (sessionStorage é tab-specific)
+    try { sessionStorage.setItem('rs_tab_session_id', data.session_id); } catch(e) {}
  
     // Limpa os parâmetros da URL sem recarregar (URL fica limpa após ativação)
     try {
