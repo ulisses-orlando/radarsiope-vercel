@@ -21,6 +21,12 @@ window._chatContext = { nid: null, uid: null, edicaoNum: null };
 // ─── Município ativo no seletor multi-município ────────────────────────────
 let _municipioAtivo = null; // { _uid, cod_municipio, nome_municipio, cod_uf }
 
+window.validarEabrirMidia = async (url, tipo) => {
+  if (await _checarSessaoCritica()) {
+    abrirModalMidia(url, tipo);
+  }
+};
+
 // ─── Parâmetros da URL ────────────────────────────────────────────────────────
 // ─── Buscar config pública via API (variáveis de ambiente) ──────────────────
 let _configCache = null;
@@ -460,6 +466,9 @@ function _renderSeletorMunicipio(tituloEl, municipiosPlano, destinatario, acesso
     </select>`;
 
   document.getElementById('rs-seletor-municipio')?.addEventListener('change', async (e) => {
+    // 🔒 Validação Crítica ao trocar de município
+    if (!(await _checarSessaoCritica())) return;
+
     const novoCod = e.target.value;
     const novo    = detalhes.find(m => m.cod_municipio === novoCod);
     if (!novo) return;
@@ -687,9 +696,14 @@ function renderMidia(newsletter, acesso) {
         <div class="rs-media-icon">🎧</div>
         <div class="rs-media-info">
           <div class="rs-media-titulo">Podcast desta edição</div>
-          <div class="rs-media-sub">Produzido pot ia · Ouça no trabalho, no trânsito ou em casa.</div>
-          <audio controls src="${_esc(newsletter.audio_url)}" preload="none"
-                 style="width:100%;margin-top:8px;border-radius:8px"></audio>
+          <div class="rs-media-sub">Produzido por ia · Ouça no trabalho, no trânsito ou em casa.</div>
+          <div class="rs-audio-wrap" style="margin-top:8px;position:relative;">
+            <button class="rs-audio-play-btn" 
+                    onclick="validarETocarAudio('${_esc(newsletter.audio_url)}', this)"
+                    style="width:100%;padding:14px;background:var(--azul,#0A3D62);color:#fff;border:none;border-radius:8px;cursor:pointer;font-weight:600;font-size:14px;display:flex;align-items:center;justify-content:center;gap:8px;transition:background .2s;">
+              ▶ Ouvir podcast
+            </button>
+          </div>
         </div>
       </div>` : `
       <div class="rs-media-item">
@@ -711,7 +725,7 @@ function renderMidia(newsletter, acesso) {
         <div class="rs-media-titulo">Vídeo explicativo</div>
         <div class="rs-media-sub">Análise detalhada em vídeo</div>
       </div>
-      <button class="rs-media-btn rs-media-btn-primary" onclick="abrirModalMidia('${_esc(newsletter.video_url)}', 'video')">Assistir →</button>
+      <button class="rs-media-btn rs-media-btn-primary" onclick="validarEabrirMidia('${_esc(newsletter.video_url)}', 'video')">Assistir →</button>
     </div>` : `
     <div class="rs-media-item">
       <div class="rs-media-icon" style="opacity:.4">📺</div>
@@ -732,7 +746,7 @@ function renderMidia(newsletter, acesso) {
           <div class="rs-media-titulo">Infográfico da edição</div>
           <div class="rs-media-sub">Visualização gráfica do conteúdo desta edição</div>
         </div>
-        <button class="rs-media-btn rs-media-btn-primary" onclick="abrirModalMidia('${_esc(newsletter.infografico_url)}', 'infografico')">Ver →</button>
+        <button class="rs-media-btn rs-media-btn-primary" onclick="validarEabrirMidia('${_esc(newsletter.infografico_url)}', 'infografico')">Ver →</button>
       </div>` : `
       <div class="rs-media-item">
         <div class="rs-media-icon" style="opacity:.4">📊</div>
@@ -1160,52 +1174,117 @@ async function buscarPorNumero(numero) {
   return { id: snap.docs[0].id, ...snap.docs[0].data() };
 }
 
-// ─── Validação de sessão em background (uma vez a cada 24h) ───────────────
+// ─── Lógica Centralizada de Segurança de Sessão ────────────────────────────
+// Cache para evitar múltiplas chamadas à API em cliques rápidos (janela de 15 min)
+let _validacaoCriticaCache = { ts: 0, status: true };
+
+async function _checarSessaoCritica() {
+  // 1. Se validou há menos de 15 min, confia no resultado anterior (evita spam)
+  if (Date.now() - _validacaoCriticaCache.ts < 15 * 60 * 1000) {
+    return _validacaoCriticaCache.status;
+  }
+
+  try {
+    const sess = JSON.parse(localStorage.getItem('rs_pwa_session') || '{}');
+    if (!sess?.session_id || !sess?.uid) return false;
+
+    const resp = await fetch('/api/pagamentoMP?acao=validar-sessao', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ uid: sess.uid, session_id: sess.session_id }),
+    });
+
+    if (!resp.ok) throw new Error('API Error');
+    const data = await resp.json();
+
+    if (data.valido) {
+      // Sucesso: atualiza timestamp local e cache
+      sess.validado_em = Date.now();
+      localStorage.setItem('rs_pwa_session', JSON.stringify(sess));
+      _validacaoCriticaCache = { ts: Date.now(), status: true };
+      return true;
+    }
+
+    // Inválido: Bloqueia acesso
+    _bloquearAcessoPorSessaoInativa(data.motivo);
+    return false;
+
+  } catch (e) {
+    console.warn('[VerNL] Falha na validação crítica (offline/erro), permitindo acesso temporário.');
+    // Se a API falhar (5xx, sem net), não bloqueia o usuário honesto
+    return true; 
+  }
+}
+
+// ─── Validação + Reprodução de Áudio (Ponto Crítico) ───────────────────────
+async function validarETocarAudio(url, btn) {
+  // 🔒 Valida sessão antes de liberar o player
+  if (await _checarSessaoCritica()) {
+    const wrap = btn.parentElement;
+    btn.style.display = 'none'; // Esconde botão
+    
+    // Injeta player nativo dinamicamente
+    const audio = document.createElement('audio');
+    audio.controls = true;
+    audio.src = url;
+    audio.preload = 'metadata';
+    audio.style.cssText = 'width:100%;border-radius:8px;outline:none;';
+    wrap.appendChild(audio);
+    
+    // Tenta iniciar reprodução automaticamente após validação
+    try { await audio.play(); } catch(e) { /* autoplay bloqueado pelo browser, usuário clica manualmente */ }
+  }
+}
+window.validarETocarAudio = validarETocarAudio; // Expõe para o onclick inline
+
+function _bloquearAcessoPorSessaoInativa(motivo) {
+  localStorage.removeItem('rs_pwa_session');
+  
+  // Remove elementos do DOM para "trancar" a tela
+  document.getElementById('rs-app')?.remove();
+  document.getElementById('rs-loading')?.remove();
+  document.getElementById('rs-drawer-overlay')?.remove();
+  document.getElementById('rs-chat-fab')?.remove();
+  document.getElementById('rs-chat-sheet')?.remove();
+
+  mostrarErro(
+    '<strong>Sessão Encerrada.</strong>',
+    motivo === 'assinatura_inativa' 
+      ? 'Sua assinatura foi encerrada.' 
+      : 'Identificamos excesso de sessões ativas. A sessão mais antiga foi desativada. Acesse pelo link ou contate o suporte.'
+  );
+}
+
+// ─── Validação de sessão em background (uma vez a cada 4h) ───────────────
 async function _validarSessaoBackground(sessao) {
   if (!sessao?.session_id || !sessao?.uid) return;
- 
-  const INTERVALO_24H = 24 * 60 * 60 * 1000;
-  if (Date.now() - (sessao.validado_em || 0) < INTERVALO_24H) return;
- 
+  // ⏱️ Reduzido de 24h para 4h
+  const INTERVALO = 4 * 60 * 60 * 1000; 
+  if (Date.now() - (sessao.validado_em || 0) < INTERVALO) return;
+
   try {
     const resp = await fetch('/api/pagamentoMP?acao=validar-sessao', {
-      method:  'POST',
+      method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ uid: sessao.uid, session_id: sessao.session_id }),
+      body: JSON.stringify({ uid: sessao.uid, session_id: sessao.session_id }),
     });
- 
-    // 5xx = erro de servidor/rede → não invalida sessão (benefício da dúvida)
-    if (!resp.ok && resp.status >= 500) return;
- 
+
+    if (!resp.ok && resp.status >= 500) return; // Erro de servidor ignora
+
     const data = await resp.json().catch(() => null);
     if (!data) return;
- 
+
     if (!data.valido) {
-      // Sessão inválida (cancelamento, compartilhamento confirmado, etc.)
-      localStorage.removeItem('rs_pwa_session');
-      mostrarErro(
-        '<strong>Sessão encerrada.</strong>',
-        data.motivo === 'assinatura_inativa'
-          ? 'Sua assinatura foi encerrada. Para renovar, entre em contato.'
-          : 'Acesse pelo link recebido no WhatsApp ou entre em contato com o suporte.'
-      );
+      // ⛔ Invalidação silenciosa (background)
+      _bloquearAcessoPorSessaoInativa(data.motivo);
       return;
     }
- 
-    // Sessão válida → atualiza plano/features localmente (podem ter mudado)
-    try {
-      const sessaoAtualizada = {
-        ...sessao,
-        validado_em: Date.now(),
-        ...(data.plano_slug && { plano_slug: data.plano_slug }),
-        ...(data.features   && { features:   data.features   }),
-      };
-      localStorage.setItem('rs_pwa_session', JSON.stringify(sessaoAtualizada));
-    } catch (e) { /* ignora se localStorage bloqueado */ }
- 
+
+    // Atualiza dados da sessão (plano/features)
+    const sessaoAtualizada = { ...sessao, validado_em: Date.now(), ...(data.plano_slug && { plano_slug: data.plano_slug }), ...(data.features && { features: data.features }) };
+    localStorage.setItem('rs_pwa_session', JSON.stringify(sessaoAtualizada));
   } catch (e) {
-    // Sem internet — não invalida sessão
-    console.warn('[verNL] Validação de sessão offline, ignorada:', e.message);
+    console.warn('[verNL] Validação background offline:', e.message);
   }
 }
  
@@ -1213,13 +1292,16 @@ async function _validarSessaoBackground(sessao) {
 // Carrega a edição mais recente para assinantes que chegam via PWA/ícone.
 async function _tentarModoAssinante(dadosSessao) {
   try {
-    const sessao = dadosSessao || (() => {
-      try { return JSON.parse(localStorage.getItem('rs_pwa_session')); } catch { return null; }
+    const sessao = dadosSessao || (() => { 
+      try { return JSON.parse(localStorage.getItem('rs_pwa_session')); } 
+      catch { return null; } 
     })();
- 
     if (!sessao || sessao.segmento !== 'assinante' || !sessao.uid) return false;
- 
-    // Validação background (não bloqueia o carregamento)
+
+    // 🔒 BLOQUEANTE: Verifica se a sessão ainda é válida antes de carregar o app
+    if (!(await _checarSessaoCritica())) return false;
+
+    // Inicia validação em background (silenciosa para atualizar features)
     _validarSessaoBackground(sessao);
  
     // Monta destinatário a partir da sessão local
@@ -1948,6 +2030,9 @@ async function VerNewsletterComToken() {
 // ══════════════════════════════════════════════════════════════════════════
 
 async function verHistoricoCompleto() {
+  // 🔒 Validação Crítica antes de carregar dados pesados
+  if (!(await _checarSessaoCritica())) return;
+
   if (!dadosMunicipioAtual || !dadosMunicipioAtual.cod_municipio) {
     alert('Município não identificado');
     console.warn('[verNL] Dados do município:', dadosMunicipioAtual);
@@ -2284,10 +2369,14 @@ function _initSwipeFechar() {
 }
 
 // ─── Abrir / fechar drawer ───────────────────────────────────────────────────
-function abrirDrawer() {
+async function abrirDrawer() {
+  // 🔒 Validação Crítica: Se a sessão caiu, não abre o drawer
+  if (!(await _checarSessaoCritica())) return;
+
   const ctx = _getCtx();
   const overlay = document.getElementById('rs-drawer-overlay');
   const panel = document.getElementById('rs-drawer-panel');
+  
   if (!overlay || !panel) return;
 
   // Edge case: sem identificação
