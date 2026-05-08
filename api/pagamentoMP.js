@@ -462,7 +462,7 @@ async function _handleValidarSessao(req, res) {
  
   const { uid, session_id } = req.body || {};
   if (!uid || !session_id) {
-    return json(res, 400, { ok: false, message: 'uid e session_id obrigatórios.' });
+    return json(res, 400, { ok: false, message: 'uid e session_id obrigatórios.' });  
   }
  
   const ua     = req.headers['user-agent'] || '';
@@ -563,9 +563,9 @@ async function _handleValidarSessao(req, res) {
       features, 
       assinaturaId,  
       municipios_plano: municipiosPlano,
-      debug: { 
-        session_id_received: session_id,
-        session_id_in_db: sessaoData.session_id 
+      debug: {
+        session_id_received: session_id,  // o que o frontend enviou
+        session_id_in_db: sessaoData.session_id // o que está no Firestore
       }
     });
  
