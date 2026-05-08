@@ -27,6 +27,18 @@ window.validarEabrirMidia = async (url, tipo) => {
   }
 };
 
+// ─── Animações base (sheet + fade) ──────────────────────────────────────────
+(function _injetarAnimacoesBase() {
+  if (document.getElementById('rs-anim-base')) return;
+  const s = document.createElement('style');
+  s.id = 'rs-anim-base';
+  s.textContent = `
+    @keyframes rsFadeIn  { from { opacity:0 } to { opacity:1 } }
+    @keyframes rsSlideUp { from { transform:translateY(100%) } to { transform:translateY(0) } }
+  `;
+  document.head.appendChild(s);
+})();
+
 // ─── Parâmetros da URL ────────────────────────────────────────────────────────
 // ─── Buscar config pública via API (variáveis de ambiente) ──────────────────
 let _configCache = null;
@@ -1186,6 +1198,12 @@ document.addEventListener('visibilitychange', () => {
 });
 
 async function _checarSessaoCritica() {
+  // Se sessão já foi bloqueada nesta aba, exibe sheet e nega acesso direto
+  if (_sessaoBloqueada) {
+    _mostrarSheetSessaoBloqueada('sessao_invalida');
+    return false;
+  }
+
   // 🔒 Cache reduzido para 30s (segurança > performance)
   if (Date.now() - _validacaoCriticaCache.ts < 30 * 1000) {
     return _validacaoCriticaCache.status;
@@ -1250,23 +1268,100 @@ async function validarETocarAudio(url, btn) {
 }
 window.validarETocarAudio = validarETocarAudio; // Expõe para o onclick inline
 
-function _bloquearAcessoPorSessaoInativa(motivo) {
-  localStorage.removeItem('rs_pwa_session');
-  
-  // Remove elementos do DOM para "trancar" a tela
-  document.getElementById('rs-app')?.remove();
-  document.getElementById('rs-loading')?.remove();
-  document.getElementById('rs-drawer-overlay')?.remove();
-  document.getElementById('rs-chat-fab')?.remove();
-  document.getElementById('rs-chat-sheet')?.remove();
+// Flag global: impede pontos críticos de executarem sem destruir o DOM
+let _sessaoBloqueada = false;
 
-  mostrarErro(
-    '<strong>Sessão Encerrada.</strong>',
-    motivo === 'assinatura_inativa' 
-      ? 'Sua assinatura foi encerrada.' 
-      : 'Identificamos excesso de sessões ativas. A sessão mais antiga foi desativada. Acesse pelo link ou contate o suporte.'
-  );
+function _bloquearAcessoPorSessaoInativa(motivo) {
+  _sessaoBloqueada = true;
+  // NÃO limpa localStorage nem destrói o DOM —
+  // o conteúdo já carregado permanece legível.
+  _mostrarSheetSessaoBloqueada(motivo);
 }
+
+function _mostrarSheetSessaoBloqueada(motivo) {
+  // Reutiliza a mesma sheet se já estiver aberta
+  document.getElementById('rs-sheet-sessao')?.remove();
+
+  const isInativa = motivo === 'assinatura_inativa';
+
+  const sheet = document.createElement('div');
+  sheet.id = 'rs-sheet-sessao';
+  sheet.innerHTML = `
+    <div id="rs-sheet-sessao-backdrop"
+         style="position:fixed;inset:0;z-index:9980;background:rgba(15,23,42,.55);
+                backdrop-filter:blur(2px);animation:rsFadeIn .2s ease"></div>
+    <div id="rs-sheet-sessao-box"
+         style="position:fixed;bottom:0;left:0;right:0;z-index:9981;
+                background:var(--rs-card,#fff);border-radius:20px 20px 0 0;
+                padding:28px 24px 36px;box-shadow:0 -4px 32px rgba(0,0,0,.15);
+                animation:rsSlideUp .25s ease;max-width:480px;margin:0 auto">
+      <div style="width:36px;height:4px;background:var(--rs-borda,#e2e8f0);
+                  border-radius:2px;margin:0 auto 20px"></div>
+      <div style="font-size:28px;text-align:center;margin-bottom:12px">
+        ${isInativa ? '⚠️' : '📱'}
+      </div>
+      <h3 style="margin:0 0 10px;font-size:16px;font-weight:700;
+                 color:var(--rs-texto,#0f172a);text-align:center">
+        ${isInativa ? 'Assinatura encerrada' : 'Sessão desativada'}
+      </h3>
+      <p style="margin:0 0 22px;font-size:13px;line-height:1.7;
+                color:var(--rs-muted,#64748b);text-align:center">
+        ${isInativa
+          ? 'Sua assinatura foi encerrada. Entre em contato com o suporte para reativar.'
+          : 'Você abriu o Radar em muitos dispositivos ao mesmo tempo e esta sessão foi desativada automaticamente.<br><br>Para continuar usando os recursos premium, abra o link recebido por e-mail.'}
+      </p>
+      ${isInativa ? `
+        <a href="/contato.html" target="_blank" rel="noopener"
+           style="display:block;width:100%;padding:13px;text-align:center;
+                  background:var(--azul,#0A3D62);color:#fff;border-radius:10px;
+                  font-size:14px;font-weight:700;text-decoration:none;
+                  box-sizing:border-box">
+          Falar com o suporte →
+        </a>` : `
+        <a href="mailto:?subject=Radar SIOPE - Acesso"
+           onclick="_abrirEmailAcesso(event)"
+           style="display:block;width:100%;padding:13px;text-align:center;
+                  background:var(--azul,#0A3D62);color:#fff;border-radius:10px;
+                  font-size:14px;font-weight:700;text-decoration:none;
+                  box-sizing:border-box;margin-bottom:10px">
+          📧 Abrir meu e-mail para novo acesso
+        </a>`}
+      <button onclick="_fecharSheetSessao()"
+              style="display:block;width:100%;padding:12px;text-align:center;
+                     background:transparent;color:var(--rs-muted,#64748b);
+                     border:1px solid var(--rs-borda,#e2e8f0);border-radius:10px;
+                     font-size:13px;cursor:pointer;box-sizing:border-box;
+                     ${isInativa ? 'margin-top:10px' : ''}">
+        Continuar lendo sem recursos premium
+      </button>
+    </div>`;
+
+  // Fecha ao clicar no backdrop
+  sheet.querySelector('#rs-sheet-sessao-backdrop')
+    .addEventListener('click', _fecharSheetSessao);
+
+  document.body.appendChild(sheet);
+  document.body.style.overflow = 'hidden';
+}
+
+function _fecharSheetSessao() {
+  const sheet = document.getElementById('rs-sheet-sessao');
+  if (!sheet) return;
+  sheet.style.opacity = '0';
+  sheet.style.transition = 'opacity .2s';
+  setTimeout(() => { sheet.remove(); document.body.style.overflow = ''; }, 200);
+}
+
+function _abrirEmailAcesso(e) {
+  e.preventDefault();
+  // Tenta abrir o cliente de e-mail na caixa de entrada (sem compor e-mail novo)
+  // Fallback útil: abre a aba de e-mail para o usuário encontrar o link do Radar
+  window.open('https://mail.google.com', '_blank');
+  // Para outros clientes, deixa o mailto como href padrão
+}
+
+window._fecharSheetSessao = _fecharSheetSessao;
+window._abrirEmailAcesso  = _abrirEmailAcesso;
 
 // ─── Validação de sessão em background (uma vez a cada 4h) ───────────────
 async function _validarSessaoBackground(sessao) {
