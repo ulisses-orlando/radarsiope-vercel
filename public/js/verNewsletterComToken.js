@@ -690,7 +690,7 @@ function renderMidia(newsletter, acesso) {
 
   const itens = [];
 
-  if (newsletter.audio_url) {
+    if (newsletter.audio_url) {
     itens.push(acesso.temAudio ? `
       <div class="rs-media-item">
         <div class="rs-media-icon">🎧</div>
@@ -1292,13 +1292,12 @@ async function _validarSessaoBackground(sessao) {
 // Carrega a edição mais recente para assinantes que chegam via PWA/ícone.
 async function _tentarModoAssinante(dadosSessao) {
   try {
-    const sessao = dadosSessao || (() => { 
-      try { return JSON.parse(localStorage.getItem('rs_pwa_session')); } 
-      catch { return null; } 
+    const sessao = dadosSessao || (() => {
+      try { return JSON.parse(localStorage.getItem('rs_pwa_session')); } catch { return null; }
     })();
     if (!sessao || sessao.segmento !== 'assinante' || !sessao.uid) return false;
 
-    // 🔒 BLOQUEANTE: Verifica se a sessão ainda é válida antes de carregar o app
+    // 🔒 BLOQUEANTE: Valida sessão antes de renderizar qualquer coisa
     if (!(await _checarSessaoCritica())) return false;
 
     // Inicia validação em background (silenciosa para atualizar features)
@@ -2376,7 +2375,6 @@ async function abrirDrawer() {
   const ctx = _getCtx();
   const overlay = document.getElementById('rs-drawer-overlay');
   const panel = document.getElementById('rs-drawer-panel');
-  
   if (!overlay || !panel) return;
 
   // Edge case: sem identificação
@@ -2388,7 +2386,6 @@ async function abrirDrawer() {
     document.body.style.overflow = 'hidden';
     return;
   }
-
   overlay.classList.add('rs-drawer-show');
   panel.classList.add('rs-drawer-show');
   _drawer.aberto = true;
