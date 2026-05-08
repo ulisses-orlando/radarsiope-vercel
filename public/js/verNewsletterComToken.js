@@ -1355,7 +1355,7 @@ async function _executarAtivacaoSessao(token, uid) {
       });
  
     const data = await resp.json().catch(() => ({}));
- 
+ console.log('[verNL] Resposta da ativação de sessão:', resp.status, data);
     if (!resp.ok || !data.ok) {
       mostrarErro(
         '<strong>Link de ativação inválido ou expirado.</strong>',
@@ -1378,7 +1378,7 @@ async function _executarAtivacaoSessao(token, uid) {
         cod_uf:         data.cod_uf,
         cod_municipio:  data.cod_municipio,
         nome_municipio: data.nome_municipio,
-        perfil:         data.perfil,
+        perfil:         data.tipo_perfil,
         municipios_plano: data.municipios_plano || [],
         validado_em:    Date.now(),
       }));
