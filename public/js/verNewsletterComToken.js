@@ -1175,15 +1175,15 @@ async function buscarPorNumero(numero) {
 }
 
 // ─── Lógica Centralizada de Segurança de Sessão ────────────────────────────
-// Cache para evitar múltiplas chamadas à API em cliques rápidos (janela de 15 min)
+// Cache para evitar múltiplas chamadas à API em cliques rápidos (janela de 1 min)
 let _validacaoCriticaCache = { ts: 0, status: true };
 
 async function _checarSessaoCritica() {
-  // 1. Se validou há menos de 15 min, confia no resultado anterior (evita spam)
-  if (Date.now() - _validacaoCriticaCache.ts < 15 * 60 * 1000) {
+  // 🔒 ATENÇÃO: Reduzido para 1 MINUTO para garantir bloqueio rápido
+  if (Date.now() - _validacaoCriticaCache.ts < 1 * 60 * 1000) { 
     return _validacaoCriticaCache.status;
   }
-
+  
   try {
     const sess = JSON.parse(localStorage.getItem('rs_pwa_session') || '{}');
     if (!sess?.session_id || !sess?.uid) return false;
@@ -1205,13 +1205,12 @@ async function _checarSessaoCritica() {
       return true;
     }
 
-    // Inválido: Bloqueia acesso
+    // Inválido: Bloqueia acesso imediatamente
     _bloquearAcessoPorSessaoInativa(data.motivo);
     return false;
 
   } catch (e) {
     console.warn('[VerNL] Falha na validação crítica (offline/erro), permitindo acesso temporário.');
-    // Se a API falhar (5xx, sem net), não bloqueia o usuário honesto
     return true; 
   }
 }
@@ -1425,7 +1424,7 @@ function _mostrarAvisoSessoes() {
     'box-shadow:0 2px 8px rgba(0,0,0,0.2)',
   ].join(';');
   aviso.innerHTML = `
-    ⚠️ Identificamos muitas sessões abertas para essa assinatura.
+
     A sessão mais antiga foi desativada automaticamente.
     <button onclick="document.getElementById('rs-aviso-sessoes').remove()"
       style="margin-left:12px;background:rgba(255,255,255,0.3);border:none;
@@ -2936,6 +2935,9 @@ async function navegarParaEdicao(edicaoId) {
 
   fecharDrawer();
 
+  // 🔒 Validação Crítica: Garante que a sessão ainda é válida antes de carregar nova edição
+  if (!(await _checarSessaoCritica())) return;
+  
   // Mostrar loading
   const appEl = document.getElementById('rs-app');
   if (appEl) {
