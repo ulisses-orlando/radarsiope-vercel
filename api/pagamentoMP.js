@@ -446,6 +446,7 @@ async function _handleAtivarSessao(req, res) {
       cod_municipio:  usuarioData.cod_municipio   || '',
       nome_municipio: usuarioData.nome_municipio  || '',
       perfil:         usuarioData.perfil          || '',
+      municipios_plano: assinaturaData.municipios_plano || [],
     });
  
   } catch (err) {
