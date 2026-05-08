@@ -303,16 +303,6 @@ document.addEventListener('DOMContentLoaded', () => {
  
 // ─── ENVIO DE SOLICITAÇÃO (ATUALIZADA COM FLUXO DE CANCELAMENTO) ─────────────
 async function enviarSolicitacao() {
-  // 🔒 Valida sessão no frame pai (mesma origem — acesso direto)
-  const _pai = window !== window.parent ? window.parent : null;
-  if (_pai?._checarSessaoCritica) {
-    const ok = await _pai._checarSessaoCritica();
-    if (!ok) {
-      // Modal já exibido no frame pai — apenas aborta a ação
-      return;
-    }
-  }
-
   const usuario = JSON.parse(localStorage.getItem('usuarioLogado'));
   const tipoEl  = document.getElementById('tipo-suporte');
   const descEl  = document.getElementById('mensagem-suporte');
