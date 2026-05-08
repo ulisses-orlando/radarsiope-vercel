@@ -1304,16 +1304,6 @@ async function _validarSessaoBackground(sessao) {
 // Carrega a edição mais recente para assinantes que chegam via PWA/ícone.
 async function _tentarModoAssinante(dadosSessao) {
   try {
-    // Antes de criar nova sessão, verifica se a atual ainda é válida
-    if (sessao?.session_id) {
-      // Tenta validar a sessão existente primeiro
-      const valida = await _checarSessaoCritica(sessao);
-      if (valida.ok) {
-        // Sessão ainda válida → usa ela
-        return true;
-      }
-    }
-
     const sessao = dadosSessao || (() => {
       try { return JSON.parse(localStorage.getItem('rs_pwa_session')); } catch { return null; }
     })();
