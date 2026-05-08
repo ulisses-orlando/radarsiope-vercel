@@ -363,7 +363,6 @@ async function renderMunicipio(destinatario, acesso, newsletter) {
   let municipiosPlano = [];
   try {
     const sess = JSON.parse(localStorage.getItem('rs_pwa_session') || '{}');
-    console.log('[verNL] Sessão localStorage:', sess);
     municipiosPlano = sess.municipios_plano || [];
   } catch (_) {}
 
@@ -1113,11 +1112,11 @@ window._fecharModalGruposWA = _fecharModalGruposWA;
 // ─── _radarUser para OneSignal ────────────────────────────────────────────────
 
 function publicarRadarUser(destinatario, segmento, assinaturaId) {
-  // Para assinantes: uid = Firebase doc ID (_uid)
-  // Para leads: uid = Supabase row ID (id) — usado em leads_mensagens.lead_id
   const isAssinante = segmento === 'assinantes';
+  const uid = isAssinante ? (destinatario._uid || null) : String(destinatario.id || '');
+  
   window._radarUser = {
-    uid: isAssinante ? (destinatario._uid || null) : String(destinatario.id || ''),
+    uid,
     email: destinatario.email || '',
     nome: destinatario.nome || '',
     segmento: isAssinante ? 'assinante' : 'lead',
@@ -1129,15 +1128,26 @@ function publicarRadarUser(destinatario, segmento, assinaturaId) {
     perfil: destinatario.perfil || '',
     assinaturaId: assinaturaId || null,
   };
-  window.dispatchEvent(new Event('radarUserReady')); // ← aqui, indentado junto
 
-  // Salva sessão para o PWA (app.html usa ao abrir sem parâmetros)
+  window.dispatchEvent(new Event('radarUserReady'));
+
+  // 🔐 SALVAR COM MERGE: preserva propriedades existentes (ex: municipios_plano)
   try {
-    localStorage.setItem('rs_pwa_session', JSON.stringify({
-      uid: isAssinante ? (destinatario._uid || null) : String(destinatario.id || ''),
+    const sessaoExistente = JSON.parse(localStorage.getItem('rs_pwa_session') || '{}');
+    const novaSessao = {
+      ...sessaoExistente, // ← mantém dados antigos
+      uid,
       assinaturaId: assinaturaId || null,
       segmento: isAssinante ? 'assinante' : 'lead',
-    }));
+      // Atualiza apenas os campos que realmente mudaram
+      ...(destinatario.plano_slug && { plano_slug: destinatario.plano_slug }),
+      ...(destinatario.features && { features: destinatario.features }),
+      ...(destinatario.cod_uf && { cod_uf: destinatario.cod_uf }),
+      ...(destinatario.cod_municipio && { cod_municipio: destinatario.cod_municipio }),
+      ...(destinatario.nome_municipio && { nome_municipio: destinatario.nome_municipio }),
+      ...(destinatario.perfil && { perfil: destinatario.perfil }),
+    };
+    localStorage.setItem('rs_pwa_session', JSON.stringify(novaSessao));
   } catch (e) { /* ignora se localStorage bloqueado */ }
 }
 
