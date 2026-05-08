@@ -1347,28 +1347,6 @@ function _mostrarAvisoSessoes() {
 // ─── Ativação de sessão via link pós-pagamento (?ativar=TOKEN&uid=UID) ─────
 async function _executarAtivacaoSessao(token, uid) {
     mostrarLoading(true);
-
-    // ── Sessão já existente para este uid → ignora o token (já foi consumido) ──
-    // Acontece quando o usuário clica no link de ativação pela segunda vez:
-    // o token já foi marcado como usado, mas a sessão continua válida no localStorage.
-    try {
-      const _sessaoAtual = JSON.parse(localStorage.getItem('rs_pwa_session') || 'null');
-      if (
-        _sessaoAtual?.segmento === 'assinante' &&
-        _sessaoAtual?.session_id &&
-        _sessaoAtual?.uid === uid
-      ) {
-        try {
-          const _url = new URL(window.location.href);
-          _url.searchParams.delete('ativar');
-          _url.searchParams.delete('uid');
-          window.history.replaceState({}, '', _url.toString());
-        } catch (e) { /* ignora */ }
-        await _tentarModoAssinante(_sessaoAtual);
-        return;
-      }
-    } catch (e) { /* ignora — continua para ativar-sessao normalmente */ }
-
     try {
       const resp = await fetch('/api/pagamentoMP?acao=ativar-sessao', {
         method:  'POST',
