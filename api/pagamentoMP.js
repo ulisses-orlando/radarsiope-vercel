@@ -578,10 +578,12 @@ async function _handleCriarSessao(req, res) {
 
     if (sessoesSnap.size >= 3) {
       const ordenadas = sessoesSnap.docs.sort((a, b) => {
-        const ta = a.data().ultimo_acesso?.toMillis?.() || 0;
-        const tb = b.data().ultimo_acesso?.toMillis?.() || 0;
+        const ta = dataA.ultimo_acesso?.toMillis?.() || dataA.criado_em?.toMillis?.() || 0;
+        const tb = dataB.ultimo_acesso?.toMillis?.() || dataB.criado_em?.toMillis?.() || 0;
         return ta - tb; // mais antiga primeiro
       });
+        console.log(`[🔒 Limite] Desativando sessão antiga: ${sessaoAntiga.id} (uid: ${uid})`);
+
       await ordenadas[0].ref.update({
         ativo:             false,
         desativado_motivo: 'limite_dispositivos',
