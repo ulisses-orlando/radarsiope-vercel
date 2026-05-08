@@ -2171,6 +2171,7 @@ const _drawer = {
   edicoesCache: {},         // { [tipoId]: [array de edições] } — memória de sessão
   contadores: [],         // refs dos setInterval dos contadores regressivos
   filtroLidas: 'todas',
+  termoBusca: '',
 };
 
 async function _getTipos() {
@@ -2446,24 +2447,45 @@ async function abrirTipo(tipoId, tipoNome, tipoIcone) {
 
   // Para leads: exibir apenas edições que foram enviadas a ele E ainda com expira_em vigente
   const _uid = ctx?.uid;
-    let edicoesVisiveis;
+  let edicoesVisiveis;
   
-    if (isAssinante) {
-      const filtro = _drawer.filtroLidas || 'todas';
-      edicoesVisiveis = edicoes.filter(ed => {
-        const lida = _edicaoLida(_uid, ed.id);
-        if (filtro === 'lidas')     return lida;
-        if (filtro === 'nao_lidas') return !lida;
-        return true; // 'todas'
-      });
-    } else {
-      edicoesVisiveis = edicoes.filter(ed => {
+  if (isAssinante) {
+     const filtro = _drawer.filtroLidas || 'todas';
+     edicoesVisiveis = edicoes.filter(ed => {
+      const lida = _edicaoLida(_uid, ed.id);
+      if (filtro === 'lidas')     return lida;
+      if (filtro === 'nao_lidas') return !lida;
+      return true; // 'todas'
+     });
+  } else {
+     edicoesVisiveis = edicoes.filter(ed => {
         const envio = enviosLead[ed.id];
         if (!envio) return false;
         if (envio.expira_em && new Date(envio.expira_em) <= new Date()) return false;
         return true;
+     });
+  }
+
+  if (isAssinante) {
+    // Favoritos sobem para o topo, ordenados por data de favoritamento (mais recente primeiro)
+    const _favAtual = _getFavs(_uid);
+    edicoesVisiveis.sort((a, b) => {
+      const fa = _favAtual[a.id], fb = _favAtual[b.id];
+      if (fa && !fb) return -1;
+      if (!fa && fb) return  1;
+      if (fa && fb)  return (fb.ts || 0) - (fa.ts || 0);
+      return 0;
+    });
+    // Filtrar por termo de busca
+    const _termo = (_drawer.termoBusca || '').trim().toLowerCase();
+    if (_termo) {
+      edicoesVisiveis = edicoesVisiveis.filter(ed => {
+        const t = (ed.titulo || '').toLowerCase();
+        const n = String(ed.numero || ed.edicao || '');
+        return t.includes(_termo) || n.includes(_termo);
       });
     }
+  }
 
   // Renderizar cards
   const listaHTML = edicoesVisiveis.map(ed => {
@@ -2494,7 +2516,7 @@ async function abrirTipo(tipoId, tipoNome, tipoIcone) {
         </a>
       </div>`;
 
-  const filtroTabs = isAssinante ? _htmlFiltroLidas(_drawer.filtroLidas || 'todas') : '';
+  const filtroTabs = isAssinante ? _htmlCabecalhoAssinante(_drawer.filtroLidas || 'todas') : '';
   body.innerHTML = `${upSellBanner}${filtroTabs}${listaOuVazio}${rodape}`;
 
   // Iniciar contadores regressivos para leads
@@ -2516,6 +2538,17 @@ function _cardEdicaoAssinante(ed, isAtual, temAcesso, uid) {
   const classeAtual = isAtual ? 'rs-drawer-ed-atual' : '';
   const bloqueado = !temAcesso;
   const lida      = _edicaoLida(uid, ed.id);
+  const fav       = _edicaoFavoritada(uid, ed.id);
+  const favHtml   = `
+    <button data-fav-nid="${_esc(ed.id)}"
+            onclick="event.stopPropagation();toggleFavorito('${_esc(uid||'')}','${_esc(ed.id)}')"
+            type="button"
+            title="${fav ? 'Remover dos favoritos' : 'Favoritar edição'}"
+            style="border:none;background:none;padding:4px 3px;cursor:pointer;font-size:17px;
+                   line-height:1;flex-shrink:0;transition:color .2s;
+                   color:${fav ? 'var(--amarelo,#F0A500)' : 'var(--rs-muted,#cbd5e1)'}">
+      ${fav ? '★' : '☆'}
+    </button>`;
  
   // Indicador visual: ponto azul = não lida, anel vazio = lida
   const dotStyle = `
@@ -2545,7 +2578,7 @@ function _cardEdicaoAssinante(ed, isAtual, temAcesso, uid) {
   }
  
   return `
-    <div class="rs-drawer-ed-card-wrap" style="display:flex;align-items:center;gap:8px;padding:2px 8px 2px 4px">
+    <div class="rs-drawer-ed-card-wrap" style="display:flex;align-items:center;gap:4px;padding:2px 4px 2px 4px">
       ${dotHtml}
       <button class="rs-drawer-ed-card ${classeAtual}"
               style="flex:1;margin:0"
@@ -2559,6 +2592,7 @@ function _cardEdicaoAssinante(ed, isAtual, temAcesso, uid) {
           ? '<span class="rs-drawer-ed-badge-atual">👁 lendo agora</span>'
           : '<span class="rs-drawer-chevron">›</span>'}
       </button>
+      ${favHtml}
     </div>`;
 }
 
@@ -2605,6 +2639,99 @@ function _setFiltroLidas(filtro) {
   }
 }
 window._setFiltroLidas = _setFiltroLidas;
+
+// ─── FAVORITOS ───────────────────────────────────────────────────────────────
+function _getFavKey(uid) { return `rs_favs_${uid || 'anon'}`; }
+
+function _getFavs(uid) {
+  try { return JSON.parse(localStorage.getItem(_getFavKey(uid)) || '{}'); }
+  catch { return {}; }
+}
+
+function _salvarFavs(uid, favs) {
+  try { localStorage.setItem(_getFavKey(uid), JSON.stringify(favs)); }
+  catch { /* ignora se localStorage bloqueado */ }
+}
+
+function _edicaoFavoritada(uid, nid) {
+  return !!_getFavs(uid)[nid];
+}
+
+function toggleFavorito(uid, nid) {
+  const favs = _getFavs(uid);
+  if (favs[nid]) {
+    delete favs[nid];
+  } else {
+    favs[nid] = { ts: Date.now() };
+  }
+  _salvarFavs(uid, favs);
+  // Re-renderiza o drawer para refletir nova ordenação
+  if (_drawer?.aberto && _drawer.nivel === 2 && _drawer.tipoAtivo) {
+    abrirTipo(_drawer.tipoAtivo.id, _drawer.tipoAtivo.nome, _drawer.tipoAtivo.icone);
+  }
+}
+window.toggleFavorito = toggleFavorito;
+
+// ─── CABEÇALHO COMBINADO (busca + filtro lidas) ──────────────────────────────
+// Substitui _htmlFiltroLidas no nível 2 para assinantes.
+// Sticky único evita sobreposição entre dois elementos posicionados.
+
+function _htmlCabecalhoAssinante(filtroAtivo) {
+  const val = _esc(_drawer.termoBusca || '');
+  const tabs = [
+    { key: 'todas',     label: 'Todas'     },
+    { key: 'nao_lidas', label: 'Não lidas' },
+    { key: 'lidas',     label: 'Lidas'     },
+  ];
+  const tabsHtml = tabs.map(t => `
+    <button onclick="_setFiltroLidas('${t.key}')"
+            style="flex:1;padding:5px 0;font-size:11px;
+                   font-weight:${t.key === filtroAtivo ? '700' : '500'};
+                   border:none;cursor:pointer;border-radius:6px;
+                   background:${t.key === filtroAtivo ? 'var(--azul,#0A3D62)' : 'transparent'};
+                   color:${t.key === filtroAtivo ? '#fff' : 'var(--rs-muted,#64748b)'};
+                   transition:all .15s"
+            type="button">${t.label}</button>
+  `).join('');
+
+  return `
+    <div style="position:sticky;top:0;z-index:2;background:var(--rs-card);
+                border-bottom:1px solid var(--rs-borda,#e2e8f0);padding:8px 12px">
+      <!-- Campo de busca -->
+      <div style="display:flex;align-items:center;gap:6px;
+                  background:var(--rs-bg,#f8fafc);border:1px solid var(--rs-borda,#e2e8f0);
+                  border-radius:8px;padding:5px 10px;margin-bottom:8px">
+        <span style="color:var(--rs-muted,#94a3b8);font-size:13px;flex-shrink:0">🔍</span>
+        <input id="rs-busca-edicao" type="text"
+               placeholder="Buscar por título…"
+               value="${val}"
+               style="flex:1;border:none;background:transparent;font-size:13px;
+                      color:var(--rs-texto,#0f172a);outline:none;min-width:0"
+               oninput="_setBusca(this.value)"
+               autocomplete="off" autocorrect="off" spellcheck="false"/>
+        ${val ? `<button onclick="_setBusca('')" type="button"
+                   aria-label="Limpar busca"
+                   style="border:none;background:none;padding:0;cursor:pointer;
+                          font-size:14px;line-height:1;color:var(--rs-muted,#94a3b8)">✕</button>` : ''}
+      </div>
+      <!-- Tabs lidas / não lidas -->
+      <div style="display:flex;gap:4px">${tabsHtml}</div>
+    </div>`;
+}
+
+// ─── BUSCA: atualizar estado e re-renderizar ─────────────────────────────────
+function _setBusca(termo) {
+  _drawer.termoBusca = termo;
+  if (_drawer.tipoAtivo) {
+    abrirTipo(_drawer.tipoAtivo.id, _drawer.tipoAtivo.nome, _drawer.tipoAtivo.icone);
+    // Restaura foco + posição do cursor no input após re-renderização
+    requestAnimationFrame(() => {
+      const inp = document.getElementById('rs-busca-edicao');
+      if (inp) { inp.focus(); inp.setSelectionRange(inp.value.length, inp.value.length); }
+    });
+  }
+}
+window._setBusca = _setBusca;
 
 // ─── Card de edição — lead ───────────────────────────────────────────────────
 function _cardEdicaoLead(ed, isAtual, envio) {
@@ -2682,6 +2809,7 @@ function _mostrarExpirado(edicaoId, titulo, horas) {
 // ─── Voltar para nível 1 ─────────────────────────────────────────────────────
 function voltarParaTipos() {
   _limparContadores();
+  _drawer.termoBusca = ''; 
   _renderNivel1();
 }
 
