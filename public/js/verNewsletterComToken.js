@@ -1179,14 +1179,17 @@ async function buscarPorNumero(numero) {
 let _validacaoCriticaCache = { ts: 0, status: true };
 
 async function _checarSessaoCritica() {
-  // 🔒 ATENÇÃO: Reduzido para 1 MINUTO para garantir bloqueio rápido
-  if (Date.now() - _validacaoCriticaCache.ts < 1 * 60 * 1000) { 
+  // 🔒 Cache reduzido para 30s (segurança > performance)
+  if (Date.now() - _validacaoCriticaCache.ts < 30 * 1000) {
     return _validacaoCriticaCache.status;
   }
-  
+
   try {
     const sess = JSON.parse(localStorage.getItem('rs_pwa_session') || '{}');
     if (!sess?.session_id || !sess?.uid) return false;
+
+    // 🔍 DEBUG TEMPORÁRIO (remova após validar)
+    console.log('[🛡️ Sessão] Validando via API...');
 
     const resp = await fetch('/api/pagamentoMP?acao=validar-sessao', {
       method: 'POST',
@@ -1194,24 +1197,25 @@ async function _checarSessaoCritica() {
       body: JSON.stringify({ uid: sess.uid, session_id: sess.session_id }),
     });
 
-    if (!resp.ok) throw new Error('API Error');
-    const data = await resp.json();
+    const data = await resp.json().catch(() => ({}));
+    console.log('[🛡️ Sessão] Resposta API:', data); // 🔍 Veja o retorno no F12
 
-    if (data.valido) {
-      // Sucesso: atualiza timestamp local e cache
-      sess.validado_em = Date.now();
-      localStorage.setItem('rs_pwa_session', JSON.stringify(sess));
-      _validacaoCriticaCache = { ts: Date.now(), status: true };
-      return true;
+    // Se a API retornou inválido ou erro de resposta
+    if (!resp.ok || !data.valido) {
+      _bloquearAcessoPorSessaoInativa(data.motivo || 'Sessão inválida ou desativada.');
+      _validacaoCriticaCache = { ts: Date.now(), status: false };
+      return false;
     }
 
-    // Inválido: Bloqueia acesso imediatamente
-    _bloquearAcessoPorSessaoInativa(data.motivo);
-    return false;
+    // ✅ Sucesso: atualiza local e cache
+    sess.validado_em = Date.now();
+    localStorage.setItem('rs_pwa_session', JSON.stringify(sess));
+    _validacaoCriticaCache = { ts: Date.now(), status: true };
+    return true;
 
   } catch (e) {
-    console.warn('[VerNL] Falha na validação crítica (offline/erro), permitindo acesso temporário.');
-    return true; 
+    console.warn('[🛡️ Sessão] Falha na validação (offline/erro):', e.message);
+    return true; // Benefício da dúvida em caso de instabilidade de rede
   }
 }
 
@@ -2937,7 +2941,7 @@ async function navegarParaEdicao(edicaoId) {
 
   // 🔒 Validação Crítica: Garante que a sessão ainda é válida antes de carregar nova edição
   if (!(await _checarSessaoCritica())) return;
-  
+
   // Mostrar loading
   const appEl = document.getElementById('rs-app');
   if (appEl) {
