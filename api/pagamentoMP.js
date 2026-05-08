@@ -618,7 +618,7 @@ async function _handleCriarSessao(req, res) {
       cod_uf:         usuarioData.cod_uf          || '',
       cod_municipio:  usuarioData.cod_municipio   || '',
       nome_municipio: usuarioData.nome_municipio  || '',
-      perfil:         usuarioData.perfil          || '',
+      perfil:         usuarioData.tipo_perfil     || '',
       validado_em:    Date.now(),
     });
 
