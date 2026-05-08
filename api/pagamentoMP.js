@@ -469,16 +469,44 @@ async function _handleValidarSessao(req, res) {
   const uaHash = crypto.createHash('md5').update(ua.slice(0, 80)).digest('hex').slice(0, 8);
  
   try {
+    // 🔍 LOG 1: Caminho completo da consulta
+    console.log(`[validar-sessao] Consultando: usuarios/${uid}/sessoes/${session_id}`);
+    
     const sessaoRef  = db.collection('usuarios').doc(uid).collection('sessoes').doc(session_id);
     const sessaoSnap = await sessaoRef.get();
-
- console.log(`[validar-sessao] Validando sessão: ${session_id} (ativo: ${sessaoSnap.data().ativo})`);
-
-    if (!sessaoSnap.exists || !sessaoSnap.data().ativo) {
-      return json(res, 200, { valido: false, motivo: 'sessao_invalida' });
+    
+    // 🔍 LOG 2: Resultado da consulta
+    console.log(`[validar-sessao] sessaoSnap.exists: ${sessaoSnap.exists}`);
+    
+    if (!sessaoSnap.exists) {
+      console.warn(`[validar-sessao] Sessão NÃO encontrada para uid=${uid}, session_id=${session_id}`);
+      return json(res, 200, { 
+        valido: false, 
+        motivo: 'sessao_nao_encontrada',
+        debug: { uid, session_id_received: session_id } // ← Retorna ID para debug
+      });
     }
- console.log(`[validar-sessao] Sessão encontrada. Verificando compartilhamento e status da assinatura...`);
+    
     const sessaoData = sessaoSnap.data();
+    
+    // 🔍 LOG 3: Valor do campo "ativo"
+    console.log(`[validar-sessao] sessaoData.ativo: ${sessaoData.ativo}`);
+    console.log(`[validar-sessao] sessaoData completo:`, JSON.stringify(sessaoData, null, 2));
+    
+    if (!sessaoData.ativo) {
+      console.log(`[validar-sessao] Bloqueando sessão inativa: ${session_id}`);
+      return json(res, 200, { 
+        valido: false, 
+        motivo: 'sessao_invalida',
+        debug: { 
+          uid, 
+          session_id_received: session_id,
+          session_id_in_db: sessaoData.session_id, // ← Confirma se bate com o enviado
+          ativo: sessaoData.ativo 
+        }
+      });
+    }
+ 
     const agora      = Date.now();
     const updates    = { ultimo_acesso: admin.firestore.FieldValue.serverTimestamp() };
  
@@ -489,16 +517,15 @@ async function _handleValidarSessao(req, res) {
         const distintos = (sessaoData.acessos_ua_distintos || 0) + 1;
         updates.acessos_ua_distintos       = distintos;
         updates.ua_hash                    = uaHash;
-        // Flag para revisão manual — não bloqueia automaticamente
         if (distintos >= 3) updates.compartilhamento_suspeito = true;
       } else {
-        updates.ua_hash = uaHash; // troca de dispositivo legítima após 1h
+        updates.ua_hash = uaHash;
       }
     }
  
     await sessaoRef.update(updates);
  
-    // Verifica status atual da assinatura (pode ter sido cancelada)
+    // Verifica status atual da assinatura
     const assinaturaId = sessaoData.assinaturaId;
     let plano_slug     = null;
     let features       = {};
@@ -522,14 +549,28 @@ async function _handleValidarSessao(req, res) {
     const statusAtivos = ['ativa', 'aprovada', 'pago'];
     if (statusAss && !statusAtivos.includes(statusAss)) {
       await sessaoRef.update({ ativo: false, desativado_motivo: 'assinatura_inativa' });
-      return json(res, 200, { valido: false, motivo: 'assinatura_inativa' });
+      return json(res, 200, { 
+        valido: false, 
+        motivo: 'assinatura_inativa',
+        debug: { uid, session_id }
+      });
     }
  
-    return json(res, 200, { valido: true, plano_slug, features, assinaturaId,  municipios_plano: municipiosPlano });
+    // ✅ Sucesso: retorna session_id para conferência no frontend
+    return json(res, 200, { 
+      valido: true, 
+      plano_slug, 
+      features, 
+      assinaturaId,  
+      municipios_plano: municipiosPlano,
+      debug: { 
+        session_id_received: session_id,
+        session_id_in_db: sessaoData.session_id 
+      }
+    });
  
   } catch (err) {
     console.error('[validar-sessao] Erro:', err.message);
-    // Em erro de rede/servidor, retorna 500 para o cliente NÃO invalidar a sessão local
     return json(res, 500, { ok: false, message: 'Erro interno ao validar sessão.' });
   }
 }
