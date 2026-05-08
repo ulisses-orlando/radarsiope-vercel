@@ -224,108 +224,59 @@
   }
 
   // ── Bind de eventos ───────────────────────────────────────────────────────
-  function _bindEventos() {
-    const wrap = document.getElementById('rs-menu-wrap');
-    if (!wrap) return;
+  // ── Bind de eventos ───────────────────────────────────────────────────────
+function _bindEventos() {
+  const wrap = document.getElementById('rs-menu-wrap');
+  if (!wrap) return;
+  document.getElementById('rs-menu-btn')
+    ?.addEventListener('click', _toggleMenu);
 
-    document.getElementById('rs-menu-btn')
-      ?.addEventListener('click', _toggleMenu);
+  document.getElementById('rs-menu-overlay')
+    ?.addEventListener('click', _fecharMenu);
 
-    document.getElementById('rs-menu-overlay')
-      ?.addEventListener('click', _fecharMenu);
-
-    // Edições — usa o drawer existente
-    document.getElementById('rs-menu-edicoes')
-      ?.addEventListener('click', () => {
-        _fecharMenu();
-        // Aciona o drawer de edições via evento customizado
-        window.dispatchEvent(new CustomEvent('rs:abrirEdicoes'));
-      });
-
-    // Alertas
-    document.getElementById('rs-menu-alertas')
-      ?.addEventListener('click', () => {
-        _fecharMenu();
-        window._rsAlertasAbrir?.();
-      });
-
-    // Fale Conosco
-    document.getElementById('rs-menu-fale')
-      ?.addEventListener('click', () => {
-        _fecharMenu();
-        window._rsFcAbrir?.();
-      });
-
-    // Minha Área — abre modal com iframe
-    document.getElementById('rs-menu-area')
-      ?.addEventListener('click', () => {
-        _fecharMenu();
-        _abrirModalLogin();
-      });
-
-    // Escuta mensagens do iframe
-    window.addEventListener('message', e => {
-
-      // Painel solicita abrir edição no app (evita abrir nova aba)
-      if (e.data?.tipo === 'rs:abrirEdicao') {
-        const { newsletterId, bypassExp } = e.data;
-        _fecharModalLogin();
-        if (bypassExp) {
-          // Edição expirada: usa fluxo de bypass (recarrega app com bypass_exp=1)
-          // Busca o envio correspondente no contexto do _radarUser para montar a URL
-          const user = window._radarUser;
-          if (user && newsletterId) {
-            window._rsAbrirEdicaoExpirada?.(newsletterId);
-          }
-        } else {
-          // Edição ativa: navega diretamente via drawer sem recarregar o app
-          if (typeof window.navegarParaEdicao === 'function') {
-            window.navegarParaEdicao(newsletterId);
-          }
-        }
-        return;
-      }
-
-      if (e.data?.tipo === 'rs:loginSucesso') {
-        const destino = e.data.destino || 'painel.html';
-        if (destino === 'admin.html') {
-          // Admin → abre o painel admin numa nova aba
-          window.open('/admin.html', '_blank');
-          _fecharModalLogin();
-        } else {
-          // Assinante/usuário → carrega painel no mesmo iframe e expande modal
-          const iframe = document.getElementById('rs-login-iframe');
-          const wrap   = document.getElementById('rs-login-iframe-wrap');
-          if (iframe) {
-            // Expande para quase fullscreen antes de carregar o painel
-            if (wrap) {
-              wrap.style.transition = 'all .3s ease';
-              wrap.style.width      = 'min(900px, 97vw)';
-              wrap.style.height     = '92vh';
-              wrap.style.borderRadius = '12px';
-            }
-            iframe.src = '/painel.html';
-          }
-          // Atualiza saudação
-          const nome = (e.data.usuario?.nome || '').split(' ')[0];
-          const hd = document.getElementById('hd-saudacao');
-          if (hd && nome) hd.textContent = `Olá, ${nome}!`;
-        }
-      }
-      if (e.data?.tipo === 'rs:fecharModal') {
-        _fecharModalLogin();
-      }
+  // 📚 Edições — fluxo original (já validado em abrirDrawer)
+  document.getElementById('rs-menu-edicoes')
+    ?.addEventListener('click', () => {
+      _fecharMenu();
+      window.dispatchEvent(new CustomEvent('rs:abrirEdicoes'));
     });
 
-    // ESC fecha
-    document.addEventListener('keydown', e => {
-      if (e.key === 'Escape') _fecharMenu();
+  // 🔔 Sentinela — COM VALIDAÇÃO DE SESSÃO
+  document.getElementById('rs-menu-alertas')
+    ?.addEventListener('click', async () => {
+      _fecharMenu();
+      if (typeof window._checarSessaoCritica === 'function') {
+        if (!(await window._checarSessaoCritica())) return;
+      }
+      window._rsAlertasAbrir?.();
     });
 
-    // Atualiza badges periodicamente
-    setInterval(_atualizarBadges, 30000);
-    setTimeout(_atualizarBadges, 1000);
-  }
+  // 💬 Ações — COM VALIDAÇÃO DE SESSÃO
+  document.getElementById('rs-menu-fale')
+    ?.addEventListener('click', async () => {
+      _fecharMenu();
+      if (typeof window._checarSessaoCritica === 'function') {
+        if (!(await window._checarSessaoCritica())) return;
+      }
+      window._rsFcAbrir?.();
+    });
+
+  // 👤 Minha Área — abre modal com iframe
+  document.getElementById('rs-menu-area')
+    ?.addEventListener('click', () => {
+      _fecharMenu();
+      _abrirModalLogin();
+    });
+
+  // ESC fecha
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') _fecharMenu();
+  });
+
+  // Atualiza badges periodicamente
+  setInterval(_atualizarBadges, 30000);
+  setTimeout(_atualizarBadges, 1000);
+}
 
   // ── Toggle / Abrir / Fechar ───────────────────────────────────────────────
   let _aberto = false;
