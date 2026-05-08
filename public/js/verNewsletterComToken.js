@@ -2515,63 +2515,45 @@ function _cardEdicaoAssinante(ed, isAtual, temAcesso, uid) {
   const data      = _fmtData(ed.data_publicacao);
   const classeAtual = isAtual ? 'rs-drawer-ed-atual' : '';
   const bloqueado = !temAcesso;
-  const lida      = _edicaoLida(uid, ed.id);
+  const lida      = _edicaoLida(uid, ed.id); 
   const fav       = _edicaoFavoritada(uid, ed.id);
-  const favHtml   = `
-    <button data-fav-nid="${_esc(ed.id)}"
-            onclick="event.stopPropagation();toggleFavorito('${_esc(uid||'')}','${_esc(ed.id)}')"
-            type="button"
-            title="${fav ? 'Remover dos favoritos' : 'Favoritar edição'}"
-            style="border:none;background:none;padding:4px 3px;cursor:pointer;font-size:17px;
-                   line-height:1;flex-shrink:0;transition:color .2s;
-                   color:${fav ? 'var(--amarelo,#F0A500)' : 'var(--rs-muted,#cbd5e1)'}">
-      ${fav ? '★' : '☆'}
-    </button>`;
- 
+  
+  // 🔒 HTML do botão de favorito (consolidado e sem quebras de string)
+  const favHtml = `<button 
+    data-fav-nid="${_esc(ed.id)}" 
+    onclick="event.stopPropagation();toggleFavorito('${_esc(uid || '')}','${_esc(ed.id)}')" 
+    type="button" 
+    title="${fav ? 'Remover dos favoritos' : 'Favoritar edição'}" 
+    style="border:none;background:none;padding:4px 3px;cursor:pointer;font-size:17px;line-height:1;flex-shrink:0;transition:color .2s;color:${fav ? 'var(--amarelo,#F0A500)' : 'var(--rs-muted,#cbd5e1)'};">
+    ${fav ? '★' : '☆'}
+  </button>`;
+
   // Indicador visual: ponto azul = não lida, anel vazio = lida
-  const dotStyle = `
-    display:inline-block;
-    width:8px; height:8px; border-radius:50%;
-    background:${lida ? 'transparent' : 'var(--azul,#0A3D62)'};
-    border:1.5px solid var(--azul,#0A3D62);
-    flex-shrink:0; margin-top:3px;
-    cursor:pointer; transition:background .2s;
-  `;
-  const dotHtml = `
-    <span data-lida-nid="${_esc(ed.id)}"
-          style="${dotStyle}"
-          title="${lida ? 'Marcar como não lida' : 'Marcar como lida'}"
-          onclick="event.stopPropagation();toggleLida('${_esc(uid||'')}','${_esc(ed.id)}')">
-    </span>`;
- 
+  const dotStyle = `display:inline-block;width:8px;height:8px;border-radius:50%;background:${lida ? 'transparent' : 'var(--azul,#0A3D62)'};border:1.5px solid var(--azul,#0A3D62);flex-shrink:0;margin-top:3px;cursor:pointer;transition:background .2s;`;
+  const dotHtml = `<span data-lida-nid="${_esc(ed.id)}" style="${dotStyle}" title="${lida ? 'Marcar como não lida' : 'Marcar como lida'}" onclick="event.stopPropagation();toggleLida('${_esc(uid||'')}','${_esc(ed.id)}')"></span>`;
+
   if (bloqueado) {
-    return `
-      <div class="rs-drawer-ed-card rs-drawer-ed-bloqueado">
-        <div class="rs-drawer-ed-info">
-          <div class="rs-drawer-ed-titulo">${titulo}</div>
-          <div class="rs-drawer-ed-data">${data}${num ? ` · Ed. ${num}` : ''}</div>
-        </div>
-        <span class="rs-drawer-ed-lock">🔒</span>
-      </div>`;
-  }
- 
-  return `
-    <div class="rs-drawer-ed-card-wrap" style="display:flex;align-items:center;gap:4px;padding:2px 4px 2px 4px">
-      ${dotHtml}
-      <button class="rs-drawer-ed-card ${classeAtual}"
-              style="flex:1;margin:0"
-              onclick="navegarParaEdicao('${_esc(ed.id)}')"
-              type="button">
-        <div class="rs-drawer-ed-info">
-          <div class="rs-drawer-ed-titulo">${titulo}</div>
-          <div class="rs-drawer-ed-data">${data}${num ? ` · Ed. ${num}` : ''}</div>
-        </div>
-        ${isAtual
-          ? '<span class="rs-drawer-ed-badge-atual">👁 lendo agora</span>'
-          : '<span class="rs-drawer-chevron">›</span>'}
-      </button>
-      ${favHtml}
+    return `<div class="rs-drawer-ed-card rs-drawer-ed-bloqueado">
+      <div class="rs-drawer-ed-info">
+        <div class="rs-drawer-ed-titulo">${titulo}</div>
+        <div class="rs-drawer-ed-data">${data}${num ? ` · Ed. ${num}` : ''}</div>
+      </div>
+      <span class="rs-drawer-ed-lock">🔒</span>
     </div>`;
+  }
+
+  // 🔑 Retorno consolidado: garante injeção segura de ${favHtml}
+  return `<div class="rs-drawer-ed-card-wrap" style="display:flex;align-items:center;gap:4px;padding:2px 4px;overflow:visible;">
+    ${dotHtml}
+    <button class="rs-drawer-ed-card ${classeAtual}" style="flex:1;margin:0;min-width:0;" onclick="navegarParaEdicao('${_esc(ed.id)}')" type="button">
+      <div class="rs-drawer-ed-info">
+        <div class="rs-drawer-ed-titulo">${titulo}</div>
+        <div class="rs-drawer-ed-data">${data}${num ? ` · Ed. ${num}` : ''}</div>
+      </div>
+      ${isAtual ? '<span class="rs-drawer-ed-badge-atual">👁 lendo agora</span>' : '<span class="rs-drawer-chevron">›</span>'}
+    </button>
+    ${favHtml}
+  </div>`;
 }
 
 // ─── FILTRO no drawer de edições ────────────────────────────────────────────
