@@ -363,7 +363,7 @@ async function renderMunicipio(destinatario, acesso, newsletter) {
   let municipiosPlano = [];
   try {
     const sess = JSON.parse(localStorage.getItem('rs_pwa_session') || '{}');
-    
+    console.log('[verNL] Sessão localStorage:', sess);
     municipiosPlano = sess.municipios_plano || [];
   } catch (_) {}
 
