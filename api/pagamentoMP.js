@@ -469,41 +469,25 @@ async function _handleValidarSessao(req, res) {
   const uaHash = crypto.createHash('md5').update(ua.slice(0, 80)).digest('hex').slice(0, 8);
  
   try {
-    // 🔍 LOG 1: Caminho completo da consulta
-    console.log(`[validar-sessao] Consultando: usuarios/${uid}/sessoes/${session_id}`);
+
     
     const sessaoRef  = db.collection('usuarios').doc(uid).collection('sessoes').doc(session_id);
     const sessaoSnap = await sessaoRef.get();
-    
-    // 🔍 LOG 2: Resultado da consulta
-    console.log(`[validar-sessao] sessaoSnap.exists: ${sessaoSnap.exists}`);
     
     if (!sessaoSnap.exists) {
       console.warn(`[validar-sessao] Sessão NÃO encontrada para uid=${uid}, session_id=${session_id}`);
       return json(res, 200, { 
         valido: false, 
         motivo: 'sessao_nao_encontrada',
-        debug: { uid, session_id_received: session_id } // ← Retorna ID para debug
       });
     }
     
     const sessaoData = sessaoSnap.data();
     
-    // 🔍 LOG 3: Valor do campo "ativo"
-    console.log(`[validar-sessao] sessaoData.ativo: ${sessaoData.ativo}`);
-    console.log(`[validar-sessao] sessaoData completo:`, JSON.stringify(sessaoData, null, 2));
-    
     if (!sessaoData.ativo) {
-      console.log(`[validar-sessao] Bloqueando sessão inativa: ${session_id}`);
       return json(res, 200, { 
         valido: false, 
         motivo: 'sessao_invalida',
-        debug: { 
-          uid, 
-          session_id_received: session_id,
-          session_id_in_db: sessaoData.session_id, // ← Confirma se bate com o enviado
-          ativo: sessaoData.ativo 
-        }
       });
     }
  
@@ -552,7 +536,6 @@ async function _handleValidarSessao(req, res) {
       return json(res, 200, { 
         valido: false, 
         motivo: 'assinatura_inativa',
-        debug: { uid, session_id }
       });
     }
  
@@ -563,10 +546,6 @@ async function _handleValidarSessao(req, res) {
       features, 
       assinaturaId,  
       municipios_plano: municipiosPlano,
-      debug: {
-        session_id_received: session_id,  // o que o frontend enviou
-        session_id_in_db: sessaoData.session_id // o que está no Firestore
-      }
     });
  
   } catch (err) {
@@ -625,7 +604,6 @@ async function _handleCriarSessao(req, res) {
         const tb = b.data().ultimo_acesso?.toMillis?.() || b.data().criado_em?.toMillis?.() || 0;
         return ta - tb; // mais antiga primeiro
       });
-      console.log(`[🔒 Limite] Desativando sessão antiga: ${ordenadas[0].id} (uid: ${uid})`);
 
       await ordenadas[0].ref.update({
         ativo:             false,
