@@ -363,6 +363,7 @@ async function renderMunicipio(destinatario, acesso, newsletter) {
   let municipiosPlano = [];
   try {
     const sess = JSON.parse(localStorage.getItem('rs_pwa_session') || '{}');
+    console.log('[verNL] Sessão do localStorage:', sess);
     municipiosPlano = sess.municipios_plano || [];
   } catch (_) {}
 
@@ -1355,7 +1356,7 @@ async function _executarAtivacaoSessao(token, uid) {
       });
  
     const data = await resp.json().catch(() => ({}));
- console.log('[verNL] Resposta da ativação de sessão:', resp.status, data);
+
     if (!resp.ok || !data.ok) {
       mostrarErro(
         '<strong>Link de ativação inválido ou expirado.</strong>',
