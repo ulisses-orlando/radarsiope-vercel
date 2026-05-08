@@ -471,11 +471,13 @@ async function _handleValidarSessao(req, res) {
   try {
     const sessaoRef  = db.collection('usuarios').doc(uid).collection('sessoes').doc(session_id);
     const sessaoSnap = await sessaoRef.get();
- 
+
+ console.log(`[validar-sessao] Validando sessão: ${session_id} (ativo: ${sessaoSnap.data().ativo})`);
+
     if (!sessaoSnap.exists || !sessaoSnap.data().ativo) {
       return json(res, 200, { valido: false, motivo: 'sessao_invalida' });
     }
- 
+ console.log(`[validar-sessao] Sessão encontrada. Verificando compartilhamento e status da assinatura...`);
     const sessaoData = sessaoSnap.data();
     const agora      = Date.now();
     const updates    = { ultimo_acesso: admin.firestore.FieldValue.serverTimestamp() };
