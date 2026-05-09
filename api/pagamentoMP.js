@@ -894,6 +894,34 @@ async function _handleGerarCobrancaCancelamento(req, res) {
   }
 }
 
+// ─── Persistir resultado do quiz ──────────────────────────────────────────
+async function _handleSalvarResultadoQuiz(req, res) {
+  if (req.method !== 'POST') return json(res, 405, { ok: false, message: 'Método não permitido.' });
+  
+  const { uid, newsletter_id, tentativas_usadas, melhor_pontuacao, aprovado, detalhes } = req.body || {};
+  
+  if (!uid || !newsletter_id) {
+    return json(res, 400, { ok: false, message: 'uid e newsletter_id obrigatórios.' });
+  }
+
+  try {
+    const ref = db.collection('usuarios').doc(uid).collection('quiz_resultados');
+    await ref.add({
+      newsletter_id,
+      tentativas_usadas: tentativas_usadas || 1,
+      melhor_pontuacao: melhor_pontuacao || 0,
+      aprovado: aprovado || false,
+      detalhes: detalhes || [],
+      criado_em: admin.firestore.FieldValue.serverTimestamp()
+    });
+
+    return json(res, 200, { ok: true, message: 'Resultado salvo com sucesso.' });
+  } catch (err) {
+    console.error('[salvar-quiz] Erro:', err.message);
+    return json(res, 500, { ok: false, message: 'Erro interno ao salvar resultado.' });
+  }
+}
+
 // ─── Handler principal ────────────────────────────────────────────────────────
 export default async function handler(req, res) {
   try {
@@ -911,7 +939,7 @@ export default async function handler(req, res) {
 
     // Validar assinatura apenas para webhooks (não para criar-pedido / status-pedido)
     const acao = (req.query && req.query.acao) ? String(req.query.acao) : null;
-    const acoesPublicas = ['criar-pedido', 'status-pedido', 'ativar-sessao', 'validar-sessao', 'criar-sessao', 'encerrar-sessao', 'cancelar-assinatura', 'gerar-cobranca-cancelamento'];
+    const acoesPublicas = ['criar-pedido', 'status-pedido', 'ativar-sessao', 'validar-sessao', 'criar-sessao', 'encerrar-sessao', 'cancelar-assinatura', 'gerar-cobranca-cancelamento', 'salvar-quiz'];
 
     if (!acao || !acoesPublicas.includes(acao)) {
       const sigCheck = validateMpWebhookSignature(rawBody, req);
@@ -952,6 +980,11 @@ export default async function handler(req, res) {
         mpInstallments: pd.mpInstallments || null,
         atualizadoEm: pd.atualizadoEm || null
       });
+    }
+
+    // ── POST ?acao=salvar-quiz ────────────────────────────────────────────
+    if (req.method === 'POST' && acao === 'salvar-quiz') {
+      return _handleSalvarResultadoQuiz(req, res);
     }
 
     // ── POST ?acao=ativar-sessao ──────────────────────────────────────────
