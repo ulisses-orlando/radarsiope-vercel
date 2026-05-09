@@ -431,9 +431,13 @@ window.addEventListener('message', function (e) {
     try { localStorage.setItem('usuarioLogado', JSON.stringify(usuario)); } catch (_) {}
   }
   _fecharModalLogin();
-  // Aguarda o modal fechar antes de abrir o drawer
   setTimeout(() => {
-    window._rsAbrirDrawerUsuario?.();
+    // Nome correto: abrirDrawerUsuario(uid) — exposto em drawer-usuario.js linha 1277
+    if (typeof window.abrirDrawerUsuario === 'function' && usuario?.id) {
+      window.abrirDrawerUsuario(usuario.id);
+    } else {
+      console.warn('[menuApp] abrirDrawerUsuario não disponível ou uid ausente', usuario);
+    }
   }, 350);
 });
 
