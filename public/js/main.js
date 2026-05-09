@@ -552,77 +552,79 @@ async function abrirModalNewsletter(docId = null, isEdit = false) {
   btnAddFaq.onclick = () => renderFaqItem();
 
 // ── QUIZ INTERATIVO ───────────────────────────────────────────────────────
-// ── QUIZ DA EDIÇÃO ───────────────────────────────────────────────────
 const quizSection = document.createElement('div');
 quizSection.style.cssText = 'margin-top:18px;padding:14px;border:1.5px solid #a78bfa;border-radius:8px;background:#faf5ff';
 quizSection.innerHTML = `
-  <div style="font-weight:600;font-size:13px;color:#5b21b6;margin-bottom:8px;display:flex;align-items:center;gap:6px">
-    🧩 Quiz da Edição
-    <span style="font-size:11px;color:#888;font-weight:400">— Disponível para assinantes</span>
-  </div>
-  <div style="font-size:12px;color:#6b7280;margin-bottom:10px;line-height:1.5">
-    Adicione perguntas para testar o conhecimento dos assinantes sobre esta edição.
-  </div>
-  
-  <div style="display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap">
-    <label style="font-size:12px;display:flex;align-items:center;gap:4px">
-      <input type="number" id="quiz-tentativas-max" min="1" max="10" value="${data.quiz?.tentativas_max || 3}" 
-             style="width:50px;padding:4px;border:1px solid #ddd;border-radius:4px;font-size:12px">
-      Tentativas máx.
-    </label>
-    <label style="font-size:12px;display:flex;align-items:center;gap:4px">
-      <input type="number" id="quiz-pontuacao-minima" min="0" max="100" value="${data.quiz?.pontuacao_minima || 70}" 
-             style="width:50px;padding:4px;border:1px solid #ddd;border-radius:4px;font-size:12px">
-      % Aprovação
-    </label>
-    <label style="font-size:12px;display:flex;align-items:center;gap:4px;margin-left:auto">
-      <input type="checkbox" id="quiz-visivel-leads" ${data.quiz?.visivel_leads ? 'checked' : ''} style="width:14px;height:14px">
-      Visível p/ leads
-    </label>
-  </div>
-
-  <div id="quiz-perguntas-container" style="display:flex;flex-direction:column;gap:8px"></div>
-  
-  <div style="display:flex;gap:8px;margin-top:10px">
-    <button type="button" id="quiz-add-pergunta" 
-            style="flex:1;padding:6px 12px;background:#8b5cf6;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:12px">
-      ➕ Adicionar Pergunta
-    </button>
-    <button type="button" id="quiz-import-json" 
-            style="flex:1;padding:6px 12px;background:#059669;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:12px">
-      📥 Importar JSON
-    </button>
-  </div>
+<div style="font-weight:600;font-size:13px;color:#5b21b6;margin-bottom:8px;display:flex;align-items:center;gap:6px">
+🧩 Quiz da Edição
+ <span style="font-size:11px;color:#888;font-weight:400">— Disponível para assinantes</span>
+ </div>
+ <div style="font-size:12px;color:#6b7280;margin-bottom:10px;line-height:1.5">
+Adicione perguntas para testar o conhecimento dos assinantes sobre esta edição.
+ </div>
+<div style="display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap">
+ <label style="font-size:12px;display:flex;align-items:center;gap:4px">
+ <input type="number" id="quiz-tentativas-max" min="1" max="10" value="${data.quiz?.tentativas_max || 3}" 
+style="width:50px;padding:4px;border:1px solid #ddd;border-radius:4px;font-size:12px">
+Tentativas máx.
+ </label>
+ <label style="font-size:12px;display:flex;align-items:center;gap:4px">
+ <input type="number" id="quiz-pontuacao-minima" min="0" max="100" value="${data.quiz?.pontuacao_minima || 70}" 
+style="width:50px;padding:4px;border:1px solid #ddd;border-radius:4px;font-size:12px">
+% Aprovação
+ </label>
+ <label style="font-size:12px;display:flex;align-items:center;gap:4px;margin-left:auto">
+ <input type="checkbox" id="quiz-visivel-leads" ${data.quiz?.visivel_leads ? 'checked' : ''} style="width:14px;height:14px">
+Visível p/ leads
+ </label>
+ </div>
+<div id="quiz-perguntas-container" style="display:flex;flex-direction:column;gap:8px"></div>
+<div style="display:flex;gap:8px;margin-top:10px">
+ <button type="button" id="quiz-add-pergunta" 
+style="flex:1;padding:6px 12px;background:#8b5cf6;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:12px">
+➕ Adicionar Pergunta
+ </button>
+ <button type="button" id="quiz-import-json" 
+style="flex:1;padding:6px 12px;background:#059669;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:12px">
+📥 Importar JSON
+ </button>
+ </div>
 `;
 col1.appendChild(quizSection);
 
-// 1. Função de renderização atualizada para aceitar múltiplas chaves (pergunta, enunciado, question)
-function renderQuizPergunta(p = {}) {
+// 1. Função de renderização de perguntas (Carregamento)
+function renderQuizPergunta(pergunta = {}) {
     const container = document.getElementById('quiz-perguntas-container');
-    if (!container) return;
+    if (!container) {
+        console.warn('[Quiz] Container #quiz-perguntas-container não encontrado!');
+        return;
+    }
+    
+    const texto = pergunta.pergunta || pergunta.enunciado || pergunta.question || '';
+    
+    // Debug
+    console.log('[Quiz] Renderizando pergunta:', { id: pergunta.id, texto });
+
     const item = document.createElement('div');
     item.style.cssText = 'border:1px solid #ddd;border-radius:6px;padding:10px;background:#fff;position:relative';
     
-    // Suporta chaves comuns: 'pergunta', 'enunciado', 'question'
-    const texto = p.pergunta || p.enunciado || p.question || '';
-    const esc = (s) => String(s || '').replace(/"/g, '"');
-
+    // HTML da pergunta
     item.innerHTML = `
         <button type="button" title="Remover" style="position:absolute;top:6px;right:8px;background:none;border:none;color:#dc2626;cursor:pointer;font-size:16px"
                 onclick="this.closest('div[style]').remove()">×</button>
         <div style="margin-bottom:6px">
             <label style="font-size:11px;font-weight:600;color:#666;display:block;margin-bottom:3px">PERGUNTA</label>
-            <input type="text" class="quiz-pergunta-texto" value="${esc(texto)}" 
-                   style="width:100%;padding:6px;border:1px solid #ddd;border-radius:4px;font-size:13px" 
-                   placeholder="Digite a pergunta...">
+            <input type="text" class="quiz-pergunta-texto" value="${texto}" 
+                  style="width:100%;padding:6px;border:1px solid #ddd;border-radius:4px;font-size:13px" 
+                  placeholder="Digite a pergunta...">
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:6px">
             ${['A', 'B', 'C', 'D'].map((letra, idx) => `
                 <div>
                     <label style="font-size:10px;color:#888">${letra}</label>
-                    <input type="text" class="quiz-alternativa" data-idx="${idx}" value="${esc(p.alternativas?.[idx] || '')}" 
-                           style="width:100%;padding:5px;border:1px solid #ddd;border-radius:4px;font-size:12px" 
-                           placeholder="Alternativa ${letra}">
+                    <input type="text" class="quiz-alternativa" data-idx="${idx}" value="${pergunta.alternativas?.[idx] || ''}" 
+                          style="width:100%;padding:5px;border:1px solid #ddd;border-radius:4px;font-size:12px" 
+                          placeholder="Alternativa ${letra}">
                 </div>
             `).join('')}
         </div>
@@ -630,7 +632,7 @@ function renderQuizPergunta(p = {}) {
             ${[0, 1, 2, 3].map(idx => `
                 <label style="font-size:11px;display:flex;align-items:center;gap:4px">
                     <input type="radio" name="quiz-correta-${Date.now()}-${Math.random()}" class="quiz-correta" value="${idx}"
-                           ${(p.correta ?? -1) === idx ? 'checked' : 'Resposta correta')}>
+                          ${(pergunta.correta ?? -1) === idx ? 'checked' : 'Resposta correta: '}>
                     ${['A', 'B', 'C', 'D'][idx]}
                 </label>
             `).join('')}
@@ -638,45 +640,52 @@ function renderQuizPergunta(p = {}) {
         <div style="margin-top:6px">
             <label style="font-size:11px;font-weight:600;color:#666;display:block;margin-bottom:3px">EXPLICAÇÃO (feedback)</label>
             <textarea class="quiz-explicacao" rows="2" style="width:100%;padding:6px;border:1px solid #ddd;border-radius:4px;font-size:12px;resize:vertical"
-                      placeholder="Por que a alternativa correta está certa?">${esc(p.explicacao || '')}</textarea>
+                     placeholder="Por que a alternativa correta está certa?">${pergunta.explicacao || ''}</textarea>
         </div>
     `;
     container.appendChild(item);
 }
 
-// 2. Lógica de Importação atualizada
+// 2. Botão Adicionar Pergunta
+document.getElementById('quiz-add-pergunta').addEventListener('click', () => {
+    renderQuizPergunta({}); // Cria pergunta vazia
+});
+
+// 3. Botão Importar JSON
 document.getElementById('quiz-import-json').addEventListener('click', async () => {
     const jsonStr = prompt('Cole aqui o JSON do Quiz gerado pelo NotebookLM.');
     if (!jsonStr) return;
     try {
         const quizData = JSON.parse(jsonStr);
-        
-        // Atualiza configurações se existirem no JSON
+        // Atualiza configurações
         if (quizData.tentativas_max !== undefined) document.getElementById('quiz-tentativas-max').value = quizData.tentativas_max;
         if (quizData.pontuacao_minima !== undefined) document.getElementById('quiz-pontuacao-minima').value = quizData.pontuacao_minima;
         if (quizData.visivel_leads !== undefined) document.getElementById('quiz-visivel-leads').checked = !!quizData.visivel_leads;
+
+        // Limpa atuais e renderiza novas
+        const container = document.getElementById('quiz-perguntas-container');
+        if (container) container.innerHTML = '';
         
-        // Identifica o array de perguntas (suporta { perguntas: [...] }, { questions: [...] } ou [...] direto)
-        let perguntasToRender = [];
         if (Array.isArray(quizData.perguntas)) {
-            perguntasToRender = quizData.perguntas;
-        } else if (Array.isArray(quizData.questions)) {
-            perguntasToRender = quizData.questions;
-        } else if (Array.isArray(quizData)) {
-            perguntasToRender = quizData;
-        }
-        
-        if (perguntasToRender.length > 0) {
-            document.getElementById('quiz-perguntas-container').innerHTML = ''; // Limpa atuais
-            perguntasToRender.forEach(p => renderQuizPergunta(p));
+            quizData.perguntas.forEach(p => renderQuizPergunta(p));
             alert('✅ Quiz importado com sucesso!');
-        } else {
-            alert('⚠️ Nenhuma pergunta encontrada no JSON.');
         }
     } catch (e) {
         alert('❌ Erro ao processar JSON: ' + e.message);
     }
 });
+
+// 4. Carregar perguntas existentes (Ao abrir a edição)
+console.log('[Quiz] Tentando carregar quiz do Firestore:', data.quiz);
+
+// Verifica se há perguntas salvas
+const perguntasSalvas = data.quiz?.perguntas || [];
+if (Array.isArray(perguntasSalvas) && perguntasSalvas.length > 0) {
+    console.log(`[Quiz] Encontradas ${perguntasSalvas.length} perguntas. Carregando...`);
+    perguntasSalvas.forEach(p => renderQuizPergunta(p));
+} else {
+    console.log('[Quiz] Nenhuma pergunta encontrada para carregar.');
+}
 
   // ── Acesso pro temporário para leads ──────────────────────────────────────
   const proTempSection = document.createElement('div');
