@@ -551,6 +551,133 @@ async function abrirModalNewsletter(docId = null, isEdit = false) {
   faqInicial.forEach(item => renderFaqItem(item.pergunta, item.resposta));
   btnAddFaq.onclick = () => renderFaqItem();
 
+// ── QUIZ INTERATIVO ───────────────────────────────────────────────────────
+const quizSection = document.createElement('div');
+quizSection.style.cssText = 'margin-top:18px;padding:14px;border:1.5px solid #a78bfa;border-radius:8px;background:#faf5ff';
+quizSection.innerHTML = `
+  <div style="font-weight:600;font-size:13px;color:#5b21b6;margin-bottom:8px;display:flex;align-items:center;gap:6px">
+    🧩 Quiz da Edição
+    <span style="font-size:11px;color:#888;font-weight:400">— Disponível para assinantes</span>
+  </div>
+  <div style="font-size:12px;color:#6b7280;margin-bottom:10px;line-height:1.5">
+    Adicione perguntas para testar o conhecimento dos assinantes sobre esta edição.
+    <br>O quiz será exibido após o conteúdo principal no Web App.
+  </div>
+  
+  <div style="display:flex;gap:8px;margin-bottom:8px">
+    <label style="font-size:12px;display:flex;align-items:center;gap:4px">
+      <input type="number" id="quiz-tentativas-max" min="1" max="10" value="${data.quiz?.tentativas_max || 3}" 
+             style="width:50px;padding:4px;border:1px solid #ddd;border-radius:4px;font-size:12px">
+      Tentativas máximas
+    </label>
+    <label style="font-size:12px;display:flex;align-items:center;gap:4px">
+      <input type="number" id="quiz-pontuacao-minima" min="0" max="100" value="${data.quiz?.pontuacao_minima || 70}" 
+             style="width:50px;padding:4px;border:1px solid #ddd;border-radius:4px;font-size:12px">
+      % para aprovação
+    </label>
+  </div>
+
+  <div id="quiz-perguntas-container" style="display:flex;flex-direction:column;gap:8px"></div>
+  
+  <button type="button" id="quiz-add-pergunta" 
+          style="margin-top:10px;padding:6px 12px;background:#8b5cf6;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:12px">
+    ➕ Adicionar Pergunta
+  </button>
+`;
+col1.appendChild(quizSection);
+
+// Renderiza perguntas existentes
+const quizInicial = Array.isArray(data.quiz?.perguntas) ? data.quiz.perguntas : [];
+function renderQuizPergunta(pergunta = {}) {
+  const container = document.getElementById('quiz-perguntas-container');
+  const item = document.createElement('div');
+  item.style.cssText = 'border:1px solid #ddd;border-radius:6px;padding:10px;background:#fff;position:relative';
+  item.innerHTML = `
+    <button type="button" title="Remover" 
+            style="position:absolute;top:6px;right:8px;background:none;border:none;color:#dc2626;cursor:pointer;font-size:16px"
+            onclick="this.closest('div[style]').remove()">×</button>
+    <div style="margin-bottom:6px">
+      <label style="font-size:11px;font-weight:600;color:#666;display:block;margin-bottom:3px">PERGUNTA</label>
+      <input type="text" class="quiz-pergunta-texto" value="${_esc(pergunta.enunciado || '')}" 
+             style="width:100%;padding:6px;border:1px solid #ddd;border-radius:4px;font-size:13px" 
+             placeholder="Digite a pergunta...">
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:6px">
+      ${['A', 'B', 'C', 'D'].map((letra, idx) => `
+        <div>
+          <label style="font-size:10px;color:#888">${letra}</label>
+          <input type="text" class="quiz-alternativa" data-idx="${idx}" value="${_esc(pergunta.alternativas?.[idx] || '')}" 
+                 style="width:100%;padding:5px;border:1px solid #ddd;border-radius:4px;font-size:12px" 
+                 placeholder="Alternativa ${letra}">
+        </div>
+      `).join('')}
+    </div>
+    <div style="display:flex;gap:8px;align-items:center">
+      <label style="font-size:11px;display:flex;align-items:center;gap:4px">
+        <input type="radio" name="quiz-correta-${Date.now()}-${Math.random()}" class="quiz-correta" value="${pergunta.correta ?? 0}" 
+               ${pergunta.correta === 0 ? 'checked' : ''}>
+        Correta: A
+      </label>
+      <label style="font-size:11px;display:flex;align-items:center;gap:4px">
+        <input type="radio" name="quiz-correta-${Date.now()}-${Math.random()}" class="quiz-correta" value="${pergunta.correta ?? 0}" 
+               ${pergunta.correta === 1 ? 'checked' : ''}>
+        B
+      </label>
+      <label style="font-size:11px;display:flex;align-items:center;gap:4px">
+        <input type="radio" name="quiz-correta-${Date.now()}-${Math.random()}" class="quiz-correta" value="${pergunta.correta ?? 0}" 
+               ${pergunta.correta === 2 ? 'checked' : ''}>
+        C
+      </label>
+      <label style="font-size:11px;display:flex;align-items:center;gap:4px">
+        <input type="radio" name="quiz-correta-${Date.now()}-${Math.random()}" class="quiz-correta" value="${pergunta.correta ?? 0}" 
+               ${pergunta.correta === 3 ? 'checked' : ''}>
+        D
+      </label>
+    </div>
+    <div style="margin-top:6px">
+      <label style="font-size:11px;font-weight:600;color:#666;display:block;margin-bottom:3px">EXPLICAÇÃO (feedback pós-resposta)</label>
+      <textarea class="quiz-explicacao" rows="2" style="width:100%;padding:6px;border:1px solid #ddd;border-radius:4px;font-size:12px;resize:vertical" 
+                placeholder="Explique por que a alternativa correta está certa...">${_esc(pergunta.explicacao || '')}</textarea>
+    </div>
+  `;
+  container.appendChild(item);
+  
+  // Garante que o radio correto seja marcado
+  if (pergunta.correta !== undefined) {
+    const radios = item.querySelectorAll('.quiz-correta');
+    if (radios[pergunta.correta]) radios[pergunta.correta].checked = true;
+  }
+}
+quizInicial.forEach(p => renderQuizPergunta(p));
+
+document.getElementById('quiz-add-pergunta').addEventListener('click', () => renderQuizPergunta());
+
+// Coleta quiz no salvar
+const coletarQuiz = () => {
+  const tentativasMax = parseInt(document.getElementById('quiz-tentativas-max')?.value) || 3;
+  const pontuacaoMinima = parseInt(document.getElementById('quiz-pontuacao-minima')?.value) || 70;
+  const perguntas = [];
+  
+  document.querySelectorAll('#quiz-perguntas-container > div').forEach(item => {
+    const enunciado = item.querySelector('.quiz-pergunta-texto')?.value?.trim() || '';
+    const alternativas = Array.from(item.querySelectorAll('.quiz-alternativa')).map(i => i.value.trim());
+    const correta = parseInt(item.querySelector('.quiz-correta:checked')?.value) || 0;
+    const explicacao = item.querySelector('.quiz-explicacao')?.value?.trim() || '';
+    
+    if (enunciado) {
+      perguntas.push({
+        id: crypto.randomUUID?.() || `q_${Date.now()}_${Math.random().toString(36).substr(2,5)}`,
+        enunciado,
+        alternativas,
+        correta,
+        explicacao
+      });
+    }
+  });
+
+  return perguntas.length > 0 ? { ativo: true, tentativas_max: tentativasMax, pontuacao_minima: pontuacaoMinima, perguntas } : {};
+};
+
   // ── Acesso pro temporário para leads ──────────────────────────────────────
   const proTempSection = document.createElement('div');
   proTempSection.style.cssText = `
@@ -1155,6 +1282,8 @@ async function abrirModalNewsletter(docId = null, isEdit = false) {
       resposta: item.querySelector('.faq-resposta')?.value?.trim() || '',
     })).filter(i => i.pergunta); // descarta itens sem pergunta
 
+    // ── Quiz ────────────────────────────────────────────────────────────
+    payload.quiz = coletarQuiz();
     // ── Blocos ────────────────────────────────────────────────────────────
     payload.blocos = coletarBlocosEdicao();
 

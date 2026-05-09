@@ -397,14 +397,15 @@ function _bindEventos() {
     // Necessário porque site.js pode não estar carregado no contexto do iframe
     const iframe = document.getElementById('rs-login-iframe');
     iframe.addEventListener('load', function () {
+      // login.html carrega site.js que define loginUsuario.
+      // Se por algum motivo não estiver disponível, injeta um fallback mínimo.
       try {
-        if (typeof window.loginUsuario === 'function') {
-          // Copia a função do pai para o iframe (mesmo domínio)
-          iframe.contentWindow.loginUsuario = window.loginUsuario;
+        if (typeof iframe.contentWindow.loginUsuario !== 'function') {
+          console.warn('[menuApp] loginUsuario ausente no iframe — verifique se site.js está incluído em login.html');
         }
-      } catch (e) {
-        console.warn('[menuApp] Não foi possível injetar loginUsuario no iframe:', e);
-      }
+        // Ajusta o tamanho do modal quando o iframe navegar para painel.html após o login
+        iframe.contentWindow.addEventListener('DOMContentLoaded', _ajustarModalParaPainel, { once: true });
+      } catch (e) { /* cross-origin guard */ }
     });
 
   } else {
@@ -421,25 +422,16 @@ function _bindEventos() {
     }
   }
 
-window._rsFecharLogin = _fecharModalLogin;
-
-// ── Recebe sinal de login concluído vindo do iframe ──────────────────────────
-window.addEventListener('message', function (e) {
-  if (e.data?.tipo !== 'rs:loginCentral') return;
-  const usuario = e.data.usuario;
-  if (usuario) {
-    try { localStorage.setItem('usuarioLogado', JSON.stringify(usuario)); } catch (_) {}
+  function _ajustarModalParaPainel() {
+  // Após redirect para painel.html, expande o modal para melhor leitura
+  const wrap = document.getElementById('rs-login-iframe-wrap');
+  if (wrap) {
+    wrap.style.width  = 'min(640px, 96vw)';
+    wrap.style.height = 'min(680px, 92vh)';
   }
-  _fecharModalLogin();
-  setTimeout(() => {
-    // Nome correto: abrirDrawerUsuario(uid) — exposto em drawer-usuario.js linha 1277
-    if (typeof window.abrirDrawerUsuario === 'function' && usuario?.id) {
-      window.abrirDrawerUsuario(usuario.id);
-    } else {
-      console.warn('[menuApp] abrirDrawerUsuario não disponível ou uid ausente', usuario);
-    }
-  }, 350);
-});
+}
+
+window._rsFecharLogin = _fecharModalLogin;
 
   // Expõe para uso externo
   window._rsMenuFechar          = _fecharMenu;

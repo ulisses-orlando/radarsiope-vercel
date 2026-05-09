@@ -3942,6 +3942,240 @@ window._fecharUpgradePanel = _fecharUpgradePanel;
 window._checarSessaoCritica    = _checarSessaoCritica;
 window._mostrarSheetSessaoBloqueada = _mostrarSheetSessaoBloqueada;
 
+// ══════════════════════════════════════════════════════════════════════════
+// QUIZ INTERATIVO POR EDIÇÃO
+// ══════════════════════════════════════════════════════════════════════════
+let _quizAtual = null;
+let _quizRespostas = {};
+let _quizPerguntaAtual = 0;
+let _quizTentativaAtual = 0;
+
+function _renderQuizContainer(newsletter, uid) {
+  // Remove container anterior se existir
+  document.getElementById('rs-quiz-section')?.remove();
+  
+  if (!newsletter?.quiz?.ativo || !newsletter?.quiz?.perguntas?.length) return;
+  
+  // Verifica se usuário já completou todas as tentativas
+  const chaveQuiz = `rs_quiz_${newsletter.id}_${uid}`;
+  const progresso = JSON.parse(localStorage.getItem(chaveQuiz) || '{}');
+  const tentativasUsadas = progresso.tentativas_usadas || 0;
+  const tentativasMax = newsletter.quiz.tentativas_max || 3;
+  
+  if (tentativasUsadas >= tentativasMax && progresso.finalizado) {
+    // Mostra resultado final
+    _mostrarResultadoQuiz(newsletter, uid, progresso);
+    return;
+  }
+
+  _quizAtual = { ...newsletter.quiz, id: newsletter.id, uid };
+  _quizPerguntaAtual = 0;
+  _quizTentativaAtual = tentativasUsadas + 1;
+  _quizRespostas = {};
+
+  // Cria seção
+  const section = document.createElement('section');
+  section.id = 'rs-quiz-section';
+  section.className = 'rs-section';
+  section.style.cssText = 'background:var(--rs-card,#1e293b);border-radius:12px;padding:20px;margin:20px 0;box-shadow:0 2px 10px rgba(0,0,0,0.1)';
+  
+  section.innerHTML = `
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">
+      <span style="font-size:24px">🧩</span>
+      <div>
+        <h3 style="margin:0;font-size:16px;font-weight:700;color:var(--rs-texto,#f8fafc)">Teste seus conhecimentos</h3>
+        <p style="margin:2px 0 0;font-size:12px;color:var(--rs-muted,#94a3b8)">
+          ${newsletter.quiz.perguntas.length} perguntas · Tentativa ${_quizTentativaAtual}/${tentativasMax}
+        </p>
+      </div>
+    </div>
+    <div id="rs-quiz-body"></div>
+  `;
+
+  // Insere após o conteúdo principal
+  const app = document.getElementById('rs-app');
+  const cta = document.getElementById('rs-cta-wrap');
+  if (cta) {
+    app.insertBefore(section, cta);
+  } else {
+    app.appendChild(section);
+  }
+
+  _renderPerguntaQuiz();
+}
+
+function _renderPerguntaQuiz() {
+  const body = document.getElementById('rs-quiz-body');
+  if (!body || !_quizAtual?.perguntas?.[_quizPerguntaAtual]) return;
+
+  const q = _quizAtual.perguntas[_quizPerguntaAtual];
+  const total = _quizAtual.perguntas.length;
+
+  body.innerHTML = `
+    <div style="background:var(--rs-card2,#162032);border-radius:8px;padding:16px;margin-bottom:12px">
+      <div style="display:flex;justify-content:space-between;margin-bottom:10px">
+        <span style="font-size:12px;color:var(--rs-muted,#94a3b8)">Pergunta ${_quizPerguntaAtual + 1} de ${total}</span>
+        <div style="width:60px;height:4px;background:#333;border-radius:2px;overflow:hidden">
+          <div style="width:${((_quizPerguntaAtual + 1) / total) * 100}%;height:100%;background:#8b5cf6;border-radius:2px"></div>
+        </div>
+      </div>
+      <p style="font-size:15px;font-weight:600;color:var(--rs-texto,#f8fafc);margin-bottom:16px;line-height:1.4">${_esc(q.enunciado)}</p>
+      
+      <div style="display:flex;flex-direction:column;gap:10px">
+        ${q.alternativas.map((alt, idx) => `
+          <button type="button" class="rs-quiz-alternativa" data-idx="${idx}" 
+                  style="padding:12px;background:var(--rs-bg,#0f172a);border:2px solid var(--rs-borda,#334155);border-radius:8px;color:var(--rs-texto,#f8fafc);font-size:14px;text-align:left;cursor:pointer;transition:all .2s">
+            <strong style="color:#8b5cf6;margin-right:8px">${String.fromCharCode(65 + idx)}.</strong> ${_esc(alt)}
+          </button>
+        `).join('')}
+      </div>
+    </div>
+  `;
+
+  // Bind eventos
+  body.querySelectorAll('.rs-quiz-alternativa').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      const idxSelecionada = parseInt(e.currentTarget.dataset.idx);
+      
+      // Desabilita cliques
+      body.querySelectorAll('.rs-quiz-alternativa').forEach(b => {
+        b.disabled = true;
+        b.style.cursor = 'default';
+      });
+
+      const correta = q.correta === idxSelecionada;
+      _quizRespostas[q.id] = { selecionada: idxSelecionada, acertou: correta };
+
+      // Feedback visual
+      e.currentTarget.style.background = correta ? 'rgba(34,197,94,0.15)' : 'rgba(239,68,68,0.15)';
+      e.currentTarget.style.borderColor = correta ? '#22c55e' : '#ef4444';
+      
+      // Marca a correta
+      body.querySelectorAll('.rs-quiz-alternativa').forEach(b => {
+        if (parseInt(b.dataset.idx) === q.correta) {
+          b.style.background = 'rgba(34,197,94,0.1)';
+          b.style.borderColor = '#22c55e';
+        }
+      });
+
+      // Explicação
+      if (q.explicacao) {
+        const exp = document.createElement('div');
+        exp.style.cssText = 'margin-top:12px;padding:12px;background:rgba(139,92,246,0.1);border-left:3px solid #8b5cf6;border-radius:0 6px 6px 0;font-size:13px;color:var(--rs-muted,#94a3b8);line-height:1.5';
+        exp.innerHTML = `<strong style="color:#8b5cf6">💡 Explicação:</strong> ${_esc(q.explicacao)}`;
+        e.currentTarget.parentElement.appendChild(exp);
+      }
+
+      // Botão próxima
+      setTimeout(() => {
+        const btnNext = document.createElement('button');
+        btnNext.textContent = _quizPerguntaAtual < total - 1 ? 'Próxima →' : 'Ver Resultado';
+        btnNext.style.cssText = 'margin-top:16px;padding:12px 24px;background:#8b5cf6;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;width:100%';
+        btnNext.onclick = () => {
+          if (_quizPerguntaAtual < total - 1) {
+            _quizPerguntaAtual++;
+            _renderPerguntaQuiz();
+          } else {
+            _finalizarQuiz();
+          }
+        };
+        e.currentTarget.parentElement.appendChild(btnNext);
+      }, 800);
+    });
+  });
+}
+
+async function _finalizarQuiz() {
+  if (!_quizAtual) return;
+  
+  const totalPerguntas = _quizAtual.perguntas.length;
+  const acertos = Object.values(_quizRespostas).filter(r => r.acertou).length;
+  const pontuacao = Math.round((acertos / totalPerguntas) * 100);
+  const aprovado = pontuacao >= (_quizAtual.pontuacao_minima || 70);
+  
+  // Salva progresso local
+  const chaveQuiz = `rs_quiz_${_quizAtual.id}_${_quizAtual.uid}`;
+  const progresso = JSON.parse(localStorage.getItem(chaveQuiz) || '{}');
+  progresso.tentativas_usadas = _quizTentativaAtual;
+  progresso.finalizado = true;
+  progresso.melhor_pontuacao = Math.max(progresso.melhor_pontuacao || 0, pontuacao);
+  progresso.aprovado = progresso.aprovado || aprovado;
+  localStorage.setItem(chaveQuiz, JSON.stringify(progresso));
+
+  // Salva no backend
+  try {
+    await fetch('/api/pagamentoMP?acao=salvar-quiz', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        uid: _quizAtual.uid,
+        newsletter_id: _quizAtual.id,
+        tentativas_usadas: _quizTentativaAtual,
+        melhor_pontuacao: pontuacao,
+        aprovado,
+        detalhes: Object.keys(_quizRespostas).map(qId => ({
+          pergunta_id: qId,
+          selecionada: _quizRespostas[qId].selecionada,
+          acertou: _quizRespostas[qId].acertou
+        }))
+      })
+    });
+  } catch (e) { console.warn('[Quiz] Falha ao salvar no servidor:', e); }
+
+  _mostrarResultadoQuiz({ id: _quizAtual.id }, _quizAtual.uid, progresso);
+  _quizAtual = null;
+}
+
+function _mostrarResultadoQuiz(newsletter, uid, progresso) {
+  document.getElementById('rs-quiz-section')?.remove();
+  
+  const section = document.createElement('section');
+  section.id = 'rs-quiz-section';
+  section.className = 'rs-section';
+  section.style.cssText = 'background:var(--rs-card,#1e293b);border-radius:12px;padding:24px;margin:20px 0;text-align:center';
+  
+  const aprovado = progresso.aprovado;
+  const tentativasMax = 3; // Pode vir do quiz da newsletter
+  const podeTentarNovamente = progresso.tentativas_usadas < tentativasMax;
+  
+  section.innerHTML = `
+    <div style="font-size:48px;margin-bottom:12px">${aprovado ? '🏆' : '📚'}</div>
+    <h3 style="margin:0 0 8px;font-size:18px;font-weight:700;color:var(--rs-texto,#f8fafc)">
+      ${aprovado ? 'Parabéns! Você foi aprovado!' : 'Continue estudando!'}
+    </h3>
+    <p style="margin:0 0 16px;font-size:14px;color:var(--rs-muted,#94a3b8)">
+      Pontuação: <strong style="color:${aprovado ? '#22c55e' : '#ef4444'}">${progresso.melhor_pontuacao}%</strong> · 
+      Tentativas: ${progresso.tentativas_usadas}/${tentativasMax}
+    </p>
+    ${podeTentarNovamente ? `
+      <button onclick="_reiniciarQuiz('${newsletter.id}', '${uid}')" 
+              style="padding:12px 24px;background:#8b5cf6;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer">
+        🔄 Tentar novamente
+      </button>
+    ` : `
+      <p style="font-size:12px;color:var(--rs-muted,#94a3b8);margin-top:12px">
+        Você atingiu o número máximo de tentativas. Aguarde a próxima edição!
+      </p>
+    `}
+  `;
+
+  const app = document.getElementById('rs-app');
+  const cta = document.getElementById('rs-cta-wrap');
+  if (cta) app.insertBefore(section, cta);
+  else app.appendChild(section);
+}
+
+function _reiniciarQuiz(newsletterId, uid) {
+  const chaveQuiz = `rs_quiz_${newsletterId}_${uid}`;
+  localStorage.removeItem(chaveQuiz);
+  
+  // Recarrega a página para reiniciar o quiz do zero
+  // Opcional: pode apenas recriar o container sem reload
+  VerNewsletterComToken();
+}
+
+// Expõe globalmente para o onclick inline
+window._reiniciarQuiz = _reiniciarQuiz;
 // ─── Inicia ───────────────────────────────────────────────────────────────────
 VerNewsletterComToken();
 
