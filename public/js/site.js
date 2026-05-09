@@ -945,7 +945,7 @@ window.loginUsuario = async function () {
         } else {
           window.location.href = "painel.html";
         }
-      }, 1000); 
+      }, 1000);
     })
     .catch(error => {
       console.error("Erro ao fazer login:", error);

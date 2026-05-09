@@ -397,15 +397,8 @@ function _bindEventos() {
     // Necessário porque site.js pode não estar carregado no contexto do iframe
     const iframe = document.getElementById('rs-login-iframe');
     iframe.addEventListener('load', function () {
-      // login.html carrega site.js que define loginUsuario.
-      // Se por algum motivo não estiver disponível, injeta um fallback mínimo.
-      try {
-        if (typeof iframe.contentWindow.loginUsuario !== 'function') {
-          console.warn('[menuApp] loginUsuario ausente no iframe — verifique se site.js está incluído em login.html');
-        }
-        // Ajusta o tamanho do modal quando o iframe navegar para painel.html após o login
-        iframe.contentWindow.addEventListener('DOMContentLoaded', _ajustarModalParaPainel, { once: true });
-      } catch (e) { /* cross-origin guard */ }
+      // site.js já carregado em login.html — loginUsuario disponível nativamente
+      // Nenhuma injeção necessária
     });
 
   } else {
@@ -422,16 +415,29 @@ function _bindEventos() {
     }
   }
 
-  function _ajustarModalParaPainel() {
-  // Após redirect para painel.html, expande o modal para melhor leitura
-  const wrap = document.getElementById('rs-login-iframe-wrap');
-  if (wrap) {
-    wrap.style.width  = 'min(640px, 96vw)';
-    wrap.style.height = 'min(680px, 92vh)';
-  }
-}
-
 window._rsFecharLogin = _fecharModalLogin;
+
+// ── Recebe mensagens do iframe de login ──────────────────────────────────────
+window.addEventListener('message', function (e) {
+  // Botão "← Voltar ao app" dentro do iframe
+  if (e.data?.tipo === 'rs:fecharModal') {
+    _fecharModalLogin();
+    return;
+  }
+
+  // Login concluído: navega o iframe para painel.html
+  if (e.data?.tipo === 'rs:loginSucesso') {
+    const destino = e.data?.destino || 'painel.html';
+    const iframe  = document.getElementById('rs-login-iframe');
+    const wrap    = document.getElementById('rs-login-iframe-wrap');
+    if (wrap) {
+      wrap.style.width  = 'min(700px, 96vw)';
+      wrap.style.height = 'min(700px, 92vh)';
+    }
+    if (iframe) iframe.src = '/' + destino;
+    return;
+  }
+});
 
   // Expõe para uso externo
   window._rsMenuFechar          = _fecharMenu;
