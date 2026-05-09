@@ -602,9 +602,6 @@ function renderQuizPergunta(pergunta = {}) {
     
     const texto = pergunta.pergunta || pergunta.enunciado || pergunta.question || '';
     
-    // Debug
-    console.log('[Quiz] Renderizando pergunta:', { id: pergunta.id, texto });
-
     const item = document.createElement('div');
     item.style.cssText = 'border:1px solid #ddd;border-radius:6px;padding:10px;background:#fff;position:relative';
     
@@ -630,9 +627,9 @@ function renderQuizPergunta(pergunta = {}) {
         </div>
         <div style="display:flex;gap:8px;align-items:center">
             ${[0, 1, 2, 3].map(idx => `
-                <label style="font-size:11px;display:flex;align-items:center;gap:4px">
+                <label style="font-size:11px;display:flex;align-items:center;gap:4px">Resposta correta: 
                     <input type="radio" name="quiz-correta-${Date.now()}-${Math.random()}" class="quiz-correta" value="${idx}"
-                          ${(pergunta.correta ?? -1) === idx ? 'checked' : 'Resposta correta: '}>
+                          ${(pergunta.correta ?? -1) === idx ? 'checked' : ''}>
                     ${['A', 'B', 'C', 'D'][idx]}
                 </label>
             `).join('')}
@@ -674,18 +671,6 @@ document.getElementById('quiz-import-json').addEventListener('click', async () =
         alert('❌ Erro ao processar JSON: ' + e.message);
     }
 });
-
-// 4. Carregar perguntas existentes (Ao abrir a edição)
-console.log('[Quiz] Tentando carregar quiz do Firestore:', data.quiz);
-
-// Verifica se há perguntas salvas
-const perguntasSalvas = data.quiz?.perguntas || [];
-if (Array.isArray(perguntasSalvas) && perguntasSalvas.length > 0) {
-    console.log(`[Quiz] Encontradas ${perguntasSalvas.length} perguntas. Carregando...`);
-    perguntasSalvas.forEach(p => renderQuizPergunta(p));
-} else {
-    console.log('[Quiz] Nenhuma pergunta encontrada para carregar.');
-}
 
   // ── Acesso pro temporário para leads ──────────────────────────────────────
   const proTempSection = document.createElement('div');
