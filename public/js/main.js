@@ -596,81 +596,86 @@ quizSection.innerHTML = `
 `;
 col1.appendChild(quizSection);
 
-// Função para renderizar item de pergunta
-function renderQuizPergunta(pergunta = {}) {
-  const container = document.getElementById('quiz-perguntas-container');
-  if (!container) return;
-  const item = document.createElement('div');
-  item.style.cssText = 'border:1px solid #ddd;border-radius:6px;padding:10px;background:#fff;position:relative';
-  
-  // Escape simples para aspas no HTML
-  const esc = (s) => String(s || '').replace(/"/g, '&quot;');
-  
-  item.innerHTML = `
-    <button type="button" title="Remover" style="position:absolute;top:6px;right:8px;background:none;border:none;color:#dc2626;cursor:pointer;font-size:16px"
-            onclick="this.closest('div[style]').remove()">×</button>
-    <div style="margin-bottom:6px">
-      <label style="font-size:11px;font-weight:600;color:#666;display:block;margin-bottom:3px">PERGUNTA</label>
-      <input type="text" class="quiz-pergunta-texto" value="${esc(pergunta.pergunta)}" 
-             style="width:100%;padding:6px;border:1px solid #ddd;border-radius:4px;font-size:13px" 
-             placeholder="Digite a pergunta...">
-    </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:6px">
-      ${['A', 'B', 'C', 'D'].map((letra, idx) => `
-        <div>
-          <label style="font-size:10px;color:#888">${letra}</label>
-          <input type="text" class="quiz-alternativa" data-idx="${idx}" value="${esc(pergunta.alternativas?.[idx] || '')}" 
-                 style="width:100%;padding:5px;border:1px solid #ddd;border-radius:4px;font-size:12px" 
-                 placeholder="Alternativa ${letra}">
+// 1. Função de renderização atualizada para aceitar múltiplas chaves (pergunta, enunciado, question)
+function renderQuizPergunta(p = {}) {
+    const container = document.getElementById('quiz-perguntas-container');
+    if (!container) return;
+    const item = document.createElement('div');
+    item.style.cssText = 'border:1px solid #ddd;border-radius:6px;padding:10px;background:#fff;position:relative';
+    
+    // Suporta chaves comuns: 'pergunta', 'enunciado', 'question'
+    const texto = p.pergunta || p.enunciado || p.question || '';
+    const esc = (s) => String(s || '').replace(/"/g, '"');
+
+    item.innerHTML = `
+        <button type="button" title="Remover" style="position:absolute;top:6px;right:8px;background:none;border:none;color:#dc2626;cursor:pointer;font-size:16px"
+                onclick="this.closest('div[style]').remove()">×</button>
+        <div style="margin-bottom:6px">
+            <label style="font-size:11px;font-weight:600;color:#666;display:block;margin-bottom:3px">PERGUNTA</label>
+            <input type="text" class="quiz-pergunta-texto" value="${esc(texto)}" 
+                   style="width:100%;padding:6px;border:1px solid #ddd;border-radius:4px;font-size:13px" 
+                   placeholder="Digite a pergunta...">
         </div>
-      `).join('')}
-    </div>
-    <div style="display:flex;gap:8px;align-items:center">
-      ${[0, 1, 2, 3].map(idx => `
-        <label style="font-size:11px;display:flex;align-items:center;gap:4px">
-          <input type="radio" name="quiz-correta-${Date.now()}-${Math.random()}" class="quiz-correta" value="${idx}" 
-                 ${(pergunta.correta ?? -1) === idx ? 'checked' : ''}>
-          ${['A', 'B', 'C', 'D'][idx]}
-        </label>
-      `).join('')}
-    </div>
-    <div style="margin-top:6px">
-      <label style="font-size:11px;font-weight:600;color:#666;display:block;margin-bottom:3px">EXPLICAÇÃO (feedback)</label>
-      <textarea class="quiz-explicacao" rows="2" style="width:100%;padding:6px;border:1px solid #ddd;border-radius:4px;font-size:12px;resize:vertical" 
-                placeholder="Por que a alternativa correta está certa?">${esc(pergunta.explicacao)}</textarea>
-    </div>
-  `;
-  container.appendChild(item);
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:6px">
+            ${['A', 'B', 'C', 'D'].map((letra, idx) => `
+                <div>
+                    <label style="font-size:10px;color:#888">${letra}</label>
+                    <input type="text" class="quiz-alternativa" data-idx="${idx}" value="${esc(p.alternativas?.[idx] || '')}" 
+                           style="width:100%;padding:5px;border:1px solid #ddd;border-radius:4px;font-size:12px" 
+                           placeholder="Alternativa ${letra}">
+                </div>
+            `).join('')}
+        </div>
+        <div style="display:flex;gap:8px;align-items:center">
+            ${[0, 1, 2, 3].map(idx => `
+                <label style="font-size:11px;display:flex;align-items:center;gap:4px">
+                    <input type="radio" name="quiz-correta-${Date.now()}-${Math.random()}" class="quiz-correta" value="${idx}"
+                           ${(p.correta ?? -1) === idx ? 'checked' : ''}>
+                    ${['A', 'B', 'C', 'D'][idx]}
+                </label>
+            `).join('')}
+        </div>
+        <div style="margin-top:6px">
+            <label style="font-size:11px;font-weight:600;color:#666;display:block;margin-bottom:3px">EXPLICAÇÃO (feedback)</label>
+            <textarea class="quiz-explicacao" rows="2" style="width:100%;padding:6px;border:1px solid #ddd;border-radius:4px;font-size:12px;resize:vertical"
+                      placeholder="Por que a alternativa correta está certa?">${esc(p.explicacao || '')}</textarea>
+        </div>
+    `;
+    container.appendChild(item);
 }
 
-// Renderiza perguntas existentes
-const quizInicial = Array.isArray(data.quiz?.perguntas) ? data.quiz.perguntas : [];
-quizInicial.forEach(p => renderQuizPergunta(p));
-
-// Botão adicionar pergunta
-document.getElementById('quiz-add-pergunta').addEventListener('click', () => renderQuizPergunta());
-
-// Botão Importar JSON
+// 2. Lógica de Importação atualizada
 document.getElementById('quiz-import-json').addEventListener('click', async () => {
-  const jsonStr = prompt('Cole aqui o JSON do Quiz gerado pelo NotebookLM.');
-  if (!jsonStr) return;
-  try {
-    const quizData = JSON.parse(jsonStr);
-    
-    // Atualiza configurações
-    if (quizData.tentativas_max !== undefined) document.getElementById('quiz-tentativas-max').value = quizData.tentativas_max;
-    if (quizData.pontuacao_minima !== undefined) document.getElementById('quiz-pontuacao-minima').value = quizData.pontuacao_minima;
-    if (quizData.visivel_leads !== undefined) document.getElementById('quiz-visivel-leads').checked = !!quizData.visivel_leads;
-    
-    // Atualiza perguntas
-    if (Array.isArray(quizData.perguntas)) {
-      document.getElementById('quiz-perguntas-container').innerHTML = ''; // Limpa atuais
-      quizData.perguntas.forEach(p => renderQuizPergunta(p));
-      alert('✅ Quiz importado com sucesso!');
+    const jsonStr = prompt('Cole aqui o JSON do Quiz gerado pelo NotebookLM.');
+    if (!jsonStr) return;
+    try {
+        const quizData = JSON.parse(jsonStr);
+        
+        // Atualiza configurações se existirem no JSON
+        if (quizData.tentativas_max !== undefined) document.getElementById('quiz-tentativas-max').value = quizData.tentativas_max;
+        if (quizData.pontuacao_minima !== undefined) document.getElementById('quiz-pontuacao-minima').value = quizData.pontuacao_minima;
+        if (quizData.visivel_leads !== undefined) document.getElementById('quiz-visivel-leads').checked = !!quizData.visivel_leads;
+        
+        // Identifica o array de perguntas (suporta { perguntas: [...] }, { questions: [...] } ou [...] direto)
+        let perguntasToRender = [];
+        if (Array.isArray(quizData.perguntas)) {
+            perguntasToRender = quizData.perguntas;
+        } else if (Array.isArray(quizData.questions)) {
+            perguntasToRender = quizData.questions;
+        } else if (Array.isArray(quizData)) {
+            perguntasToRender = quizData;
+        }
+        
+        if (perguntasToRender.length > 0) {
+            document.getElementById('quiz-perguntas-container').innerHTML = ''; // Limpa atuais
+            perguntasToRender.forEach(p => renderQuizPergunta(p));
+            alert('✅ Quiz importado com sucesso!');
+        } else {
+            alert('⚠️ Nenhuma pergunta encontrada no JSON.');
+        }
+    } catch (e) {
+        alert('❌ Erro ao processar JSON: ' + e.message);
     }
-  } catch (e) {
-    alert('❌ Erro ao processar JSON: ' + e.message);
-  }
 });
 
   // ── Acesso pro temporário para leads ──────────────────────────────────────
@@ -1312,7 +1317,7 @@ document.getElementById('quiz-import-json').addEventListener('click', async () =
     };
 
     payload.quiz = coletarQuiz();
-    
+
     // ── Blocos ────────────────────────────────────────────────────────────
     payload.blocos = coletarBlocosEdicao();
 
