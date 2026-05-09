@@ -630,7 +630,7 @@ function renderQuizPergunta(p = {}) {
             ${[0, 1, 2, 3].map(idx => `
                 <label style="font-size:11px;display:flex;align-items:center;gap:4px">
                     <input type="radio" name="quiz-correta-${Date.now()}-${Math.random()}" class="quiz-correta" value="${idx}"
-                           ${(p.correta ?? -1) === idx ? 'checked' : ''}>
+                           ${(p.correta ?? -1) === idx ? 'checked' : 'Resposta correta')}>
                     ${['A', 'B', 'C', 'D'][idx]}
                 </label>
             `).join('')}
