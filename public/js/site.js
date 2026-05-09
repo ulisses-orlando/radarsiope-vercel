@@ -940,6 +940,15 @@ window.loginUsuario = async function () {
       msg.innerText = "Login realizado com sucesso!";
 
       setTimeout(() => {
+        // Se dentro do iframe do app (modal Minha Área), notifica o pai
+        if (window.self !== window.top) {
+          window.parent.postMessage(
+            { tipo: 'rs:loginCentral', usuario: usuarioLogado },
+            window.location.origin
+          );
+          return;
+        }
+        // Fluxo direto (acesso via /login.html no browser)
         if (usuarioLogado.tipo_perfil === "Admin") {
           window.location.href = "admin.html";
         } else {

@@ -224,7 +224,6 @@
   }
 
   // ── Bind de eventos ───────────────────────────────────────────────────────
-  // ── Bind de eventos ───────────────────────────────────────────────────────
 function _bindEventos() {
   const wrap = document.getElementById('rs-menu-wrap');
   if (!wrap) return;
@@ -350,58 +349,68 @@ function _bindEventos() {
 
   // ── Modal de login ───────────────────────────────────────────────────────
   function _abrirModalLogin() {
-    // Cria modal se não existe
-    if (!document.getElementById('rs-login-modal')) {
-      const modal = document.createElement('div');
-      modal.id = 'rs-login-modal';
-      modal.style.cssText = `
-        position: fixed; inset: 0; z-index: 9000;
-        background: rgba(0,0,0,.7);
-        display: flex; align-items: center; justify-content: center;
-        backdrop-filter: blur(3px);
-        animation: rsFadeIn .2s ease;
-      `;
-      const _emailParam = window._radarUser?.email
-        ? '?email=' + encodeURIComponent(window._radarUser.email) : '';
-      modal.innerHTML = `
-        <style>
-          @keyframes rsFadeIn { from { opacity:0 } to { opacity:1 } }
-          @keyframes rsSlideUp { from { opacity:0; transform:translateY(20px) } to { opacity:1; transform:translateY(0) } }
-          #rs-login-iframe-wrap {
-            background: #fff; border-radius: 16px;
-            width: min(420px, 94vw); height: min(520px, 90vh);
-            position: relative; overflow: hidden;
-            box-shadow: 0 8px 40px rgba(0,0,0,.4);
-            animation: rsSlideUp .25s ease;
-          }
-          #rs-login-iframe {
-            width: 100%; height: 100%;
-            border: none;
-          }
-          #rs-login-fechar {
-            position: absolute; top: 10px; right: 12px;
-            background: rgba(0,0,0,.15); border: none;
-            border-radius: 50%; width: 28px; height: 28px;
-            color: #fff; font-size: 16px; cursor: pointer;
-            display: flex; align-items: center; justify-content: center;
-            z-index: 1; transition: background .15s;
-          }
-          #rs-login-fechar:hover { background: rgba(0,0,0,.3); }
-        </style>
-        <div id="rs-login-iframe-wrap">
-          <button id="rs-login-fechar" onclick="window._rsFecharLogin()">×</button>
-          <iframe id="rs-login-iframe" src="/login.html${_emailParam}" title="Minha Área"></iframe>
-        </div>
-      `;
-      // Fecha ao clicar fora
-      modal.addEventListener('click', e => {
-        if (e.target === modal) _fecharModalLogin();
-      });
-      document.body.appendChild(modal);
-    } else {
-      document.getElementById('rs-login-modal').style.display = 'flex';
-    }
+  if (!document.getElementById('rs-login-modal')) {
+    const modal = document.createElement('div');
+    modal.id = 'rs-login-modal';
+    modal.style.cssText = `
+      position: fixed; inset: 0; z-index: 9000;
+      background: rgba(0,0,0,.7);
+      display: flex; align-items: center; justify-content: center;
+      backdrop-filter: blur(3px);
+      animation: rsFadeIn .2s ease;
+    `;
+    const _emailParam = window._radarUser?.email
+      ? '?email=' + encodeURIComponent(window._radarUser.email) : '';
+    modal.innerHTML = `
+      <style>
+        @keyframes rsFadeIn { from { opacity:0 } to { opacity:1 } }
+        @keyframes rsSlideUp { from { opacity:0; transform:translateY(20px) } to { opacity:1; transform:translateY(0) } }
+        #rs-login-iframe-wrap {
+          background: #fff; border-radius: 16px;
+          width: min(420px, 94vw); height: min(520px, 90vh);
+          position: relative; overflow: hidden;
+          box-shadow: 0 8px 40px rgba(0,0,0,.4);
+          animation: rsSlideUp .25s ease;
+        }
+        #rs-login-iframe { width: 100%; height: 100%; border: none; }
+        #rs-login-fechar {
+          position: absolute; top: 10px; right: 12px;
+          background: rgba(0,0,0,.15); border: none;
+          border-radius: 50%; width: 28px; height: 28px;
+          color: #fff; font-size: 16px; cursor: pointer;
+          display: flex; align-items: center; justify-content: center;
+          z-index: 1; transition: background .15s;
+        }
+        #rs-login-fechar:hover { background: rgba(0,0,0,.3); }
+      </style>
+      <div id="rs-login-iframe-wrap">
+        <button id="rs-login-fechar" onclick="window._rsFecharLogin()">×</button>
+        <iframe id="rs-login-iframe" src="/login.html${_emailParam}" title="Minha Área"></iframe>
+      </div>`;
+
+    modal.addEventListener('click', e => {
+      if (e.target === modal) _fecharModalLogin();
+    });
+    document.body.appendChild(modal);
+
+    // ── Injeta loginUsuario no iframe após carregamento ──────────────────────
+    // Necessário porque site.js pode não estar carregado no contexto do iframe
+    const iframe = document.getElementById('rs-login-iframe');
+    iframe.addEventListener('load', function () {
+      try {
+        if (typeof window.loginUsuario === 'function') {
+          // Copia a função do pai para o iframe (mesmo domínio)
+          iframe.contentWindow.loginUsuario = window.loginUsuario;
+        }
+      } catch (e) {
+        console.warn('[menuApp] Não foi possível injetar loginUsuario no iframe:', e);
+      }
+    });
+
+  } else {
+    document.getElementById('rs-login-modal').style.display = 'flex';
   }
+}
 
   function _fecharModalLogin() {
     const modal = document.getElementById('rs-login-modal');
@@ -412,7 +421,21 @@ function _bindEventos() {
     }
   }
 
-  window._rsFecharLogin = _fecharModalLogin;
+window._rsFecharLogin = _fecharModalLogin;
+
+// ── Recebe sinal de login concluído vindo do iframe ──────────────────────────
+window.addEventListener('message', function (e) {
+  if (e.data?.tipo !== 'rs:loginCentral') return;
+  const usuario = e.data.usuario;
+  if (usuario) {
+    try { localStorage.setItem('usuarioLogado', JSON.stringify(usuario)); } catch (_) {}
+  }
+  _fecharModalLogin();
+  // Aguarda o modal fechar antes de abrir o drawer
+  setTimeout(() => {
+    window._rsAbrirDrawerUsuario?.();
+  }, 350);
+});
 
   // Expõe para uso externo
   window._rsMenuFechar          = _fecharMenu;
