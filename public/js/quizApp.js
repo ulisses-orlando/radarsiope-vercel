@@ -25,23 +25,31 @@ const _localKey = (uid, nid) => `rs_quiz_${uid}_${nid}`;
  * @param {Object} user - Objeto do usuário atual (_radarUser)
  */
 function init(newsletter, user) {
-    // 1. Validações básicas
-    if (!newsletter?.quiz?.ativo) return;
-    if (!user?.uid) return;
+  if (!newsletter?.quiz?.ativo) return;
+  if (!user?.uid) return;
 
-    _config = newsletter.quiz;
+  _config = newsletter.quiz;
 
-    // 2. Regras de Visibilidade
-    const isAssinante = user.segmento === 'assinante';
-    const visivelParaLeads = (_config.visivel_leads === true);
+  // 🔒 Validação e Normalização de Dados
+  if (!Array.isArray(_config.perguntas)) {
+    console.error("[QuizApp] Quiz inválido: 'perguntas' não é um array.", _config);
+    return;
+  }
 
-    if (!isAssinante && !visivelParaLeads) return;
+  // Garante que cada pergunta tenha 'alternativas' como array
+  _config.perguntas = _config.perguntas.map(p => ({
+    ...p,
+    alternativas: Array.isArray(p.alternativas) ? p.alternativas : [],
+    enunciado: p.enunciado || p.pergunta || "Pergunta sem enunciado"
+  }));
 
-    // 3. Verifica se já concluiu (Cache Local)
-    if (obteveConclusaoLocal(user.uid, newsletter.id)) return;
+  const isAssinante = user.segmento === 'assinante';
+  const visivelParaLeads = (_config.visivel_leads === true);
+  if (!isAssinante && !visivelParaLeads) return;
 
-    // 4. Renderiza o Card de Convite
-    renderizarCardConvite(newsletter.id, user.uid);
+  if (obteveConclusaoLocal(user.uid, newsletter.id)) return;
+
+  renderizarCardConvite(newsletter.id, user.uid);
 }
 
 /**
@@ -160,43 +168,44 @@ function abrirQuizOverlay(nid, uid) {
 }
 
 function renderizarPergunta() {
-    if (!_state || _state.finished) return;
+  if (!_state || _state.finished) return;
+  
+  const perguntas = _quizAtual?.perguntas || [];
+  if (_quizPerguntaAtual >= perguntas.length) {
+    console.error("[QuizApp] Índice da pergunta fora dos limites:", _quizPerguntaAtual);
+    return;
+  }
 
-    const perguntas = _config.perguntas;
-    const atual = perguntas[_state.qIndex];
-    const total = perguntas.length;
+  const q = perguntas[_quizPerguntaAtual];
+  // 🔒 Garante que alternativas seja um array válido
+  const alternativas = Array.isArray(q.alternativas) ? q.alternativas : [];
+  const total = perguntas.length;
 
-    // Atualiza Header/Progresso
-    document.getElementById('rs-quiz-title').textContent = `Pergunta ${_state.qIndex + 1} de ${total}`;
-    const pct = ((_state.qIndex + 1) / total) * 100;
-    document.querySelector('.rs-quiz-progress-bar .fill').style.width = `${pct}%`;
+  document.getElementById('rs-quiz-title').textContent = `Pergunta ${_state.qIndex + 1} de ${total}`;
+  document.querySelector('.rs-quiz-progress-bar .fill').style.width = `${((_state.qIndex + 1) / total) * 100}%`;
 
-    const container = document.getElementById('rs-quiz-question-container');
-    const footer = document.getElementById('rs-quiz-footer');
-    
-    // Limpa Footer
-    footer.style.display = 'none';
-    footer.innerHTML = '';
+  const container = document.getElementById('rs-quiz-question-container');
+  const footer = document.getElementById('rs-quiz-footer');
+  footer.style.display = 'none';
+  footer.innerHTML = '';
 
-    // Renderiza Conteúdo
-    container.innerHTML = `
-        <div class="rs-quiz-texto">${atual.pergunta}</div>
-        <div class="rs-quiz-opcoes">
-            ${atual.opcoes.map((opcao, idx) => `
-                <button class="rs-quiz-opcao-btn" data-idx="${idx}" type="button">
-                    ${opcao}
-                </button>
-            `).join('')}
-        </div>
-    `;
+  container.innerHTML = `
+    <div class="rs-quiz-texto">${q.enunciado}</div>
+    <div class="rs-quiz-opcoes">
+      ${alternativas.map((alt, idx) => `
+        <button class="rs-quiz-opcao-btn" data-idx="${idx}" type="button">
+          ${alt}
+        </button>
+      `).join('')}
+    </div>
+  `;
 
-    // Bind de Cliques nas Opções
-    container.querySelectorAll('.rs-quiz-opcao-btn').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            const idx = parseInt(e.currentTarget.dataset.idx);
-            processarResposta(idx);
-        });
+  container.querySelectorAll('.rs-quiz-opcao-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      const idx = parseInt(e.currentTarget.dataset.idx);
+      processarResposta(idx);
     });
+  });
 }
 
 function processarResposta(idxSelecionado) {
