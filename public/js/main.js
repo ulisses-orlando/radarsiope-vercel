@@ -629,7 +629,7 @@ function renderQuizPergunta(pergunta = {}) {
             ${[0, 1, 2, 3].map(idx => `
                 <label style="font-size:11px;display:flex;align-items:center;gap:4px">
                     <input type="radio" name="quiz-correta-${Date.now()}-${Math.random()}" class="quiz-correta" value="${idx}"
-                          ${(pergunta.correta ?? -1) === idx ? 'checked' : ''}>
+                          ${(pergunta.correta ?? -1) === idx ? 'checked' : 'Resposta correta: '}>
                     ${['A', 'B', 'C', 'D'][idx]}
                 </label>
             `).join('')}
@@ -671,6 +671,11 @@ document.getElementById('quiz-import-json').addEventListener('click', async () =
         alert('❌ Erro ao processar JSON: ' + e.message);
     }
 });
+
+// Verifica se há perguntas salvas
+const perguntasSalvas = data.quiz?.perguntas || [];
+if (Array.isArray(perguntasSalvas) && perguntasSalvas.length > 0) 
+    perguntasSalvas.forEach(p => renderQuizPergunta(p));
 
   // ── Acesso pro temporário para leads ──────────────────────────────────────
   const proTempSection = document.createElement('div');
