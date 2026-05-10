@@ -107,9 +107,16 @@ async function abrirModalCupom(id, editar = false) {
   document.getElementById('modal-edit-save').onclick = async () => {
     try {
       clearFieldErrors && clearFieldErrors();
-      const fields = body.querySelectorAll('[data-field-name], #field-max_usos');
+          
+      // 1. Coleta APENAS campos com data-field-name (evita criar a chave "field-max_usos")
+      const fields = body.querySelectorAll('[data-field-name]');
       let data = {};
-      fields.forEach(f => data[f.dataset.fieldName || f.id] = f.value);
+      fields.forEach(f => data[f.dataset.fieldName] = f.value);
+
+      // 2. Lê max_usos diretamente do DOM (sem duplicar variáveis)
+      const isIlimitado = document.getElementById('chk-ilimitado')?.checked;
+      const valMaxUsos  = document.getElementById('field-max_usos')?.value.trim() || '0';
+      data.max_usos = isIlimitado ? 0 : (Number(valMaxUsos) || 0);
 
       let errors = {};
       if (!data.codigo || String(data.codigo).trim() === '') errors.codigo = 'Código é obrigatório.';
