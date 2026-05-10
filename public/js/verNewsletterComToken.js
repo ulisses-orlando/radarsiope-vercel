@@ -1468,9 +1468,17 @@ async function _tentarModoAssinante(dadosSessao) {
     renderWatermark(destinatario, newsletter);
  
     mostrarApp();
-    if (typeof QuizManager !== 'undefined' && newsletter?.quiz?.ativo) {
-      QuizManager.init(newsletter, window._radarUser);
+
+    if (typeof window.QuizManager?.init === 'function') {
+        // Aguarda próximo tick para garantir que _radarUser está disponível
+        setTimeout(() => {
+            const user = window._radarUser;
+            if (user && newsletter) {
+                window.QuizManager.init(newsletter, user);
+            }
+        }, 0);
     }
+
     iniciarChatFAB(newsletter, sessao.uid, acesso);
     iniciarDrawer(newsletter);
     verificarEdicaoMaisRecente(newsletter);
