@@ -110,6 +110,9 @@ async function abrirModalCupom(id, editar = false) {
       const fields = body.querySelectorAll('[data-field-name], #field-max_usos');
       let data = {};
       fields.forEach(f => data[f.dataset.fieldName || f.id] = f.value);
+      const ilimitado = document.getElementById('chk-ilimitado')?.checked;
+      const rawMaxUsos = document.getElementById('field-max_usos')?.value || '';
+      data.max_usos = ilimitado ? 0 : (Number(rawMaxUsos) || 0);
 
       let errors = {};
       if (!data.codigo || String(data.codigo).trim() === '') errors.codigo = 'Código é obrigatório.';
