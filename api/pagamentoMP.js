@@ -936,7 +936,6 @@ async function _handleGerarCobrancaCancelamento(req, res) {
 }
 
 // ─── Persistir resultado do quiz ──────────────────────────────────────────
-// ─── Persistir resultado do quiz ──────────────────────────────────────────
 async function _handleSalvarResultadoQuiz(req, res) {
   if (req.method !== 'POST') return json(res, 405, { ok: false, message: 'Método não permitido.' });
   const { uid, newsletter_id, pontuacao, aprovado, detalhes } = req.body || {};
@@ -1007,53 +1006,6 @@ async function _handleQuizHistorico(req, res) {
       .sort((a, b) => (b.criado_em || '').localeCompare(a.criado_em || ''));
 
     return json(res, 200, { ok: true, tentativas, tentativas_total: tentativas.length, tentativas_max });
-  } catch (err) {
-    console.error('[quiz-historico] Erro:', err.message);
-    return json(res, 500, { ok: false, message: 'Erro interno ao buscar histórico.' });
-  }
-}
-
-// ─── GET: buscar histórico de tentativas ─────────────────────────────────────
-// Rota: GET /api/pagamentoMP?acao=quiz-historico&uid=xxx&newsletter_id=yyy
-async function _handleQuizHistorico(req, res) {
-  if (req.method !== 'GET') {
-    return json(res, 405, { ok: false, message: 'Método não permitido.' });
-  }
- 
-  const { uid, newsletter_id } = req.query || {};
- 
-  if (!uid || !newsletter_id) {
-    return json(res, 400, { ok: false, message: 'uid e newsletter_id são obrigatórios.' });
-  }
- 
-  try {
-    // 1. Busca tentativas_max na newsletter
-    const newsletterDoc = await db.collection('newsletters').doc(newsletter_id).get();
-    const tentativas_max = newsletterDoc.exists
-      ? (newsletterDoc.data()?.quiz?.tentativas_max ?? 3)
-      : 3;
- 
-    // 2. Busca tentativas do usuário para esta newsletter
-    const snap = await db
-      .collection('usuarios').doc(uid)
-      .collection('quiz_resultados')
-      .where('newsletter_id', '==', newsletter_id)
-      .orderBy('criado_em', 'desc')
-      .get();
- 
-    const tentativas = snap.docs.map(d => ({
-      pontuacao: d.data().pontuacao,
-      aprovado:  d.data().aprovado,
-      criado_em: d.data().criado_em?.toDate?.()?.toISOString() ?? null
-    }));
- 
-    return json(res, 200, {
-      ok: true,
-      tentativas,
-      tentativas_total: tentativas.length,
-      tentativas_max
-    });
- 
   } catch (err) {
     console.error('[quiz-historico] Erro:', err.message);
     return json(res, 500, { ok: false, message: 'Erro interno ao buscar histórico.' });
