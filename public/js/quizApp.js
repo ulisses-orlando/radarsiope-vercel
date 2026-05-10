@@ -114,7 +114,11 @@ function _renderizarCardConcluido(nid, uid) {
     if (!app) return;
     _removerCardQuiz();
 
-    const { tentativas, tentativas_total, tentativas_max } = _historico;
+    // 🔧 CORREÇÃO: Validação defensiva para garantir que seja array
+    const tentativas = Array.isArray(_historico?.tentativas) ? _historico.tentativas : [];
+    const tentativas_total = _historico?.tentativas_total || 0;
+    const tentativas_max = _historico?.tentativas_max || _config?.tentativas_max || 3;
+
     const melhor    = tentativas.reduce((m, t) => Math.max(m, t.pontuacao), 0);
     const aprovado  = tentativas.some(t => t.aprovado);
     const podeReiniciar = tentativas_total < tentativas_max;
@@ -127,21 +131,21 @@ function _renderizarCardConcluido(nid, uid) {
         <div class="rs-quiz-cta-content">
             <h3>Quiz respondido</h3>
             <p>
-                Melhor pontuação: <strong>${melhor}%</strong>
-                &nbsp;·&nbsp;
+               Melhor pontuação: <strong>${melhor}%</strong>
+                &nbsp;· &nbsp;
                 <span class="rs-quiz-badge-status ${aprovado ? 'aprovado' : 'reprovado'}">
-                    ${aprovado ? 'Aprovado' : 'Não aprovado'}
+                   ${aprovado ? 'Aprovado' : 'Não aprovado'}
                 </span>
             </p>
             <span class="rs-quiz-info">
-                ${tentativas_total} de ${tentativas_max} tentativa${tentativas_max > 1 ? 's' : ''} usada${tentativas_total > 1 ? 's' : ''}
+               ${tentativas_total} de ${tentativas_max} tentativa${tentativas_max > 1 ? 's' : ''} usada${tentativas_total > 1 ? 's' : ''}
             </span>
         </div>
         <div class="rs-quiz-cta-acoes">
             <button id="rs-quiz-btn-historico" type="button" class="rs-quiz-btn-sec">Ver resultados</button>
-            ${podeReiniciar
-                ? `<button id="rs-quiz-btn-reiniciar" type="button" class="rs-quiz-btn-pri">Tentar novamente →</button>`
-                : ''}
+           ${podeReiniciar
+               ? `<button id="rs-quiz-btn-reiniciar" type="button" class="rs-quiz-btn-pri">Tentar novamente →</button>`
+               : ''}
         </div>
     `;
 
@@ -379,8 +383,11 @@ function _fecharQuizModal() {
 function _abrirModalHistorico() {
     document.getElementById('rs-quiz-historico-overlay')?.remove();
 
-    const { tentativas, tentativas_total, tentativas_max } = _historico;
-
+    // 🔧 CORREÇÃO: Validação defensiva
+    const tentativas = Array.isArray(_historico?.tentativas) ? _historico.tentativas : [];
+    const tentativas_total = _historico?.tentativas_total || 0;
+    const tentativas_max = _historico?.tentativas_max || _config?.tentativas_max || 3;
+    
     const linhas = tentativas.map((t, i) => {
         const data  = _formatarData(t.criado_em);
         const icone = t.aprovado ? '✅' : '❌';
