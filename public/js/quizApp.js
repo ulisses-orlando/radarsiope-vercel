@@ -32,8 +32,8 @@ function init(newsletter, user) {
     _config = newsletter.quiz;
 
     // 2. Regras de Visibilidade
-    // FIX #1: segmento vem como 'assinantes' (plural) de verNewsletterComToken.js
-    const isAssinante = user.segmento === 'assinantes';
+    // FIX #1: aceita 'assinante' (singular, de _radarUser) e 'assinantes' (plural, de userParaQuiz)
+    const isAssinante = user.segmento === 'assinante' || user.segmento === 'assinantes';
     const visivelParaLeads = (_config.visivel_leads === true);
 
     if (!isAssinante && !visivelParaLeads) return;
