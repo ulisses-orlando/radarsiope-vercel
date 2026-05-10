@@ -134,9 +134,9 @@ async function abrirModalCupom(id, editar = false) {
       fields.forEach(f => data[f.dataset.fieldName] = f.value);
 
       // 🔍 CORREÇÃO CRÍTICA: Ler max_usos diretamente do DOM
-      const ilimitado = document.getElementById('chk-ilimitado')?.checked;
+/*       const ilimitado = document.getElementById('chk-ilimitado')?.checked;
       const rawMaxUsos = document.getElementById('field-max_usos')?.value || '';
-      data.max_usos = ilimitado ? 0 : (Number(rawMaxUsos) || 0);
+      data.max_usos = ilimitado ? 0 : (Number(rawMaxUsos) || 0); */
 
       // Validações
       let errors = {};
