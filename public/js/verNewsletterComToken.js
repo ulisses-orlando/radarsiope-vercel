@@ -2091,17 +2091,6 @@ async function VerNewsletterComToken() {
       plano: destinatario.plano_slug || '',
     };
 
-    // ─── INICIALIZAÇÃO DO QUIZ (após usuário e newsletter carregados) ─────────
-    if (typeof window.QuizManager?.init === 'function') {
-        // Aguarda próximo tick para garantir que _radarUser está disponível
-        setTimeout(() => {
-            const user = window._radarUser;
-            if (user && newsletter) {
-                window.QuizManager.init(newsletter, user);
-            }
-        }, 0);
-    }
-    
     // 11. Render (header + conteúdo primeiro para UX)
     renderHeader(newsletter, destinatario);
 
@@ -2122,6 +2111,17 @@ async function VerNewsletterComToken() {
     await renderReactions(nid, uid);
     renderCTA(acesso, newsletter);
     renderWatermark(destinatario, newsletter);
+
+    // ─── INICIALIZAÇÃO DO QUIZ (após usuário e newsletter carregados) ─────────
+    if (window.QuizManager && newsletter?.quiz) {
+      const userParaQuiz = {
+        uid: destinatario._uid || destinatario.id || uid,
+        segmento: segmento,
+        plano_slug: destinatario.plano_slug || null,
+        features: destinatario.features || {}
+      };
+      window.QuizManager.init(newsletter, userParaQuiz);
+    }
 
     // 12. Exibe com fade-in
     mostrarApp();
