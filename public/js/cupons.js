@@ -167,4 +167,9 @@ function filtrarCupons() {
   });
 }
 
+// 🔒 Expõe funções ao escopo global (resolve ReferenceError)
+window.carregarCupons = carregarCupons;
+window.abrirModalCupom = abrirModalCupom;
+window.confirmarExclusaoCupom = confirmarExclusaoCupom;
+window.filtrarCupons = filtrarCupons;
 window._cuponsAdmin = { carregarCupons, abrirModalCupom, confirmarExclusaoCupom };
