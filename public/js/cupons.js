@@ -107,24 +107,13 @@ async function abrirModalCupom(id, editar = false) {
   document.getElementById('modal-edit-save').onclick = async () => {
     try {
       clearFieldErrors && clearFieldErrors();
-      const fields = body.querySelectorAll('[data-field-name]'); // Removido #field-max_usos para não poluir o data
+      const fields = body.querySelectorAll('[data-field-name], #field-max_usos');
       let data = {};
-      fields.forEach(f => data[f.dataset.fieldName] = f.value);
+      fields.forEach(f => data[f.dataset.fieldName || f.id] = f.value);
 
-      // ── CORREÇÃO: Ler max_usos diretamente do input ──────────────────────
-      const ilimitado = document.getElementById('chk-ilimitado')?.checked;
-      const rawMaxUsos = document.getElementById('field-max_usos')?.value || '';
-      data.max_usos = ilimitado ? 0 : (Number(rawMaxUsos) || 0);
-      // ──────────────────────────────────────────────────────────────────────
-
-      // validações simples
       let errors = {};
-      if (!data.codigo || String(data.codigo).trim() === '') {
-        errors.codigo = 'Código é obrigatório.';
-      }
-      if (!data.valor || isNaN(Number(data.valor))) {
-        errors.valor = 'Valor inválido.';
-      }
+      if (!data.codigo || String(data.codigo).trim() === '') errors.codigo = 'Código é obrigatório.';
+      if (!data.valor || isNaN(Number(data.valor))) errors.valor = 'Valor inválido.';
       if (Object.keys(errors).length) {
         if (showFieldErrors) showFieldErrors(errors);
         else { Object.keys(errors).forEach(f => { const sp = document.getElementById(`error-${f}`); if (sp) { sp.textContent = errors[f]; sp.style.display = 'block'; } }); }
