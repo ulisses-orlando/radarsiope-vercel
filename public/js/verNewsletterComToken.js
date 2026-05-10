@@ -2113,15 +2113,14 @@ async function VerNewsletterComToken() {
     renderWatermark(destinatario, newsletter);
 
     // ─── INICIALIZAÇÃO DO QUIZ (após usuário e newsletter carregados) ─────────
-    if (window.QuizManager && newsletter?.quiz) {
-      const userParaQuiz = {
-        uid: destinatario._uid || destinatario.id || uid,
-        segmento: segmento,
-        plano_slug: destinatario.plano_slug || null,
-        features: destinatario.features || {}
-      };
-      window.QuizManager.init(newsletter, userParaQuiz);
-    }
+    document.getElementById('btn-abrir-quiz')?.addEventListener('click', () => {
+  window.QuizApp.open({
+    uid: window._radarUser?.uid || 'anon',
+    newsletter_id: newsletter.id, // variável já existente no seu app
+    pontuacao_minima: 70,
+    perguntas: newsletter.quiz?.perguntas || []
+  });
+});
 
     // 12. Exibe com fade-in
     mostrarApp();

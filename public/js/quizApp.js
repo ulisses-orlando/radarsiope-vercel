@@ -1,542 +1,226 @@
 /* ==========================================================================
-quizApp.js — Módulo de Quiz Interativo por Edição (VERSÃO FINAL)
-Integração com: verNewsletterComToken.js + API /api/pagamentoMP?acao=salvar-quiz
+   quizApp.js — Módulo de Quiz Interativo por Edição
+   Integração: verNewsletterComToken.js + API /api/pagamentoMP
+   Modal centralizado, responsivo e com fallback para variáveis do app.
 ========================================================================== */
 (function () {
-'use strict';
+  'use strict';
 
-// Configuração do Quiz (vinda do Firestore via newsletter.quiz)
-let _config = null;
+  // Estado interno
+  let _state = null;
+  let _config = null;
+  let _currentQuestion = 0;
+  let _answers = {};
 
-// Estado da Sessão Atual (RAM)
-// Estrutura: { nid, uid, qIndex, answers: [], score: 0, finished: boolean, tentativas: number }
-let _state = null;
+  const STORAGE_KEY = (uid, nid) => `rs_quiz_progress_${uid}_${nid}`;
 
-// Chave para persistência local (evita mostrar card se já completou na aba)
-const _localKey = (uid, nid) => `rs_quiz_${uid}_${nid}`;
-
-// ────────────────────────────────────────────────────────────────────────
-// PÚBLICO
-// ────────────────────────────────────────────────────────────────────────
-
-/**
- * Inicializa o módulo. Deve ser chamado após o carregamento da newsletter e do usuário.
- * @param {Object} newsletter - Objeto da newsletter completa
- * @param {Object} user - Objeto do usuário atual (_radarUser)
- */
-function init(newsletter, user) {
-  if (!newsletter?.quiz?.ativo) return;
-  if (!user?.uid) return;
-
-  _config = newsletter.quiz;
-
-  // 🔒 Validação e Normalização de Dados
-  if (!Array.isArray(_config.perguntas)) {
-    console.error("[QuizApp] Quiz inválido: 'perguntas' não é um array.", _config);
-    return;
-  }
-
-  // Garante que cada pergunta tenha 'alternativas' como array
-  _config.perguntas = _config.perguntas.map(p => ({
-    ...p,
-    alternativas: Array.isArray(p.alternativas) ? p.alternativas : [],
-    enunciado: p.enunciado || p.pergunta || "Pergunta sem enunciado"
-  }));
-
-  const isAssinante = user.segmento === 'assinante';
-  const visivelParaLeads = (_config.visivel_leads === true);
-  if (!isAssinante && !visivelParaLeads) return;
-
-  if (obteveConclusaoLocal(user.uid, newsletter.id)) return;
-
-  renderizarCardConvite(newsletter.id, user.uid);
-}
-
-/**
- * Verifica se o usuário já concluiu o quiz desta edição
- * @param {string} uid 
- * @param {string} nid 
- * @returns {boolean}
- */
-function jaConcluiu(uid, nid) {
-    return obteveConclusaoLocal(uid, nid);
-}
-
-/**
- * Obtém estatísticas do quiz para exibição (ex: "Você acertou 80%")
- * @param {string} uid 
- * @param {string} nid 
- * @returns {Object|null}
- */
-function getEstatisticas(uid, nid) {
-    try {
-        const d = localStorage.getItem(_localKey(uid, nid));
-        return d ? JSON.parse(d) : null;
-    } catch { return null; }
-}
-
-// ────────────────────────────────────────────────────────────────────────
-// LÓGICA DE UI
-// ────────────────────────────────────────────────────────────────────────
-
-function renderizarCardConvite(nid, uid) {
-    // Local para injetar o card: Tentamos colocar antes do CTA de assinatura ou no final do app
-    const ctaWrap = document.getElementById('rs-cta-wrap');
-    const app = document.getElementById('rs-app');
-    const target = ctaWrap || app;
-    
-    if (!target) return;
- 
-    // Remove card existente se houver
-    const existente = document.getElementById('rs-quiz-cta-card');
-    if (existente) existente.remove();
-
-    const card = document.createElement('div');
-    card.id = 'rs-quiz-cta-card';
-    card.className = 'rs-quiz-cta-card';
-    card.innerHTML = `
-        <div class="rs-quiz-icon">🧠</div>
-        <h3>Teste seus conhecimentos</h3>
-        <p>Responda ao quiz desta edição e valide seu aprendizado.</p>
-        <button id="rs-quiz-btn-iniciar" type="button">Iniciar Quiz</button>
-        ${_config.tentativas_max > 1 ? `<div class="rs-quiz-info">Tentativas permitidas: ${_config.tentativas_max}</div>` : ''}
-    `;
-
-    // Injeta CSS se necessário
-    injetarEstilosCSS();
-
-    // Insere no DOM
-    if (ctaWrap) {
-        app.insertBefore(card, ctaWrap);
-    } else {
-        app.appendChild(card);
-    }
-
-    // Evento de Início
-    document.getElementById('rs-quiz-btn-iniciar').addEventListener('click', () => {
-        abrirQuizOverlay(nid, uid);
-    });
-}
-
-function abrirQuizOverlay(nid, uid) {
-    // Remove o card de convite para não duplicar
-    const card = document.getElementById('rs-quiz-cta-card');
-    if (card) card.remove();
-
-    // Inicializa Estado
-    _state = {
-        nid,
-        uid,
-        qIndex: 0,
-        answers: [],
-        score: 0,
-        finished: false,
-        tentativas: 1 // contador de tentativas nesta sessão
-    };
-
-    // Cria Overlay
-    const overlay = document.createElement('div');
-    overlay.id = 'rs-quiz-overlay';
-    overlay.className = 'rs-quiz-overlay';
-    overlay.innerHTML = `
-        <div id="rs-quiz-sheet" class="rs-quiz-sheet">
-            <header id="rs-quiz-header">
-                <span id="rs-quiz-title">Pergunta 1</span>
-                <button id="rs-quiz-fechar" aria-label="Fechar">✕</button>
-            </header>
-            
-            <div id="rs-quiz-body">
-                <div class="rs-quiz-progress-bar"><div class="fill" style="width: 0%"></div></div>
-                <div id="rs-quiz-question-container"></div>
-            </div>
-
-            <footer id="rs-quiz-footer"></footer>
-        </div>
-    `;
-
-    document.body.appendChild(overlay);
-    document.body.style.overflow = 'hidden';
-
-    // Bind de Fechar (cancelar quiz)
-    document.getElementById('rs-quiz-fechar').addEventListener('click', () => {
-        fecharQuizOverlay();
-        // Se cancelou no meio, volta a mostrar o card
-        renderizarCardConvite(nid, uid);
-    });
-
-    renderizarPergunta();
-}
-
-function renderizarPergunta() {
-  if (!_state || _state.finished) return;
-  
-  const perguntas = _quizAtual?.perguntas || [];
-  if (_quizPerguntaAtual >= perguntas.length) {
-    console.error("[QuizApp] Índice da pergunta fora dos limites:", _quizPerguntaAtual);
-    return;
-  }
-
-  const q = perguntas[_quizPerguntaAtual];
-  // 🔒 Garante que alternativas seja um array válido
-  const alternativas = Array.isArray(q.alternativas) ? q.alternativas : [];
-  const total = perguntas.length;
-
-  document.getElementById('rs-quiz-title').textContent = `Pergunta ${_state.qIndex + 1} de ${total}`;
-  document.querySelector('.rs-quiz-progress-bar .fill').style.width = `${((_state.qIndex + 1) / total) * 100}%`;
-
-  const container = document.getElementById('rs-quiz-question-container');
-  const footer = document.getElementById('rs-quiz-footer');
-  footer.style.display = 'none';
-  footer.innerHTML = '';
-
-  container.innerHTML = `
-    <div class="rs-quiz-texto">${q.enunciado}</div>
-    <div class="rs-quiz-opcoes">
-      ${alternativas.map((alt, idx) => `
-        <button class="rs-quiz-opcao-btn" data-idx="${idx}" type="button">
-          ${alt}
-        </button>
-      `).join('')}
-    </div>
-  `;
-
-  container.querySelectorAll('.rs-quiz-opcao-btn').forEach(btn => {
-    btn.addEventListener('click', (e) => {
-      const idx = parseInt(e.currentTarget.dataset.idx);
-      processarResposta(idx);
-    });
-  });
-}
-
-function processarResposta(idxSelecionado) {
-    const perguntas = _config.perguntas;
-    const atual = perguntas[_state.qIndex];
-    const acertou = (idxSelecionado === parseInt(atual.correta));
-
-    if (acertou) _state.score++;
-
-    // Salva na memória
-    _state.answers.push({
-        qId: atual.id || _state.qIndex,
-        selecionada: idxSelecionado,
-        correta: parseInt(atual.correta),
-        acertou
-    });
-
-    // Feedback Visual (Trava botões e colore)
-    const container = document.getElementById('rs-quiz-question-container');
-    const botoes = container.querySelectorAll('.rs-quiz-opcao-btn');
-    
-    botoes.forEach(btn => {
-        btn.disabled = true;
-        const idxBtn = parseInt(btn.dataset.idx);
-        
-        if (idxBtn === parseInt(atual.correta)) {
-            btn.classList.add('rs-quiz-correta');
-        } else if (idxBtn === idxSelecionado && !acertou) {
-            btn.classList.add('rs-quiz-errada');
-        }
-    });
-
-    // Exibe Explicação (se houver)
-    if (atual.explicacao) {
-        const expDiv = document.createElement('div');
-        expDiv.className = 'rs-quiz-explicacao';
-        expDiv.innerHTML = `<strong>Explicação:</strong> ${atual.explicacao}`;
-        container.appendChild(expDiv);
-    }
-
-    // Exibe Botão de Avançar no Footer
-    const footer = document.getElementById('rs-quiz-footer');
-    footer.style.display = 'block';
-    
-    const isLast = (_state.qIndex >= perguntas.length - 1);
-    const label = isLast ? 'Ver Resultado' : 'Próxima Pergunta';
-    const action = isLast ? finalizarQuiz : proximaPergunta;
-
-    footer.innerHTML = `<button id="rs-quiz-btn-acao" type="button">${label}</button>`;
-    document.getElementById('rs-quiz-btn-acao').addEventListener('click', action);
-}
-
-function proximaPergunta() {
-    _state.qIndex++;
-    // Limpa container para nova renderização
-    document.getElementById('rs-quiz-question-container').innerHTML = '';
-    renderizarPergunta();
-}
-
-async function finalizarQuiz() {
-    _state.finished = true;
-    
-    // 1. Calcula Resultado
-    const total = _config.perguntas.length;
-    const pontuacao = Math.round((_state.score / total) * 100);
-    const minimo = _config.pontuacao_minima || 70;
-    const aprovado = pontuacao >= minimo;
-
-    // 2. Salva no Backend (formato esperado pela API)
-    await salvarNoBackend({
-        pontuacao,
-        aprovado,
-        tentativas_usadas: _state.tentativas,
-        melhor_pontuacao: pontuacao, // em sessões futuras, comparar com localStorage
-        detalhes: _state.answers.map(a => ({
-            pergunta_id: a.qId,
-            resposta_selecionada: a.selecionada,
-            resposta_correta: a.correta,
-            acertou: a.acertou
-        }))
-    });
-
-    // 3. Renderiza Tela de Resultado
-    renderizarResultado(pontuacao, aprovado, minimo);
-}
-
-function renderizarResultado(pontuacao, aprovado, minimo) {
-    const body = document.getElementById('rs-quiz-body');
-    const footer = document.getElementById('rs-quiz-footer');
-    const header = document.getElementById('rs-quiz-header');
-
-    // Oculta header padrão
-    header.style.display = 'none';
-
-    body.innerHTML = `
-        <div class="rs-quiz-resultado ${aprovado ? 'aprovado' : 'reprovado'}">
-            <div class="rs-quiz-icon">${aprovado ? '🏆' : '📚'}</div>
-            <h2>${aprovado ? 'Parabéns!' : 'Continue Estudando!'}</h2>
-            <div class="rs-quiz-score-circle">
-                <span>${pontuacao}%</span>
-            </div>
-            <p>Você acertou <strong>${_state.score}</strong> de <strong>${_config.perguntas.length}</strong> questões.</p>
-            <p class="rs-quiz-status-msg">
-                ${aprovado 
-                    ? 'Você atingiu a pontuação mínima necessária.' 
-                    : `A pontuação mínima para aprovação é ${minimo}%.`}
-            </p>
-        </div>
-    `;
-
-    footer.style.display = 'block';
-    footer.innerHTML = `<button id="rs-quiz-btn-sair" type="button">Fechar e Voltar à Leitura</button>`;
-    document.getElementById('rs-quiz-btn-sair').addEventListener('click', fecharQuizOverlay);
-}
-
-function fecharQuizOverlay() {
-    const overlay = document.getElementById('rs-quiz-overlay');
-    if (overlay) overlay.remove();
-    document.body.style.overflow = '';
-    
-    _state = null; // Limpa memória
-}
-
-// ────────────────────────────────────────────────────────────────────────
-// API & PERSISTÊNCIA
-// ────────────────────────────────────────────────────────────────────────
-
-/**
- * Salva resultado no backend no formato esperado
- * @param {Object} dados - { pontuacao, aprovado, tentativas_usadas, melhor_pontuacao, detalhes }
- */
-async function salvarNoBackend({ pontuacao, aprovado, tentativas_usadas, melhor_pontuacao, detalhes }) {
-    if (!_state) return;
-
-    const payload = {
-        uid: _state.uid,
-        newsletter_id: _state.nid,
-        tentativas_usadas: tentativas_usadas || 1,
-        melhor_pontuacao: melhor_pontuacao || pontuacao,
-        aprovado: aprovado || false,
-        detalhes: detalhes || _state.answers.map(a => ({
-            pergunta_id: a.qId,
-            resposta_selecionada: a.selecionada,
-            resposta_correta: a.correta,
-            acertou: a.acertou
-        }))
-    };
-
-    try {
-        // Chama o endpoint fornecido
-        const resp = await fetch('/api/pagamentoMP?acao=salvar-quiz', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
-        });
-
-        const data = await resp.json().catch(() => ({}));
-
-        // Marca localmente como concluído (independente do sucesso da API)
-        marcarConcluidoLocal(_state.uid, _state.nid, {
-            completed: true,
-            timestamp: Date.now(),
-            pontuacao,
-            aprovado,
-            tentativas: tentativas_usadas
-        });
-        
-        // Dispara evento para atualizar badges (se houver listener)
-        window.dispatchEvent(new CustomEvent('rs:quizConcluido', { 
-            detail: { nid: _state.nid, pontuacao, aprovado } 
-        }));
-
-        return data;
-    } catch (err) {
-        console.error('[QuizApp] Erro ao salvar resultado:', err);
-        // Mesmo com erro de rede, marcamos localmente para não travar o usuário
-        marcarConcluidoLocal(_state.uid, _state.nid, {
-            completed: true,
-            timestamp: Date.now(),
-            pontuacao,
-            aprovado,
-            error: true
-        });
-        throw err;
-    }
-}
-
-// Helpers LocalStorage
-function obterConclusaoLocal(uid, nid) {
-    try {
-        const d = localStorage.getItem(_localKey(uid, nid));
-        return d ? JSON.parse(d) : null;
-    } catch { return null; }
-}
-
-function marcarConcluidoLocal(uid, nid, dados) {
-    try {
-        localStorage.setItem(_localKey(uid, nid), JSON.stringify({
-            completed: true,
-            timestamp: Date.now(),
-            ...dados
-        }));
-    } catch {}
-}
-
-function obteveConclusaoLocal(uid, nid) {
-    const d = obterConclusaoLocal(uid, nid);
-    return d && d.completed === true;
-}
-
-// ────────────────────────────────────────────────────────────────────────
-// CSS INJECTION
-// ────────────────────────────────────────────────────────────────────────
-
-function injetarEstilosCSS() {
-    if (document.getElementById('rs-quiz-style')) return;
-
+  // ── Injeção de CSS (Modal Centralizado) ────────────────────────────────
+  function _injectCSS() {
+    if (document.getElementById('quiz-modal-styles')) return;
     const style = document.createElement('style');
-    style.id = 'rs-quiz-style';
+    style.id = 'quiz-modal-styles';
     style.textContent = `
-        /* Card de Convite */
-        .rs-quiz-cta-card {
-            background: var(--rs-card2, #162032);
-            border: 1px dashed var(--azul, #0A3D62);
-            border-radius: 12px;
-            padding: 24px;
-            margin: 24px 0;
-            text-align: center;
-            animation: rsFadeIn 0.5s ease;
-        }
-        .rs-quiz-cta-card h3 { color: var(--rs-text, #fff); margin: 8px 0; }
-        .rs-quiz-cta-card p { color: var(--rs-muted, #94a3b8); font-size: 14px; margin-bottom: 16px; }
-        #rs-quiz-btn-iniciar {
-            background: var(--azul, #0A3D62);
-            color: #fff;
-            border: none;
-            padding: 10px 24px;
-            border-radius: 8px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: transform 0.2s;
-        }
-        #rs-quiz-btn-iniciar:hover { transform: scale(1.05); }
-        .rs-quiz-info { font-size: 11px; color: #64748b; margin-top: 8px; }
-
-        /* Overlay e Sheet (Modal) */
-        .rs-quiz-overlay {
-            position: fixed; inset: 0; z-index: 10000;
-            background: rgba(0,0,0,0.8);
-            display: flex; align-items: flex-end; justify-content: center;
-        }
-        .rs-quiz-sheet {
-            background: var(--rs-card, #1e293b);
-            width: 100%; max-width: 600px;
-            height: 90vh;
-            border-radius: 16px 16px 0 0;
-            display: flex; flex-direction: column;
-            animation: rsSlideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-            overflow: hidden;
-        }
-        @keyframes rsSlideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
-        
-        #rs-quiz-header {
-            padding: 16px; border-bottom: 1px solid var(--rs-borda);
-            display: flex; justify-content: space-between; align-items: center;
-            font-weight: 700; color: var(--rs-text, #fff);
-        }
-        #rs-quiz-fechar { background: none; border: none; color: var(--rs-muted); font-size: 20px; cursor: pointer; }
-
-        #rs-quiz-body { flex: 1; padding: 20px; overflow-y: auto; position: relative; }
-        
-        .rs-quiz-progress-bar { height: 4px; background: #334155; border-radius: 2px; margin-bottom: 20px; overflow: hidden; }
-        .rs-quiz-progress-bar .fill { height: 100%; background: #22c55e; transition: width 0.3s ease; }
-
-        .rs-quiz-texto { font-size: 18px; margin-bottom: 24px; line-height: 1.5; color: var(--rs-text); font-weight: 500; }
-        
-        .rs-quiz-opcoes { display: flex; flex-direction: column; gap: 12px; }
-        .rs-quiz-opcao-btn {
-            background: var(--rs-bg, #f8fafc);
-            border: 2px solid var(--rs-borda);
-            padding: 14px; border-radius: 8px;
-            text-align: left; font-size: 15px; cursor: pointer;
-            transition: all 0.2s; color: var(--rs-texto, #0f172a);
-        }
-        .rs-quiz-opcao-btn:hover:not(:disabled) { border-color: var(--azul); background: rgba(10, 61, 98, 0.1); }
-        .rs-quiz-opcao-btn:disabled { cursor: default; opacity: 0.7; }
-        
-        .rs-quiz-correta { background: #dcfce7 !important; border-color: #22c55e !important; color: #14532d !important; }
-        .rs-quiz-errada { background: #fee2e2 !important; border-color: #ef4444 !important; color: #7f1d1d !important; }
-
-        .rs-quiz-explicacao {
-            margin-top: 20px; padding: 14px; background: rgba(139, 92, 246, 0.1);
-            border-left: 4px solid #8b5cf6; border-radius: 4px;
-            font-size: 14px; color: var(--rs-text); line-height: 1.5;
-        }
-
-        #rs-quiz-footer {
-            padding: 16px; border-top: 1px solid var(--rs-borda);
-            display: none; justify-content: center; background: var(--rs-card2);
-        }
-        #rs-quiz-btn-acao, #rs-quiz-btn-sair {
-            background: var(--azul, #0A3D62); color: #fff;
-            border: none; padding: 12px 32px; border-radius: 8px;
-            font-size: 16px; font-weight: 600; cursor: pointer; width: 100%; max-width: 300px;
-        }
-
-        /* Tela de Resultado */
-        .rs-quiz-resultado { text-align: center; padding-top: 40px; }
-        .rs-quiz-icon { font-size: 64px; margin-bottom: 16px; }
-        .rs-quiz-score-circle {
-            width: 100px; height: 100px; border-radius: 50%;
-            background: #0f172a; border: 4px solid var(--azul);
-            display: flex; align-items: center; justify-content: center;
-            font-size: 28px; font-weight: 700; color: #fff; margin: 24px auto;
-        }
-        .rs-quiz-status-msg { margin-top: 12px; color: var(--rs-muted); }
+      .quiz-overlay {
+        position: fixed; inset: 0;
+        background: rgba(0, 0, 0, 0.65);
+        backdrop-filter: blur(6px);
+        z-index: 9999;
+        display: flex; align-items: center; justify-content: center;
+        padding: 20px;
+        opacity: 0; pointer-events: none;
+        transition: opacity 0.25s ease;
+      }
+      .quiz-overlay.active { opacity: 1; pointer-events: auto; }
+      .quiz-modal-box {
+        background: var(--rs-card, #1e293b);
+        color: var(--rs-text, #f8fafc);
+        width: 100%; max-width: 540px; max-height: 90vh;
+        border-radius: 16px; box-shadow: 0 12px 32px rgba(0,0,0,0.4);
+        display: flex; flex-direction: column; overflow: hidden;
+        transform: scale(0.95) translateY(8px);
+        transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+      }
+      .quiz-overlay.active .quiz-modal-box { transform: scale(1) translateY(0); }
+      .quiz-header {
+        padding: 18px 20px; border-bottom: 1px solid var(--rs-borda, #334155);
+        display: flex; justify-content: space-between; align-items: center;
+      }
+      .quiz-title { font-size: 16px; font-weight: 700; margin: 0; }
+      .quiz-close {
+        background: none; border: none; color: #94a3b8;
+        font-size: 22px; cursor: pointer; padding: 4px; line-height: 1;
+      }
+      .quiz-close:hover { color: #f8fafc; }
+      .quiz-body { padding: 20px; overflow-y: auto; flex: 1; }
+      .quiz-footer {
+        padding: 16px 20px; border-top: 1px solid var(--rs-borda, #334155);
+        display: flex; justify-content: flex-end; gap: 10px;
+        background: var(--rs-card2, #162032);
+      }
+      .quiz-progress { height: 4px; background: #334155; border-radius: 2px; margin-bottom: 16px; overflow: hidden; }
+      .quiz-progress-fill { height: 100%; background: #3b82f6; transition: width 0.3s ease; }
+      .quiz-q-title { font-size: 15px; font-weight: 600; margin-bottom: 12px; line-height: 1.4; }
+      .quiz-opts { display: flex; flex-direction: column; gap: 10px; }
+      .quiz-opt-btn {
+        padding: 12px 14px; background: #0f172a; border: 2px solid #334155;
+        border-radius: 8px; color: #f8fafc; font-size: 14px; text-align: left;
+        cursor: pointer; transition: all 0.2s; width: 100%;
+      }
+      .quiz-opt-btn:hover:not(:disabled) { border-color: #3b82f6; background: #1e293b; }
+      .quiz-opt-btn:disabled { cursor: default; opacity: 0.8; }
+      .quiz-opt-btn.correct { background: rgba(34,197,94,0.15) !important; border-color: #22c55e !important; }
+      .quiz-opt-btn.wrong { background: rgba(239,68,68,0.15) !important; border-color: #ef4444 !important; }
+      .quiz-feedback { margin-top: 14px; padding: 12px; background: rgba(59,130,246,0.1); border-left: 3px solid #3b82f6; border-radius: 4px; font-size: 13px; line-height: 1.5; }
+      .quiz-btn { padding: 10px 20px; background: #3b82f6; color: #fff; border: none; border-radius: 8px; cursor: pointer; font-weight: 600; transition: background 0.2s; }
+      .quiz-btn:hover { background: #2563eb; }
+      .quiz-btn.secondary { background: #475569; }
+      .quiz-btn.secondary:hover { background: #334155; }
+      .quiz-result { text-align: center; padding: 10px 0; }
+      .quiz-result-icon { font-size: 48px; margin-bottom: 12px; }
+      .quiz-result-score { font-size: 24px; font-weight: 700; margin-bottom: 8px; }
+      .quiz-result-msg { font-size: 14px; color: #94a3b8; margin-bottom: 16px; }
+      @media(max-width: 480px) {
+        .quiz-overlay { padding: 10px; }
+        .quiz-modal-box { max-height: 95vh; }
+      }
     `;
     document.head.appendChild(style);
-}
+  }
 
-// ────────────────────────────────────────────────────────────────────────
-// EXPORTAÇÕES GLOBAIS
-// ────────────────────────────────────────────────────────────────────────
+  // ── Lógica do Quiz ─────────────────────────────────────────────────────
+  function openQuiz(config) {
+    if (!config?.perguntas?.length) return;
+    _injectCSS();
+    _config = config;
+    _currentQuestion = 0;
+    _answers = {};
 
-window.QuizManager = {
-    init,
-    jaConcluiu,
-    getEstatisticas,
-    // Para testes/debug
-    _getState: () => _state,
-    _getConfig: () => _config
-};
+    const overlay = document.createElement('div');
+    overlay.className = 'quiz-overlay';
+    overlay.innerHTML = `
+      <div class="quiz-modal-box">
+        <div class="quiz-header">
+          <h3 class="quiz-title">📝 Quiz da Edição</h3>
+          <button class="quiz-close" aria-label="Fechar">✕</button>
+        </div>
+        <div class="quiz-body" id="q-body"></div>
+        <div class="quiz-footer" id="q-footer"></div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+    requestAnimationFrame(() => overlay.classList.add('active'));
 
+    overlay.querySelector('.quiz-close').onclick = closeQuiz;
+    overlay.addEventListener('click', e => { if (e.target === overlay) closeQuiz(); });
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') closeQuiz(); });
+
+    _render();
+  }
+
+  function closeQuiz() {
+    const overlay = document.querySelector('.quiz-overlay');
+    if (!overlay) return;
+    overlay.classList.remove('active');
+    document.removeEventListener('keydown', e => { if (e.key === 'Escape') closeQuiz(); });
+    setTimeout(() => { overlay.remove(); _state = null; }, 250);
+  }
+
+  function _render() {
+    if (!_config || _currentQuestion >= _config.perguntas.length) {
+      _showResult(); return;
+    }
+
+    const q = _config.perguntas[_currentQuestion];
+    const progress = ((_currentQuestion + 1) / _config.perguntas.length) * 100;
+    const answered = _answers[q.id];
+    const body = document.getElementById('q-body');
+    const footer = document.getElementById('q-footer');
+
+    body.innerHTML = `
+      <div class="quiz-progress"><div class="quiz-progress-fill" style="width:${progress}%"></div></div>
+      <div class="quiz-q-title">${_currentQuestion + 1}. ${q.pergunta}</div>
+      <div class="quiz-opts" id="q-opts">
+        ${q.alternativas.map((alt, i) => `
+          <button class="quiz-opt-btn" data-idx="${i}" ${answered ? 'disabled' : ''}>
+            ${String.fromCharCode(65 + i)}. ${alt}
+          </button>
+        `).join('')}
+      </div>
+      ${answered ? `<div class="quiz-feedback">${answered.explicacao}</div>` : ''}
+    `;
+
+    if (answered) {
+      const btns = document.querySelectorAll('.quiz-opt-btn');
+      btns[answered.selected].classList.add(answered.acertou ? 'correct' : 'wrong');
+      btns[answered.correct].classList.add('correct');
+    } else {
+      document.querySelectorAll('.quiz-opt-btn').forEach(btn => {
+        btn.onclick = () => _handleAnswer(parseInt(btn.dataset.idx));
+      });
+    }
+
+    footer.innerHTML = answered
+      ? `<button class="quiz-btn" id="q-next">${_currentQuestion < _config.perguntas.length - 1 ? 'Próxima →' : 'Ver Resultado'}</button>`
+      : `<button class="quiz-btn secondary" disabled>Selecione uma alternativa</button>`;
+
+    const nextBtn = document.getElementById('q-next');
+    if (nextBtn) nextBtn.onclick = () => { _currentQuestion++; _render(); };
+  }
+
+  function _handleAnswer(idx) {
+    if (_answers[_config.perguntas[_currentQuestion].id]) return;
+    const q = _config.perguntas[_currentQuestion];
+    const acertou = idx === q.correta;
+    _answers[q.id] = { selected: idx, acertou, explicacao: q.explicacao };
+    _render();
+  }
+
+  function _showResult() {
+    const total = _config.perguntas.length;
+    const acertos = Object.values(_answers).filter(a => a.acertou).length;
+    const pct = Math.round((acertos / total) * 100);
+    const aprovado = pct >= (_config.pontuacao_minima || 70);
+    const body = document.getElementById('q-body');
+    const footer = document.getElementById('q-footer');
+
+    body.innerHTML = `
+      <div class="quiz-result">
+        <div class="quiz-result-icon">${aprovado ? '🏆' : '📚'}</div>
+        <div class="quiz-result-score">${pct}% de acertos</div>
+        <div class="quiz-result-msg">${acertos} de ${total} corretas. ${aprovado ? 'Parabéns!' : 'Continue estudando!'}</div>
+        <div style="font-size:13px;color:#94a3b8;margin-bottom:16px;">Pontuação mínima: ${_config.pontuacao_minima || 70}%</div>
+      </div>`;
+
+    footer.innerHTML = `
+      <button class="quiz-btn secondary" id="q-retry">Tentar Novamente</button>
+      <button class="quiz-btn" id="q-close">Fechar</button>`;
+
+    document.getElementById('q-retry').onclick = () => { _answers = {}; _currentQuestion = 0; _render(); };
+    document.getElementById('q-close').onclick = () => { _save(); closeQuiz(); };
+    _save();
+  }
+
+  async function _save() {
+    if (!_config?.uid || !_config?.newsletter_id) return;
+    localStorage.setItem(STORAGE_KEY(_config.uid, _config.newsletter_id), JSON.stringify({
+      responses: _answers, completed: _currentQuestion >= _config.perguntas.length, ts: Date.now()
+    }));
+
+    if (_currentQuestion >= _config.perguntas.length) {
+      try {
+        await fetch('/api/pagamentoMP?acao=salvar-quiz', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            uid: _config.uid, newsletter_id: _config.newsletter_id,
+            pontuacao: Math.round((Object.values(_answers).filter(a => a.acertou).length / _config.perguntas.length) * 100),
+            aprovado: Math.round((Object.values(_answers).filter(a => a.acertou).length / _config.perguntas.length) * 100) >= (_config.pontuacao_minima || 70),
+            respostas: _answers
+          })
+        });
+      } catch (e) { console.warn('[Quiz] Falha ao salvar:', e); }
+    }
+  }
+
+  // Expõe apenas o necessário globalmente
+  window.QuizApp = { open: openQuiz, close: closeQuiz };
 })();
