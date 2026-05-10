@@ -896,29 +896,124 @@ async function _handleGerarCobrancaCancelamento(req, res) {
 
 // ─── Persistir resultado do quiz ──────────────────────────────────────────
 async function _handleSalvarResultadoQuiz(req, res) {
-  if (req.method !== 'POST') return json(res, 405, { ok: false, message: 'Método não permitido.' });
-  
-  const { uid, newsletter_id, tentativas_usadas, melhor_pontuacao, aprovado, detalhes } = req.body || {};
-  
-  if (!uid || !newsletter_id) {
-    return json(res, 400, { ok: false, message: 'uid e newsletter_id obrigatórios.' });
+  if (req.method !== 'POST') {
+    return json(res, 405, { ok: false, message: 'Método não permitido.' });
   }
-
+ 
+  const { uid, newsletter_id, pontuacao, aprovado, detalhes } = req.body || {};
+ 
+  if (!uid || !newsletter_id) {
+    return json(res, 400, { ok: false, message: 'uid e newsletter_id são obrigatórios.' });
+  }
+  if (typeof pontuacao !== 'number' || pontuacao < 0 || pontuacao > 100) {
+    return json(res, 400, { ok: false, message: 'pontuacao deve ser um número entre 0 e 100.' });
+  }
+ 
   try {
-    const ref = db.collection('usuarios').doc(uid).collection('quiz_resultados');
-    await ref.add({
+    // 1. Busca tentativas_max na newsletter (fonte de verdade — não vem do frontend)
+    const newsletterDoc = await db.collection('newsletters').doc(newsletter_id).get();
+    if (!newsletterDoc.exists) {
+      return json(res, 404, { ok: false, message: 'Newsletter não encontrada.' });
+    }
+    const tentativas_max = newsletterDoc.data()?.quiz?.tentativas_max ?? 3;
+ 
+    // 2. Conta tentativas já realizadas
+    const resultadosRef = db
+      .collection('usuarios').doc(uid)
+      .collection('quiz_resultados');
+ 
+    const existentes = await resultadosRef
+      .where('newsletter_id', '==', newsletter_id)
+      .get();
+ 
+    if (existentes.size >= tentativas_max) {
+      return json(res, 403, {
+        ok: false,
+        message: `Limite de ${tentativas_max} tentativa(s) atingido para esta edição.`
+      });
+    }
+ 
+    // 3. Salva a nova tentativa
+    await resultadosRef.add({
       newsletter_id,
-      tentativas_usadas: tentativas_usadas || 1,
-      melhor_pontuacao: melhor_pontuacao || 0,
-      aprovado: aprovado || false,
-      detalhes: detalhes || [],
-      criado_em: admin.firestore.FieldValue.serverTimestamp()
+      pontuacao,
+      aprovado:   aprovado  || false,
+      detalhes:   detalhes  || [],
+      criado_em:  admin.firestore.FieldValue.serverTimestamp()
     });
-
-    return json(res, 200, { ok: true, message: 'Resultado salvo com sucesso.' });
+ 
+    // 4. Retorna histórico atualizado para o frontend evitar um GET extra
+    const atualizados = await resultadosRef
+      .where('newsletter_id', '==', newsletter_id)
+      .orderBy('criado_em', 'desc')
+      .get();
+ 
+    const tentativas = atualizados.docs.map(d => ({
+      pontuacao:  d.data().pontuacao,
+      aprovado:   d.data().aprovado,
+      criado_em:  d.data().criado_em?.toDate?.()?.toISOString() ?? null
+    }));
+ 
+    return json(res, 200, {
+      ok: true,
+      message: 'Resultado salvo com sucesso.',
+      historico: {
+        tentativas,
+        tentativas_total: tentativas.length,
+        tentativas_max
+      }
+    });
+ 
   } catch (err) {
     console.error('[salvar-quiz] Erro:', err.message);
     return json(res, 500, { ok: false, message: 'Erro interno ao salvar resultado.' });
+  }
+}
+
+// ─── GET: buscar histórico de tentativas ─────────────────────────────────────
+// Rota: GET /api/pagamentoMP?acao=quiz-historico&uid=xxx&newsletter_id=yyy
+async function _handleQuizHistorico(req, res) {
+  if (req.method !== 'GET') {
+    return json(res, 405, { ok: false, message: 'Método não permitido.' });
+  }
+ 
+  const { uid, newsletter_id } = req.query || {};
+ 
+  if (!uid || !newsletter_id) {
+    return json(res, 400, { ok: false, message: 'uid e newsletter_id são obrigatórios.' });
+  }
+ 
+  try {
+    // 1. Busca tentativas_max na newsletter
+    const newsletterDoc = await db.collection('newsletters').doc(newsletter_id).get();
+    const tentativas_max = newsletterDoc.exists
+      ? (newsletterDoc.data()?.quiz?.tentativas_max ?? 3)
+      : 3;
+ 
+    // 2. Busca tentativas do usuário para esta newsletter
+    const snap = await db
+      .collection('usuarios').doc(uid)
+      .collection('quiz_resultados')
+      .where('newsletter_id', '==', newsletter_id)
+      .orderBy('criado_em', 'desc')
+      .get();
+ 
+    const tentativas = snap.docs.map(d => ({
+      pontuacao: d.data().pontuacao,
+      aprovado:  d.data().aprovado,
+      criado_em: d.data().criado_em?.toDate?.()?.toISOString() ?? null
+    }));
+ 
+    return json(res, 200, {
+      ok: true,
+      tentativas,
+      tentativas_total: tentativas.length,
+      tentativas_max
+    });
+ 
+  } catch (err) {
+    console.error('[quiz-historico] Erro:', err.message);
+    return json(res, 500, { ok: false, message: 'Erro interno ao buscar histórico.' });
   }
 }
 
@@ -939,7 +1034,7 @@ export default async function handler(req, res) {
 
     // Validar assinatura apenas para webhooks (não para criar-pedido / status-pedido)
     const acao = (req.query && req.query.acao) ? String(req.query.acao) : null;
-    const acoesPublicas = ['criar-pedido', 'status-pedido', 'ativar-sessao', 'validar-sessao', 'criar-sessao', 'encerrar-sessao', 'cancelar-assinatura', 'gerar-cobranca-cancelamento', 'salvar-quiz'];
+    const acoesPublicas = ['criar-pedido', 'status-pedido', 'ativar-sessao', 'validar-sessao', 'criar-sessao', 'encerrar-sessao', 'cancelar-assinatura', 'gerar-cobranca-cancelamento', 'salvar-quiz', 'quiz-historico'];
 
     if (!acao || !acoesPublicas.includes(acao)) {
       const sigCheck = validateMpWebhookSignature(rawBody, req);
@@ -982,6 +1077,10 @@ export default async function handler(req, res) {
       });
     }
 
+    if (req.method === 'GET' && acao === 'quiz-historico') {
+       return _handleQuizHistorico(req, res);
+    }
+    
     // ── POST ?acao=salvar-quiz ────────────────────────────────────────────
     if (req.method === 'POST' && acao === 'salvar-quiz') {
       return _handleSalvarResultadoQuiz(req, res);
