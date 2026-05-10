@@ -662,8 +662,25 @@ async function validarCupom(codigo) {
     if (snap.empty) { mostrarMensagem('Cupom não encontrado.'); return null; }
     const cupom = snap.docs[0].data();
     if (cupom.status !== 'ativo') { mostrarMensagem('Cupom inativo.'); return null; }
-    if (cupom.expira_em && cupom.expira_em.toDate() < new Date()) { mostrarMensagem('Cupom expirado.'); return null; }
-    return { ...cupom, _id: snap.docs[0].id };
+    
+    // Validação de validade (Brasília UTC-3 fixo)
+    if (cupom.expira_em) {
+      const now = new Date();
+      const utc = now.getTime() + (now.getTimezoneOffset() * 60000);
+      const nowSP = new Date(utc - (3 * 3600000));
+      if (nowSP > cupom.expira_em.toDate()) { mostrarMensagem('Cupom expirado.'); return null; }
+    }
+
+    // Validação de usos (UX apenas - o backend valida novamente)
+    const maxUsos = cupom.max_usos || 0;
+    const usosAtuais = cupom.usos_atuais || 0;
+    let msgUso = null;
+    if (maxUsos > 0) {
+      if (usosAtuais >= maxUsos) { mostrarMensagem('Limite de usos deste cupom foi atingido.'); return null; }
+      msgUso = `Restam apenas ${maxUsos - usosAtuais} uso(s).`;
+    }
+
+    return { ...cupom, _id: snap.docs[0].id, msgUso };
   } catch (err) {
     console.error('[assinatura] Erro ao validar cupom:', err);
     return null;
@@ -1061,6 +1078,13 @@ async function processarEnvioAssinatura(e) {
     }
   } catch (err) {
     console.error('[assinatura] Erro no processamento:', err);
+    if (err.message && err.message.includes('Cupom inválido:')) {
+      mostrarMensagem(err.message.replace('Cupom inválido: ', ''));
+      _cupomAplicado = null;
+      document.getElementById('cupom').value = '';
+      document.getElementById('cupom-feedback').textContent = '';
+      await atualizarPreview();
+    }
     setStatus(err.message || 'Erro ao processar. Tente novamente.', '#c00');
   } finally {
     btn.disabled = false;
@@ -1113,35 +1137,23 @@ async function initAssinatura() {
     const cupom = await validarCupom(codigo);
     if (cupom) {
       _cupomAplicado = cupom;
-      if (fb) { fb.textContent = `✅ Cupom "${codigo}" aplicado!`; fb.style.color = '#16a34a'; }
-
-      const isGratuidade  = cupom.valor === 100;
-      const munContainer  = document.getElementById('container-municipios-extra');
-      if (isGratuidade) {
-        _municipiosExtrasSelecionados = [];
-        if (munContainer) {
-          munContainer.style.display      = 'none';
-          munContainer.style.pointerEvents = 'none';
-          munContainer.style.opacity       = '0.5';
-        }
-        mostrarMensagem('Cupom de gratuidade aplicado. Seleção de municípios adicionais desativada.');
-      } else {
-        if (munContainer) {
-          munContainer.style.display      = 'block';
-          munContainer.style.pointerEvents = 'auto';
-          munContainer.style.opacity       = '1';
-        }
+      if (fb) { fb.textContent = `✅ Cupom "${codigo}" aplicado!${cupom.msgUso ? ' ' + cupom.msgUso : ''}`; fb.style.color = '#16a34a'; }
+      
+      const isGratuidade = cupom.valor === 100;
+      const munContainer = document.getElementById('container-municipios-extra');
+      if (isGratuidade) { 
+        _municipiosExtrasSelecionados = []; 
+        if (munContainer) { munContainer.style.display = 'none'; munContainer.style.pointerEvents = 'none'; munContainer.style.opacity = '0.5'; } 
+        mostrarMensagem('Cupom de gratuidade aplicado.'); 
+      } else { 
+        if (munContainer) { munContainer.style.display = 'block'; munContainer.style.pointerEvents = 'auto'; munContainer.style.opacity = '1'; } 
       }
       await atualizarPreview();
     } else {
-      _cupomAplicado = null;
+      _cupomAplicado = null; 
       if (fb) fb.textContent = '';
       const munContainer = document.getElementById('container-municipios-extra');
-      if (munContainer && _planoAtual?.features?.max_municipios > 1) {
-        munContainer.style.display      = 'block';
-        munContainer.style.pointerEvents = 'auto';
-        munContainer.style.opacity       = '1';
-      }
+      if (munContainer && _planoAtual?.features?.max_municipios > 1) { munContainer.style.display = 'block'; munContainer.style.pointerEvents = 'auto'; munContainer.style.opacity = '1'; }
     }
   });
 
