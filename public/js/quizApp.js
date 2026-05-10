@@ -1,87 +1,90 @@
 /* ==========================================================================
 quizApp.js — Módulo de Quiz Interativo por Edição
-Integração com: verNewsletterComToken.js + API /api/pagamentoMP?acao=salvar-quiz
+Integração com: verNewsletterComToken.js + API /api/pagamentoMP
 ========================================================================== */
 (function () {
 'use strict';
 
-// Configuração do Quiz (vinda do Firestore via newsletter.quiz)
-let _config = null;
+let _config     = null;  // newsletter.quiz
+let _state      = null;  // sessão ativa
+let _historico  = null;  // cache da resposta da API { tentativas[], tentativas_total, tentativas_max }
 
-// Estado da Sessão Atual (RAM)
-// Estrutura: { nid, uid, qIndex, answers: [], score: 0, finished: boolean, tentativas: number }
-let _state = null;
-
-// Chave para persistência local (evita mostrar card se já completou na aba)
 const _localKey = (uid, nid) => `rs_quiz_${uid}_${nid}`;
 
 // ────────────────────────────────────────────────────────────────────────
 // PÚBLICO
 // ────────────────────────────────────────────────────────────────────────
 
-/**
- * Inicializa o módulo. Deve ser chamado após o carregamento da newsletter e do usuário.
- * @param {Object} newsletter - Objeto da newsletter completa
- * @param {Object} user - Objeto do usuário atual (_radarUser)
- */
-function init(newsletter, user) {
-    // 1. Validações básicas
+async function init(newsletter, user) {
     if (!newsletter?.quiz?.ativo) return;
     if (!user?.uid) return;
 
     _config = newsletter.quiz;
 
-    // 2. Regras de Visibilidade
-    // FIX #1: aceita 'assinante' (singular, de _radarUser) e 'assinantes' (plural, de userParaQuiz)
     const isAssinante = user.segmento === 'assinante' || user.segmento === 'assinantes';
     const visivelParaLeads = (_config.visivel_leads === true);
-
     if (!isAssinante && !visivelParaLeads) return;
 
-    // 3. Verifica se já concluiu (Cache Local)
-    if (obteveConclusaoLocal(user.uid, newsletter.id)) return;
+    injetarEstilosCSS();
 
-    // 4. Renderiza o Card de Convite
-    renderizarCardConvite(newsletter.id, user.uid);
-}
+    // Exibe skeleton enquanto aguarda API
+    _renderizarSkeleton(newsletter.id);
 
-/**
- * Verifica se o usuário já concluiu o quiz desta edição
- * @param {string} uid
- * @param {string} nid
- * @returns {boolean}
- */
-function jaConcluiu(uid, nid) {
-    return obteveConclusaoLocal(uid, nid);
-}
-
-/**
- * Obtém estatísticas do quiz para exibição (ex: "Você acertou 80%")
- * @param {string} uid
- * @param {string} nid
- * @returns {Object|null}
- */
-function getEstatisticas(uid, nid) {
     try {
-        const d = localStorage.getItem(_localKey(uid, nid));
-        return d ? JSON.parse(d) : null;
-    } catch { return null; }
+        _historico = await _buscarHistorico(user.uid, newsletter.id);
+    } catch (e) {
+        console.warn('[QuizApp] Falha ao buscar histórico, usando fallback local:', e);
+        _historico = _carregarCacheLocal(user.uid, newsletter.id);
+    }
+
+    _removerSkeleton();
+
+    if (!_historico || _historico.tentativas_total === 0) {
+        _renderizarCardConvite(newsletter.id, user.uid);
+    } else {
+        _renderizarCardConcluido(newsletter.id, user.uid);
+    }
+}
+
+function jaConcluiu(uid, nid) {
+    if (_historico) return _historico.tentativas_total > 0;
+    const c = _carregarCacheLocal(uid, nid);
+    return c && c.tentativas_total > 0;
+}
+
+function getEstatisticas(uid, nid) {
+    if (_historico) return _historico;
+    return _carregarCacheLocal(uid, nid);
 }
 
 // ────────────────────────────────────────────────────────────────────────
-// LÓGICA DE UI
+// CARDS
 // ────────────────────────────────────────────────────────────────────────
 
-function renderizarCardConvite(nid, uid) {
-    const ctaWrap = document.getElementById('rs-cta-wrap');
+function _renderizarSkeleton(nid) {
     const app = document.getElementById('rs-app');
-    const target = ctaWrap || app;
+    if (!app) return;
+    _removerCardQuiz();
+    const sk = document.createElement('div');
+    sk.id = 'rs-quiz-skeleton';
+    sk.className = 'rs-quiz-skeleton';
+    sk.innerHTML = `<div class="rs-quiz-sk-line w60"></div><div class="rs-quiz-sk-line w40"></div>`;
+    const ctaWrap = document.getElementById('rs-cta-wrap');
+    ctaWrap ? app.insertBefore(sk, ctaWrap) : app.appendChild(sk);
+}
 
-    if (!target) return;
+function _removerSkeleton() {
+    document.getElementById('rs-quiz-skeleton')?.remove();
+}
 
-    // Remove card existente se houver
-    const existente = document.getElementById('rs-quiz-cta-card');
-    if (existente) existente.remove();
+function _removerCardQuiz() {
+    document.getElementById('rs-quiz-cta-card')?.remove();
+}
+
+function _renderizarCardConvite(nid, uid) {
+    const app = document.getElementById('rs-app');
+    if (!app) return;
+    _removerCardQuiz();
 
     const card = document.createElement('div');
     card.id = 'rs-quiz-cta-card';
@@ -91,44 +94,79 @@ function renderizarCardConvite(nid, uid) {
         <div class="rs-quiz-cta-content">
             <h3>Teste seus conhecimentos</h3>
             <p>Responda ao quiz desta edição e valide seu aprendizado.</p>
-            ${_config.tentativas_max > 1 ? `<span class="rs-quiz-info">Até ${_config.tentativas_max} tentativas permitidas</span>` : ''}
+            ${_config.tentativas_max > 1
+                ? `<span class="rs-quiz-info">Até ${_config.tentativas_max} tentativas permitidas</span>`
+                : ''}
         </div>
         <button id="rs-quiz-btn-iniciar" type="button">Iniciar Quiz →</button>
     `;
 
-    // Injeta CSS se necessário
-    injetarEstilosCSS();
+    const ctaWrap = document.getElementById('rs-cta-wrap');
+    ctaWrap ? app.insertBefore(card, ctaWrap) : app.appendChild(card);
 
-    // Insere no DOM
-    if (ctaWrap) {
-        app.insertBefore(card, ctaWrap);
-    } else {
-        app.appendChild(card);
-    }
-
-    // Evento de Início
     document.getElementById('rs-quiz-btn-iniciar').addEventListener('click', () => {
-        abrirQuizModal(nid, uid);
+        _abrirQuizModal(nid, uid);
     });
 }
 
-function abrirQuizModal(nid, uid) {
-    // Remove card de convite para não duplicar
-    const card = document.getElementById('rs-quiz-cta-card');
-    if (card) card.remove();
+function _renderizarCardConcluido(nid, uid) {
+    const app = document.getElementById('rs-app');
+    if (!app) return;
+    _removerCardQuiz();
 
-    // Inicializa Estado
-    _state = {
-        nid,
-        uid,
-        qIndex: 0,
-        answers: [],
-        score: 0,
-        finished: false,
-        tentativas: 1
-    };
+    const { tentativas, tentativas_total, tentativas_max } = _historico;
+    const melhor    = tentativas.reduce((m, t) => Math.max(m, t.pontuacao), 0);
+    const aprovado  = tentativas.some(t => t.aprovado);
+    const podeReiniciar = tentativas_total < tentativas_max;
 
-    // Cria Overlay com modal centralizado
+    const card = document.createElement('div');
+    card.id = 'rs-quiz-cta-card';
+    card.className = 'rs-quiz-cta-card rs-quiz-cta-card--concluido';
+    card.innerHTML = `
+        <div class="rs-quiz-cta-icon">${aprovado ? '🏆' : '📚'}</div>
+        <div class="rs-quiz-cta-content">
+            <h3>Quiz respondido</h3>
+            <p>
+                Melhor pontuação: <strong>${melhor}%</strong>
+                &nbsp;·&nbsp;
+                <span class="rs-quiz-badge-status ${aprovado ? 'aprovado' : 'reprovado'}">
+                    ${aprovado ? 'Aprovado' : 'Não aprovado'}
+                </span>
+            </p>
+            <span class="rs-quiz-info">
+                ${tentativas_total} de ${tentativas_max} tentativa${tentativas_max > 1 ? 's' : ''} usada${tentativas_total > 1 ? 's' : ''}
+            </span>
+        </div>
+        <div class="rs-quiz-cta-acoes">
+            <button id="rs-quiz-btn-historico" type="button" class="rs-quiz-btn-sec">Ver resultados</button>
+            ${podeReiniciar
+                ? `<button id="rs-quiz-btn-reiniciar" type="button" class="rs-quiz-btn-pri">Tentar novamente →</button>`
+                : ''}
+        </div>
+    `;
+
+    const ctaWrap = document.getElementById('rs-cta-wrap');
+    ctaWrap ? app.insertBefore(card, ctaWrap) : app.appendChild(card);
+
+    document.getElementById('rs-quiz-btn-historico').addEventListener('click', () => {
+        _abrirModalHistorico();
+    });
+    if (podeReiniciar) {
+        document.getElementById('rs-quiz-btn-reiniciar').addEventListener('click', () => {
+            _abrirQuizModal(nid, uid);
+        });
+    }
+}
+
+// ────────────────────────────────────────────────────────────────────────
+// MODAL DO QUIZ
+// ────────────────────────────────────────────────────────────────────────
+
+function _abrirQuizModal(nid, uid) {
+    document.getElementById('rs-quiz-cta-card')?.remove();
+
+    _state = { nid, uid, qIndex: 0, answers: [], score: 0, finished: false };
+
     const overlay = document.createElement('div');
     overlay.id = 'rs-quiz-overlay';
     overlay.className = 'rs-quiz-overlay';
@@ -141,15 +179,12 @@ function abrirQuizModal(nid, uid) {
                 </div>
                 <button id="rs-quiz-fechar" aria-label="Fechar quiz">✕</button>
             </header>
-
             <div class="rs-quiz-progress-wrap">
-                <div class="rs-quiz-progress-bar"><div class="fill" style="width: 0%"></div></div>
+                <div class="rs-quiz-progress-bar"><div class="fill" style="width:0%"></div></div>
             </div>
-
             <div id="rs-quiz-body">
                 <div id="rs-quiz-question-container"></div>
             </div>
-
             <footer id="rs-quiz-footer"></footer>
         </div>
     `;
@@ -157,44 +192,42 @@ function abrirQuizModal(nid, uid) {
     document.body.appendChild(overlay);
     document.body.style.overflow = 'hidden';
 
-    // Fecha ao clicar no backdrop
     overlay.addEventListener('click', (e) => {
-        if (e.target === overlay) {
-            fecharQuizModal();
-            renderizarCardConvite(nid, uid);
-        }
+        if (e.target === overlay) _cancelarQuiz(nid, uid);
     });
-
-    // Bind de Fechar
     document.getElementById('rs-quiz-fechar').addEventListener('click', () => {
-        fecharQuizModal();
-        renderizarCardConvite(nid, uid);
+        _cancelarQuiz(nid, uid);
     });
 
-    renderizarPergunta();
+    _renderizarPergunta();
 }
 
-function renderizarPergunta() {
+function _cancelarQuiz(nid, uid) {
+    _fecharQuizModal();
+    if (!_historico || _historico.tentativas_total === 0) {
+        _renderizarCardConvite(nid, uid);
+    } else {
+        _renderizarCardConcluido(nid, uid);
+    }
+}
+
+function _renderizarPergunta() {
     if (!_state || _state.finished) return;
 
     const perguntas = _config.perguntas;
-    const atual = perguntas[_state.qIndex];
-    const total = perguntas.length;
+    const atual     = perguntas[_state.qIndex];
+    const total     = perguntas.length;
 
-    // Atualiza Header/Progresso
     document.getElementById('rs-quiz-title').textContent = `Pergunta ${_state.qIndex + 1} de ${total}`;
     const pct = ((_state.qIndex + 1) / total) * 100;
     document.querySelector('.rs-quiz-progress-bar .fill').style.width = `${pct}%`;
 
     const container = document.getElementById('rs-quiz-question-container');
-    const footer = document.getElementById('rs-quiz-footer');
-
+    const footer    = document.getElementById('rs-quiz-footer');
     footer.style.display = 'none';
-    footer.innerHTML = '';
+    footer.innerHTML     = '';
 
-    // FIX #2: campo correto é 'alternativas', não 'opcoes'
     const alternativas = atual.alternativas || [];
-
     container.innerHTML = `
         <div class="rs-quiz-texto">${atual.pergunta}</div>
         <div class="rs-quiz-opcoes">
@@ -207,23 +240,19 @@ function renderizarPergunta() {
         </div>
     `;
 
-    // Bind de Cliques nas Opções
     container.querySelectorAll('.rs-quiz-opcao-btn').forEach(btn => {
         btn.addEventListener('click', (e) => {
-            const idx = parseInt(e.currentTarget.dataset.idx);
-            processarResposta(idx);
+            _processarResposta(parseInt(e.currentTarget.dataset.idx));
         });
     });
 }
 
-function processarResposta(idxSelecionado) {
-    const perguntas = _config.perguntas;
-    const atual = perguntas[_state.qIndex];
-    const acertou = (idxSelecionado === parseInt(atual.correta));
+function _processarResposta(idxSelecionado) {
+    const atual   = _config.perguntas[_state.qIndex];
+    const acertou = idxSelecionado === parseInt(atual.correta);
 
     if (acertou) _state.score++;
 
-    // Salva na memória
     _state.answers.push({
         qId: atual.id || _state.qIndex,
         selecionada: idxSelecionado,
@@ -231,81 +260,84 @@ function processarResposta(idxSelecionado) {
         acertou
     });
 
-    // Feedback Visual — trava botões e colore
     const container = document.getElementById('rs-quiz-question-container');
-    const botoes = container.querySelectorAll('.rs-quiz-opcao-btn');
-
-    botoes.forEach(btn => {
+    container.querySelectorAll('.rs-quiz-opcao-btn').forEach(btn => {
         btn.disabled = true;
-        const idxBtn = parseInt(btn.dataset.idx);
-
-        if (idxBtn === parseInt(atual.correta)) {
-            btn.classList.add('rs-quiz-correta');
-        } else if (idxBtn === idxSelecionado && !acertou) {
-            btn.classList.add('rs-quiz-errada');
-        }
+        const i = parseInt(btn.dataset.idx);
+        if (i === parseInt(atual.correta))        btn.classList.add('rs-quiz-correta');
+        else if (i === idxSelecionado && !acertou) btn.classList.add('rs-quiz-errada');
     });
 
-    // Exibe Explicação (se houver)
     if (atual.explicacao) {
-        const expDiv = document.createElement('div');
-        expDiv.className = 'rs-quiz-explicacao';
-        expDiv.innerHTML = `<strong>💡 Explicação:</strong> ${atual.explicacao}`;
-        container.appendChild(expDiv);
+        const exp = document.createElement('div');
+        exp.className = 'rs-quiz-explicacao';
+        exp.innerHTML = `<strong>💡 Explicação:</strong> ${atual.explicacao}`;
+        container.appendChild(exp);
     }
 
-    // Exibe Botão de Avançar no Footer
-    // FIX #3: display 'flex' para que justify-content funcione corretamente
-    const footer = document.getElementById('rs-quiz-footer');
+    const footer  = document.getElementById('rs-quiz-footer');
     footer.style.display = 'flex';
 
-    const isLast = (_state.qIndex >= perguntas.length - 1);
-    const label = isLast ? 'Ver Resultado' : 'Próxima Pergunta →';
-    const action = isLast ? finalizarQuiz : proximaPergunta;
-
-    footer.innerHTML = `<button id="rs-quiz-btn-acao" type="button">${label}</button>`;
-    document.getElementById('rs-quiz-btn-acao').addEventListener('click', action);
+    const isLast = _state.qIndex >= _config.perguntas.length - 1;
+    footer.innerHTML = `<button id="rs-quiz-btn-acao" type="button">${isLast ? 'Ver Resultado' : 'Próxima Pergunta →'}</button>`;
+    document.getElementById('rs-quiz-btn-acao').addEventListener('click', isLast ? _finalizarQuiz : _proximaPergunta);
 }
 
-function proximaPergunta() {
+function _proximaPergunta() {
     _state.qIndex++;
     document.getElementById('rs-quiz-question-container').innerHTML = '';
-    renderizarPergunta();
+    _renderizarPergunta();
 }
 
-async function finalizarQuiz() {
+async function _finalizarQuiz() {
     _state.finished = true;
 
-    const total = _config.perguntas.length;
+    const total    = _config.perguntas.length;
     const pontuacao = Math.round((_state.score / total) * 100);
-    const minimo = _config.pontuacao_minima || 70;
+    const minimo   = _config.pontuacao_minima || 70;
     const aprovado = pontuacao >= minimo;
 
-    await salvarNoBackend({
-        pontuacao,
-        aprovado,
-        tentativas_usadas: _state.tentativas,
-        melhor_pontuacao: pontuacao,
-        detalhes: _state.answers.map(a => ({
-            pergunta_id: a.qId,
-            resposta_selecionada: a.selecionada,
-            resposta_correta: a.correta,
-            acertou: a.acertou
-        }))
-    });
+    // Trava botão enquanto salva
+    const btnAcao = document.getElementById('rs-quiz-btn-acao');
+    if (btnAcao) { btnAcao.disabled = true; btnAcao.textContent = 'Salvando...'; }
 
-    renderizarResultado(pontuacao, aprovado, minimo);
+    try {
+        const respApi = await _salvarNoBackend({ pontuacao, aprovado });
+
+        // Atualiza histórico em memória com retorno da API (preferencial)
+        if (respApi?.historico) {
+            _historico = respApi.historico;
+        } else {
+            // Fallback: atualiza manualmente
+            const entrada = { pontuacao, aprovado, criado_em: new Date().toISOString() };
+            if (!_historico) {
+                _historico = {
+                    tentativas: [],
+                    tentativas_total: 0,
+                    tentativas_max: _config.tentativas_max || 3
+                };
+            }
+            _historico.tentativas.unshift(entrada);
+            _historico.tentativas_total += 1;
+        }
+
+        _salvarCacheLocal(_state.uid, _state.nid, _historico);
+
+        window.dispatchEvent(new CustomEvent('rs:quizConcluido', {
+            detail: { nid: _state.nid, pontuacao, aprovado }
+        }));
+    } catch (err) {
+        console.error('[QuizApp] Erro ao salvar resultado:', err);
+    }
+
+    _renderizarResultadoFinal(pontuacao, aprovado, minimo);
 }
 
-function renderizarResultado(pontuacao, aprovado, minimo) {
-    const body = document.getElementById('rs-quiz-body');
-    const footer = document.getElementById('rs-quiz-footer');
-    const header = document.getElementById('rs-quiz-header');
-
-    header.style.display = 'none';
+function _renderizarResultadoFinal(pontuacao, aprovado, minimo) {
+    document.getElementById('rs-quiz-header').style.display = 'none';
     document.querySelector('.rs-quiz-progress-wrap').style.display = 'none';
 
-    body.innerHTML = `
+    document.getElementById('rs-quiz-body').innerHTML = `
         <div class="rs-quiz-resultado">
             <div class="rs-quiz-resultado-icon">${aprovado ? '🏆' : '📚'}</div>
             <h2 class="rs-quiz-resultado-titulo">${aprovado ? 'Parabéns!' : 'Continue Estudando!'}</h2>
@@ -323,103 +355,164 @@ function renderizarResultado(pontuacao, aprovado, minimo) {
         </div>
     `;
 
-    // FIX #3: display 'flex' para que justify-content funcione corretamente
+    const footer = document.getElementById('rs-quiz-footer');
     footer.style.display = 'flex';
     footer.innerHTML = `<button id="rs-quiz-btn-sair" type="button">Fechar e Voltar à Leitura</button>`;
-    document.getElementById('rs-quiz-btn-sair').addEventListener('click', fecharQuizModal);
+    document.getElementById('rs-quiz-btn-sair').addEventListener('click', () => {
+        const nid = _state?.nid;
+        const uid = _state?.uid;
+        _fecharQuizModal();
+        _renderizarCardConcluido(nid, uid);
+    });
 }
 
-function fecharQuizModal() {
-    const overlay = document.getElementById('rs-quiz-overlay');
-    if (overlay) overlay.remove();
+function _fecharQuizModal() {
+    document.getElementById('rs-quiz-overlay')?.remove();
     document.body.style.overflow = '';
     _state = null;
 }
 
 // ────────────────────────────────────────────────────────────────────────
-// API & PERSISTÊNCIA
+// MODAL DE HISTÓRICO
 // ────────────────────────────────────────────────────────────────────────
 
-async function salvarNoBackend({ pontuacao, aprovado, tentativas_usadas, melhor_pontuacao, detalhes }) {
-    if (!_state) return;
+function _abrirModalHistorico() {
+    document.getElementById('rs-quiz-historico-overlay')?.remove();
 
-    const payload = {
-        uid: _state.uid,
-        newsletter_id: _state.nid,
-        tentativas_usadas: tentativas_usadas || 1,
-        melhor_pontuacao: melhor_pontuacao || pontuacao,
-        aprovado: aprovado || false,
-        detalhes: detalhes || _state.answers.map(a => ({
-            pergunta_id: a.qId,
-            resposta_selecionada: a.selecionada,
-            resposta_correta: a.correta,
-            acertou: a.acertou
-        }))
+    const { tentativas, tentativas_total, tentativas_max } = _historico;
+
+    const linhas = tentativas.map((t, i) => {
+        const data  = _formatarData(t.criado_em);
+        const icone = t.aprovado ? '✅' : '❌';
+        return `
+            <div class="rs-quiz-hist-row">
+                <span class="rs-quiz-hist-num">${i + 1}ª</span>
+                <span class="rs-quiz-hist-score ${t.aprovado ? 'aprovado' : 'reprovado'}">${t.pontuacao}%</span>
+                <span class="rs-quiz-hist-status">${icone} ${t.aprovado ? 'Aprovado' : 'Não aprovado'}</span>
+                <span class="rs-quiz-hist-data">${data}</span>
+            </div>
+        `;
+    }).join('');
+
+    const overlay = document.createElement('div');
+    overlay.id    = 'rs-quiz-historico-overlay';
+    overlay.className = 'rs-quiz-overlay';
+    overlay.innerHTML = `
+        <div class="rs-quiz-modal" role="dialog" aria-modal="true" aria-label="Histórico de tentativas">
+            <header id="rs-quiz-header">
+                <div class="rs-quiz-header-left">
+                    <span class="rs-quiz-badge">Quiz</span>
+                    <span>Seus Resultados</span>
+                </div>
+                <button id="rs-quiz-hist-fechar" aria-label="Fechar">✕</button>
+            </header>
+            <div id="rs-quiz-body" style="padding: 20px;">
+                <p class="rs-quiz-hist-meta">
+                    ${tentativas_total} de ${tentativas_max} tentativa${tentativas_max > 1 ? 's' : ''} realizada${tentativas_total > 1 ? 's' : ''}
+                </p>
+                <div class="rs-quiz-hist-lista">
+                    ${linhas}
+                </div>
+            </div>
+            <footer id="rs-quiz-footer" style="display:flex;">
+                <button id="rs-quiz-hist-ok" type="button">Fechar</button>
+            </footer>
+        </div>
+    `;
+
+    document.body.appendChild(overlay);
+    document.body.style.overflow = 'hidden';
+
+    const fechar = () => {
+        overlay.remove();
+        document.body.style.overflow = '';
     };
-
-    try {
-        const resp = await fetch('/api/pagamentoMP?acao=salvar-quiz', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
-        });
-
-        const data = await resp.json().catch(() => ({}));
-
-        marcarConcluidoLocal(_state.uid, _state.nid, {
-            completed: true,
-            timestamp: Date.now(),
-            pontuacao,
-            aprovado,
-            tentativas: tentativas_usadas
-        });
-
-        window.dispatchEvent(new CustomEvent('rs:quizConcluido', {
-            detail: { nid: _state.nid, pontuacao, aprovado }
-        }));
-
-        return data;
-    } catch (err) {
-        console.error('[QuizApp] Erro ao salvar resultado:', err);
-        marcarConcluidoLocal(_state.uid, _state.nid, {
-            completed: true,
-            timestamp: Date.now(),
-            pontuacao,
-            aprovado,
-            error: true
-        });
-        throw err;
-    }
+    document.getElementById('rs-quiz-hist-fechar').addEventListener('click', fechar);
+    document.getElementById('rs-quiz-hist-ok').addEventListener('click', fechar);
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) fechar(); });
 }
 
 // ────────────────────────────────────────────────────────────────────────
-// HELPERS LOCALSTORAGE
+// API
 // ────────────────────────────────────────────────────────────────────────
 
-function obterConclusaoLocal(uid, nid) {
+async function _buscarHistorico(uid, nid) {
+    const url = `/api/pagamentoMP?acao=quiz-historico&uid=${encodeURIComponent(uid)}&newsletter_id=${encodeURIComponent(nid)}`;
+    const resp = await fetch(url, { method: 'GET' });
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const data = await resp.json();
+    if (!data.ok) throw new Error(data.message || 'Erro ao buscar histórico');
+    return {
+        tentativas:      data.tentativas      || [],
+        tentativas_total: data.tentativas_total || 0,
+        tentativas_max:  data.tentativas_max  || _config.tentativas_max || 3
+    };
+}
+
+async function _salvarNoBackend({ pontuacao, aprovado }) {
+    if (!_state) return;
+
+    const payload = {
+        uid:           _state.uid,
+        newsletter_id: _state.nid,
+        pontuacao,
+        aprovado,
+        detalhes: _state.answers.map(a => ({
+            pergunta_id:         a.qId,
+            resposta_selecionada: a.selecionada,
+            resposta_correta:    a.correta,
+            acertou:             a.acertou
+        }))
+    };
+
+    const resp = await fetch('/api/pagamentoMP?acao=salvar-quiz', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+    });
+
+    if (!resp.ok) {
+        const err = await resp.json().catch(() => ({}));
+        throw new Error(err.message || `HTTP ${resp.status}`);
+    }
+
+    return resp.json().catch(() => ({}));
+}
+
+// ────────────────────────────────────────────────────────────────────────
+// CACHE LOCAL (display apenas — não é fonte de verdade para tentativas)
+// ────────────────────────────────────────────────────────────────────────
+
+function _salvarCacheLocal(uid, nid, historico) {
+    try {
+        localStorage.setItem(_localKey(uid, nid), JSON.stringify(historico));
+    } catch {}
+}
+
+function _carregarCacheLocal(uid, nid) {
     try {
         const d = localStorage.getItem(_localKey(uid, nid));
         return d ? JSON.parse(d) : null;
     } catch { return null; }
 }
 
-function marcarConcluidoLocal(uid, nid, dados) {
-    try {
-        localStorage.setItem(_localKey(uid, nid), JSON.stringify({
-            completed: true,
-            timestamp: Date.now(),
-            ...dados
-        }));
-    } catch {}
-}
+// ────────────────────────────────────────────────────────────────────────
+// UTILS
+// ────────────────────────────────────────────────────────────────────────
 
-function obteveConclusaoLocal(uid, nid) {
-    const d = obterConclusaoLocal(uid, nid);
-    return d && d.completed === true;
+function _formatarData(value) {
+    if (!value) return '—';
+    try {
+        // Suporta Firestore Timestamp serializado ({ _seconds }), ISO string ou Date
+        const d = value?._seconds
+            ? new Date(value._seconds * 1000)
+            : new Date(value);
+        return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+    } catch { return '—'; }
 }
 
 // ────────────────────────────────────────────────────────────────────────
-// CSS INJECTION
+// CSS
 // ────────────────────────────────────────────────────────────────────────
 
 function injetarEstilosCSS() {
@@ -428,291 +521,226 @@ function injetarEstilosCSS() {
     const style = document.createElement('style');
     style.id = 'rs-quiz-style';
     style.textContent = `
-        /* ── Card de Convite ── */
+        /* ── Skeleton ── */
+        .rs-quiz-skeleton {
+            padding: 20px; margin: 24px 0;
+            background: var(--rs-card2, #162032);
+            border-radius: 12px;
+            display: flex; flex-direction: column; gap: 10px;
+        }
+        .rs-quiz-sk-line {
+            height: 12px; border-radius: 6px;
+            background: rgba(255,255,255,0.06);
+            animation: rsPulse 1.4s ease-in-out infinite;
+        }
+        .rs-quiz-sk-line.w60 { width: 60%; }
+        .rs-quiz-sk-line.w40 { width: 40%; }
+        @keyframes rsPulse { 0%,100% { opacity:.4 } 50% { opacity:.9 } }
+
+        /* ── Card Convite ── */
         .rs-quiz-cta-card {
             background: var(--rs-card2, #162032);
-            border: 1px solid rgba(10, 61, 98, 0.5);
-            border-radius: 12px;
-            padding: 20px;
-            margin: 24px 0;
-            display: flex;
-            align-items: center;
-            gap: 16px;
+            border: 1px solid rgba(10,61,98,0.5);
+            border-radius: 12px; padding: 20px; margin: 24px 0;
+            display: flex; align-items: center; gap: 16px;
             animation: rsFadeIn 0.4s ease;
         }
+        .rs-quiz-cta-card--concluido { border-color: rgba(255,255,255,0.08); }
         .rs-quiz-cta-icon { font-size: 36px; flex-shrink: 0; }
         .rs-quiz-cta-content { flex: 1; min-width: 0; }
-        .rs-quiz-cta-content h3 {
-            color: var(--rs-text, #fff);
-            margin: 0 0 4px;
-            font-size: 15px;
-        }
-        .rs-quiz-cta-content p {
-            color: var(--rs-muted, #94a3b8);
-            font-size: 13px;
-            margin: 0;
-        }
+        .rs-quiz-cta-content h3 { color: var(--rs-text, #f1f5f9); margin: 0 0 4px; font-size: 15px; }
+        .rs-quiz-cta-content p  { color: var(--rs-muted, #94a3b8); font-size: 13px; margin: 0; }
         .rs-quiz-info {
-            display: inline-block;
-            margin-top: 6px;
-            font-size: 11px;
-            color: #64748b;
+            display: inline-block; margin-top: 6px;
+            font-size: 11px; color: #64748b;
             background: rgba(255,255,255,0.05);
-            padding: 2px 8px;
-            border-radius: 20px;
+            padding: 2px 8px; border-radius: 20px;
         }
-        #rs-quiz-btn-iniciar {
-            background: var(--azul, #0A3D62);
-            color: #fff;
-            border: none;
-            padding: 10px 18px;
-            border-radius: 8px;
-            font-weight: 600;
-            font-size: 13px;
-            cursor: pointer;
-            white-space: nowrap;
-            flex-shrink: 0;
-            transition: background 0.2s, transform 0.15s;
+        .rs-quiz-badge-status {
+            font-size: 11px; font-weight: 700;
+            padding: 2px 7px; border-radius: 20px;
         }
-        #rs-quiz-btn-iniciar:hover { background: #0d4f7c; transform: translateY(-1px); }
+        .rs-quiz-badge-status.aprovado  { background: rgba(34,197,94,0.15);  color: #4ade80; }
+        .rs-quiz-badge-status.reprovado { background: rgba(245,158,11,0.15); color: #fbbf24; }
+        .rs-quiz-cta-acoes { display: flex; flex-direction: column; gap: 8px; flex-shrink: 0; }
+        .rs-quiz-btn-pri {
+            background: var(--azul, #0A3D62); color: #fff;
+            border: none; padding: 10px 18px; border-radius: 8px;
+            font-weight: 600; font-size: 13px; cursor: pointer; white-space: nowrap;
+            transition: background .2s, transform .15s;
+        }
+        .rs-quiz-btn-pri:hover { background: #0d4f7c; transform: translateY(-1px); }
+        .rs-quiz-btn-sec {
+            background: rgba(255,255,255,0.06); color: var(--rs-muted, #94a3b8);
+            border: 1px solid rgba(255,255,255,0.1);
+            padding: 9px 18px; border-radius: 8px;
+            font-size: 13px; cursor: pointer; white-space: nowrap;
+            transition: background .2s;
+        }
+        .rs-quiz-btn-sec:hover { background: rgba(255,255,255,0.1); }
 
-        /* ── Overlay e Modal Centralizado ── */
+        /* ── Overlay / Modal ── */
         .rs-quiz-overlay {
-            position: fixed;
-            inset: 0;
-            z-index: 10000;
-            background: rgba(0, 0, 0, 0.75);
-            display: flex;
-            align-items: center;
-            justify-content: center;
+            position: fixed; inset: 0; z-index: 10000;
+            background: rgba(0,0,0,0.75);
+            display: flex; align-items: center; justify-content: center;
             padding: 16px;
             backdrop-filter: blur(2px);
         }
         .rs-quiz-modal {
             background: var(--rs-card, #1e293b);
-            width: 100%;
-            max-width: 560px;
-            max-height: 90vh;
+            width: 100%; max-width: 560px; max-height: 90vh;
             border-radius: 16px;
-            display: flex;
-            flex-direction: column;
-            animation: rsScaleIn 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+            display: flex; flex-direction: column;
+            animation: rsScaleIn 0.25s cubic-bezier(0.16,1,0.3,1);
             overflow: hidden;
             box-shadow: 0 24px 60px rgba(0,0,0,0.5);
         }
 
         /* ── Header ── */
         #rs-quiz-header {
-            padding: 14px 16px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
+            padding: 14px 16px; flex-shrink: 0;
+            display: flex; justify-content: space-between; align-items: center;
             border-bottom: 1px solid var(--rs-borda, rgba(255,255,255,0.08));
         }
-        .rs-quiz-header-left {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
+        .rs-quiz-header-left { display: flex; align-items: center; gap: 10px; }
         .rs-quiz-badge {
-            background: rgba(10, 61, 98, 0.5);
-            color: #60a5fa;
-            font-size: 11px;
-            font-weight: 700;
-            padding: 3px 8px;
-            border-radius: 20px;
-            letter-spacing: 0.05em;
-            text-transform: uppercase;
+            background: rgba(10,61,98,0.5); color: #60a5fa;
+            font-size: 11px; font-weight: 700;
+            padding: 3px 8px; border-radius: 20px;
+            letter-spacing: .05em; text-transform: uppercase;
         }
-        #rs-quiz-title {
-            font-size: 14px;
-            font-weight: 600;
-            color: var(--rs-muted, #94a3b8);
+        #rs-quiz-title { font-size: 14px; font-weight: 600; color: var(--rs-muted, #94a3b8); }
+        #rs-quiz-fechar, #rs-quiz-hist-fechar {
+            background: rgba(255,255,255,0.06); border: none;
+            color: var(--rs-muted, #94a3b8); font-size: 16px;
+            width: 30px; height: 30px; border-radius: 50%; cursor: pointer;
+            display: flex; align-items: center; justify-content: center;
+            transition: background .2s; flex-shrink: 0;
         }
-        #rs-quiz-fechar {
-            background: rgba(255,255,255,0.06);
-            border: none;
-            color: var(--rs-muted, #94a3b8);
-            font-size: 16px;
-            width: 30px;
-            height: 30px;
-            border-radius: 50%;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            transition: background 0.2s;
-        }
-        #rs-quiz-fechar:hover { background: rgba(255,255,255,0.12); }
+        #rs-quiz-fechar:hover, #rs-quiz-hist-fechar:hover { background: rgba(255,255,255,0.12); }
 
-        /* ── Barra de Progresso ── */
-        .rs-quiz-progress-wrap { padding: 0 16px 12px; }
-        .rs-quiz-progress-bar {
-            height: 4px;
-            background: rgba(255,255,255,0.08);
-            border-radius: 2px;
-            overflow: hidden;
-        }
+        /* ── Progresso ── */
+        .rs-quiz-progress-wrap { padding: 0 16px 12px; flex-shrink: 0; }
+        .rs-quiz-progress-bar  { height: 4px; background: rgba(255,255,255,0.08); border-radius: 2px; overflow: hidden; }
         .rs-quiz-progress-bar .fill {
-            height: 100%;
+            height: 100%; border-radius: 2px;
             background: linear-gradient(90deg, #0A3D62, #22c55e);
-            border-radius: 2px;
-            transition: width 0.4s ease;
+            transition: width .4s ease;
         }
 
         /* ── Body / Pergunta ── */
-        #rs-quiz-body {
-            flex: 1;
-            padding: 0 20px 4px;
-            overflow-y: auto;
-        }
+        #rs-quiz-body { flex: 1; padding: 0 20px 4px; overflow-y: auto; }
         .rs-quiz-texto {
-            font-size: 17px;
-            line-height: 1.55;
-            color: var(--rs-text, #f1f5f9);
-            font-weight: 500;
-            margin-bottom: 20px;
-            padding-top: 16px;
+            font-size: 17px; line-height: 1.55;
+            color: var(--rs-text, #f1f5f9); font-weight: 500;
+            margin-bottom: 20px; padding-top: 16px;
         }
         .rs-quiz-opcoes { display: flex; flex-direction: column; gap: 10px; }
         .rs-quiz-opcao-btn {
             background: rgba(255,255,255,0.04);
             border: 1.5px solid rgba(255,255,255,0.1);
-            padding: 12px 14px;
-            border-radius: 10px;
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            text-align: left;
-            font-size: 14px;
-            cursor: pointer;
-            transition: border-color 0.2s, background 0.2s;
-            color: var(--rs-text, #f1f5f9);
-            width: 100%;
+            padding: 12px 14px; border-radius: 10px;
+            display: flex; align-items: center; gap: 12px;
+            text-align: left; font-size: 14px; cursor: pointer;
+            transition: border-color .2s, background .2s;
+            color: var(--rs-text, #f1f5f9); width: 100%;
         }
         .rs-quiz-opcao-btn:hover:not(:disabled) {
             border-color: var(--azul, #0A3D62);
-            background: rgba(10, 61, 98, 0.15);
+            background: rgba(10,61,98,0.15);
         }
         .rs-quiz-opcao-btn:disabled { cursor: default; }
         .rs-quiz-opcao-letra {
-            width: 26px;
-            height: 26px;
-            border-radius: 50%;
+            width: 26px; height: 26px; border-radius: 50%;
             background: rgba(255,255,255,0.08);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 12px;
-            font-weight: 700;
-            flex-shrink: 0;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 12px; font-weight: 700; flex-shrink: 0;
             color: var(--rs-muted, #94a3b8);
         }
         .rs-quiz-opcao-texto { flex: 1; line-height: 1.4; }
-
-        /* Estados de Resposta */
-        .rs-quiz-correta {
-            background: rgba(34, 197, 94, 0.12) !important;
-            border-color: #22c55e !important;
-        }
-        .rs-quiz-correta .rs-quiz-opcao-letra {
-            background: #22c55e !important;
-            color: #fff !important;
-        }
-        .rs-quiz-errada {
-            background: rgba(239, 68, 68, 0.12) !important;
-            border-color: #ef4444 !important;
-        }
-        .rs-quiz-errada .rs-quiz-opcao-letra {
-            background: #ef4444 !important;
-            color: #fff !important;
-        }
-
-        /* Explicação */
+        .rs-quiz-correta { background: rgba(34,197,94,0.12)  !important; border-color: #22c55e !important; }
+        .rs-quiz-correta .rs-quiz-opcao-letra { background: #22c55e !important; color: #fff !important; }
+        .rs-quiz-errada  { background: rgba(239,68,68,0.12)  !important; border-color: #ef4444 !important; }
+        .rs-quiz-errada  .rs-quiz-opcao-letra { background: #ef4444 !important; color: #fff !important; }
         .rs-quiz-explicacao {
-            margin-top: 16px;
-            padding: 14px;
-            background: rgba(139, 92, 246, 0.1);
-            border-left: 3px solid #8b5cf6;
-            border-radius: 0 8px 8px 0;
-            font-size: 13px;
-            color: var(--rs-muted, #94a3b8);
-            line-height: 1.55;
+            margin-top: 16px; padding: 14px;
+            background: rgba(139,92,246,0.1);
+            border-left: 3px solid #8b5cf6; border-radius: 0 8px 8px 0;
+            font-size: 13px; color: var(--rs-muted, #94a3b8); line-height: 1.55;
         }
         .rs-quiz-explicacao strong { color: #a78bfa; }
 
         /* ── Footer ── */
         #rs-quiz-footer {
-            padding: 14px 20px;
+            padding: 14px 20px; flex-shrink: 0;
             border-top: 1px solid var(--rs-borda, rgba(255,255,255,0.08));
-            display: none;
-            justify-content: center;
+            display: none; justify-content: center;
             background: var(--rs-card2, #162032);
         }
-        #rs-quiz-btn-acao, #rs-quiz-btn-sair {
-            background: var(--azul, #0A3D62);
-            color: #fff;
-            border: none;
-            padding: 12px 32px;
-            border-radius: 8px;
-            font-size: 15px;
-            font-weight: 600;
-            cursor: pointer;
-            width: 100%;
-            max-width: 320px;
-            transition: background 0.2s, transform 0.15s;
+        #rs-quiz-btn-acao, #rs-quiz-btn-sair, #rs-quiz-hist-ok {
+            background: var(--azul, #0A3D62); color: #fff;
+            border: none; padding: 12px 32px; border-radius: 8px;
+            font-size: 15px; font-weight: 600; cursor: pointer;
+            width: 100%; max-width: 320px;
+            transition: background .2s, transform .15s;
         }
-        #rs-quiz-btn-acao:hover, #rs-quiz-btn-sair:hover {
-            background: #0d4f7c;
-            transform: translateY(-1px);
+        #rs-quiz-btn-acao:hover, #rs-quiz-btn-sair:hover, #rs-quiz-hist-ok:hover {
+            background: #0d4f7c; transform: translateY(-1px);
         }
+        #rs-quiz-btn-acao:disabled { opacity: .6; cursor: default; transform: none; }
 
-        /* ── Tela de Resultado ── */
+        /* ── Resultado Final ── */
         .rs-quiz-resultado { text-align: center; padding: 32px 0 16px; }
-        .rs-quiz-resultado-icon { font-size: 56px; margin-bottom: 12px; }
-        .rs-quiz-resultado-titulo {
-            font-size: 22px;
-            font-weight: 700;
-            color: var(--rs-text, #f1f5f9);
-            margin: 0 0 16px;
-        }
+        .rs-quiz-resultado-icon   { font-size: 56px; margin-bottom: 12px; }
+        .rs-quiz-resultado-titulo { font-size: 22px; font-weight: 700; color: var(--rs-text, #f1f5f9); margin: 0 0 16px; }
         .rs-quiz-score-circle {
-            width: 96px;
-            height: 96px;
-            border-radius: 50%;
+            width: 96px; height: 96px; border-radius: 50%;
             border: 4px solid var(--azul, #0A3D62);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 26px;
-            font-weight: 700;
-            color: #fff;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 26px; font-weight: 700; color: #fff;
             margin: 0 auto 20px;
-            background: rgba(10, 61, 98, 0.2);
+            background: rgba(10,61,98,0.2);
         }
-        .rs-quiz-score-circle.aprovado { border-color: #22c55e; background: rgba(34, 197, 94, 0.15); }
-        .rs-quiz-score-circle.reprovado { border-color: #f59e0b; background: rgba(245, 158, 11, 0.15); }
-        .rs-quiz-resultado-acertos {
-            font-size: 15px;
-            color: var(--rs-text, #f1f5f9);
-            margin: 0 0 8px;
+        .rs-quiz-score-circle.aprovado  { border-color: #22c55e; background: rgba(34,197,94,0.15); }
+        .rs-quiz-score-circle.reprovado { border-color: #f59e0b; background: rgba(245,158,11,0.15); }
+        .rs-quiz-resultado-acertos { font-size: 15px; color: var(--rs-text, #f1f5f9); margin: 0 0 8px; }
+        .rs-quiz-status-msg        { font-size: 13px; color: var(--rs-muted, #94a3b8); margin: 0; }
+
+        /* ── Histórico ── */
+        .rs-quiz-hist-meta {
+            font-size: 13px; color: var(--rs-muted, #94a3b8);
+            margin: 0 0 16px; padding-bottom: 12px;
+            border-bottom: 1px solid var(--rs-borda, rgba(255,255,255,0.08));
         }
-        .rs-quiz-status-msg {
-            font-size: 13px;
-            color: var(--rs-muted, #94a3b8);
-            margin: 0;
+        .rs-quiz-hist-lista { display: flex; flex-direction: column; gap: 10px; }
+        .rs-quiz-hist-row {
+            display: grid;
+            grid-template-columns: 28px 52px 1fr auto;
+            align-items: center; gap: 12px;
+            padding: 12px 14px;
+            background: rgba(255,255,255,0.04);
+            border-radius: 10px;
         }
+        .rs-quiz-hist-num    { font-size: 12px; color: #475569; }
+        .rs-quiz-hist-score  { font-size: 18px; font-weight: 700; }
+        .rs-quiz-hist-score.aprovado  { color: #4ade80; }
+        .rs-quiz-hist-score.reprovado { color: #fbbf24; }
+        .rs-quiz-hist-status { font-size: 13px; color: var(--rs-muted, #94a3b8); }
+        .rs-quiz-hist-data   { font-size: 12px; color: #475569; white-space: nowrap; }
 
         /* ── Mobile ── */
         @media (max-width: 480px) {
             .rs-quiz-overlay { padding: 12px 8px; align-items: flex-end; }
             .rs-quiz-modal {
-                border-radius: 16px 16px 0 0;
-                max-height: 92vh;
-                animation: rsSlideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+                border-radius: 16px 16px 0 0; max-height: 92vh;
+                animation: rsSlideUp 0.3s cubic-bezier(0.16,1,0.3,1);
             }
             .rs-quiz-cta-card { flex-direction: column; text-align: center; }
-            #rs-quiz-btn-iniciar { width: 100%; }
+            .rs-quiz-cta-acoes { flex-direction: row; width: 100%; }
+            .rs-quiz-btn-pri, .rs-quiz-btn-sec { flex: 1; text-align: center; }
+            .rs-quiz-hist-row { grid-template-columns: 28px 48px 1fr; }
+            .rs-quiz-hist-data { display: none; }
         }
     `;
     document.head.appendChild(style);
@@ -726,9 +754,9 @@ window.QuizManager = {
     init,
     jaConcluiu,
     getEstatisticas,
-    // Para testes/debug
-    _getState: () => _state,
-    _getConfig: () => _config
+    _getState:     () => _state,
+    _getConfig:    () => _config,
+    _getHistorico: () => _historico
 };
 
 })();
