@@ -1784,6 +1784,7 @@ async function _executarPreview(params) {
         newsletter_audio      : true,
         newsletter_infografico: true,
         newsletter_video      : true,
+        newsletter_mapa_mental: true,
         alertas_prioritarios  : true,
       },
     };
