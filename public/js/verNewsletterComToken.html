@@ -1,0 +1,2263 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>Radar SIOPE</title>
+
+  <!-- PWA -->
+  <link rel="manifest" href="/manifest.json">
+  <meta name="theme-color" content="#0A3D62">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+
+  <!-- Fonte Syne para consistência com o web app -->
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+
+  <style>
+    /* ── Reset & Tokens ─────────────────────────────────────────────────── */
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    /* ── SISTEMA DE TEMAS — sincronizado com o web app ──────────────────── */
+    /* Tema padrão: Escuro */
+    :root {
+      --azul: #0A3D62;
+      --azul-mid: #1A5276;
+      --azul-light: rgba(56, 189, 248, .12);
+      --verde: #16a34a;
+      --vermelho: #dc2626;
+      --amarelo: #d97706;
+      --radius: 12px;
+
+      /* Variáveis adaptativas por tema */
+      --rs-bg: #0f172a;
+      --rs-card: #1e293b;
+      --rs-card2: #162032;
+      --rs-text: #f8fafc;
+      --rs-muted: #94a3b8;
+      --rs-borda: rgba(148, 163, 184, .12);
+      --rs-shadow: rgba(0, 0, 0, .35);
+      --rs-skeleton-a: #1e293b;
+      --rs-skeleton-b: #263548;
+    }
+
+    /* Tema Claro */
+    [data-theme="claro"] {
+      --rs-bg: #f1f5f9;
+      --rs-card: #ffffff;
+      --rs-card2: #f8fafc;
+      --rs-text: #0f172a;
+      --rs-muted: #475569;
+      --rs-borda: rgba(0, 0, 0, .07);
+      --rs-shadow: rgba(0, 0, 0, .08);
+      --rs-skeleton-a: #e2e8f0;
+      --rs-skeleton-b: #cbd5e1;
+    }
+
+    /* Tema Suave */
+    [data-theme="suave"] {
+      --rs-bg: #fdf6ee;
+      --rs-card: #fff8f1;
+      --rs-card2: #ffffff;
+      --rs-text: #2d1f0e;
+      --rs-muted: #8a6a4e;
+      --rs-borda: rgba(160, 100, 60, .1);
+      --rs-shadow: rgba(80, 40, 0, .08);
+      --rs-skeleton-a: #f0e4d4;
+      --rs-skeleton-b: #e8d5c0;
+    }
+
+    /* Tema Minimalista */
+    [data-theme="minimalista"] {
+      --rs-bg: #f9f9f7;
+      --rs-card: #ffffff;
+      --rs-card2: #fafaf8;
+      --rs-text: #111111;
+      --rs-muted: #666666;
+      --rs-borda: rgba(0, 0, 0, .06);
+      --rs-shadow: rgba(0, 0, 0, .04);
+      --rs-skeleton-a: #efefed;
+      --rs-skeleton-b: #e4e4e2;
+      --radius: 6px;
+    }
+
+    /* Tema Êxito */
+    [data-theme="exito"] {
+      --rs-bg: #021a0f;
+      --rs-card: #052e18;
+      --rs-card2: #042414;
+      --rs-text: #e8fdf0;
+      --rs-muted: #86efac;
+      --rs-borda: rgba(34, 197, 94, .12);
+      --rs-shadow: rgba(0, 0, 0, .45);
+      --rs-skeleton-a: #063d1f;
+      --rs-skeleton-b: #0a5229;
+      --verde: #22c55e;
+    }
+
+    /* Tema Aurora */
+    [data-theme="aurora"] {
+      --rs-bg: #0d0d1a;
+      --rs-card: #13132b;
+      --rs-card2: #0f0f23;
+      --rs-text: #f0eeff;
+      --rs-muted: #c4b5fd;
+      --rs-borda: rgba(167, 139, 250, .12);
+      --rs-shadow: rgba(0, 0, 0, .5);
+      --rs-skeleton-a: #1a1a35;
+      --rs-skeleton-b: #22224a;
+    }
+
+    html {
+      scroll-behavior: smooth;
+      -webkit-text-size-adjust: 100%;
+    }
+
+    body {
+      font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+      background: var(--rs-bg);
+      color: var(--rs-text);
+      font-size: 16px;
+      line-height: 1.6;
+      min-height: 100dvh;
+      -webkit-font-smoothing: antialiased;
+      transition: background .3s, color .3s;
+    }
+
+    a {
+      color: var(--azul);
+    }
+
+    [data-theme="exito"] a {
+      color: #22c55e;
+    }
+
+    [data-theme="aurora"] a {
+      color: #a78bfa;
+    }
+
+    img {
+      max-width: 100%;
+      height: auto;
+      display: block;
+    }
+
+    /* ── Layout ─────────────────────────────────────────────────────────── */
+    .rs-page {
+      max-width: 680px;
+      margin: 0 auto;
+      padding-bottom: 80px;
+    }
+
+    /* ── Header ─────────────────────────────────────────────────────────── */
+    .rs-header {
+      background: var(--azul);
+      color: #fff;
+      padding: 14px 16px 18px;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, .18);
+    }
+
+    .rs-header-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 10px;
+    }
+
+    .rs-logo {
+      height: 30px;
+      filter: brightness(0) invert(1);
+    }
+
+    .rs-header-meta {
+      font-size: 12px;
+      color: rgba(255, 255, 255, .6);
+      text-align: right;
+      line-height: 1.5;
+    }
+
+    .rs-header-titulo {
+      font-size: 17px;
+      font-weight: 700;
+      line-height: 1.35;
+      color: #fff;
+    }
+
+    .rs-header-saudacao {
+      font-size: 13px;
+      color: rgba(255, 255, 255, .7);
+      margin-top: 2px;
+    }
+
+    /* ── Seções ─────────────────────────────────────────────────────────── */
+    .rs-section {
+      background: var(--rs-card);
+      border-radius: var(--radius);
+      margin: 10px 10px 0;
+      overflow: hidden;
+      box-shadow: 0 2px 8px var(--rs-shadow);
+      border: 1px solid var(--rs-borda);
+    }
+
+    .rs-section-header {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      padding: 12px 14px 8px;
+      border-bottom: 1px solid var(--rs-borda);
+    }
+
+    .rs-section-header h2 {
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .6px;
+      color: var(--azul);
+    }
+
+    [data-theme="exito"] .rs-section-header h2 {
+      color: #22c55e;
+    }
+
+    [data-theme="aurora"] .rs-section-header h2 {
+      color: #a78bfa;
+    }
+
+    .rs-section-body {
+      padding: 12px 14px;
+    }
+
+    /* ── Município ──────────────────────────────────────────────────────── */
+    .rs-municipio-card {
+      padding: 12px 14px;
+      position: relative;
+    }
+
+    .rs-mun-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+
+    .rs-mun-nome {
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--azul);
+      display: block;
+    }
+
+    [data-theme="exito"] .rs-mun-nome {
+      color: #22c55e;
+    }
+
+    [data-theme="aurora"] .rs-mun-nome {
+      color: #a78bfa;
+    }
+
+    .rs-mun-ref {
+      font-size: 12px;
+      color: var(--rs-muted);
+      display: block;
+      margin-top: 2px;
+    }
+
+    .rs-mun-status {
+      font-size: 12px;
+      font-weight: 700;
+      padding: 3px 10px;
+      border-radius: 20px;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+
+    .rs-mde-label {
+      display: flex;
+      justify-content: space-between;
+      font-size: 13px;
+      color: var(--rs-muted);
+      margin-bottom: 5px;
+    }
+
+    .rs-mde-label strong {
+      font-size: 17px;
+    }
+
+    .rs-mde-track {
+      height: 10px;
+      background: var(--rs-borda);
+      border-radius: 5px;
+      position: relative;
+      overflow: visible;
+    }
+
+    .rs-mde-fill {
+      height: 100%;
+      border-radius: 5px;
+      transition: width .7s ease;
+    }
+
+    .rs-mde-min {
+      position: absolute;
+      top: -3px;
+      width: 2px;
+      height: 16px;
+      background: var(--rs-muted);
+      border-radius: 1px;
+    }
+
+    .rs-mde-min::after {
+      content: attr(title);
+      position: absolute;
+      top: 18px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 9px;
+      color: var(--rs-muted);
+      white-space: nowrap;
+    }
+
+    .rs-mde-meta {
+      display: flex;
+      justify-content: space-between;
+      font-size: 10px;
+      color: var(--rs-muted);
+      margin-top: 14px;
+    }
+
+    .rs-fundeb-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 10px;
+      padding-top: 8px;
+      border-top: 1px solid var(--rs-borda);
+      font-size: 12px;
+    }
+
+    .rs-fundeb-valor {
+      font-weight: 700;
+      color: var(--verde);
+      font-size: 13px;
+    }
+
+    /* Skeleton */
+    .rs-skeleton {
+      background: linear-gradient(90deg, var(--rs-skeleton-a) 25%, var(--rs-skeleton-b) 50%, var(--rs-skeleton-a) 75%);
+      background-size: 200% 100%;
+      animation: shimmer 1.4s infinite;
+      border-radius: 6px;
+    }
+
+    .rs-sk-title {
+      height: 16px;
+      width: 55%;
+      margin-bottom: 10px;
+    }
+
+    .rs-sk-bar {
+      height: 10px;
+      width: 100%;
+      margin-bottom: 12px;
+    }
+
+    .rs-sk-line {
+      height: 12px;
+      width: 40%;
+    }
+
+    @keyframes shimmer {
+      0% {
+        background-position: 200% 0;
+      }
+
+      100% {
+        background-position: -200% 0;
+      }
+    }
+
+    /* ── Toggle ─────────────────────────────────────────────────────────── */
+    .rs-toggle {
+      display: flex;
+      background: var(--rs-card2);
+      border-radius: 10px;
+      padding: 4px;
+      gap: 4px;
+      margin: 10px 10px 0;
+      border: 1px solid var(--rs-borda);
+    }
+
+    .rs-toggle button {
+      flex: 1;
+      padding: 10px;
+      border: none;
+      border-radius: 7px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      background: transparent;
+      color: var(--rs-muted);
+      transition: all .18s;
+    }
+
+    .rs-toggle button.ativo {
+      background: var(--rs-card);
+      color: var(--azul);
+      box-shadow: 0 1px 5px var(--rs-shadow);
+    }
+
+    [data-theme="exito"] .rs-toggle button.ativo {
+      color: #22c55e;
+    }
+
+    [data-theme="aurora"] .rs-toggle button.ativo {
+      color: #a78bfa;
+    }
+
+    /* ── Modo rápido ────────────────────────────────────────────────────── */
+    #modo-rapido,
+    #modo-completo {
+      display: none;
+    }
+
+    #modo-rapido.visivel,
+    #modo-completo.visivel {
+      display: block;
+    }
+
+    .rs-bullets {
+      list-style: none;
+    }
+
+    .rs-bullets li {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      padding: 9px 0;
+      border-bottom: 1px solid var(--rs-borda);
+      font-size: 15px;
+      line-height: 1.6;
+      color: var(--rs-text);
+    }
+
+    .rs-bullets li:last-child {
+      border-bottom: none;
+    }
+
+    .rs-bullets li::before {
+      content: '→';
+      color: var(--azul);
+      font-weight: 700;
+      flex-shrink: 0;
+      margin-top: 1px;
+    }
+
+    [data-theme="exito"] .rs-bullets li::before {
+      color: #22c55e;
+    }
+
+    [data-theme="aurora"] .rs-bullets li::before {
+      color: #a78bfa;
+    }
+
+    .rs-bullets-truncado {
+      position: relative;
+    }
+
+    .rs-bullets-truncado::after {
+      content: '';
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 56px;
+      background: linear-gradient(transparent, var(--rs-card));
+      pointer-events: none;
+    }
+
+    /* Bullets clicáveis (para usuários com acesso) */
+    .rs-bullet-clicavel {
+      transition: background .15s, transform .1s;
+      border-radius: 8px;
+      margin: 0 -8px;
+      padding: 9px 8px !important;
+    }
+
+    .rs-bullet-clicavel:hover {
+      background: var(--rs-borda);
+      transform: translateX(4px);
+    }
+
+    .rs-bullet-clicavel:active {
+      transform: translateX(4px) scale(0.98);
+    }
+
+    /* ── Modo completo ──────────────────────────────────────────────────── */
+    #conteudo-newsletter {
+      font-size: 16px;
+      line-height: 1.8;
+      color: var(--rs-text);
+    }
+
+    #conteudo-newsletter h1,
+    #conteudo-newsletter h2,
+    #conteudo-newsletter h3 {
+      color: var(--azul);
+      margin: 18px 0 8px;
+    }
+
+    [data-theme="exito"] #conteudo-newsletter h1,
+    [data-theme="exito"] #conteudo-newsletter h2,
+    [data-theme="exito"] #conteudo-newsletter h3 {
+      color: #22c55e;
+    }
+
+    [data-theme="aurora"] #conteudo-newsletter h1,
+    [data-theme="aurora"] #conteudo-newsletter h2,
+    [data-theme="aurora"] #conteudo-newsletter h3 {
+      color: #a78bfa;
+    }
+
+    #conteudo-newsletter h1 {
+      font-size: 24px;
+    }
+
+    #conteudo-newsletter h2 {
+      font-size: 20px;
+    }
+
+    #conteudo-newsletter h3 {
+      font-size: 18px;
+    }
+
+    #conteudo-newsletter p {
+      margin-bottom: 12px;
+      color: var(--rs-text);
+    }
+
+    #conteudo-newsletter img {
+      border-radius: 8px;
+      margin: 8px 0;
+    }
+
+    #conteudo-newsletter a {
+      color: var(--azul);
+    }
+
+    #conteudo-newsletter blockquote {
+      border-left: 3px solid var(--azul);
+      padding: 8px 14px;
+      margin: 12px 0;
+      background: var(--rs-card2);
+      border-radius: 0 8px 8px 0;
+      font-style: italic;
+      color: var(--rs-muted);
+    }
+
+    #conteudo-newsletter table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 12px 0;
+    }
+
+    #conteudo-newsletter th {
+      background: var(--azul);
+      color: #fff;
+      padding: 8px 10px;
+      font-size: 13px;
+    }
+
+    #conteudo-newsletter td {
+      padding: 7px 10px;
+      border-bottom: 1px solid var(--rs-borda);
+      font-size: 13px;
+      color: var(--rs-text);
+    }
+
+    /* ── Mídia — Proposta C (cards inline) ──────────────────────────────── */
+    .rs-media-card {
+      border: 1px solid var(--rs-borda);
+      border-radius: 12px;
+      overflow: hidden;
+      margin-bottom: 10px;
+      background: var(--rs-card2);
+      transition: border-color .15s;
+    }
+
+    .rs-media-card:last-child {
+      margin-bottom: 0;
+    }
+
+    .rs-media-card-aberta {
+      border-color: var(--azul);
+    }
+
+    [data-theme="exito"] .rs-media-card-aberta {
+      border-color: #22c55e;
+    }
+
+    [data-theme="aurora"] .rs-media-card-aberta {
+      border-color: #a78bfa;
+    }
+
+    .rs-media-card-lock {
+      opacity: .85;
+    }
+
+    .rs-media-card-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 14px;
+    }
+
+    .rs-media-card-icon {
+      width: 40px;
+      height: 40px;
+      border-radius: 10px;
+      background: var(--rs-card);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+      flex-shrink: 0;
+      border: 1px solid var(--rs-borda);
+    }
+
+    .rs-media-card-info {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .rs-media-titulo {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--rs-text);
+    }
+
+    .rs-media-sub {
+      font-size: 11px;
+      color: var(--rs-muted);
+      margin-top: 2px;
+    }
+
+    .rs-media-card-body {
+      padding: 0 14px 14px;
+    }
+
+    /* Embed de vídeo responsivo 16:9 */
+    .rs-media-video-wrap {
+      position: relative;
+      padding-bottom: 56.25%;
+      height: 0;
+      border-radius: 8px;
+      overflow: hidden;
+      background: #000;
+    }
+
+    .rs-media-btn {
+      padding: 7px 13px;
+      border-radius: 8px;
+      font-size: 12px;
+      font-weight: 700;
+      border: none;
+      cursor: pointer;
+      text-decoration: none;
+      display: inline-block;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+
+    .rs-media-btn-primary {
+      background: var(--azul);
+      color: #fff;
+    }
+
+    [data-theme="exito"] .rs-media-btn-primary {
+      background: #22c55e;
+      color: #021a0f;
+    }
+
+    [data-theme="aurora"] .rs-media-btn-primary {
+      background: #a78bfa;
+      color: #0d0d1a;
+    }
+
+    .rs-media-btn-lock {
+      background: var(--rs-card);
+      color: var(--rs-muted);
+      cursor: default;
+      border: 1px solid var(--rs-borda);
+    }
+
+    /* ── FAQ ────────────────────────────────────────────────────────────── */
+    .rs-faq-item {
+      border-bottom: 1px solid var(--rs-borda);
+    }
+
+    .rs-faq-item:last-child {
+      border-bottom: none;
+    }
+
+    .rs-faq-pergunta {
+      width: 100%;
+      background: none;
+      border: none;
+      text-align: left;
+      padding: 12px 0;
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--rs-text);
+      cursor: pointer;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .rs-faq-icon {
+      font-size: 18px;
+      color: var(--azul);
+      transition: transform .2s;
+      flex-shrink: 0;
+    }
+
+    [data-theme="exito"] .rs-faq-icon {
+      color: #22c55e;
+    }
+
+    [data-theme="aurora"] .rs-faq-icon {
+      color: #a78bfa;
+    }
+
+    .rs-faq-item.aberto .rs-faq-icon {
+      transform: rotate(45deg);
+    }
+
+    .rs-faq-resposta {
+      display: none;
+      font-size: 13px;
+      color: var(--rs-muted);
+      line-height: 1.65;
+      padding: 0 0 12px;
+    }
+
+    .rs-faq-item.aberto .rs-faq-resposta {
+      display: block;
+    }
+
+    /* ── Reactions ──────────────────────────────────────────────────────── */
+    .rs-reactions {
+      display: flex;
+      gap: 8px;
+      justify-content: center;
+      flex-wrap: wrap;
+      padding: 4px 0;
+    }
+
+    .rs-reaction-btn {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 3px;
+      padding: 10px 14px;
+      border: 2px solid var(--rs-borda);
+      border-radius: 12px;
+      background: var(--rs-card2);
+      cursor: pointer;
+      transition: all .18s;
+      font-size: 22px;
+      min-width: 68px;
+    }
+
+    .rs-reaction-btn:hover {
+      border-color: var(--azul);
+      transform: scale(1.06);
+    }
+
+    .rs-reaction-btn.ativo {
+      border-color: var(--azul);
+      background: var(--rs-card2);
+      box-shadow: 0 0 0 2px var(--azul);
+    }
+
+    [data-theme="exito"] .rs-reaction-btn.ativo {
+      border-color: #22c55e;
+      box-shadow: 0 0 0 2px #22c55e;
+    }
+
+    [data-theme="aurora"] .rs-reaction-btn.ativo {
+      border-color: #a78bfa;
+      box-shadow: 0 0 0 2px #a78bfa;
+    }
+
+    .rs-reaction-count {
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--rs-muted);
+    }
+
+    .rs-reaction-label {
+      font-size: 10px;
+      color: var(--rs-muted);
+    }
+
+    .rs-reaction-feedback {
+      text-align: center;
+      font-size: 12px;
+      color: var(--verde);
+      margin-top: 8px;
+      min-height: 16px;
+    }
+
+    /* ── CTA ────────────────────────────────────────────────────────────── */
+    .rs-cta {
+      margin: 10px 10px 0;
+      border-radius: var(--radius);
+      padding: 20px;
+      text-align: center;
+    }
+
+    .rs-cta-lead {
+      background: linear-gradient(135deg, var(--azul) 0%, var(--azul-mid) 100%);
+      color: #fff;
+    }
+
+    .rs-cta-basico {
+      background: var(--rs-card2);
+      border: 1px solid var(--rs-borda);
+      color: var(--rs-text);
+    }
+
+    .rs-cta h3 {
+      font-size: 18px;
+      margin-bottom: 6px;
+      line-height: 1.3;
+    }
+
+    .rs-cta p {
+      font-size: 14px;
+      margin-bottom: 14px;
+      opacity: .85;
+      line-height: 1.55;
+    }
+
+    .rs-cta-btn {
+      display: inline-block;
+      padding: 12px 28px;
+      border-radius: 8px;
+      font-size: 15px;
+      font-weight: 700;
+      text-decoration: none;
+      border: none;
+      cursor: pointer;
+    }
+
+    .rs-cta-lead .rs-cta-btn {
+      background: rgba(255, 255, 255, .95);
+      color: var(--azul);
+    }
+
+    .rs-cta-basico .rs-cta-btn {
+      background: var(--azul);
+      color: #fff;
+    }
+
+    /* ── Watermark ──────────────────────────────────────────────────────── */
+    .rs-watermark {
+      font-size: 10px;
+      color: var(--rs-muted);
+      text-align: center;
+      padding: 12px 16px;
+      line-height: 1.5;
+      user-select: none;
+      margin: 10px 10px 0;
+      opacity: .5;
+    }
+
+    /* ── Loading / Erro ─────────────────────────────────────────────────── */
+    #rs-loading {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 70dvh;
+      gap: 14px;
+      color: var(--rs-muted);
+      font-size: 14px;
+    }
+
+    .rs-spinner {
+      width: 36px;
+      height: 36px;
+      border: 3px solid var(--rs-borda);
+      border-top-color: var(--azul);
+      border-radius: 50%;
+      animation: spin .7s linear infinite;
+    }
+
+    @keyframes spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+    #rs-erro {
+      display: none;
+      margin: 32px 16px;
+      padding: 20px;
+      background: var(--rs-card);
+      border-radius: var(--radius);
+      border-left: 4px solid var(--vermelho);
+      border: 1px solid var(--rs-borda);
+      box-shadow: 0 2px 8px var(--rs-shadow);
+    }
+
+    #rs-erro h3 {
+      color: var(--vermelho);
+      margin-bottom: 8px;
+      font-size: 16px;
+    }
+
+    #rs-erro-msg {
+      font-size: 14px;
+      line-height: 1.6;
+      color: var(--rs-muted);
+    }
+
+    /* ── Proteção ───────────────────────────────────────────────────────── */
+    .rs-protegido {
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    /* ══════════════════════════════════════════════════════════════
+   SÉRIE HISTÓRICA - ESTILOS
+   ══════════════════════════════════════════════════════════════ */
+
+    #municipio-historico table {
+      background: var(--rs-card);
+      color: var(--rs-text);
+    }
+
+    #municipio-historico table thead {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+
+    #municipio-historico svg {
+      overflow: visible;
+    }
+
+    #btn-ver-historico:hover {
+      background: var(--azul-mid);
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(10, 61, 98, 0.2);
+    }
+
+    /* Responsivo */
+    @media (max-width: 640px) {
+      #municipio-historico svg {
+        min-height: 180px;
+      }
+
+      #municipio-historico table {
+        font-size: 11px;
+      }
+
+      #municipio-historico th,
+      #municipio-historico td {
+        padding: 6px 4px !important;
+      }
+    }
+
+    /* ══════════════════════════════════════════════════════════════
+   SELETOR DE TEMAS FLUTUANTE — igual ao web app (template)
+   ══════════════════════════════════════════════════════════════ */
+
+    /* Barra flutuante no rodapé */
+    .rs-theme-bar {
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background: var(--rs-card);
+      border: 1px solid var(--rs-borda);
+      border-radius: 40px;
+      padding: 6px 14px;
+      box-shadow: 0 8px 32px var(--rs-shadow);
+      z-index: 500;
+      transition: background .3s, border-color .3s;
+      /* Sempre visível — sem media query que esconda */
+    }
+
+    .rs-theme-bar-label {
+      font-family: 'Syne', system-ui, sans-serif;
+      font-size: 9px;
+      color: var(--rs-muted);
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      margin-right: 2px;
+    }
+
+    /* Dots circulares com gradientes — exatamente como o template */
+    .rs-theme-dot {
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      border: 2px solid transparent;
+      cursor: pointer;
+      transition: transform .2s, border-color .2s;
+      position: relative;
+      -webkit-tap-highlight-color: transparent;
+      /* Garante toque no iOS */
+      touch-action: manipulation;
+    }
+
+    .rs-theme-dot:hover {
+      transform: scale(1.25);
+    }
+
+    .rs-theme-dot.active {
+      border-color: var(--rs-text);
+      transform: scale(1.15);
+    }
+
+    /* Gradientes por tema — idênticos ao template */
+    .rs-theme-dot[data-t="escuro"] {
+      background: linear-gradient(135deg, #0f172a, #38bdf8);
+    }
+
+    .rs-theme-dot[data-t="claro"] {
+      background: linear-gradient(135deg, #f1f5f9, #0284c7);
+    }
+
+    .rs-theme-dot[data-t="suave"] {
+      background: linear-gradient(135deg, #fdf6ee, #e07a2f);
+    }
+
+    .rs-theme-dot[data-t="minimalista"] {
+      background: linear-gradient(135deg, #f9f9f7, #111);
+    }
+
+    .rs-theme-dot[data-t="exito"] {
+      background: linear-gradient(135deg, #021a0f, #22c55e);
+    }
+
+    .rs-theme-dot[data-t="aurora"] {
+      background: linear-gradient(135deg, #0d0d1a, #a78bfa);
+    }
+
+    /* Efeito conic especial no Aurora */
+    .rs-theme-dot[data-t="aurora"]::after {
+      content: '';
+      position: absolute;
+      inset: -2px;
+      border-radius: 50%;
+      background: conic-gradient(from 0deg, #a78bfa, #f472b6, #38bdf8, #a78bfa);
+      z-index: -1;
+      filter: blur(2px);
+    }
+
+    /* Header: ajuste logo + brand */
+    .rs-header-brand {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+    }
+
+    .rs-header-brand-text {
+      display: flex;
+      flex-direction: column;
+      line-height: 1.2;
+    }
+
+    .rs-header-brand-text strong {
+      font-family: 'Syne', system-ui, sans-serif;
+      font-size: 13px;
+      font-weight: 800;
+      color: #fff;
+      letter-spacing: .2px;
+    }
+
+    .rs-header-brand-text small {
+      font-size: 9px;
+      color: rgba(255, 255, 255, .6);
+      letter-spacing: .3px;
+    }
+
+    /* CSS inline do [data-theme-btn] antigo — removido */
+
+    /* Responsivo */
+    @media (max-width: 640px) {
+      .rs-header-top {
+        flex-direction: row;
+        /* mantém linha em mobile */
+        flex-wrap: wrap;
+        gap: 6px;
+        padding-right: 95px;
+        /* ← ADICIONAR: reserva espaço para o botão Edições fixo */
+      }
+
+      .rs-theme-bar {
+        bottom: 12px;
+        padding: 5px 10px;
+        gap: 5px;
+      }
+
+      .rs-theme-dot {
+        width: 20px;
+        height: 20px;
+      }
+    }
+
+    @media (max-width: 360px) {
+      .rs-theme-bar-label {
+        display: none;
+      }
+    }
+
+    /* ══════════════════════════════════════════════════════════════
+   DRAWER DE NAVEGAÇÃO DE EDIÇÕES
+   ══════════════════════════════════════════════════════════════ */
+
+    /* Overlay */
+    #rs-drawer-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, .5);
+      z-index: 600;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity .25s;
+      backdrop-filter: blur(2px);
+    }
+
+    #rs-drawer-overlay.rs-drawer-show {
+      opacity: 1;
+      pointer-events: all;
+    }
+
+    /* Painel lateral */
+    #rs-drawer-panel {
+      position: fixed;
+      top: 0;
+      right: 0;
+      bottom: 0;
+      width: min(360px, 92vw);
+      background: var(--rs-card);
+      z-index: 700;
+      display: flex;
+      flex-direction: column;
+      transform: translateX(110%);
+      transition: transform .28s cubic-bezier(.4, 0, .2, 1);
+      box-shadow: -4px 0 32px rgba(0, 0, 0, .3);
+      overflow: hidden;
+    }
+
+    #rs-drawer-panel.rs-drawer-show {
+      transform: translateX(0);
+    }
+
+    /* Header do drawer */
+    #rs-drawer-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 16px 16px 14px;
+      border-bottom: 1px solid var(--rs-borda);
+      flex-shrink: 0;
+      background: var(--rs-card);
+    }
+
+    #rs-drawer-voltar {
+      display: none;
+      align-items: center;
+      gap: 4px;
+      background: none;
+      border: none;
+      color: var(--azul);
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      padding: 4px 8px 4px 0;
+      flex-shrink: 0;
+      touch-action: manipulation;
+    }
+
+    [data-theme="exito"] #rs-drawer-voltar {
+      color: #22c55e;
+    }
+
+    [data-theme="aurora"] #rs-drawer-voltar {
+      color: #a78bfa;
+    }
+
+    #rs-drawer-titulo {
+      flex: 1;
+      font-family: 'Syne', system-ui, sans-serif;
+      font-size: 15px;
+      font-weight: 800;
+      color: var(--rs-text);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    #rs-drawer-fechar {
+      background: none;
+      border: none;
+      color: var(--rs-muted);
+      font-size: 22px;
+      cursor: pointer;
+      padding: 4px;
+      line-height: 1;
+      touch-action: manipulation;
+      flex-shrink: 0;
+    }
+
+    /* Body do drawer */
+    #rs-drawer-body {
+      flex: 1;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+      overscroll-behavior: contain;
+    }
+
+    /* Cards de TIPO (nível 1) */
+    .rs-drawer-tipos-lista {
+      padding: 10px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .rs-drawer-tipo-card {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      width: 100%;
+      padding: 13px 14px;
+      background: var(--rs-card2);
+      border: 1px solid var(--rs-borda);
+      border-radius: 12px;
+      cursor: pointer;
+      text-align: left;
+      transition: background .15s, transform .15s;
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
+      color: var(--rs-text);
+    }
+
+    .rs-drawer-tipo-card:hover {
+      background: var(--rs-card);
+      transform: translateX(2px);
+    }
+
+    .rs-drawer-tipo-card.rs-drawer-tipo-atual {
+      border-color: var(--azul);
+      background: var(--azul-light);
+    }
+
+    [data-theme="exito"] .rs-drawer-tipo-card.rs-drawer-tipo-atual {
+      border-color: #22c55e;
+      background: rgba(34, 197, 94, .08);
+    }
+
+    [data-theme="aurora"] .rs-drawer-tipo-card.rs-drawer-tipo-atual {
+      border-color: #a78bfa;
+      background: rgba(167, 139, 250, .08);
+    }
+
+    .rs-drawer-tipo-icone {
+      font-size: 22px;
+      flex-shrink: 0;
+    }
+
+    .rs-drawer-tipo-nome {
+      flex: 1;
+      font-family: 'Syne', system-ui, sans-serif;
+      font-size: 14px;
+      font-weight: 700;
+    }
+
+    .rs-drawer-tipo-badge {
+      font-size: 10px;
+      font-weight: 700;
+      background: var(--azul);
+      color: #fff;
+      padding: 2px 8px;
+      border-radius: 20px;
+      letter-spacing: .3px;
+    }
+
+    [data-theme="exito"] .rs-drawer-tipo-badge {
+      background: #22c55e;
+      color: #021a0f;
+    }
+
+    [data-theme="aurora"] .rs-drawer-tipo-badge {
+      background: #a78bfa;
+      color: #0d0d1a;
+    }
+
+    .rs-drawer-lock {
+      font-size: 14px;
+      opacity: .5;
+    }
+
+    .rs-drawer-chevron {
+      color: var(--rs-muted);
+      font-size: 20px;
+      font-weight: 300;
+    }
+
+    /* Up-sell banner (nível 2 — tipo sem acesso) */
+    .rs-drawer-upsell {
+      margin: 12px 12px 0;
+      padding: 12px 14px;
+      background: rgba(220, 38, 38, .07);
+      border: 1px solid rgba(220, 38, 38, .2);
+      border-radius: 10px;
+      font-size: 13px;
+      line-height: 1.6;
+      color: var(--rs-text);
+    }
+
+    /* Lista de edições (nível 2) */
+    .rs-drawer-edicoes-lista {
+      padding: 10px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .rs-drawer-ed-card {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      width: 100%;
+      padding: 12px 14px;
+      background: var(--rs-card2);
+      border: 1px solid var(--rs-borda);
+      border-radius: 10px;
+      text-align: left;
+      cursor: pointer;
+      transition: background .15s;
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
+      color: var(--rs-text);
+    }
+
+    .rs-drawer-ed-card:hover {
+      background: var(--rs-card);
+    }
+
+    /* Edição atual */
+    .rs-drawer-ed-atual {
+      border-color: var(--azul) !important;
+      border-width: 2px !important;
+      background: var(--azul-light) !important;
+    }
+
+    [data-theme="exito"] .rs-drawer-ed-atual {
+      border-color: #22c55e !important;
+      background: rgba(34, 197, 94, .08) !important;
+    }
+
+    [data-theme="aurora"] .rs-drawer-ed-atual {
+      border-color: #a78bfa !important;
+      background: rgba(167, 139, 250, .08) !important;
+    }
+
+    /* Edição ativa (lead com acesso) */
+    .rs-drawer-ed-ativa {
+      cursor: pointer;
+    }
+
+    /* Edição expirando */
+    .rs-drawer-ed-expirando {
+      border-color: var(--amarelo) !important;
+    }
+
+    /* Edição expirada */
+    .rs-drawer-ed-expirada {
+      opacity: .65;
+      cursor: pointer;
+    }
+
+    /* Edição bloqueada / não recebida */
+    .rs-drawer-ed-bloqueado,
+    .rs-drawer-ed-naorecebida {
+      opacity: .6;
+      cursor: default;
+    }
+
+    .rs-drawer-ed-info {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .rs-drawer-ed-titulo {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--rs-text);
+      line-height: 1.35;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .rs-drawer-ed-data {
+      font-size: 11px;
+      color: var(--rs-muted);
+      margin-top: 2px;
+    }
+
+    .rs-drawer-ed-cta-text {
+      font-size: 11px;
+      color: var(--azul);
+      margin-top: 4px;
+      font-weight: 600;
+    }
+
+    [data-theme="exito"] .rs-drawer-ed-cta-text {
+      color: #22c55e;
+    }
+
+    [data-theme="aurora"] .rs-drawer-ed-cta-text {
+      color: #a78bfa;
+    }
+
+    .rs-drawer-ed-status {
+      font-size: 10px;
+      font-weight: 700;
+      margin-top: 4px;
+      border-radius: 4px;
+      display: inline-block;
+      padding: 1px 6px;
+    }
+
+    .rs-drawer-ed-status-exp {
+      background: rgba(220, 38, 38, .1);
+      color: var(--vermelho);
+    }
+
+    .rs-drawer-ed-status-warn {
+      background: rgba(217, 119, 6, .1);
+      color: var(--amarelo);
+    }
+
+    .rs-drawer-ed-badge-atual {
+      font-size: 10px;
+      font-weight: 700;
+      background: var(--azul);
+      color: #fff;
+      padding: 3px 8px;
+      border-radius: 20px;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+
+    [data-theme="exito"] .rs-drawer-ed-badge-atual {
+      background: #22c55e;
+      color: #021a0f;
+    }
+
+    [data-theme="aurora"] .rs-drawer-ed-badge-atual {
+      background: #a78bfa;
+      color: #0d0d1a;
+    }
+
+    .rs-drawer-ed-lock {
+      font-size: 14px;
+      opacity: .5;
+      flex-shrink: 0;
+    }
+
+    .rs-drawer-ed-contador {
+      font-size: 11px;
+      font-weight: 700;
+      margin-top: 4px;
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* Rodapé do nível 2 */
+    .rs-drawer-rodape {
+      padding: 14px 12px 20px;
+      text-align: center;
+      border-top: 1px solid var(--rs-borda);
+      margin-top: 4px;
+    }
+
+    /* Modal de edição expirada */
+    #rs-drawer-modal-expirado {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, .6);
+      z-index: 900;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    #rs-drawer-modal-expirado.rs-drawer-show {
+      display: flex;
+    }
+
+    .rs-modal-exp-box {
+      background: var(--rs-card);
+      border-radius: var(--radius);
+      padding: 24px 20px;
+      max-width: 360px;
+      width: 100%;
+      border: 1px solid var(--rs-borda);
+      text-align: center;
+    }
+
+    .rs-modal-exp-box h3 {
+      font-family: 'Syne', system-ui, sans-serif;
+      font-size: 16px;
+      color: var(--rs-text);
+      margin-bottom: 10px;
+      line-height: 1.4;
+    }
+
+    .rs-modal-exp-box p {
+      font-size: 13px;
+      color: var(--rs-muted);
+      line-height: 1.65;
+      margin-bottom: 18px;
+    }
+
+    .rs-modal-exp-btn-primary {
+      display: inline-block;
+      padding: 11px 24px;
+      background: var(--azul);
+      color: #fff;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 700;
+      text-decoration: none;
+      margin-right: 8px;
+    }
+
+    .rs-modal-exp-btn-fechar {
+      background: none;
+      border: 1px solid var(--rs-borda);
+      color: var(--rs-muted);
+      padding: 10px 16px;
+      border-radius: 8px;
+      font-size: 13px;
+      cursor: pointer;
+    }
+
+    /* Banner de edição mais recente */
+    #rs-banner-recente {
+      display: none;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 10px 14px;
+      background: linear-gradient(90deg, var(--azul), var(--azul-mid));
+      color: #fff;
+      font-size: 13px;
+      position: sticky;
+      top: 66px;
+      z-index: 90;
+    }
+
+    [data-theme="exito"] #rs-banner-recente {
+      background: linear-gradient(90deg, #052e18, #063d1f);
+    }
+
+    [data-theme="aurora"] #rs-banner-recente {
+      background: linear-gradient(90deg, #13132b, #1a1a35);
+    }
+
+    #rs-banner-recente-link {
+      color: #fff;
+      font-weight: 700;
+      text-decoration: underline;
+      cursor: pointer;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+
+    #rs-banner-recente-fechar {
+      background: none;
+      border: none;
+      color: rgba(255, 255, 255, .7);
+      font-size: 18px;
+      cursor: pointer;
+      line-height: 1;
+      padding: 0 2px;
+      flex-shrink: 0;
+    }
+
+    /* ── Feedback (abaixo das reações) ──────────────────────────────────── */
+    #rs-feedback-wrap {
+      margin-top: 14px;
+    }
+
+    .rs-feedback-area {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .rs-feedback-label {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--rs-text);
+    }
+
+    .rs-feedback-textarea {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid var(--rs-borda);
+      border-radius: 10px;
+      background: var(--rs-card2);
+      color: var(--rs-text);
+      font-size: 14px;
+      line-height: 1.5;
+      resize: vertical;
+      font-family: system-ui, sans-serif;
+      transition: border-color .15s;
+      outline: none;
+    }
+
+    .rs-feedback-textarea:focus {
+      border-color: var(--azul);
+    }
+
+    [data-theme="exito"] .rs-feedback-textarea:focus {
+      border-color: #22c55e;
+    }
+
+    [data-theme="aurora"] .rs-feedback-textarea:focus {
+      border-color: #a78bfa;
+    }
+
+    .rs-feedback-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .rs-feedback-contador {
+      font-size: 11px;
+      color: var(--rs-muted);
+    }
+
+    .rs-feedback-btn {
+      padding: 8px 20px;
+      background: var(--azul);
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: opacity .15s;
+    }
+
+    .rs-feedback-btn:disabled {
+      opacity: .45;
+      cursor: default;
+    }
+
+    .rs-feedback-btn:not(:disabled):hover {
+      opacity: .85;
+    }
+
+    [data-theme="exito"] .rs-feedback-btn {
+      background: #22c55e;
+      color: #021a0f;
+    }
+
+    [data-theme="aurora"] .rs-feedback-btn {
+      background: #a78bfa;
+      color: #0d0d1a;
+    }
+
+    .rs-feedback-enviado {
+      text-align: center;
+      font-size: 13px;
+      color: var(--verde);
+      font-weight: 600;
+      padding: 8px 0;
+    }
+
+    /* Animação pulso (contador expirando) */
+    @keyframes rs-pulso {
+
+      0%,
+      100% {
+        opacity: 1;
+      }
+
+      50% {
+        opacity: .5;
+      }
+    }
+
+    /* ── Melhorias visuais Fase 1 + 2 ──────────────────────────────────────
+       Adicionado em: [data de hoje]
+       Não altera nenhuma lógica de negócio.
+    ────────────────────────────────────────────────────────────────────── */
+
+    /* Fade de entrada ao ativar modo rápido ou completo
+       (display:none→block não anima; usamos animação na classe .visivel) */
+    #modo-rapido.visivel,
+    #modo-completo.visivel {
+      animation: rs-fade-in 0.22s ease both;
+    }
+
+    @keyframes rs-fade-in {
+      from { opacity: 0; }
+      to   { opacity: 1; }
+    }
+
+    /* Textarea de feedback — glow no foco (complementa o border-color já existente) */
+    .rs-feedback-textarea:focus {
+      box-shadow: 0 0 0 3px rgba(10, 61, 98, 0.14);
+    }
+    [data-theme="exito"] .rs-feedback-textarea:focus {
+      box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.2);
+    }
+    [data-theme="aurora"] .rs-feedback-textarea:focus {
+      box-shadow: 0 0 0 3px rgba(167, 139, 250, 0.2);
+    }
+
+    /* Contador de caracteres — aviso ao atingir o limite */
+    .rs-feedback-contador.rs-limit {
+      color: var(--vermelho);
+      font-weight: 700;
+    }
+
+    /* Pulse ao clicar em reação — adicionado via JS: btn.classList.add('rs-pulse') */
+    @keyframes rs-pulse-reacao {
+      0%   { transform: scale(1); }
+      40%  { transform: scale(1.3); }
+      70%  { transform: scale(0.92); }
+      100% { transform: scale(1); }
+    }
+    .rs-pulse {
+      animation: rs-pulse-reacao 0.32s ease forwards;
+    }
+
+    /* Botão flutuante de tema (requer <button id="rs-btn-tema"> no HTML) */
+    #rs-btn-tema {
+      position: fixed;
+      bottom: 24px;
+      right: 20px;
+      z-index: 9999;
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      background: var(--azul);
+      color: #fff;
+      font-size: 18px;
+      border: none;
+      cursor: pointer;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+    #rs-btn-tema:hover {
+      transform: scale(1.08);
+      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.32);
+    }
+    [data-theme="exito"] #rs-btn-tema { background: #22c55e; color: #021a0f; }
+    [data-theme="aurora"] #rs-btn-tema { background: #a78bfa; color: #0d0d1a; }
+
+    /* CTA — entrada suave e botão mais arredondado */
+    .rs-cta {
+      animation: rs-cta-entrada 0.35s ease both;
+    }
+    @keyframes rs-cta-entrada {
+      from { opacity: 0; transform: translateY(8px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    .rs-cta-btn {
+      border-radius: 24px;
+      transition: transform 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease;
+    }
+    .rs-cta-btn:hover {
+      transform: scale(1.03);
+      box-shadow: 0 4px 14px rgba(10, 61, 98, 0.22);
+    }
+
+    /* Grid de mídia responsivo */
+    #midia-conteudo {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 12px;
+    }
+    @media (min-width: 640px) {
+      #midia-conteudo {
+        grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      }
+    }
+
+    /* Focus visível em elementos interativos */
+    a:focus-visible,
+    button:focus-visible,
+    [tabindex]:focus-visible {
+      outline: 2px solid var(--azul);
+      outline-offset: 3px;
+      border-radius: 4px;
+    }
+    [data-theme="exito"] a:focus-visible,
+    [data-theme="exito"] button:focus-visible { outline-color: #22c55e; }
+    [data-theme="aurora"] a:focus-visible,
+    [data-theme="aurora"] button:focus-visible { outline-color: #a78bfa; }
+
+    /* Respeitar preferência por menos animação */
+    /* ── Painel de upgrade de mídia ────────────────────────────────────── */
+
+    /* Cursor correto no botão de bloqueio */
+    .rs-media-btn-lock {
+      cursor: pointer !important;
+    }
+
+    #rs-upgrade-panel {
+      position: fixed;
+      inset: 0;
+      z-index: 10000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      animation: rs-fade-in 0.18s ease both;
+    }
+
+    .rs-upgrade-backdrop {
+      position: absolute;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.5);
+      cursor: pointer;
+    }
+
+    .rs-upgrade-box {
+      position: relative;
+      background: var(--rs-card);
+      color: var(--rs-text);
+      border-radius: 20px 20px 0 0;
+      padding: 28px 24px 36px;
+      width: 100%;
+      max-width: 520px;
+      box-shadow: 0 -4px 32px rgba(0, 0, 0, 0.25);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      gap: 12px;
+      animation: rs-upgrade-slide 0.28s cubic-bezier(0.2, 0.9, 0.4, 1) both;
+    }
+
+    @keyframes rs-upgrade-slide {
+      from { transform: translateY(100%); }
+      to   { transform: translateY(0); }
+    }
+
+    .rs-upgrade-close {
+      position: absolute;
+      top: 14px;
+      right: 16px;
+      background: var(--rs-card2);
+      border: none;
+      border-radius: 50%;
+      width: 30px;
+      height: 30px;
+      cursor: pointer;
+      font-size: 14px;
+      color: var(--rs-muted);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      line-height: 1;
+    }
+
+    .rs-upgrade-icone {
+      font-size: 36px;
+      line-height: 1;
+    }
+
+    .rs-upgrade-titulo {
+      font-size: 17px;
+      font-weight: 700;
+      color: var(--rs-text);
+      margin: 0;
+    }
+
+    .rs-upgrade-texto {
+      font-size: 14px;
+      color: var(--rs-muted);
+      line-height: 1.6;
+      margin: 0;
+      max-width: 380px;
+    }
+
+    .rs-upgrade-btn-primario {
+      display: inline-block;
+      width: 100%;
+      max-width: 340px;
+      padding: 13px 20px;
+      background: var(--azul);
+      color: #fff;
+      border-radius: 12px;
+      font-size: 14px;
+      font-weight: 700;
+      text-decoration: none;
+      text-align: center;
+      cursor: pointer;
+      transition: opacity 0.15s ease, transform 0.15s ease;
+    }
+
+    .rs-upgrade-btn-primario:hover {
+      opacity: 0.88;
+      transform: scale(1.01);
+    }
+
+    [data-theme="exito"] .rs-upgrade-btn-primario { background: #22c55e; color: #021a0f; }
+    [data-theme="aurora"] .rs-upgrade-btn-primario { background: #a78bfa; color: #0d0d1a; }
+
+    .rs-upgrade-btn-secundario {
+      background: none;
+      border: none;
+      color: var(--rs-muted);
+      font-size: 13px;
+      cursor: pointer;
+      padding: 4px 8px;
+      text-decoration: underline;
+      text-underline-offset: 3px;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *,
+      *::before,
+      *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+      }
+    }
+
+  </style>
+
+<body>
+
+  <!-- ── Loading ─────────────────────────────────────────────────────────────── -->
+  <div id="rs-loading">
+    <div class="rs-spinner"></div>
+    <span>Carregando sua edição…</span>
+  </div>
+
+  <!-- ── Erro ────────────────────────────────────────────────────────────────── -->
+  <div id="rs-erro">
+    <h3>⚠️ Acesso não disponível</h3>
+    <p id="rs-erro-msg">Ocorreu um erro ao carregar esta edição.</p>
+  </div>
+
+  <!-- ── App (oculto até carregar) ───────────────────────────────────────────── -->
+  <div id="rs-app" class="rs-page" style="display:none">
+
+    <!-- HEADER -->
+    <header class="rs-header">
+      <div class="rs-header-top">
+        <!-- Logo + brand -->
+        <div class="rs-header-brand">
+          <img src="/icons/icon-192x192-transparent.png" class="rs-logo" alt="Radar SIOPE"
+            onerror="this.style.display='none'">
+          <div class="rs-header-brand-text">
+            <strong>Radar SIOPE</strong>
+            <small>Guia Digital — FUNDEB e SIOPE</small>
+          </div>
+        </div>
+        <!-- Edição + data -->
+        <div class="rs-header-meta">
+          <div id="hd-edicao">Edição —</div>
+          <div id="hd-data">—</div>
+        </div>
+      </div>
+
+      <!-- Título da edição -->
+      <div id="hd-titulo" class="rs-header-titulo">Radar SIOPE</div>
+
+      <!-- Linha: saudação + hamburger menu -->
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:6px">
+        <div id="hd-saudacao" class="rs-header-saudacao" style="margin:0"></div>
+        <!-- Hamburger menu (injetado pelo menuApp.js) -->
+        <div id="rs-menu-wrap"></div>
+      </div>
+    </header>
+
+    <!-- Banner de edição mais recente (sticky, logo abaixo do header) -->
+    <div id="rs-banner-recente" role="alert">
+      <span>📬 Existe uma edição mais recente disponível</span>
+      <a id="rs-banner-recente-link" href="#" role="button">Ver agora →</a>
+      <button id="rs-banner-recente-fechar" type="button"
+        onclick="document.getElementById('rs-banner-recente').style.display='none'" aria-label="Fechar">×</button>
+    </div>
+
+    <!-- MUNICÍPIO -->
+    <section class="rs-section">
+      <div class="rs-section-header">
+        <span>📍</span>
+        <h2 id="municipio-titulo">Seu Município</h2>
+        <button id="btn-toggle-historico" style="padding:10px 20px;background:var(--azul);color:#fff;
+                   border:none;border-radius:8px;font-size:13px;font-weight:600;
+                   cursor:pointer;margin-left:auto;display:none">
+          📈 Ver série histórica
+        </button>
+      </div>
+
+      <!-- Modo Resumo (padrão) -->
+      <div id="municipio-resumo">
+        <div id="municipio-conteudo">
+          <div class="rs-municipio-card">
+            <div class="rs-skeleton rs-sk-title"></div>
+            <div class="rs-skeleton rs-sk-bar" style="margin-top:10px"></div>
+            <div class="rs-skeleton rs-sk-line" style="margin-top:8px"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Modo Histórico (oculto por padrão) -->
+      <div id="municipio-historico" style="display:none;padding:14px"></div>
+
+      <!-- vitrine dinamica de graficos -->
+      <div id="municipio-vitrine"></div>
+
+    </section>
+
+    <!-- TOGGLE MODO -->
+    <div class="rs-toggle" id="rs-toggle-modo">
+      <button id="btn-rapido" class="ativo" onclick="trocarModo('rapido')">
+        ⚡ Modo Rápido
+      </button>
+      <button id="btn-completo" onclick="trocarModo('completo')">
+        📖 Leitura Completa
+      </button>
+    </div>
+
+    <!-- MODO RÁPIDO -->
+    <section class="rs-section" id="modo-rapido">
+      <div class="rs-section-header">
+        <span>⚡</span>
+        <h2>Pontos-chave desta edição</h2>
+      </div>
+      <div class="rs-section-body">
+        <ul class="rs-bullets rs-protegido" id="lista-bullets"></ul>
+      </div>
+    </section>
+
+    <!-- MODO COMPLETO -->
+    <section class="rs-section" id="modo-completo">
+      <div class="rs-section-header">
+        <span>📖</span>
+        <h2>Edição Completa</h2>
+      </div>
+      <div class="rs-section-body rs-protegido">
+        <div id="conteudo-newsletter"></div>
+      </div>
+    </section>
+
+    <!-- AVALIAÇÃO POR SEÇÃO -->
+    <section class="rs-section" id="secao-feedback-secoes" style="display:none">
+      <div class="rs-section-header">
+        <span>🧾</span>
+        <h2>Avaliação por seção</h2>
+      </div>
+      <div class="rs-section-body" id="secao-feedback-secoes-conteudo">
+        <p style="color:#999; margin:0;">Aguardando carregamento de avaliações...</p>
+      </div>
+    </section>
+
+    <!-- MÍDIA -->
+    <section class="rs-section" id="secao-midia" style="display:none">
+      <div class="rs-section-header">
+        <span>🎙️</span>
+        <h2>Mídia desta edição</h2>
+      </div>
+      <div class="rs-section-body" id="midia-conteudo"></div>
+    </section>
+
+    <!-- FAQ -->
+    <section class="rs-section" id="secao-faq" style="display:none">
+      <div class="rs-section-header">
+        <span>❓</span>
+        <h2>Perguntas frequentes</h2>
+      </div>
+      <div class="rs-section-body" id="faq-conteudo"></div>
+    </section>
+
+    <!-- REACTIONS -->
+    <section class="rs-section">
+      <div class="rs-section-header">
+        <span>💬</span>
+        <h2>O que você achou desta edição?</h2>
+      </div>
+      <div class="rs-section-body">
+        <div class="rs-reactions" id="reactions-wrap"></div>
+        <div class="rs-reaction-feedback" id="reaction-feedback"></div>
+        <!-- Feedback textual (renderizado pelo JS após as reações) -->
+        <div id="rs-feedback-wrap"></div>
+      </div>
+    </section>
+
+    <!-- CTA dinâmico -->
+    <div id="rs-cta-wrap"></div>
+
+    <!-- WATERMARK -->
+    <div class="rs-watermark rs-protegido" id="rs-watermark"></div>
+
+    <!-- CSS para botão ativo (legado — mantido para compatibilidade) -->
+    <style>
+      [data-theme-btn].ativo {
+        border-color: var(--azul) !important;
+        transform: scale(1.1);
+        box-shadow: 0 0 0 3px rgba(10, 61, 98, 0.1);
+      }
+    </style>
+  </div><!-- /rs-app -->
+
+
+
+  <!-- ── Overlay do drawer ────────────────────────────────────────────────── -->
+  <div id="rs-drawer-overlay" role="presentation"></div>
+
+  <!-- ── Painel do drawer ─────────────────────────────────────────────────── -->
+  <aside id="rs-drawer-panel" role="dialog" aria-modal="true" aria-label="Navegação de edições">
+
+    <!-- Header do drawer -->
+    <div id="rs-drawer-header">
+      <button id="rs-drawer-voltar" type="button" aria-label="Voltar para tipos">
+        ‹ Tipos
+      </button>
+      <span id="rs-drawer-titulo">Edições por tipo</span>
+      <button id="rs-drawer-fechar" type="button" aria-label="Fechar">×</button>
+    </div>
+
+    <!-- Body do drawer (preenchido pelo JS) -->
+    <div id="rs-drawer-body"></div>
+
+  </aside>
+
+  <!-- ── Modal de edição expirada ─────────────────────────────────────────── -->
+  <div id="rs-drawer-modal-expirado" role="dialog" aria-modal="true" aria-labelledby="rs-modal-exp-h">
+    <div class="rs-modal-exp-box">
+      <div style="font-size:36px;margin-bottom:12px">⌛</div>
+      <h3 id="rs-modal-exp-h" id="rs-modal-exp-titulo">Edição</h3>
+      <p>
+        Este conteúdo ficou disponível por
+        <strong id="rs-modal-exp-horas">24</strong> horas após o envio.<br>
+        Assine para ter acesso permanente a todas as edições.
+      </p>
+      <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap">
+        <a href="/assinatura.html" class="rs-modal-exp-btn-primary">
+          Assinar para acesso permanente →
+        </a>
+        <button class="rs-modal-exp-btn-fechar" type="button"
+          onclick="document.getElementById('rs-drawer-modal-expirado').classList.remove('rs-drawer-show')">
+          Fechar
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Barra de temas flutuante (sempre visível, inclusive no iPhone) ─────── -->
+  <div class="rs-theme-bar" role="toolbar" aria-label="Seletor de tema">
+    <span class="rs-theme-bar-label">Tema</span>
+    <button class="rs-theme-dot active" data-t="escuro" title="Escuro" onclick="setTheme('escuro')"
+      type="button"></button>
+    <button class="rs-theme-dot" data-t="claro" title="Claro" onclick="setTheme('claro')" type="button"></button>
+    <button class="rs-theme-dot" data-t="suave" title="Suave" onclick="setTheme('suave')" type="button"></button>
+    <button class="rs-theme-dot" data-t="minimalista" title="Minimalista" onclick="setTheme('minimalista')"
+      type="button"></button>
+    <button class="rs-theme-dot" data-t="exito" title="Êxito" onclick="setTheme('exito')" type="button"></button>
+    <button class="rs-theme-dot" data-t="aurora" title="Aurora" onclick="setTheme('aurora')" type="button"></button>
+  </div>
+
+  <!-- ── Scripts ──────────────────────────────────────────────────────────────── -->
+
+  <!-- Firebase v10 compat (mesma versão do restante do projeto) -->
+  <script src="https://www.gstatic.com/firebasejs/10.0.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.0.0/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.0.0/firebase-auth-compat.js"></script>
+  <script src="/js/firebase-init.js"></script>
+
+  <!-- Supabase UMD via CDN (expõe `supabase` globalmente) -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <!-- Inicializa window.supabase sem Vite/bundler -->
+  <script src="/js/supabase-browser.js"></script>
+
+  <!-- Utilitários do projeto -->
+  <script src="/js/functions.js"></script>
+
+  <!-- Módulo Supabase município (v2 — usa vw_municipio_resumo) -->
+  <script src="/js/supabase-municipio.js"></script>
+
+  <!-- Módulo Vitrine município ( montagem dinamica dos graficos) -->
+  <script src="/js/vitrine-graficos.js"></script>
+
+  <!-- Módulo mapa mental -->
+  <script src="/js/mapa-mental.js"></script>
+
+  <!-- Lógica principal do web app -->
+  <script src="/js/verNewsletterComToken.js"></script>
+
+    <!-- quiz interativo -->
+  <script src="/js/quizApp.js"></script>
+
+  <!-- Leitor paginado (flipbook) para mobile -->
+  <script src="/js/flipbook.js"></script>
+
+  <!-- PWA Service Worker -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/OneSignalSDKWorker.js').catch(() => { });
+    }
+  </script>
+
+  <!-- OneSignal (carrega por último, não bloqueia render) -->
+  <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
+  <script src="/js/onesignal-init.js" defer></script>
+  <script src="/js/centralMensagens.js" defer></script>
+  <script src="/js/faleConosco.js" defer></script>
+  <script src="/js/menuApp.js" defer></script>
+
+  <!-- Proteções de conteúdo -->
+  <script>
+    document.addEventListener('contextmenu', e => e.preventDefault());
+    document.addEventListener('keydown', e => {
+      if ((e.ctrlKey || e.metaKey) &&
+        ['c', 'u', 's', 'p', 'a'].includes(e.key.toLowerCase())) {
+        e.preventDefault();
+      }
+    });
+  </script>
+
+</body>
+
+</html>
