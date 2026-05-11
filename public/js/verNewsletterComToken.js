@@ -40,6 +40,120 @@ window.validarEabrirMidia = async (url, tipo) => {
   document.head.appendChild(s);
 })();
 
+// ─── CSS dos Cards de Mídia (padrão Mapa Mental) ────────────────────────────
+(function _injetarCSSMidia() {
+  if (document.getElementById('rs-midia-style')) return;
+  const s = document.createElement('style');
+  s.id = 'rs-midia-style';
+  s.textContent = `
+    .rs-media-card {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      background: var(--rs-card2, #162032);
+      border: 1px solid rgba(10,61,98,0.55);
+      border-radius: 12px;
+      padding: 16px 18px;
+      margin: 12px 0;
+      animation: rsFadeIn 0.35s ease;
+      transition: background .2s, transform .15s;
+    }
+    .rs-media-card:hover {
+      background: #1a2540;
+      transform: translateY(-1px);
+    }
+    .rs-media-card.rs-media-card-bloqueado {
+      opacity: 0.7;
+      background: rgba(22,32,50,0.6);
+    }
+    .rs-media-card-icone {
+      font-size: 30px;
+      flex-shrink: 0;
+      line-height: 1;
+    }
+    .rs-media-card-info {
+      flex: 1;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+    .rs-media-card-label {
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      color: #60A5FA;
+    }
+    .rs-media-card-titulo {
+      font-size: 14px;
+      color: var(--rs-text, #f1f5f9);
+      font-weight: 600;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .rs-media-card-sub {
+      font-size: 12px;
+      color: var(--rs-muted, #94a3b8);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .rs-media-card-btn {
+      background: var(--azul, #0A3D62);
+      color: #fff;
+      border: none;
+      padding: 9px 16px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      white-space: nowrap;
+      flex-shrink: 0;
+      transition: background .2s, transform .15s;
+    }
+    .rs-media-card-btn:hover {
+      background: #0d4f7c;
+      transform: translateY(-1px);
+    }
+    .rs-media-card-btn.rs-media-card-btn-lock {
+      background: rgba(255,255,255,0.08);
+      color: #94a3b8;
+    }
+    .rs-media-card-btn.rs-media-card-btn-lock:hover {
+      background: rgba(255,255,255,0.12);
+      color: #f1f5f9;
+    }
+    .rs-media-card-audio {
+      flex-shrink: 0;
+    }
+    .rs-media-card-audio button {
+      width: 100%;
+    }
+    @media (max-width: 640px) {
+      .rs-media-card {
+        flex-wrap: wrap;
+        gap: 12px;
+      }
+      .rs-media-card-icone {
+        font-size: 26px;
+      }
+      .rs-media-card-info {
+        flex: 1 1 100%;
+        order: 3;
+        margin-top: 4px;
+      }
+      .rs-media-card-btn,
+      .rs-media-card-audio {
+        width: 100%;
+        order: 2;
+      }
+    }
+  `;
+  document.head.appendChild(s);
+})();
+
 // ─── Parâmetros da URL ────────────────────────────────────────────────────────
 // ─── Buscar config pública via API (variáveis de ambiente) ──────────────────
 let _configCache = null;
@@ -696,7 +810,6 @@ function fecharModalMidia() {
 document.addEventListener('keydown', e => { if (e.key === 'Escape') fecharModalMidia(); });
 
 // ─── Mídia ────────────────────────────────────────────────────────────────────
-
 function renderMidia(newsletter, acesso) {
   const secao = document.getElementById('secao-midia');
   const wrap = document.getElementById('midia-conteudo');
@@ -704,140 +817,112 @@ function renderMidia(newsletter, acesso) {
 
   const itens = [];
 
-    if (newsletter.audio_url) {
-    itens.push(acesso.temAudio ? `
-      <div class="rs-media-item">
-        <div class="rs-media-icon">🎧</div>
-        <div class="rs-media-info">
-          <div class="rs-media-titulo">Podcast desta edição</div>
-          <div class="rs-media-sub">Produzido por ia · Ouça no trabalho, no trânsito ou em casa.</div>
-          <div class="rs-audio-wrap" style="margin-top:8px;position:relative;">
-            <button class="rs-audio-play-btn" 
+  // ── Helper para criar cards padronizados ──────────────────────────────
+  const criarCard = ({ icone, label, titulo, sub, btnHtml, bloqueado = false }) => {
+    const classeBloq = bloqueado ? ' rs-media-card-bloqueado' : '';
+    return `
+      <div class="rs-media-card${classeBloq}">
+        <div class="rs-media-card-icone">${icone}</div>
+        <div class="rs-media-card-info">
+          <span class="rs-media-card-label">${label}</span>
+          <span class="rs-media-card-titulo">${titulo}</span>
+          <span class="rs-media-card-sub">${sub}</span>
+        </div>
+        ${btnHtml}
+      </div>`;
+  };
+
+  // ── Áudio ─────────────────────────────────────────────────────────────
+  if (newsletter.audio_url) {
+    if (acesso.temAudio) {
+      itens.push(criarCard({
+        icone: '🎧',
+        label: 'Podcast',
+        titulo: 'Podcast desta edição',
+        sub: 'Produzido por IA · Ouça no trabalho, no trânsito ou em casa.',
+        btnHtml: `
+          <div class="rs-media-card-audio">
+            <button class="rs-media-card-btn" 
                     onclick="validarETocarAudio('${_esc(newsletter.audio_url)}', this)"
-                    style="width:100%;padding:14px;background:var(--azul,#0A3D62);color:#fff;border:none;border-radius:8px;cursor:pointer;font-weight:600;font-size:14px;display:flex;align-items:center;justify-content:center;gap:8px;transition:background .2s;">
+                    type="button">
               ▶ Ouvir podcast
             </button>
-          </div>
-        </div>
-      </div>` : `
-      <div class="rs-media-item">
-        <div class="rs-media-icon" style="opacity:.4">🎧</div>
-        <div class="rs-media-info">
-          <div class="rs-media-titulo">Podcast desta edição</div>
-          <div class="rs-media-sub">Disponível no plano Essence ou superior</div>
-        </div>
-        <button class="rs-media-btn rs-media-btn-lock"
-                onclick="_solicitarUpgrade('audio', ${acesso.isAssinante})">🔒 Desbloquear</button>
-      </div>`);
+          </div>`
+      }));
+    } else {
+      itens.push(criarCard({
+        icone: '🎧',
+        label: 'Podcast',
+        titulo: 'Podcast desta edição',
+        sub: 'Disponível no plano Essence ou superior',
+        bloqueado: true,
+        btnHtml: `
+          <button class="rs-media-card-btn rs-media-card-btn-lock"
+                  onclick="_solicitarUpgrade('audio', ${acesso.isAssinante})"
+                  type="button">🔒 Desbloquear</button>`
+      }));
+    }
   }
 
+  // ── Vídeo ─────────────────────────────────────────────────────────────
   if (newsletter.video_url) {
-    itens.push(acesso.temVideo ? `
-    <div class="rs-media-item">
-      <div class="rs-media-icon">📺</div>
-      <div class="rs-media-info">
-        <div class="rs-media-titulo">Vídeo explicativo</div>
-        <div class="rs-media-sub">Análise detalhada em vídeo</div>
-      </div>
-      <button class="rs-media-btn rs-media-btn-primary" onclick="validarEabrirMidia('${_esc(newsletter.video_url)}', 'video')">Assistir →</button>
-    </div>` : `
-    <div class="rs-media-item">
-      <div class="rs-media-icon" style="opacity:.4">📺</div>
-      <div class="rs-media-info">
-        <div class="rs-media-titulo">Vídeo explicativo</div>
-        <div class="rs-media-sub">Disponível no plano Profissional ou superior</div>
-      </div>
-      <button class="rs-media-btn rs-media-btn-lock"
-              onclick="_solicitarUpgrade('video', ${acesso.isAssinante})">🔒 Desbloquear</button>
-    </div>`);
+    itens.push(criarCard({
+      icone: '📺',
+      label: 'Vídeo',
+      titulo: 'Vídeo explicativo',
+      sub: 'Análise detalhada em vídeo',
+      bloqueado: !acesso.temVideo,
+      btnHtml: acesso.temVideo
+        ? `<button class="rs-media-card-btn" onclick="validarEabrirMidia('${_esc(newsletter.video_url)}', 'video')" type="button">Assistir →</button>`
+        : `<button class="rs-media-card-btn rs-media-card-btn-lock" onclick="_solicitarUpgrade('video', ${acesso.isAssinante})" type="button">🔒 Desbloquear</button>`
+    }));
   }
 
+  // ── Infográfico ───────────────────────────────────────────────────────
   if (newsletter.infografico_url) {
-    itens.push(acesso.temInfografico ? `
-      <div class="rs-media-item">
-        <div class="rs-media-icon">📊</div>
-        <div class="rs-media-info">
-          <div class="rs-media-titulo">Infográfico da edição</div>
-          <div class="rs-media-sub">Visualização gráfica do conteúdo desta edição</div>
-        </div>
-        <button class="rs-media-btn rs-media-btn-primary" onclick="validarEabrirMidia('${_esc(newsletter.infografico_url)}', 'infografico')">Ver →</button>
-      </div>` : `
-      <div class="rs-media-item">
-        <div class="rs-media-icon" style="opacity:.4">📊</div>
-        <div class="rs-media-info">
-          <div class="rs-media-titulo">Infográfico da edição</div>
-          <div class="rs-media-sub">Disponível no plano Profissional ou superior</div>
-        </div>
-        <button class="rs-media-btn rs-media-btn-lock"
-                onclick="_solicitarUpgrade('infografico', ${acesso.isAssinante})">🔒 Desbloquear</button>
-      </div>`);
+    itens.push(criarCard({
+      icone: '📊',
+      label: 'Infográfico',
+      titulo: 'Infográfico da edição',
+      sub: 'Visualização gráfica do conteúdo desta edição',
+      bloqueado: !acesso.temInfografico,
+      btnHtml: acesso.temInfografico
+        ? `<button class="rs-media-card-btn" onclick="validarEabrirMidia('${_esc(newsletter.infografico_url)}', 'infografico')" type="button">Ver →</button>`
+        : `<button class="rs-media-card-btn rs-media-card-btn-lock" onclick="_solicitarUpgrade('infografico', ${acesso.isAssinante})" type="button">🔒 Desbloquear</button>`
+    }));
   }
 
   // ── Mapa Mental ──────────────────────────────────────────────────────
-
   if (newsletter.mapa_mental?.ativo) {
-    itens.push(acesso.temMapaMental ? '__MAPA_MENTAL__' : `
-      <div class="rs-media-item">
-        <div class="rs-media-icon" style="opacity:.4">🗺️</div>
-        <div class="rs-media-info">
-          <div class="rs-media-titulo">Mapa Mental</div>
-          <div class="rs-media-sub">Disponível no plano Profissional ou superior</div>
-        </div>
-        <button class="rs-media-btn rs-media-btn-lock"
-                onclick="_solicitarUpgrade('mapa_mental', ${acesso.isAssinante})">🔒 Desbloquear</button>
-      </div>`);
+    if (acesso.temMapaMental) {
+      itens.push('__MAPA_MENTAL__');
+    } else {
+      itens.push(criarCard({
+        icone: '🗺️',
+        label: 'Mapa Mental',
+        titulo: 'Mapa Mental da edição',
+        sub: 'Disponível no plano Profissional ou superior',
+        bloqueado: true,
+        btnHtml: `<button class="rs-media-card-btn rs-media-card-btn-lock" onclick="_solicitarUpgrade('mapa_mental', ${acesso.isAssinante})" type="button">🔒 Desbloquear</button>`
+      }));
+    }
   }
 
+  // ── Renderização ──────────────────────────────────────────────────────
   if (itens.length) {
     secao.style.display = 'block';
-    // Remove o placeholder antes de injetar o HTML
     const itensSemMapa = itens.filter(i => i !== '__MAPA_MENTAL__');
     wrap.innerHTML = itensSemMapa.join('');
-    // MapaMentalManager injeta e gerencia o próprio card
-    if (itens.includes('__MAPA_MENTAL__')
-        && typeof window.MapaMentalManager?.init === 'function') {
+    
+    if (itens.includes('__MAPA_MENTAL__') && 
+        typeof window.MapaMentalManager?.init === 'function') {
       window.MapaMentalManager.init(newsletter, acesso);
     }
   } else {
     secao.style.display = 'none';
     wrap.innerHTML = '';
   }
-
-
-    // ── Mapa Mental ──────────────────────────────────────────────────────
-/* if (newsletter.mapa_mental?.ativo) {
-  itens.push(acesso.temMapaMental ? ' MAPA_MENTAL ' : `<div class="rs-media-item">...</div>`);
 }
-
-if (itens.length) {
-  secao.style.display = 'block';
-  const itensSemMapa = itens.filter(i => i !== ' MAPA_MENTAL ');
-  wrap.innerHTML = itensSemMapa.join('');
-
-  // 🐛 DIAGNÓSTICO EXATO DO BLOQUEIO
-  const temPlaceholder = itens.includes(' MAPA_MENTAL ');
-  const managerOk = typeof window.MapaMentalManager?.init === 'function';
-  const mm = newsletter.mapa_mental;
-  const temRaiz = !!mm?.raiz; // Guard interno do mapaMental.js
-
-  console.log('[🗺️ CHECK MAPA MENTAL]', { 
-    temPlaceholder, 
-    managerOk, 
-    temRaiz,
-    containerExiste: !!document.getElementById('midia-conteudo'),
-    erroSintaxe: managerOk ? '✅ Script carregado' : '❌ mapaMental.js travou ou não foi incluído'
-  });
-
-  if (temPlaceholder && managerOk && temRaiz) {
-    window.MapaMentalManager.init(newsletter, acesso);
-  } else {
-    console.warn('⛔ MAPA MENTAL BLOQUEADO POR:', { managerOk, temRaiz });
-  }
-} */
-
-
-}
-
 
 // ─── FAQ ──────────────────────────────────────────────────────────────────────
 
