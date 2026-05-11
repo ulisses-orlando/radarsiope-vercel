@@ -1,9 +1,9 @@
 /* ==========================================================================
-mapaMental.js — Módulo de Mapa Mental Interativo (Corrigido)
-Integração : verNewsletterComToken.js → renderMidia()
-Dados      : newsletter.mapa_mental (Firestore)
-Entrada    : window.MapaMentalManager.init(newsletter, acesso)
-========================================================================== */
+   mapaMental.js — Módulo de Mapa Mental Interativo (CORRIGIDO & VALIDADO)
+   Integração : verNewsletterComToken.js → renderMidia()
+   Dados      : newsletter.mapa_mental (Firestore)
+   Entrada    : window.MapaMentalManager.init(newsletter, acesso)
+   ========================================================================== */
 (function () {
   'use strict';
 
@@ -17,17 +17,16 @@ Entrada    : window.MapaMentalManager.init(newsletter, acesso)
   const MIN_SCALE = 0.2;
   const MAX_SCALE = 2.5;
 
-  const PALETA = [
-    '#60A5FA', '#34D399', '#A78BFA', '#FBBF24', '#22D3EE', '#F87171', '#818CF8', '#4ADE80'
-  ];
+  const PALETA = ['#60A5FA', '#34D399', '#A78BFA', '#FBBF24', '#22D3EE', '#F87171', '#818CF8', '#4ADE80'];
 
   // ── Estado interno ──────────────────────────────────────────────────────
-  let _dados     = null;
-  let _expanded  = new Set();
-  let _tf        = { x: 0, y: 0, scale: 1 };
-  let _svgEl     = null;
-  let _svgG      = null;
-  let _layout    = null;
+  let _dados    = null;
+  let _expanded = new Set();
+  let _tf       = { x: 0, y: 0, scale: 1 };
+  let _svgEl    = null;
+  let _svgG     = null;
+  let _layout   = null;
+  let _wasDragging = false;
 
   // ══════════════════════════════════════════════════════════════════════
   // PÚBLICO
@@ -35,18 +34,20 @@ Entrada    : window.MapaMentalManager.init(newsletter, acesso)
   function init(newsletter, acesso) {
     const mm = newsletter?.mapa_mental;
     if (!mm?.ativo || !mm?.raiz) return;
+    
     _dados = mm;
     _injetarCSS();
-    _renderizarCard(newsletter);
+    _renderizarCard();
+    console.log('[mapaMental.js] ✅ Módulo carregado e card injetado.');
   }
 
   // ══════════════════════════════════════════════════════════════════════
   // CARD NA SEÇÃO DE MÍDIAS
   // ══════════════════════════════════════════════════════════════════════
-  function _renderizarCard(newsletter) {
+  function _renderizarCard() {
     const wrap = document.getElementById('midia-conteudo')
-      || document.getElementById('rs-midia-wrap')
-      || document.getElementById('rs-app');
+              || document.getElementById('rs-midia-wrap')
+              || document.getElementById('rs-app');
     if (!wrap) return;
 
     document.getElementById('rs-mm-card')?.remove();
@@ -64,8 +65,7 @@ Entrada    : window.MapaMentalManager.init(newsletter, acesso)
     `;
 
     wrap.appendChild(card);
-    card.querySelector('.rs-mm-card-btn')
-      .addEventListener('click', _abrirModal);
+    card.querySelector('.rs-mm-card-btn').addEventListener('click', _abrirModal);
   }
 
   // ══════════════════════════════════════════════════════════════════════
@@ -128,12 +128,9 @@ Entrada    : window.MapaMentalManager.init(newsletter, acesso)
       _setupInteracao();
     });
 
-    document.getElementById('rs-mm-btn-fechar')
-      .addEventListener('click', _fecharModal);
-    document.getElementById('rs-mm-btn-reset')
-      .addEventListener('click', () => _centralizarVista(true));
-    document.getElementById('rs-mm-btn-expandir')
-      .addEventListener('click', _toggleExpandirTodos);
+    document.getElementById('rs-mm-btn-fechar').addEventListener('click', _fecharModal);
+    document.getElementById('rs-mm-btn-reset').addEventListener('click', () => _centralizarVista(true));
+    document.getElementById('rs-mm-btn-expandir').addEventListener('click', _toggleExpandirTodos);
   }
 
   function _fecharModal() {
@@ -169,8 +166,8 @@ Entrada    : window.MapaMentalManager.init(newsletter, acesso)
     const alturaTotal = alturas.reduce((soma, h, i) => soma + h + (i > 0 ? VGAP : 0), 0);
 
     pos['root'] = {
-      x: PAD, y: alturaTotal / 2 - NH / 2,
-      w: NW.root, h: NH, tipo: 'root', texto: raiz.texto, cor: null, nodeId: 'root',
+      x: PAD, y: alturaTotal / 2 - NH / 2, w: NW.root, h: NH,
+      tipo: 'root', texto: raiz.texto, cor: null, nodeId: 'root',
     };
 
     let topoY = 0;
@@ -179,21 +176,15 @@ Entrada    : window.MapaMentalManager.init(newsletter, acesso)
       const cor = PALETA[idx % PALETA.length];
 
       pos[node.id] = {
-        x: PAD + NW.root + HGAP,
-        y: topoY + sh / 2 - NH / 2,
-        w: NW.l1, h: NH,
-        tipo: 'l1', texto: node.texto, cor,
-        nodeId: node.id, temFilhos: !!(node.filhos?.length),
+        x: PAD + NW.root + HGAP, y: topoY + sh / 2 - NH / 2, w: NW.l1, h: NH,
+        tipo: 'l1', texto: node.texto, cor, nodeId: node.id, temFilhos: !!(node.filhos?.length),
       };
 
       if (_expanded.has(node.id) && node.filhos?.length) {
         node.filhos.forEach((child, cidx) => {
           pos[child.id] = {
-            x: PAD + NW.root + HGAP + NW.l1 + HGAP,
-            y: topoY + cidx * (NH + VGAP),
-            w: NW.l2, h: NH,
-            tipo: 'l2', texto: child.texto, cor,
-            nodeId: child.id,
+            x: PAD + NW.root + HGAP + NW.l1 + HGAP, y: topoY + cidx * (NH + VGAP), w: NW.l2, h: NH,
+            tipo: 'l2', texto: child.texto, cor, nodeId: child.id,
           };
         });
       }
@@ -202,12 +193,7 @@ Entrada    : window.MapaMentalManager.init(newsletter, acesso)
 
     const xs = Object.values(pos).map(p => p.x + p.w);
     const ys = Object.values(pos).map(p => p.y + p.h);
-    return {
-      pos,
-      alturaTotal,
-      canvasW: Math.max(...xs) + PAD,
-      canvasH: Math.max(...ys) + PAD,
-    };
+    return { pos, alturaTotal, canvasW: Math.max(...xs) + PAD, canvasH: Math.max(...ys) + PAD };
   }
 
   // ══════════════════════════════════════════════════════════════════════
@@ -215,21 +201,21 @@ Entrada    : window.MapaMentalManager.init(newsletter, acesso)
   // ══════════════════════════════════════════════════════════════════════
   function _renderizarGrafo() {
     if (!_svgG || !_svgEl) return;
-    _layout       = _calcularLayout();
+    _layout = _calcularLayout();
     const { pos } = _layout;
     const raiz    = _dados.raiz;
     const filhos  = raiz.filhos || [];
 
     _svgG.innerHTML = '';
 
-    // 1. Conexões raiz → nível 1
+    // Conexões raiz → nível 1
     const rootP = pos['root'];
     filhos.forEach(node => {
       const p = pos[node.id];
       _drawCurve(rootP.x + rootP.w, rootP.y + rootP.h / 2, p.x, p.y + p.h / 2, p.cor, 2, 0.5);
     });
 
-    // 2. Conexões nível 1 → nível 2
+    // Conexões nível 1 → nível 2
     filhos.forEach(node => {
       if (!_expanded.has(node.id) || !node.filhos?.length) return;
       const parent = pos[node.id];
@@ -240,7 +226,7 @@ Entrada    : window.MapaMentalManager.init(newsletter, acesso)
       });
     });
 
-    // 3. Nós
+    // Nós
     Object.values(pos).forEach(_drawNode);
   }
 
@@ -306,12 +292,10 @@ Entrada    : window.MapaMentalManager.init(newsletter, acesso)
     g.appendChild(rect);
 
     // Texto
-    const paddingX   = p.tipo === 'l1' ? 14 : 12;
-    const maxTextW   = p.w - paddingX - (p.tipo === 'l1' ? 28 : paddingX);
-    const fontSize   = p.tipo === 'root' ? 13 : p.tipo === 'l1' ? 12 : 11;
-    const fillColor  = p.tipo === 'root' ? '#ffffff'
-                  : p.tipo === 'l1'   ? '#f1f5f9'
-                  :                     '#cbd5e1';
+    const paddingX  = p.tipo === 'l1' ? 14 : 12;
+    const maxTextW  = p.w - paddingX - (p.tipo === 'l1' ? 28 : paddingX);
+    const fontSize  = p.tipo === 'root' ? 13 : p.tipo === 'l1' ? 12 : 11;
+    const fillColor = p.tipo === 'root' ? '#ffffff' : p.tipo === 'l1' ? '#f1f5f9' : '#cbd5e1';
     const fontWeight = p.tipo === 'root' ? '700' : '500';
     const linhas     = _wrapText(p.texto, maxTextW, fontSize);
     const cx         = p.x + paddingX;
@@ -363,7 +347,6 @@ Entrada    : window.MapaMentalManager.init(newsletter, acesso)
   // ══════════════════════════════════════════════════════════════════════
   // INTERAÇÃO
   // ══════════════════════════════════════════════════════════════════════
-  let _wasDragging = false;
   function _toggleExpansao(nodeId) {
     if (_expanded.has(nodeId)) _expanded.delete(nodeId);
     else _expanded.add(nodeId);
@@ -484,7 +467,7 @@ Entrada    : window.MapaMentalManager.init(newsletter, acesso)
   }
 
   // ══════════════════════════════════════════════════════════════════════
-  // HELPERS
+  // HELPERS & CSS
   // ══════════════════════════════════════════════════════════════════════
   function svgEl(tag) {
     return document.createElementNS('http://www.w3.org/2000/svg', tag);
@@ -494,9 +477,6 @@ Entrada    : window.MapaMentalManager.init(newsletter, acesso)
     return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   }
 
-  // ══════════════════════════════════════════════════════════════════════
-  // CSS
-  // ══════════════════════════════════════════════════════════════════════
   function _injetarCSS() {
     if (document.getElementById('rs-mm-style')) return;
     const s = document.createElement('style');
