@@ -53,9 +53,9 @@
     return {
       cicloId: c.id,
       indicacaoAberta: !bloqueado && ini_ind && agora >= ini_ind && (!fim_ind || agora <= fim_ind),
-      msgIndicacao: bloqueado ? 'Ciclo encerrado ou inativo.' : (!ini_ind || agora < ini_ind ? 'A indicação ainda não abriu.' : 'A indicação já encerrou.'),
+      msgIndicacao: bloqueado ? 'Ciclo encerrado ou inativo.' : (!ini_ind || agora < ini_ind ? 'O período de sugestão de tema ainda não abriu.' : 'O período de sugestão de tema já encerrou.'),
       votacaoAberta: !bloqueado && ini_vot && agora >= ini_vot && (!fim_vot || agora <= fim_vot),
-      msgVotacao: bloqueado ? 'Ciclo encerrado ou inativo.' : (!ini_vot || agora < ini_vot ? 'A votação ainda não abriu.' : 'A votação já encerrou.')
+      msgVotacao: bloqueado ? 'Ciclo encerrado ou inativo.' : (!ini_vot || agora < ini_vot ? 'O período de votação ainda não abriu.' : 'O período de votação já encerrou.')
     };
   }
 
@@ -65,8 +65,8 @@
     const agora = Date.now();
     const ini = _tsMs(cicloDoc.inicio_indicacao);
     const fim = _tsMs(cicloDoc.fim_indicacao);
-    if (!ini || agora < ini) return { valido: false, erro: 'Período de indicação ainda não abriu.' };
-    if (fim && agora > fim) return { valido: false, erro: 'Período de indicação já encerrou.' };
+    if (!ini || agora < ini) return { valido: false, erro: 'O período de sugestão de tema ainda não abriu.' };
+    if (fim && agora > fim) return { valido: false, erro: 'O período de sugestão de tema já encerrou.' };
     return { valido: true };
   }
 
@@ -91,12 +91,26 @@
     let quotaTema = 0; let usoTemaMes = 0;
 
     if (isAssinante) {
-      try { const _sessao = JSON.parse(localStorage.getItem('rs_pwa_session') || '{}'); quotaTema = (_sessao.features || user.features || {}).sugestao_tema_quota || 0; } catch (e) { /* ignora */ }
+      try {
+        const _sessao = JSON.parse(localStorage.getItem('rs_pwa_session') || '{}');
+        quotaTema = (_sessao.features || user.features || {}).sugestao_tema_quota || 0;
+      } catch (e) { /* ignora */ }
     }
 
     const [historico] = await Promise.all([
       _buscarHistorico(user),
-      quotaTema > 0 ? (async () => { try { const inicioMes = new Date(); inicioMes.setDate(1); inicioMes.setHours(0, 0, 0, 0); const snap = await window.db.collection('usuarios').doc(user.uid).collection('solicitacoes').where('tipo', '==', 'sugestao_tema').get(); usoTemaMes = snap.docs.filter(d => { const ds = d.data().data_solicitacao; return ds && new Date(ds) >= inicioMes; }).length; } catch (e) { console.warn('[faleConosco] quota:', e.message); } })() : Promise.resolve(),
+      quotaTema > 0 ? (async () => {
+        try {
+          const inicioMes = new Date();
+          inicioMes.setDate(1);
+          inicioMes.setHours(0, 0, 0, 0);
+          const snap = await window.db.collection('usuarios').doc(user.uid).collection('solicitacoes').where('tipo', '==', 'sugestao_tema').get();
+          usoTemaMes = snap.docs.filter(d => {
+            const ds = d.data().data_solicitacao;
+            return ds && new Date(ds) >= inicioMes;
+          }).length;
+        } catch (e) { console.warn('[faleConosco] quota:', e.message); }
+      })() : Promise.resolve(),
     ]);
 
     _marcarRespostasVistas(historico);
@@ -112,27 +126,38 @@
     if (isAssinante) { html += temFeatureTema ? `<button class="rs-fc-tipo-btn ${tipoAtivo === 'sugestao_tema' ? 'ativo' : ''}" onclick="window._fcSelecionarTipo('sugestao_tema')">💡 Sugerir tema</button>` : `<button class="rs-fc-tipo-btn bloqueado" title="Disponível em planos superiores">💡 Sugerir tema 🔒</button>`; }
     html += `</div>`;
 
+    // ── Dentro de async function _renderDrawer(tipoAtivo = 'mensagem') { ... } ──
     if (tipoAtivo === 'sugestao_tema') {
-      const estado = await _checarEstadosCiclo();
-      html += await _renderVotacaoAtual(user, temFeatureTema, estado);
+      html += await _renderVotacaoAtual(user, temFeatureTema);
 
       const restantes = Math.max(0, quotaTema - usoTemaMes);
-      const podeSugerir = estado.indicacaoAberta && !quotaEsgotada;
-      const placeholderTxt = podeSugerir
-        ? `Descreva o tema que gostaria que fosse abordado… você ainda tem direito a ${restantes} sugestão(ões).`
-        : estado.msgIndicacao;
 
-      const textareaAttrs = podeSugerir ? '' : 'disabled readonly style="opacity:0.6; cursor:not-allowed;"';
+      // ✅ PRECEDÊNCIA CLARA: Quota > Datas do Ciclo > Normal
+      let isBlocked = quotaEsgotada;
+      let blockMsg = '⛔ Sua quota de sugestões para este mês já foi atingida. Aguarde o próximo ciclo para enviar novas sugestões.';
+
+      // Placeholder padrão (caso não esteja bloqueado)
+      let placeholderTxt = `Descreva o tema que gostaria que fosse abordado… você ainda tem direito a ${restantes} sugestão(ões).`;
+
+      // Se a quota não estiver esgotada, aqui você pode futuramente inserir a validação de datas:
+      // if (!isBlocked && !indicacaoAberta) { isBlocked = true; blockMsg = 'A indicação ainda não está aberta.'; }
+
+      // Aplica bloqueio visual e de interação
+      if (isBlocked) {
+        placeholderTxt = blockMsg;
+      }
+
+      const textareaAttrs = isBlocked ? 'disabled readonly style="opacity:0.6; cursor:not-allowed;"' : '';
 
       html += `
-      <div style="margin-top:16px">
-        <label class="rs-fc-label" for="rs-fc-txt">💡 Sugestão de tema</label>
-        <textarea id="rs-fc-txt" class="rs-fc-textarea" placeholder="${_esc(placeholderTxt)}"
-         maxlength="${MAX_CHARS}" ${textareaAttrs}></textarea>
-        <div class="rs-fc-chars" id="rs-fc-chars">0/${MAX_CHARS}</div>
-      </div>
-      <button class="rs-fc-enviar" id="rs-fc-enviar" disabled ${!podeSugerir ? 'disabled' : ''}
-       onclick="window._fcEnviar('sugestao_tema')">Enviar</button>`;
+        <div style="margin-top:16px">
+          <label class="rs-fc-label" for="rs-fc-txt">💡 Sugestão de tema</label>
+          <textarea id="rs-fc-txt" class="rs-fc-textarea" placeholder="${_esc(placeholderTxt)}"
+          maxlength="${MAX_CHARS}" ${textareaAttrs}></textarea>
+          <div class="rs-fc-chars" id="rs-fc-chars">0/${MAX_CHARS}</div>
+        </div>
+        <button class="rs-fc-enviar" id="rs-fc-enviar" disabled ${isBlocked ? 'disabled' : ''}
+        onclick="window._fcEnviar('sugestao_tema')">Enviar</button>`;
 
       html += await _renderResultadoAnterior(user, temFeatureTema);
     } else {
@@ -323,7 +348,14 @@
     }
   }
   // ── RENDER: Resultado Mês Anterior ────────────────────────────────────────
-  async function _renderResultadoAnterior(user, temFeatureTema) { try { const periodoAnt = _getPeriodoAnterior(); const snap = await window.db.collection('sugestoes_publicas').where('periodo', '==', periodoAnt).orderBy('votos', 'desc').get(); if (snap.empty) return ''; const raw = snap.docs.map(d => ({ id: d.id, ...d.data() })); let ordenado = raw; if (raw[0]?.ranking_final) { ordenado = raw[0].ranking_final.map(item => { const orig = raw.find(r => r.solicitacao_ref === item.solicitacao_ref); return orig ? { ...orig, posicao_fixa: item.posicao, votos_fixos: item.votos } : null; }).filter(Boolean); } const top5 = ordenado.slice(0, 5).map(s => ({ ...s, texto: s.texto_preview || s.texto || '(sem texto)' })); if (top5.length === 0) return ''; let html = `<div class="rs-resultado-card">`; html += `<div class="rs-resultado-header">🏁 VOTAÇÃO DE ${_formatarPeriodo(periodoAnt).toUpperCase()} ENCERRADA - Veja abaixo o resultado</div>`; top5.forEach((s, i) => { const isWinner = i === 0; const votos = s.votos_fixos !== undefined ? s.votos_fixos : (s.votos || 0); const pos = isWinner ? '🥇' : `#${i + 1}`; const dataEnv = s.criado_em ? new Date(s.criado_em.seconds ? s.criado_em.seconds * 1000 : s.criado_em).toLocaleDateString('pt-BR') : '—'; html += `<div class="rs-res-item ${isWinner ? 'vencedor' : ''}"><div class="rs-res-pos">${pos}</div><div class="rs-res-info"><div class="rs-res-texto">${_esc(s.texto)}</div><div class="rs-res-meta"><span class="rs-res-votos">👍 ${votos}</span><span>ENVIADA em ${dataEnv}</span></div></div></div>`; }); html += `</div>`; return html; } catch (err) { console.error('[faleConosco] resultado ant:', err); return ''; } }
+  async function _renderResultadoAnterior(user, temFeatureTema) {
+    try {
+      const periodoAnt = _getPeriodoAnterior();
+      const snap = await window.db.collection('sugestoes_publicas').where('periodo', '==', periodoAnt).orderBy('votos', 'desc').get();
+      if (snap.empty) return '';
+      const raw = snap.docs.map(d => ({ id: d.id, ...d.data() })); let ordenado = raw; if (raw[0]?.ranking_final) { ordenado = raw[0].ranking_final.map(item => { const orig = raw.find(r => r.solicitacao_ref === item.solicitacao_ref); return orig ? { ...orig, posicao_fixa: item.posicao, votos_fixos: item.votos } : null; }).filter(Boolean); } const top5 = ordenado.slice(0, 5).map(s => ({ ...s, texto: s.texto_preview || s.texto || '(sem texto)' })); if (top5.length === 0) return ''; let html = `<div class="rs-resultado-card">`; html += `<div class="rs-resultado-header">🏁 VOTAÇÃO DE ${_formatarPeriodo(periodoAnt).toUpperCase()} ENCERRADA - Veja abaixo o resultado</div>`; top5.forEach((s, i) => { const isWinner = i === 0; const votos = s.votos_fixos !== undefined ? s.votos_fixos : (s.votos || 0); const pos = isWinner ? '🥇' : `#${i + 1}`; const dataEnv = s.criado_em ? new Date(s.criado_em.seconds ? s.criado_em.seconds * 1000 : s.criado_em).toLocaleDateString('pt-BR') : '—'; html += `<div class="rs-res-item ${isWinner ? 'vencedor' : ''}"><div class="rs-res-pos">${pos}</div><div class="rs-res-info"><div class="rs-res-texto">${_esc(s.texto)}</div><div class="rs-res-meta"><span class="rs-res-votos">👍 ${votos}</span><span>ENVIADA em ${dataEnv}</span></div></div></div>`; }); html += `</div>`; return html;
+    } catch (err) { console.error('[faleConosco] resultado ant:', err); return ''; }
+  }
   // ── Votar ─────────────────────────────────────────────────────────────────
   window.votarSugestao = async function (sugestaoId, userId, cicloId) { // ✅ AJUSTADO: Recebe cicloId
     try {
