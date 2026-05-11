@@ -698,6 +698,16 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape') fecharModalM
 // ─── Mídia ────────────────────────────────────────────────────────────────────
 
 function renderMidia(newsletter, acesso) {
+
+  console.log('[DEBUG MAPA MENTAL]', {
+  mapa_ativo: newsletter.mapa_mental?.ativo,
+  user_segmento: segmento,
+  user_features: destinatario.features,
+  tem_acesso: acesso.temMapaMental,
+  manager_loaded: typeof window.MapaMentalManager?.init === 'function'
+});
+
+
   const secao = document.getElementById('secao-midia');
   const wrap = document.getElementById('midia-conteudo');
   if (!secao || !wrap) return;
