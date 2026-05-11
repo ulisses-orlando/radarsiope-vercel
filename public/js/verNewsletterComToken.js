@@ -150,6 +150,41 @@ window.validarEabrirMidia = async (url, tipo) => {
         order: 2;
       }
     }
+      // Adicione ao final do CSS injetado:
+
+/* Player de áudio nativo injetado dinamicamente */
+.rs-media-card-audio audio {
+  width: 100%;
+  max-width: 200px;
+  height: 36px;
+  min-height: 36px;
+  border-radius: 8px;
+  outline: none;
+  background: #0f1729;
+  display: block;
+  margin: 0 auto;
+}
+
+/* Garante que o container do áudio tenha espaço */
+.rs-media-card-audio {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 36px;
+}
+
+/* Mobile: player em linha separada */
+@media (max-width: 640px) {
+  .rs-media-card-audio {
+    width: 100%;
+    order: 2;
+    margin-top: 8px;
+  }
+  .rs-media-card-audio audio {
+    max-width: 100%;
+  }
+}
   `;
   document.head.appendChild(s);
 })();
