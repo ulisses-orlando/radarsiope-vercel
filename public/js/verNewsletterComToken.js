@@ -775,6 +775,11 @@ function renderMidia(newsletter, acesso) {
 
   // ── Mapa Mental ──────────────────────────────────────────────────────
 
+  console.log('[DEBUG MAPA MENTAL]', {
+  mapa_ativo: newsletter.mapa_mental?.ativo,
+  tem_acesso: acesso.temMapaMental,
+});
+
   if (newsletter.mapa_mental?.ativo) {
     itens.push(acesso.temMapaMental ? '__MAPA_MENTAL__' : `
       <div class="rs-media-item">
@@ -2137,13 +2142,7 @@ async function VerNewsletterComToken() {
 
     // Município em paralelo — não bloqueia o conteúdo principal
     renderMunicipio(destinatario, acesso, newsletter);
-console.log('[DEBUG MAPA MENTAL]', {
-  mapa_ativo: newsletter.mapa_mental?.ativo,
-  user_segmento: segmento,
-  user_features: destinatario.features,
-  tem_acesso: acesso.temMapaMental,
-  manager_loaded: typeof window.MapaMentalManager?.init === 'function'
-});
+
     renderMidia(newsletter, acesso);
     renderFAQ(newsletter, acesso);
     await renderReactions(nid, uid);
