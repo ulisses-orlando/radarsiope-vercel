@@ -40,12 +40,13 @@ window.validarEabrirMidia = async (url, tipo) => {
   document.head.appendChild(s);
 })();
 
-// ─── CSS dos Cards de Mídia (padrão Mapa Mental) ────────────────────────────
+// ─── CSS dos Cards de Mídia (padrão unificado) ────────────────────────────
 (function _injetarCSSMidia() {
   if (document.getElementById('rs-midia-style')) return;
   const s = document.createElement('style');
   s.id = 'rs-midia-style';
   s.textContent = `
+    /* ── Container base ─────────────────────────────────────── */
     .rs-media-card {
       display: flex;
       align-items: center;
@@ -56,36 +57,53 @@ window.validarEabrirMidia = async (url, tipo) => {
       padding: 16px 18px;
       margin: 12px 0;
       animation: rsFadeIn 0.35s ease;
-      transition: background .2s, transform .15s;
+      transition: background 0.2s ease;
     }
-    .rs-media-card:hover {
-      background: #1a2540;
-      transform: translateY(-1px);
+    
+    /* Hover suave e unificado (inclui Mapa Mental) */
+    .rs-media-card:hover,
+    .rs-mm-card:hover {
+      background: #1e293b; /* Apenas escurece levemente, sem movimento */
     }
-    .rs-media-card.rs-media-card-bloqueado {
+
+    /* ── Cards bloqueados ──────────────────────────────────── */
+    .rs-media-card.rs-media-card-bloqueado,
+    .rs-mm-card.rs-mm-card-bloqueado {
       opacity: 0.7;
       background: rgba(22,32,50,0.6);
     }
-    .rs-media-card-icone {
+
+    /* ── Ícone ─────────────────────────────────────────────── */
+    .rs-media-card-icone,
+    .rs-mm-card-icone {
       font-size: 30px;
       flex-shrink: 0;
       line-height: 1;
     }
-    .rs-media-card-info {
+
+    /* ── Informações ───────────────────────────────────────── */
+    .rs-media-card-info,
+    .rs-mm-card-info {
       flex: 1;
       min-width: 0;
       display: flex;
       flex-direction: column;
       gap: 3px;
     }
-    .rs-media-card-label {
+
+    /* ── Label (categoria) ─────────────────────────────────── */
+    .rs-media-card-label,
+    .rs-mm-card-label {
       font-size: 10px;
       font-weight: 700;
       letter-spacing: .08em;
       text-transform: uppercase;
       color: #60A5FA;
     }
-    .rs-media-card-titulo {
+
+    /* ── Título ────────────────────────────────────────────── */
+    .rs-media-card-titulo,
+    .rs-mm-card-titulo {
       font-size: 14px;
       color: var(--rs-text, #f1f5f9);
       font-weight: 600;
@@ -93,6 +111,8 @@ window.validarEabrirMidia = async (url, tipo) => {
       overflow: hidden;
       text-overflow: ellipsis;
     }
+
+    /* ── Subtítulo ─────────────────────────────────────────── */
     .rs-media-card-sub {
       font-size: 12px;
       color: var(--rs-muted, #94a3b8);
@@ -100,7 +120,10 @@ window.validarEabrirMidia = async (url, tipo) => {
       overflow: hidden;
       text-overflow: ellipsis;
     }
-    .rs-media-card-btn {
+
+    /* ── Botões ────────────────────────────────────────────── */
+    .rs-media-card-btn,
+    .rs-mm-card-btn {
       background: var(--azul, #0A3D62);
       color: #fff;
       border: none;
@@ -111,80 +134,73 @@ window.validarEabrirMidia = async (url, tipo) => {
       cursor: pointer;
       white-space: nowrap;
       flex-shrink: 0;
-      transition: background .2s, transform .15s;
+      transition: background .2s;
     }
-    .rs-media-card-btn:hover {
+    .rs-media-card-btn:hover,
+    .rs-mm-card-btn:hover {
       background: #0d4f7c;
-      transform: translateY(-1px);
     }
-    .rs-media-card-btn.rs-media-card-btn-lock {
+    .rs-media-card-btn.rs-media-card-btn-lock,
+    .rs-mm-card-btn.rs-mm-card-btn-lock {
       background: rgba(255,255,255,0.08);
       color: #94a3b8;
     }
-    .rs-media-card-btn.rs-media-card-btn-lock:hover {
+    .rs-media-card-btn.rs-media-card-btn-lock:hover,
+    .rs-mm-card-btn.rs-mm-card-btn-lock:hover {
       background: rgba(255,255,255,0.12);
       color: #f1f5f9;
     }
+
+    /* ── Container de Áudio ────────────────────────────────── */
     .rs-media-card-audio {
       flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      min-width: 120px;
     }
     .rs-media-card-audio button {
       width: 100%;
     }
+
+    /* ── Player de Áudio Nativo (INJETADO) ─────────────────── */
+    /* Garante que o player apareça mesmo dentro de containers flex */
+    .rs-media-card-audio audio {
+      display: block !important;
+      width: 100% !important;
+      max-width: 220px;
+      height: 38px !important;
+      min-height: 38px !important;
+      border-radius: 8px;
+      outline: none;
+      background: #0f1729;
+      margin: 0;
+      padding: 0;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+    }
+    
+    /* ── Mobile ────────────────────────────────────────────── */
     @media (max-width: 640px) {
-      .rs-media-card {
+      .rs-media-card, .rs-mm-card {
         flex-wrap: wrap;
         gap: 12px;
       }
-      .rs-media-card-icone {
+      .rs-media-card-icone, .rs-mm-card-icone {
         font-size: 26px;
       }
-      .rs-media-card-info {
+      .rs-media-card-info, .rs-mm-card-info {
         flex: 1 1 100%;
         order: 3;
         margin-top: 4px;
       }
-      .rs-media-card-btn,
-      .rs-media-card-audio {
+      .rs-media-card-btn, .rs-mm-card-btn,
+      .rs-media-card-audio, .rs-mm-card-audio {
         width: 100%;
         order: 2;
       }
+      .rs-media-card-audio audio, .rs-mm-card-audio audio {
+        max-width: 100%;
+      }
     }
-      // Adicione ao final do CSS injetado:
-
-/* Player de áudio nativo injetado dinamicamente */
-.rs-media-card-audio audio {
-  width: 100%;
-  max-width: 200px;
-  height: 36px;
-  min-height: 36px;
-  border-radius: 8px;
-  outline: none;
-  background: #0f1729;
-  display: block;
-  margin: 0 auto;
-}
-
-/* Garante que o container do áudio tenha espaço */
-.rs-media-card-audio {
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 36px;
-}
-
-/* Mobile: player em linha separada */
-@media (max-width: 640px) {
-  .rs-media-card-audio {
-    width: 100%;
-    order: 2;
-    margin-top: 8px;
-  }
-  .rs-media-card-audio audio {
-    max-width: 100%;
-  }
-}
   `;
   document.head.appendChild(s);
 })();
