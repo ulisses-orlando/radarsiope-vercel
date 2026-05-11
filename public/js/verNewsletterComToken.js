@@ -252,6 +252,7 @@ function detectarAcesso(destinatario, newsletter, segmento, envio) {
       : (!!newsletter.acesso_audio_leads || acessoProTemp),
     temInfografico: isAssinante ? !!features.newsletter_infografico : acessoProTemp,
     temVideo: isAssinante ? !!features.newsletter_video : acessoProTemp,
+    temMapaMental: isAssinante ? !!features.newsletter_mapa_mental : acessoProTemp,
     temAlertas: isAssinante && !!features.alertas_prioritarios,
     temChat: isAssinante && !!features.pergunta_edicao,
     blurMunicipio: !isAssinante && !acessoProTemp,
@@ -772,15 +773,37 @@ function renderMidia(newsletter, acesso) {
       </div>`);
   }
 
+  // ── Mapa Mental ──────────────────────────────────────────────────────
+
+  if (newsletter.mapa_mental?.ativo) {
+    itens.push(acesso.temMapaMental ? '__MAPA_MENTAL__' : `
+      <div class="rs-media-item">
+        <div class="rs-media-icon" style="opacity:.4">🗺️</div>
+        <div class="rs-media-info">
+          <div class="rs-media-titulo">Mapa Mental</div>
+          <div class="rs-media-sub">Disponível no plano Profissional ou superior</div>
+        </div>
+        <button class="rs-media-btn rs-media-btn-lock"
+                onclick="_solicitarUpgrade('mapa_mental', ${acesso.isAssinante})">🔒 Desbloquear</button>
+      </div>`);
+  }
+
   if (itens.length) {
     secao.style.display = 'block';
-    wrap.innerHTML = itens.join('');
+    // Remove o placeholder antes de injetar o HTML
+    const itensSemMapa = itens.filter(i => i !== '__MAPA_MENTAL__');
+    wrap.innerHTML = itensSemMapa.join('');
+    // MapaMentalManager injeta e gerencia o próprio card
+    if (itens.includes('__MAPA_MENTAL__')
+        && typeof window.MapaMentalManager?.init === 'function') {
+      window.MapaMentalManager.init(newsletter, acesso);
+    }
   } else {
-    // Sem mídia nesta edição — limpa para não herdar conteúdo de edição anterior
     secao.style.display = 'none';
     wrap.innerHTML = '';
   }
 }
+
 
 // ─── FAQ ──────────────────────────────────────────────────────────────────────
 

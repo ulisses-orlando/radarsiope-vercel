@@ -677,6 +677,86 @@ const perguntasSalvas = data.quiz?.perguntas || [];
 if (Array.isArray(perguntasSalvas) && perguntasSalvas.length > 0) 
     perguntasSalvas.forEach(p => renderQuizPergunta(p));
 
+// ── MAPA MENTAL ────────────────────────────────────────────────────────────
+  const mapaMentalSection = document.createElement('div');
+  mapaMentalSection.style.cssText = 'margin-top:18px;padding:14px;border:1.5px solid #0d9488;border-radius:8px;background:#f0fdfa';
+  mapaMentalSection.innerHTML = `
+    <div style="font-weight:600;font-size:13px;color:#0f766e;margin-bottom:8px;display:flex;align-items:center;gap:6px">
+      🗺️ Mapa Mental da Edição
+      <span style="font-size:11px;color:#888;font-weight:400">— Gerado via NotebookLM</span>
+    </div>
+    <div style="font-size:12px;color:#6b7280;margin-bottom:10px;line-height:1.5">
+      Cole o JSON gerado pelo NotebookLM. Use o botão "Validar" antes de salvar.
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+      <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer">
+        <input type="checkbox" id="mm-ativo"
+          ${data.mapa_mental?.ativo ? 'checked' : ''}
+          style="width:14px;height:14px">
+        Ativo (visível no app)
+      </label>
+    </div>
+    <textarea id="mm-json-input" rows="8"
+      style="width:100%;padding:8px;border:1.5px solid #99f6e4;border-radius:6px;
+             font-family:monospace;font-size:11px;resize:vertical;background:#fff;
+             color:#134e4a;line-height:1.5"
+      placeholder='{"titulo":"...","raiz":{"id":"root","texto":"...","filhos":[...]}}'
+      spellcheck="false">${data.mapa_mental?.raiz ? JSON.stringify(data.mapa_mental, null, 2) : ''}</textarea>
+    <div style="display:flex;gap:8px;margin-top:8px">
+      <button type="button" id="mm-btn-validar"
+        style="flex:1;padding:7px 12px;background:#0d9488;color:#fff;border:none;
+               border-radius:6px;cursor:pointer;font-size:12px;font-weight:600">
+        ✅ Validar JSON
+      </button>
+      <button type="button" id="mm-btn-limpar"
+        style="padding:7px 12px;background:#f1f5f9;color:#64748b;border:1px solid #e2e8f0;
+               border-radius:6px;cursor:pointer;font-size:12px">
+        🗑️ Limpar
+      </button>
+    </div>
+    <div id="mm-status" style="margin-top:8px;font-size:12px;min-height:18px"></div>
+  `;
+  col1.appendChild(mapaMentalSection);
+
+  // Validar JSON
+  document.getElementById('mm-btn-validar').addEventListener('click', () => {
+    const status = document.getElementById('mm-status');
+    const raw = document.getElementById('mm-json-input').value.trim();
+    if (!raw) {
+      status.innerHTML = '<span style="color:#94a3b8">— Nenhum JSON informado.</span>';
+      return;
+    }
+    try {
+      const obj = JSON.parse(raw);
+      const erros = [];
+      if (!obj.titulo)                    erros.push('campo "titulo" ausente');
+      if (!obj.raiz?.id)                  erros.push('campo "raiz.id" ausente');
+      if (!obj.raiz?.texto)               erros.push('campo "raiz.texto" ausente');
+      if (!Array.isArray(obj.raiz?.filhos)) erros.push('"raiz.filhos" deve ser um array');
+
+      if (erros.length) {
+        status.innerHTML = `<span style="color:#dc2626">❌ JSON inválido: ${erros.join('; ')}.</span>`;
+        return;
+      }
+
+      const nTopicos   = obj.raiz.filhos.length;
+      const nSubtopicos = obj.raiz.filhos.reduce((s, n) => s + (n.filhos?.length || 0), 0);
+      status.innerHTML =
+        `<span style="color:#0d9488">✅ JSON válido — ${nTopicos} tópico(s), ${nSubtopicos} subtópico(s).</span>`;
+
+      // Formata o JSON no textarea
+      document.getElementById('mm-json-input').value = JSON.stringify(obj, null, 2);
+    } catch (e) {
+      status.innerHTML = `<span style="color:#dc2626">❌ Erro de sintaxe: ${e.message}</span>`;
+    }
+  });
+
+  // Limpar campo
+  document.getElementById('mm-btn-limpar').addEventListener('click', () => {
+    document.getElementById('mm-json-input').value = '';
+    document.getElementById('mm-status').innerHTML = '';
+  });
+
   // ── Acesso pro temporário para leads ──────────────────────────────────────
   const proTempSection = document.createElement('div');
   proTempSection.style.cssText = `
@@ -1316,6 +1396,21 @@ if (Array.isArray(perguntasSalvas) && perguntasSalvas.length > 0)
     };
 
     payload.quiz = coletarQuiz();
+
+    // ── Coleta do Mapa Mental ──────────────────────────────────────────────
+    const coletarMapaMental = () => {
+      const raw = document.getElementById('mm-json-input')?.value?.trim();
+      if (!raw) return null;
+      try {
+        const obj = JSON.parse(raw);
+        if (!obj.raiz?.filhos) return null;
+        return {
+          ...obj,
+          ativo: document.getElementById('mm-ativo')?.checked || false
+        };
+      } catch { return null; }
+    };
+    payload.mapa_mental = coletarMapaMental();
 
     // ── Blocos ────────────────────────────────────────────────────────────
     payload.blocos = coletarBlocosEdicao();
