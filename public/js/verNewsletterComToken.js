@@ -874,7 +874,7 @@ function renderMidia(newsletter, acesso) {
         icone: '🎧',
         label: 'Podcast',
         titulo: 'Podcast desta edição',
-        sub: 'Produzido por IA · Ouça no trabalho, no trânsito ou em casa.',
+        sub: 'Ouça no trabalho, no trânsito ou em casa.',
         btnHtml: `
           <div class="rs-media-card-audio">
             <button class="rs-media-card-btn" 
