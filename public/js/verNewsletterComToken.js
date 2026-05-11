@@ -775,12 +775,7 @@ function renderMidia(newsletter, acesso) {
 
   // ── Mapa Mental ──────────────────────────────────────────────────────
 
-  console.log('[DEBUG MAPA MENTAL]', {
-  mapa_ativo: newsletter.mapa_mental?.ativo,
-  tem_acesso: acesso.temMapaMental,
-});
-
-  if (newsletter.mapa_mental?.ativo) {
+  /* if (newsletter.mapa_mental?.ativo) {
     itens.push(acesso.temMapaMental ? '__MAPA_MENTAL__' : `
       <div class="rs-media-item">
         <div class="rs-media-icon" style="opacity:.4">🗺️</div>
@@ -806,7 +801,41 @@ function renderMidia(newsletter, acesso) {
   } else {
     secao.style.display = 'none';
     wrap.innerHTML = '';
+  } */
+
+
+    // ── Mapa Mental ──────────────────────────────────────────────────────
+if (newsletter.mapa_mental?.ativo) {
+  itens.push(acesso.temMapaMental ? ' MAPA_MENTAL ' : `<div class="rs-media-item">...</div>`);
+}
+
+if (itens.length) {
+  secao.style.display = 'block';
+  const itensSemMapa = itens.filter(i => i !== ' MAPA_MENTAL ');
+  wrap.innerHTML = itensSemMapa.join('');
+
+  // 🐛 DIAGNÓSTICO EXATO DO BLOQUEIO
+  const temPlaceholder = itens.includes(' MAPA_MENTAL ');
+  const managerOk = typeof window.MapaMentalManager?.init === 'function';
+  const mm = newsletter.mapa_mental;
+  const temRaiz = !!mm?.raiz; // Guard interno do mapaMental.js
+
+  console.log('[🗺️ CHECK MAPA MENTAL]', { 
+    temPlaceholder, 
+    managerOk, 
+    temRaiz,
+    containerExiste: !!document.getElementById('midia-conteudo'),
+    erroSintaxe: managerOk ? '✅ Script carregado' : '❌ mapaMental.js travou ou não foi incluído'
+  });
+
+  if (temPlaceholder && managerOk && temRaiz) {
+    window.MapaMentalManager.init(newsletter, acesso);
+  } else {
+    console.warn('⛔ MAPA MENTAL BLOQUEADO POR:', { managerOk, temRaiz });
   }
+}
+
+
 }
 
 
