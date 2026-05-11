@@ -775,7 +775,7 @@ function renderMidia(newsletter, acesso) {
 
   // ── Mapa Mental ──────────────────────────────────────────────────────
 
-  /* if (newsletter.mapa_mental?.ativo) {
+  if (newsletter.mapa_mental?.ativo) {
     itens.push(acesso.temMapaMental ? '__MAPA_MENTAL__' : `
       <div class="rs-media-item">
         <div class="rs-media-icon" style="opacity:.4">🗺️</div>
@@ -801,11 +801,11 @@ function renderMidia(newsletter, acesso) {
   } else {
     secao.style.display = 'none';
     wrap.innerHTML = '';
-  } */
+  }
 
 
     // ── Mapa Mental ──────────────────────────────────────────────────────
-if (newsletter.mapa_mental?.ativo) {
+/* if (newsletter.mapa_mental?.ativo) {
   itens.push(acesso.temMapaMental ? ' MAPA_MENTAL ' : `<div class="rs-media-item">...</div>`);
 }
 
@@ -833,7 +833,7 @@ if (itens.length) {
   } else {
     console.warn('⛔ MAPA MENTAL BLOQUEADO POR:', { managerOk, temRaiz });
   }
-}
+} */
 
 
 }
