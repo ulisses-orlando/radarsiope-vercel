@@ -32,6 +32,25 @@ function _validarJanelaCiclo(cicloDoc, acao) {
   return { valido: true, ciclo: cicloDoc };
 }
 
+// ✅ Helpers para validação segura de datas e ciclo
+function _tsMs(ts) {
+  if (!ts) return null;
+  if (ts.seconds) return ts.seconds * 1000; // Firestore Timestamp
+  if (ts instanceof Date) return ts.getTime();
+  return new Date(ts).getTime(); // String ou Date
+}
+
+function _validarCicloParaIndicacao(cicloDoc) {
+  if (!cicloDoc) return { valido: false, erro: 'Nenhum ciclo configurado.' };
+  if (cicloDoc.status === 'inativo' || cicloDoc.status === 'encerrado') return { valido: false, erro: 'Ciclo encerrado ou inativo.' };
+  const agora = Date.now();
+  const ini = _tsMs(cicloDoc.inicio_indicacao);
+  const fim = _tsMs(cicloDoc.fim_indicacao);
+  if (!ini || agora < ini) return { valido: false, erro: 'Período de indicação ainda não abriu.' };
+  if (fim && agora > fim) return { valido: false, erro: 'Período de indicação já encerrou.' };
+  return { valido: true };
+}
+
 // ── Inicialização ─────────────────────────────────────────────────────────
 function init() { _injetarHTML(); _injetarCSS(); _bindEventos(); _atualizarBadge(); }
 // ── HTML ──────────────────────────────────────────────────────────────────
@@ -108,51 +127,71 @@ if (textarea) {
 window._fcSelecionarTipo = function (tipo) { _renderDrawer(tipo); };
 // ── Enviar mensagem ───────────────────────────────────────────────────────
 window._fcEnviar = async function (tipo) {
-const textarea = document.getElementById('rs-fc-txt'); const btnEnv = document.getElementById('rs-fc-enviar'); const texto = textarea?.value?.trim();
-if (!texto) return;
-const user = window._radarUser; if (!user) return;
-if (btnEnv) { btnEnv.disabled = true; btnEnv.textContent = 'Enviando…'; }
+  const textarea = document.getElementById('rs-fc-txt');
+  const btnEnv = document.getElementById('rs-fc-enviar');
+  const texto = textarea?.value?.trim();
+  if (!texto) return;
+  const user = window._radarUser;
+  if (!user) return;
+  if (btnEnv) { btnEnv.disabled = true; btnEnv.textContent = 'Enviando…'; }
 
-try {
-  if (user.segmento === 'assinante') {
-    // ✅ AJUSTADO: Validação rigorosa de quota e datas antes de criar solicitação
-    if (tipo === 'sugestao_tema') {
-      const quotaMsg = _checarQuotaIndicacao(user);
-      if (!quotaMsg.valido) throw new Error(quotaMsg.erro);
+  try {
+    // 1️⃣ Validação SERVER-SIDE de quota (assinante)
+    if (user.segmento === 'assinante' && tipo === 'sugestao_tema') {
+      const _sessao = JSON.parse(localStorage.getItem('rs_pwa_session') || '{}');
+      const quota = (_sessao.features || user.features || {}).sugestao_tema_quota || 0;
+      if (quota === 0) throw new Error('Seu plano não permite sugestões de tema.');
       
-      // Busca o ciclo mais recente e valida datas
-      const ciclosSnap = await window.db.collection('ciclos_votacao').orderBy('inicio_indicacao', 'desc').limit(3).get();
+      const inicioMes = new Date(); inicioMes.setDate(1); inicioMes.setHours(0,0,0,0);
+      const snap = await window.db.collection('usuarios').doc(user.uid).collection('solicitacoes').where('tipo', '==', 'sugestao_tema').get();
+      const uso = snap.docs.filter(d => d.data().data_solicitacao && new Date(d.data().data_solicitacao) >= inicioMes).length;
+      if (uso >= quota) throw new Error('Cota mensal de sugestões esgotada.');
+    }
+
+    // 2️⃣ Cria a solicitação privada
+    const solicitacaoRef = await window.db.collection('usuarios').doc(user.uid).collection('solicitacoes').add({
+      tipo, descricao: texto, status: 'aberta', data_solicitacao: new Date().toISOString()
+    });
+
+    // 3️⃣ Se for tema, vincula ao ciclo válido e cria documento público
+    if (tipo === 'sugestao_tema') {
+      const ciclosSnap = await window.db.collection('ciclos_votacao').orderBy('inicio_indicacao', 'desc').limit(5).get();
       let cicloAtivo = null;
       for (const doc of ciclosSnap.docs) {
-        const val = _validarJanelaCiclo({ id: doc.id, ...doc.data() }, 'indicacao');
-        if (val.valido) { cicloAtivo = val.ciclo; break; }
+        const cicloData = { id: doc.id, ...doc.data() };
+        if (_validarCicloParaIndicacao(cicloData).valido) {
+          cicloAtivo = cicloData;
+          break;
+        }
       }
       if (!cicloAtivo) throw new Error('Não há ciclo de indicação aberto no momento.');
-      
-      const solicitacaoRef = await window.db.collection('usuarios').doc(user.uid).collection('solicitacoes').add({ tipo, descricao: texto, status: 'aberta', data_solicitacao: new Date().toISOString() });
-      
+
+      // Extrai o período com segurança (evita crash com .toDate())
+      const periodoStr = new Date(_tsMs(cicloAtivo.inicio_indicacao)).toISOString().slice(0, 7);
+
       await window.db.collection('sugestoes_publicas').doc(`sugestao_${solicitacaoRef.id}`).set({
-        solicitacao_ref: solicitacaoRef.path, texto_preview: texto.substring(0, 100) + (texto.length > 100 ? '...' : ''), autor_uid: user.uid, votos: 0, votantes: [], status: 'ativa',
-        ciclo_id: cicloAtivo.id, periodo: new Date(_tsMs(cicloAtivo.inicio_indicacao)).toISOString().slice(0, 7), criado_em: new Date(), atualizado_em: new Date()
+        solicitacao_ref: solicitacaoRef.path,
+        texto_preview: texto.substring(0, 100) + (texto.length > 100 ? '...' : ''),
+        autor_uid: user.uid, votos: 0, votantes: [],
+        status: 'ativa',
+        ciclo_id: cicloAtivo.id,
+        periodo: periodoStr,
+        criado_em: new Date(), atualizado_em: new Date()
       });
-    } else {
-      const solicitacaoRef = await window.db.collection('usuarios').doc(user.uid).collection('solicitacoes').add({ tipo, descricao: texto, status: 'aberta', data_solicitacao: new Date().toISOString() });
     }
+
+    // 4️⃣ Atualiza contador admin
     await window.db.collection('admin_contadores').doc('pendencias').set({ solicitacoes: firebase.firestore.FieldValue.increment(1) }, { merge: true });
-  } else {
-    const leadId = parseInt(user.uid, 10); if (!leadId) throw new Error('ID do lead inválido.');
-    const { error } = await window.supabase.from('leads_mensagens').insert({ lead_id: leadId, texto, tipo });
-    if (error) throw new Error(error.message);
-    await window.db.collection('admin_contadores').doc('pendencias').set({ leads_mensagens: firebase.firestore.FieldValue.increment(1) }, { merge: true });
+
+    if (btnEnv) { btnEnv.textContent = '✅ Enviado!'; btnEnv.disabled = true; }
+    _historicoCache = null;
+    setTimeout(() => _renderDrawer(tipo), 700);
+
+  } catch (e) {
+    console.error('[faleConosco] enviar:', e);
+    if (btnEnv) { btnEnv.disabled = false; btnEnv.textContent = 'Enviar'; }
+    alert(e.message || 'Erro ao enviar. Tente novamente.');
   }
-  if (btnEnv) { btnEnv.textContent = '✅ Enviado!'; btnEnv.disabled = true; }
-  _historicoCache = null;
-  setTimeout(() => _renderDrawer(tipo), 700);
-} catch (e) {
-  console.error('[faleConosco] enviar:', e);
-  if (btnEnv) { btnEnv.disabled = false; btnEnv.textContent = 'Enviar'; }
-  alert(e.message || 'Erro ao enviar. Tente novamente.');
-}
 };
 
 // ✅ NOVO: Helper para validar quota de indicação
