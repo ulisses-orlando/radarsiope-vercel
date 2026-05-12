@@ -471,7 +471,10 @@ function _criarCardPlano(plano, ciclo, allFeatures) {
     let label = f.nome || f.id;
     if (f.tipo === 'number') {
       const numVal = Number(val);
-      if (!isNaN(numVal) && numVal > 0) label += ` (${numVal}/mês)`;
+      if (!isNaN(numVal) && numVal > 0) {
+        const unidade = f.unidade || '/mês'; // ✅ Usa a unidade do Firestore (com fallback)
+        label += `(${numVal}${unidade})`;
+      }
     }
     return `<li class="${ativo ? '' : 'inativo'}">${label}</li>`;
   }).join('');
