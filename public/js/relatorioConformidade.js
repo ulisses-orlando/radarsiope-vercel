@@ -11,40 +11,39 @@
 // ─── Ponto de entrada público ─────────────────────────────────────────────────
 async function gerarRelatorioConformidade(cod, nome, uf) {
   const btn = document.getElementById('btn-relatorio-conformidade');
-  if (btn) {
-    btn.disabled = true;
-    btn.innerHTML = '⏳ Gerando…';
-  }
-
+  if (btn) { btn.disabled = true; btn.innerHTML = '⏳ Gerando…'; }
+ 
   try {
-    const user = firebase.auth().currentUser;
-    if (!user) throw new Error('Usuário não autenticado.');
-
-    const token = await user.getIdToken();
-
+    // Usa window._radarUser — padrão do projeto, sem firebase.auth()
+    const user = window._radarUser;
+    if (!user?.uid) throw new Error('Usuário não autenticado.');
+ 
     const resp = await fetch('/api/sendViaSES?acao=relatorio_conformidade', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`,
-      },
-      body: JSON.stringify({ cod_municipio: cod }),
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        uid:          user.uid,       // identificação do assinante
+        cod_municipio: cod,
+      }),
     });
-
+ 
     const dados = await resp.json();
-
+ 
     if (!dados.ok) {
-      const msg = dados.error || 'Erro ao gerar relatório.';
+      const msg = resp.status === 403
+        ? 'Este recurso não está disponível no seu plano atual.'
+        : (dados.error || 'Erro ao gerar relatório.');
       if (typeof mostrarMensagem === 'function') mostrarMensagem(msg);
       else alert(msg);
       return;
     }
-
-    // Abre nova aba e escreve o HTML do relatório
+ 
+    // Abre nova aba com o HTML do relatório
     const html = _montarHTMLRelatorio(dados);
     const win  = window.open('', '_blank');
+ 
     if (!win) {
-      // Popup bloqueado — fallback: cria blob e abre link
+      // Fallback para popup bloqueado
       const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
       const url  = URL.createObjectURL(blob);
       const a    = document.createElement('a');
@@ -52,26 +51,19 @@ async function gerarRelatorioConformidade(cod, nome, uf) {
       setTimeout(() => URL.revokeObjectURL(url), 5000);
       return;
     }
-
+ 
     win.document.open();
     win.document.write(html);
     win.document.close();
-
-    // Aguarda recursos carregarem antes de acionar print
-    win.addEventListener('load', () => {
-      setTimeout(() => win.print(), 400);
-    });
-
+    win.addEventListener('load', () => setTimeout(() => win.print(), 400));
+ 
   } catch (err) {
     console.error('[Relatório] Erro:', err);
     const msg = 'Não foi possível gerar o relatório. Tente novamente.';
     if (typeof mostrarMensagem === 'function') mostrarMensagem(msg);
     else alert(msg);
   } finally {
-    if (btn) {
-      btn.disabled = false;
-      btn.innerHTML = '📋 Relatório de Conformidade';
-    }
+    if (btn) { btn.disabled = false; btn.innerHTML = '📋 Relatório de Conformidade'; }
   }
 }
 
