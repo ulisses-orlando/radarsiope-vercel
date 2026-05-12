@@ -584,13 +584,7 @@
     </div>
 
     <hr style="margin: 30px 0;">
-    <h3>🔐 Migração de Senhas Antigas</h3>
-    <p>Atualize todas as senhas salvas em texto puro para SHA-256.</p>
-    <button onclick="migrarSenhasAntigas()">🔄 Migrar Senhas</button>
-    <button onclick="seedRespostasAutomaticas()">🔄 Popular respostas automaticas</button>
 
-    <button onclick="Atualizarnomelower()">🔄 Atualizar nome lower</button>
-    <button onclick="popularDatas()">🔄 Popular data lotes gerais</button>
     <div id="status-migracao" style="margin-top: 10px; font-weight: bold;"></div>
 
     <button onclick="abrirAbaBacklog('secao-backlog')">📋 Backlog (Kanban)</button>
@@ -611,7 +605,6 @@
         <button onclick="mostrarAba('secao-newsletters-envio')">📰 Newsletters Disponíveis</button>
         <button onclick="abrirAbaDescadastramentos()">📉 Descadastramentos</button>
         <button onclick="abrirTelaTodosOsLotes()">📂 Ver Todos os Lotes</button>
-        <button onclick="abrirAbaOrientacoes()">📖 Orientações</button>
       </div>
 
       <!-- Seletor de público-alvo -->
@@ -1309,62 +1302,6 @@
             <!-- preenchido dinamicamente -->
           </tbody>
         </table>
-      </section>
-
-      <section id="secao-orientacoes"
-        style="display:none; margin-top:30px; background:#fff8e1; padding:20px; border-left:4px solid #fbc02d;">
-        <h2>📖 Orientações de Envio de Newsletters</h2>
-
-        <div style="margin-bottom:20px;">
-          <h3>1. Providers de E-mail</h3>
-          <p>
-            Atualmente usamos <strong>Vercel</strong> para testes.
-            Para produção, basta alterar <code>EMAIL_PROVIDER</code> para <strong>"ses"</strong> e configurar o endpoint
-            <code>/api/sesEnviarEmail</code>.
-          </p>
-        </div>
-
-        <div style="margin-bottom:20px;">
-          <h3>2. Variáveis de Ambiente</h3>
-          <ul>
-            <li><code>AWS_ACCESS_KEY_ID</code></li>
-            <li><code>AWS_SECRET_ACCESS_KEY</code></li>
-            <li><code>AWS_REGION</code></li>
-            <li><code>SES_SOURCE_EMAIL</code> (e-mail verificado no SES)</li>
-            <li><code>SES_REPLYTO_EMAIL</code> (opcional)</li>
-          </ul>
-          <p>Configure essas variáveis no painel do Vercel (para testes) ou no ambiente AWS (produção).</p>
-        </div>
-
-        <div style="margin-bottom:20px;">
-          <h3>3. Regras de Envio</h3>
-          <ul>
-            <li>Leads → apenas newsletters <strong>básicas</strong>, se <code>receber_newsletter !== false</code>.</li>
-            <li>Usuários → podem receber <strong>premium</strong> se assinatura estiver <code>ativo</code>.</li>
-            <li>Canceladas/expiradas não recebem.</li>
-          </ul>
-        </div>
-
-        <div style="margin-bottom:20px;">
-          <h3>4. Rate Limiting e Paralelismo</h3>
-          <p>
-            O envio usa <strong>pool de workers</strong> com limite de paralelismo e pausa entre envios.
-            Exemplo atual: <code>5 workers</code> + <code>600ms delay</code> → ~50–100/min.
-          </p>
-        </div>
-
-        <div style="margin-bottom:20px;">
-          <h3>5. Checklist de Testes</h3>
-          <ul>
-            <li>Prévia mostra apenas destinatários válidos.</li>
-            <li>Botão "Preparar envio" só habilita após escolher tipo de destinatário.</li>
-            <li>Envio registra status no Firestore (<code>enviado</code> ou <code>erro</code>).</li>
-            <li>Barra de progresso atualiza corretamente.</li>
-          </ul>
-        </div>
-
-        <!-- Botão de voltar -->
-        <button onclick="mostrarAba('secao-newsletters-envio')">⬅️ Voltar para Newsletters</button>
       </section>
     </section>
 
