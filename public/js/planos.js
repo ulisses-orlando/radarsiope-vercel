@@ -19,18 +19,18 @@ const PLANOS_CANON = {
     destaque: false,
     badge: '',
     features: {
-      newsletter_texto:    true,
-      newsletter_audio:    false,
-      newsletter_video:    false,
+      newsletter_texto: true,
+      newsletter_audio: false,
+      newsletter_video: false,
       newsletter_infografico: false,
       alertas_prioritarios: false,
-      grupo_whatsapp_vip:  false,
-      biblioteca_acesso:   true,
+      grupo_whatsapp_vip: false,
+      biblioteca_acesso: true,
       sugestao_tema_quota: 0,
       consultoria_horas_mes: 0,
     },
     metodos_pagamento: ['credit_card'],
-    desconto_pct_6m:  10,
+    desconto_pct_6m: 10,
     desconto_pct_12m: 20,
     descontos_por_ciclo: { '1': 0, '3': 0, '6': 10, '12': 20 },
     ciclos_disponiveis: ['3', '6', '12'],
@@ -42,18 +42,18 @@ const PLANOS_CANON = {
     destaque: false,
     badge: '',
     features: {
-      newsletter_texto:    true,
-      newsletter_audio:    true,
-      newsletter_video:    false,
+      newsletter_texto: true,
+      newsletter_audio: true,
+      newsletter_video: false,
       newsletter_infografico: false,
       alertas_prioritarios: false,
-      grupo_whatsapp_vip:  false,
-      biblioteca_acesso:   true,
+      grupo_whatsapp_vip: false,
+      biblioteca_acesso: true,
       sugestao_tema_quota: 0,
       consultoria_horas_mes: 0,
     },
     metodos_pagamento: ['credit_card'],
-    desconto_pct_6m:  10,
+    desconto_pct_6m: 10,
     desconto_pct_12m: 20,
     descontos_por_ciclo: { '1': 0, '3': 0, '6': 10, '12': 20 },
     ciclos_disponiveis: ['3', '6', '12'],
@@ -65,18 +65,18 @@ const PLANOS_CANON = {
     destaque: true,
     badge: '⭐ Mais popular',
     features: {
-      newsletter_texto:    true,
-      newsletter_audio:    true,
-      newsletter_video:    true,
+      newsletter_texto: true,
+      newsletter_audio: true,
+      newsletter_video: true,
       newsletter_infografico: true,
       alertas_prioritarios: true,
-      grupo_whatsapp_vip:  false,
-      biblioteca_acesso:   true,
+      grupo_whatsapp_vip: false,
+      biblioteca_acesso: true,
       sugestao_tema_quota: 0,
       consultoria_horas_mes: 0,
     },
     metodos_pagamento: ['credit_card'],
-    desconto_pct_6m:  10,
+    desconto_pct_6m: 10,
     desconto_pct_12m: 20,
     descontos_por_ciclo: { '1': 0, '3': 0, '6': 10, '12': 20 },
     ciclos_disponiveis: ['3', '6', '12'],
@@ -88,18 +88,18 @@ const PLANOS_CANON = {
     destaque: false,
     badge: '🏆 VIP',
     features: {
-      newsletter_texto:    true,
-      newsletter_audio:    true,
-      newsletter_video:    true,
+      newsletter_texto: true,
+      newsletter_audio: true,
+      newsletter_video: true,
       newsletter_infografico: true,
       alertas_prioritarios: true,
-      grupo_whatsapp_vip:  true,
-      biblioteca_acesso:   true,
+      grupo_whatsapp_vip: true,
+      biblioteca_acesso: true,
       sugestao_tema_quota: 2,
       consultoria_horas_mes: 0,
     },
     metodos_pagamento: ['credit_card'],
-    desconto_pct_6m:  10,
+    desconto_pct_6m: 10,
     desconto_pct_12m: 20,
     descontos_por_ciclo: { '1': 0, '3': 0, '6': 10, '12': 20 },
   },
@@ -110,18 +110,18 @@ const PLANOS_CANON = {
     destaque: false,
     badge: '💎 Elite',
     features: {
-      newsletter_texto:    true,
-      newsletter_audio:    true,
-      newsletter_video:    true,
+      newsletter_texto: true,
+      newsletter_audio: true,
+      newsletter_video: true,
       newsletter_infografico: true,
       alertas_prioritarios: true,
-      grupo_whatsapp_vip:  true,
-      biblioteca_acesso:   true,
+      grupo_whatsapp_vip: true,
+      biblioteca_acesso: true,
       sugestao_tema_quota: 2,
       consultoria_horas_mes: 4,
     },
     metodos_pagamento: ['credit_card'],
-    desconto_pct_6m:  10,
+    desconto_pct_6m: 10,
     desconto_pct_12m: 20,
     descontos_por_ciclo: { '1': 0, '3': 0, '6': 10, '12': 20 },
     ciclos_disponiveis: ['3', '6', '12'],
@@ -159,13 +159,13 @@ function fmtFeatureBadges(features) {
   // Fallback para o sistema antigo
   if (!features || typeof features !== 'object') return '—';
   const ativos = [];
-  if (features.newsletter_audio)       ativos.push('🎧');
-  if (features.newsletter_video)       ativos.push('🎬');
+  if (features.newsletter_audio) ativos.push('🎧');
+  if (features.newsletter_video) ativos.push('🎬');
   if (features.newsletter_infografico) ativos.push('📊');
-  if (features.alertas_prioritarios)   ativos.push('🔔');
-  if (features.grupo_whatsapp_vip)     ativos.push('💬');
-  if (features.consultoria_horas_mes)  ativos.push(`🎯${features.consultoria_horas_mes}h`);
-  if (features.sugestao_tema_quota)    ativos.push(`💡${features.sugestao_tema_quota}/mês`);
+  if (features.alertas_prioritarios) ativos.push('🔔');
+  if (features.grupo_whatsapp_vip) ativos.push('💬');
+  if (features.consultoria_horas_mes) ativos.push(`🎯${features.consultoria_horas_mes}h`);
+  if (features.sugestao_tema_quota) ativos.push(`💡${features.sugestao_tema_quota}/mês`);
   return ativos.length ? ativos.join(' ') : '📝 Básico';
 }
 
@@ -203,7 +203,7 @@ async function carregarPlanos() {
 
       // badge visual de destaque
       const badgeTd = d.destaque
-        ? `<span style="background:${escapeHtml(d.cor_destaque||'#0A3D62')};color:#fff;padding:2px 7px;border-radius:10px;font-size:11px">${escapeHtml(d.badge||'⭐')}</span>`
+        ? `<span style="background:${escapeHtml(d.cor_destaque || '#0A3D62')};color:#fff;padding:2px 7px;border-radius:10px;font-size:11px">${escapeHtml(d.badge || '⭐')}</span>`
         : '';
 
       // status colorido — considera em_breve
@@ -226,7 +226,7 @@ async function carregarPlanos() {
         <td style="text-align:center;white-space:nowrap">
           <span class="icon-btn" title="Editar" onclick="abrirModalPlano('${doc.id}', true)">✏️</span>
           <span class="icon-btn" title="Duplicar" onclick="duplicarPlano('${doc.id}')">📋</span>
-          <span class="icon-btn" title="Excluir" onclick="confirmarExclusaoPlano('${doc.id}','${escapeHtml((d.nome||'').replace(/'/g,"\\'"))}')">🗑️</span>
+          <span class="icon-btn" title="Excluir" onclick="confirmarExclusaoPlano('${doc.id}','${escapeHtml((d.nome || '').replace(/'/g, "\\'"))}')">🗑️</span>
         </td>
       `;
       tbody.appendChild(tr);
@@ -284,35 +284,35 @@ async function abrirModalPlano(id = null, editar = false) {
 
   // defaults
   let d = {
-    plano_slug:        '',
-    nome:              '',
-    descricao:         '',
-    valor_mensal:      '',
-    valor_anual:       '',
-    qtde_parcelas:     1,
+    plano_slug: '',
+    nome: '',
+    descricao: '',
+    valor_mensal: '',
+    valor_anual: '',
+    qtde_parcelas: 1,
     permitir_sem_juros: false,
     parcelas_sem_juros: '',
-    status:            'ativo',
-    ordem:             99,
-    destaque:          false,
-    badge:             '',
-    cor_destaque:      '#0A3D62',
-    tipos_inclusos:    [],
+    status: 'ativo',
+    ordem: 99,
+    destaque: false,
+    badge: '',
+    cor_destaque: '#0A3D62',
+    tipos_inclusos: [],
     allow_multi_select: false,
-    vagas_grupo_vip:   50,
-    desconto_pct_6m:   10,
-    desconto_pct_12m:  20,
+    vagas_grupo_vip: 50,
+    desconto_pct_6m: 10,
+    desconto_pct_12m: 20,
     metodos_pagamento: ['credit_card'],
     features: {
-      newsletter_texto:       true,
-      newsletter_audio:       false,
-      newsletter_video:       false,
+      newsletter_texto: true,
+      newsletter_audio: false,
+      newsletter_video: false,
       newsletter_infografico: false,
-      alertas_prioritarios:   false,
-      grupo_whatsapp_vip:     false,
-      biblioteca_acesso:      true,
-      sugestao_tema_quota:    0,
-      consultoria_horas_mes:  0,
+      alertas_prioritarios: false,
+      grupo_whatsapp_vip: false,
+      biblioteca_acesso: true,
+      sugestao_tema_quota: 0,
+      consultoria_horas_mes: 0,
     }
   };
 
@@ -346,16 +346,24 @@ async function abrirModalPlano(id = null, editar = false) {
 
   // Seção: Identificação
   const secIdent = _secLabel('📋 Identificação do Plano');
-  secIdent.style.marginTop = '200px'; // Ajuste o valor (10 linhas ≈ 120px a 150px)
+  secIdent.style.marginTop = '0'; // Remove o espaçamento excessivo
   body.appendChild(secIdent);
+
+  // ✅ Garante que o corpo do modal tenha altura máxima e barra de rolagem
+  if (body) {
+    body.style.maxHeight = '85vh';   // Limita à altura da viewport
+    body.style.overflowY = 'auto';   // Habilita rolagem vertical
+    body.style.padding = '16px';   // Respiração visual
+    body.style.paddingTop = '8px';    // Compensa margem removida
+  }
 
   // Slug (select canônico)
   body.appendChild(_field('Slug do plano', `
     <select id="pl-slug" style="${_inputStyle()}">
       <option value="">— Selecione o slug —</option>
       ${Object.keys(PLANOS_CANON).map(s =>
-        `<option value="${s}" ${d.plano_slug === s ? 'selected' : ''}>${PLANOS_CANON[s].nome} (${s})</option>`
-      ).join('')}
+    `<option value="${s}" ${d.plano_slug === s ? 'selected' : ''}>${PLANOS_CANON[s].nome} (${s})</option>`
+  ).join('')}
     </select>
     <div style="font-size:11px;color:#888;margin-top:4px">Selecionar o slug preenche automaticamente as features recomendadas.</div>
   `));
@@ -415,12 +423,12 @@ async function abrirModalPlano(id = null, editar = false) {
     { id: '12', label: '12 meses (anual)', default: false }
   ];
 
-  const ciclosSelecionados = Array.isArray(d.ciclos_disponiveis) 
-    ? d.ciclos_disponiveis 
+  const ciclosSelecionados = Array.isArray(d.ciclos_disponiveis)
+    ? d.ciclos_disponiveis
     : ciclosDef.filter(c => c.default).map(c => c.id);
 
-  const descontos = typeof d.descontos_por_ciclo === 'object' 
-    ? d.descontos_por_ciclo 
+  const descontos = typeof d.descontos_por_ciclo === 'object'
+    ? d.descontos_por_ciclo
     : { 1: 0, 3: 0, 6: 10, 12: 20 };
 
   ciclosDef.forEach(c => {
@@ -440,7 +448,7 @@ async function abrirModalPlano(id = null, editar = false) {
       </div>
     `;
     // Habilita/desabilita input ao marcar ciclo
-    row.querySelector('.ciclo-check').addEventListener('change', function() {
+    row.querySelector('.ciclo-check').addEventListener('change', function () {
       const input = row.querySelector('.ciclo-desc-input');
       input.parentElement.style.opacity = this.checked ? '1' : '0.4';
       input.parentElement.style.pointerEvents = this.checked ? 'auto' : 'none';
@@ -470,11 +478,11 @@ async function abrirModalPlano(id = null, editar = false) {
       // Só exibe se o ciclo estiver marcado (checkbox ativo)
       const check = document.querySelector(`.ciclo-check[value="${m}"]`);
       if (check && !check.checked) return null;
-      const pct      = descs[m] || 0;
-      const mensal   = Math.round(vm * (1 - pct / 100) * 100) / 100;
-      const total    = Math.round(mensal * m * 100) / 100;
+      const pct = descs[m] || 0;
+      const mensal = Math.round(vm * (1 - pct / 100) * 100) / 100;
+      const total = Math.round(mensal * m * 100) / 100;
       const economia = Math.round(vm * m * pct / 100 * 100) / 100;
-      const label    = { 1: '1 mês', 3: '3 meses', 6: '6 meses', 12: '12 meses' }[m];
+      const label = { 1: '1 mês', 3: '3 meses', 6: '6 meses', 12: '12 meses' }[m];
       return `${label}: ${fmtBRL(mensal)}/mês — total <strong>${fmtBRL(total)}</strong>${pct > 0 ? ` (${pct}% off · economia ${fmtBRL(economia)})` : ' (sem desconto)'}`;
     }).filter(Boolean);
 
@@ -520,10 +528,10 @@ async function abrirModalPlano(id = null, editar = false) {
   mpWrap.style.cssText = 'display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:12px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px';
 
   const _metodosMp = [
-    { id: 'credit_card',    label: '💳 Cartão de crédito' },
-    { id: 'debit_card',     label: '🏧 Cartão de débito'  },
-    { id: 'ticket',         label: '📄 Boleto'             },
-    { id: 'bank_transfer',  label: '🏦 Pix / Transferência' },
+    { id: 'credit_card', label: '💳 Cartão de crédito' },
+    { id: 'debit_card', label: '🏧 Cartão de débito' },
+    { id: 'ticket', label: '📄 Boleto' },
+    { id: 'bank_transfer', label: '🏦 Pix / Transferência' },
   ];
 
   const _metodosAtivos = Array.isArray(d.metodos_pagamento) ? d.metodos_pagamento : ['credit_card'];
@@ -545,11 +553,11 @@ async function abrirModalPlano(id = null, editar = false) {
   visualWrap.innerHTML = `
     <div>
       <label style="font-size:12px;color:#555;display:block;margin-bottom:4px">Badge (texto curto)</label>
-      <input id="pl-badge" type="text" value="${escapeHtml(d.badge||'')}" style="${_inputStyle()}" placeholder="Ex: ⭐ Mais popular">
+      <input id="pl-badge" type="text" value="${escapeHtml(d.badge || '')}" style="${_inputStyle()}" placeholder="Ex: ⭐ Mais popular">
     </div>
     <div>
       <label style="font-size:12px;color:#555;display:block;margin-bottom:4px">Cor do card</label>
-      <input id="pl-cor" type="color" value="${d.cor_destaque||'#0A3D62'}" style="width:100%;height:36px;border:1px solid #ccc;border-radius:4px;cursor:pointer">
+      <input id="pl-cor" type="color" value="${d.cor_destaque || '#0A3D62'}" style="width:100%;height:36px;border:1px solid #ccc;border-radius:4px;cursor:pointer">
     </div>
     <div style="padding-bottom:4px">
       <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
@@ -616,7 +624,7 @@ async function abrirModalPlano(id = null, editar = false) {
           <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
             <span style="font-size:13px">${escapeHtml(label)}</span>
             <div style="display:flex;align-items:center;gap:4px">
-              <input type="number" id="feat-${feature.id}" value="${Number(val)||0}" min="0" max="999"
+              <input type="number" id="feat-${feature.id}" value="${Number(val) || 0}" min="0" max="999"
                 style="width:70px;padding:4px 6px;border:1px solid #ccc;border-radius:4px;font-size:13px">
               <span style="font-size:12px;color:#666">${unidade}</span>
             </div>
@@ -636,7 +644,7 @@ async function abrirModalPlano(id = null, editar = false) {
   vagasWrap.style.marginTop = '8px';
   vagasWrap.innerHTML = `
     <label style="font-size:12px;color:#555;display:block;margin-bottom:4px">💬 Limite de vagas no grupo VIP</label>
-    <input id="pl-vagas" type="number" value="${d.vagas_grupo_vip||50}" min="1" max="500"
+    <input id="pl-vagas" type="number" value="${d.vagas_grupo_vip || 50}" min="1" max="500"
       style="${_inputStyle('120px')}">
   `;
   body.appendChild(vagasWrap);
@@ -655,7 +663,7 @@ async function abrirModalPlano(id = null, editar = false) {
       const checked = Array.isArray(d.tipos_inclusos) && d.tipos_inclusos.includes(t.id);
       const label = document.createElement('label');
       label.style.cssText = 'display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer';
-      label.innerHTML = `<input type="checkbox" class="tipo-check" value="${escapeHtml(t.id)}" ${checked ? 'checked' : ''}> ${escapeHtml(t.nome||t.id)}`;
+      label.innerHTML = `<input type="checkbox" class="tipo-check" value="${escapeHtml(t.id)}" ${checked ? 'checked' : ''}> ${escapeHtml(t.nome || t.id)}`;
       tiposWrap.appendChild(label);
     });
     body.appendChild(tiposWrap);
@@ -744,8 +752,8 @@ function _autoPreencherPeloSlug() {
   if (vagasWrap) vagasWrap.style.display = canon.features.grupo_whatsapp_vip ? 'block' : 'none';
 
   // Preenche ciclos disponíveis e descontos a partir do canônico
-  const canonCiclos    = canon.ciclos_disponiveis    || ['3', '6', '12'];
-  const canonDescontos = canon.descontos_por_ciclo   || {};
+  const canonCiclos = canon.ciclos_disponiveis || ['3', '6', '12'];
+  const canonDescontos = canon.descontos_por_ciclo || {};
 
   document.querySelectorAll('.ciclo-check').forEach(cb => {
     cb.checked = canonCiclos.includes(cb.value);
@@ -773,22 +781,22 @@ async function _salvarPlano(id, editar) {
   document.querySelectorAll('.ciclo-desc-input').forEach(inp => {
     descontosPorCiclo[inp.dataset.ciclo] = Number(inp.value) || 0;
   });
-  const slug       = document.getElementById('pl-slug')?.value?.trim() || '';
-  const nome       = document.getElementById('pl-nome')?.value?.trim() || '';
-  const descricao  = document.getElementById('pl-descricao')?.value?.trim() || '';
-  const ordemRaw   = document.getElementById('pl-ordem')?.value;
-  const vmRaw      = document.getElementById('pl-valor-mensal')?.value;
-  const vaRaw      = document.getElementById('pl-valor-anual')?.value;
-  const parcRaw    = document.getElementById('pl-parcelas')?.value;
-  const semJuros   = !!document.getElementById('pl-sem-juros')?.checked;
-  const psjRaw     = document.getElementById('pl-parcelas-sem-juros')?.value;
-  const badge      = document.getElementById('pl-badge')?.value?.trim() || '';
-  const cor        = document.getElementById('pl-cor')?.value || '#0A3D62';
-  const destaque   = !!document.getElementById('pl-destaque')?.checked;
-  const statusVal  = document.querySelector('input[name="pl-status"]:checked')?.value || 'ativo';
+  const slug = document.getElementById('pl-slug')?.value?.trim() || '';
+  const nome = document.getElementById('pl-nome')?.value?.trim() || '';
+  const descricao = document.getElementById('pl-descricao')?.value?.trim() || '';
+  const ordemRaw = document.getElementById('pl-ordem')?.value;
+  const vmRaw = document.getElementById('pl-valor-mensal')?.value;
+  const vaRaw = document.getElementById('pl-valor-anual')?.value;
+  const parcRaw = document.getElementById('pl-parcelas')?.value;
+  const semJuros = !!document.getElementById('pl-sem-juros')?.checked;
+  const psjRaw = document.getElementById('pl-parcelas-sem-juros')?.value;
+  const badge = document.getElementById('pl-badge')?.value?.trim() || '';
+  const cor = document.getElementById('pl-cor')?.value || '#0A3D62';
+  const destaque = !!document.getElementById('pl-destaque')?.checked;
+  const statusVal = document.querySelector('input[name="pl-status"]:checked')?.value || 'ativo';
   const allowMulti = !!document.getElementById('pl-allow-multi')?.checked;
-  const vagasRaw   = document.getElementById('pl-vagas')?.value;
-  const emBreve          = !!document.getElementById('pl-em-breve')?.checked;
+  const vagasRaw = document.getElementById('pl-vagas')?.value;
+  const emBreve = !!document.getElementById('pl-em-breve')?.checked;
   const metodosPagamento = Array.from(
     document.querySelectorAll('.mp-metodo-check:checked')
   ).map(cb => cb.value);
@@ -801,8 +809,8 @@ async function _salvarPlano(id, editar) {
   } else {
     // Fallback: coletar features hardcoded
     const hardcodedFeatures = ['newsletter_texto', 'newsletter_audio', 'newsletter_video', 'newsletter_infografico',
-                              'alertas_prioritarios', 'grupo_whatsapp_vip', 'biblioteca_acesso',
-                              'sugestao_tema_quota', 'consultoria_horas_mes'];
+      'alertas_prioritarios', 'grupo_whatsapp_vip', 'biblioteca_acesso',
+      'sugestao_tema_quota', 'consultoria_horas_mes'];
     hardcodedFeatures.forEach(key => {
       const el = document.getElementById(`feat-${key}`);
       if (!el) return;
@@ -822,9 +830,9 @@ async function _salvarPlano(id, editar) {
   if (!slug) erros.slug = 'Selecione o slug do plano.';
 
   const valor_mensal = safeNumber(vmRaw);
-  const valor_anual  = safeNumber(vaRaw);
+  const valor_anual = safeNumber(vaRaw);
   if (valor_mensal === null || valor_mensal <= 0) erros.valor_mensal = 'Informe o valor mensal.';
-  if (valor_anual !== null && valor_anual <= 0)   erros.valor_anual  = 'Valor anual inválido.';
+  if (valor_anual !== null && valor_anual <= 0) erros.valor_anual = 'Valor anual inválido.';
 
   const qtde_parcelas = safeNumber(parcRaw);
   if (!qtde_parcelas || qtde_parcelas < 1) erros.parcelas = 'Informe o número de parcelas (mín. 1).';
@@ -839,7 +847,7 @@ async function _salvarPlano(id, editar) {
 
   if (Object.keys(erros).length) {
     // mostra erros inline
-    ['valor-mensal','valor-anual','parcelas','parcelas-sem-juros'].forEach(k => {
+    ['valor-mensal', 'valor-anual', 'parcelas', 'parcelas-sem-juros'].forEach(k => {
       const el = document.getElementById(`err-${k}`);
       if (el) { el.textContent = erros[k] || ''; el.style.display = erros[k] ? 'block' : 'none'; }
     });
@@ -849,33 +857,33 @@ async function _salvarPlano(id, editar) {
 
   // ── Montar payload ──
   const data = {
-    plano_slug:        slug,
+    plano_slug: slug,
     nome,
     descricao,
-    valor_mensal:      valor_mensal,
-    valor_anual:       valor_anual,
-    valor:             valor_mensal, // mantém campo legado para compatibilidade
-    qtde_parcelas:     qtde_parcelas,
+    valor_mensal: valor_mensal,
+    valor_anual: valor_anual,
+    valor: valor_mensal, // mantém campo legado para compatibilidade
+    qtde_parcelas: qtde_parcelas,
     permitir_sem_juros: semJuros,
     parcelas_sem_juros,
-    status:            statusVal,
-    em_breve:          emBreve,
-    ordem:             safeNumber(ordemRaw) || 99,
+    status: statusVal,
+    em_breve: emBreve,
+    ordem: safeNumber(ordemRaw) || 99,
     destaque,
     badge,
-    cor_destaque:      cor,
+    cor_destaque: cor,
     allow_multi_select: allowMulti,
     tipos_inclusos,
-    vagas_grupo_vip:   features.grupo_whatsapp_vip ? (safeNumber(vagasRaw) || 50) : null,
+    vagas_grupo_vip: features.grupo_whatsapp_vip ? (safeNumber(vagasRaw) || 50) : null,
     features,
-    ciclos_disponiveis:    ciclosDisponiveis.length ? ciclosDisponiveis : ['3'],
-    descontos_por_ciclo:   descontosPorCiclo,
+    ciclos_disponiveis: ciclosDisponiveis.length ? ciclosDisponiveis : ['3'],
+    descontos_por_ciclo: descontosPorCiclo,
     // Campos legados — mantidos para getDescontoPct fallback em assinatura.js
-    desconto_pct_6m:       Number(descontosPorCiclo['6'])  || 0,
-    desconto_pct_12m:      Number(descontosPorCiclo['12']) || 0,
-    metodos_pagamento:     metodosPagamento.length ? metodosPagamento : ['credit_card'],
-    tipo:              'assinatura',
-    updatedAt:         firebase.firestore.FieldValue.serverTimestamp(),
+    desconto_pct_6m: Number(descontosPorCiclo['6']) || 0,
+    desconto_pct_12m: Number(descontosPorCiclo['12']) || 0,
+    metodos_pagamento: metodosPagamento.length ? metodosPagamento : ['credit_card'],
+    tipo: 'assinatura',
+    updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
   };
 
   // desabilita botão durante salvamento
