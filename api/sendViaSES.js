@@ -17,6 +17,13 @@ const db = admin.firestore();
 
 import { SESClient, SendEmailCommand } from "@aws-sdk/client-ses";
 
+import { createClient } from '@supabase/supabase-js';
+ 
+const supabase = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_KEY
+);
+
 const sesClient = new SESClient({
   region: process.env.AWS_REGION || "sa-east-1",
   credentials: {
