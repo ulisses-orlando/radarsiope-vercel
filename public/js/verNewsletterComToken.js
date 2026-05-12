@@ -211,16 +211,16 @@ let _configCache = null;
 async function _getConfigPublica() {
   // Retorna cache se já buscado
   if (_configCache) return _configCache;
-  
+
   try {
     // ✅ URL absoluta para o domínio da API
-    const resp = await fetch('https://api.radarsiope.com.br/api/click?acao=config', { 
+    const resp = await fetch('https://api.radarsiope.com.br/api/click?acao=config', {
       method: 'GET',
       headers: { 'Accept': 'application/json' }
     });
-    
+
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-    
+
     const data = await resp.json();
     if (data.ok && data.config) {
       _configCache = data.config;
@@ -231,7 +231,7 @@ async function _getConfigPublica() {
   } catch (err) {
     console.warn('[verNL] Falha ao buscar config pública:', err);
   }
-  
+
   // Fallback: valores vazios
   return {
     NEXT_PUBLIC_WA_GRUPO_AVISOS_LINK: null,
@@ -420,6 +420,7 @@ function detectarAcesso(destinatario, newsletter, segmento, envio) {
     temMapaMental: isAssinante ? !!features.newsletter_mapa_mental : acessoProTemp,
     temAlertas: isAssinante && !!features.alertas_prioritarios,
     temChat: isAssinante && !!features.pergunta_edicao,
+    temRelatorio: isAssinante && !!features.relatorio_conformidade,
     blurMunicipio: !isAssinante && !acessoProTemp,
     truncarTexto: !isAssinante && !acessoProTemp,
     modoPadrao: isAssinante && window.innerWidth > 768 ? 'completo' : 'rapido',
@@ -542,30 +543,30 @@ async function renderModoCompleto(newsletter, dados, segmento, acesso) {
 
 async function renderMunicipio(destinatario, acesso, newsletter) {
   const container = document.getElementById('municipio-conteudo');
-  const titulo    = document.getElementById('municipio-titulo');
+  const titulo = document.getElementById('municipio-titulo');
 
   // ── Lê municipios_plano da sessão ────────────────────────────────────────
   let municipiosPlano = [];
   try {
     const sess = JSON.parse(localStorage.getItem('rs_pwa_session') || '{}');
     municipiosPlano = sess.municipios_plano || [];
-  } catch (_) {}
+  } catch (_) { }
 
   const temMultiplos = acesso.isAssinante && municipiosPlano.length > 1;
 
   // Inicializa _municipioAtivo apenas na primeira chamada ou ao trocar de assinante
   if (!_municipioAtivo || _municipioAtivo._uid !== destinatario._uid) {
     _municipioAtivo = {
-      _uid:           destinatario._uid,
-      cod_municipio:  destinatario.cod_municipio  || null,
+      _uid: destinatario._uid,
+      cod_municipio: destinatario.cod_municipio || null,
       nome_municipio: destinatario.nome_municipio || '',
-      cod_uf:         destinatario.cod_uf         || '',
+      cod_uf: destinatario.cod_uf || '',
     };
   }
 
-  const cod  = _municipioAtivo.cod_municipio;
+  const cod = _municipioAtivo.cod_municipio;
   const nome = _municipioAtivo.nome_municipio;
-  const uf   = _municipioAtivo.cod_uf;
+  const uf = _municipioAtivo.cod_uf;
 
   // ── Título ou seletor (ocupa o mesmo espaço) ──────────────────────────────
   if (titulo) {
@@ -603,6 +604,11 @@ async function renderMunicipio(destinatario, acesso, newsletter) {
     } else {
       dadosMunicipioAtual = { cod_municipio: null, nome: null, uf: null };
     }
+
+    if (acesso.temRelatorio && resumo && cod) {
+      _injetarBotaoRelatorio(cod, nome, uf);
+    }
+    
   } catch (err) {
     console.warn('[verNL] Município falhou (não fatal):', err);
     container.innerHTML = '';
@@ -649,26 +655,26 @@ function _renderSeletorMunicipio(tituloEl, municipiosPlano, destinatario, acesso
     if (!(await _checarSessaoCritica())) return;
 
     const novoCod = e.target.value;
-    const novo    = detalhes.find(m => m.cod_municipio === novoCod);
+    const novo = detalhes.find(m => m.cod_municipio === novoCod);
     if (!novo) return;
 
     _municipioAtivo = {
-      _uid:           destinatario._uid,
-      cod_municipio:  novo.cod_municipio,
+      _uid: destinatario._uid,
+      cod_municipio: novo.cod_municipio,
       nome_municipio: novo.nome,
-      cod_uf:         novo.uf || '',
+      cod_uf: novo.uf || '',
     };
 
-    const container   = document.getElementById('municipio-conteudo');
-    const btn         = document.getElementById('btn-toggle-historico');
-    const resumoEl    = document.getElementById('municipio-resumo');
+    const container = document.getElementById('municipio-conteudo');
+    const btn = document.getElementById('btn-toggle-historico');
+    const resumoEl = document.getElementById('municipio-resumo');
     const historicoEl = document.getElementById('municipio-historico');
-    const SM          = window.SupabaseMunicipio;
+    const SM = window.SupabaseMunicipio;
     if (!SM || !container) return;
 
     // Volta ao resumo se estava no histórico
-    if (resumoEl)     resumoEl.style.display    = 'block';
-    if (historicoEl)  historicoEl.style.display = 'none';
+    if (resumoEl) resumoEl.style.display = 'block';
+    if (historicoEl) historicoEl.style.display = 'none';
     if (btn) { btn.style.display = 'none'; btn.innerHTML = '📈 Ver série histórica completa'; }
 
     SM.renderSkeleton(container);
@@ -677,18 +683,18 @@ function _renderSeletorMunicipio(tituloEl, municipiosPlano, destinatario, acesso
       const resumo = await SM.getResumoMunicipio(novo.cod_municipio);
       SM.renderSecaoMunicipio({
         container,
-        blur:          acesso.blurMunicipio,
+        blur: acesso.blurMunicipio,
         resumo,
         nomeMunicipio: novo.nome,
-        uf:            novo.uf || '',
+        uf: novo.uf || '',
       });
 
       if (resumo && (acesso.isAssinante || acesso.acessoProTemp)) {
         dadosMunicipioAtual = {
           cod_municipio: novo.cod_municipio,
-          nome:          novo.nome,
-          uf:            novo.uf || '',
-          vitrine:       newsletter?.vitrine || null,
+          nome: novo.nome,
+          uf: novo.uf || '',
+          vitrine: newsletter?.vitrine || null,
         };
         if (btn) btn.style.display = 'block';
       } else {
@@ -793,12 +799,12 @@ function abrirModalMidia(url, tipo) {
 
   // 🔁 Converte URL para formato embed
   const urlEmbed = _converterEmbedUrl(url, tipo);
-  const urlLimpa  = urlEmbed.split('?')[0].split('#')[0];
-  const ext       = urlLimpa.split('.').pop().toLowerCase();
+  const urlLimpa = urlEmbed.split('?')[0].split('#')[0];
+  const ext = urlLimpa.split('.').pop().toLowerCase();
 
-  const isVideo   = /\.(mp4|webm|ogg)(\?.*)?$/i.test(urlEmbed);
-  const isImage   = ['png','jpg','jpeg','webp','gif','svg'].includes(ext);
-  const isPdf     = ext === 'pdf';
+  const isVideo = /\.(mp4|webm|ogg)(\?.*)?$/i.test(urlEmbed);
+  const isImage = ['png', 'jpg', 'jpeg', 'webp', 'gif', 'svg'].includes(ext);
+  const isPdf = ext === 'pdf';
 
   // HTML base com fallback embutido
   const criarFallback = (msg) => `
@@ -964,9 +970,9 @@ function renderMidia(newsletter, acesso) {
     secao.style.display = 'block';
     const itensSemMapa = itens.filter(i => i !== '__MAPA_MENTAL__');
     wrap.innerHTML = itensSemMapa.join('');
-    
-    if (itens.includes('__MAPA_MENTAL__') && 
-        typeof window.MapaMentalManager?.init === 'function') {
+
+    if (itens.includes('__MAPA_MENTAL__') &&
+      typeof window.MapaMentalManager?.init === 'function') {
       window.MapaMentalManager.init(newsletter, acesso);
     }
   } else {
@@ -1182,10 +1188,10 @@ async function verificarEExibirLinksGrupos(uid, assinaturaId) {
       .doc(assinaturaId)
       .get();
 
-      if (!assinSnap.exists) return;
-    
+    if (!assinSnap.exists) return;
+
     const assinData = assinSnap.data();
-    
+
     // ✅ Verifica flag diretamente na raiz
     if (assinData.links_grupos_ativos !== false) return;
 
@@ -1195,18 +1201,18 @@ async function verificarEExibirLinksGrupos(uid, assinaturaId) {
     // Segmentação por feature
     const features = assinData.features_snapshot || assinData.features || {};
     const temAlertasPrioritarios = features.alertas_prioritarios === true;
-    
+
     // Usa config da API em vez de process.env
     const linkAvisos = config.NEXT_PUBLIC_WA_GRUPO_AVISOS_LINK;
-    const linkAlertas = temAlertasPrioritarios 
-      ? config.NEXT_PUBLIC_WA_GRUPO_ALERTAS_LINK 
+    const linkAlertas = temAlertasPrioritarios
+      ? config.NEXT_PUBLIC_WA_GRUPO_ALERTAS_LINK
       : null;
 
     if (!linkAvisos) return; // Sem links configurados → não exibe modal
 
     // Detecta dispositivo para instrução contextual
     const isMobile = /Android|iPhone|iPad|iPod|Windows Phone/i.test(navigator.userAgent);
-    
+
     // Cria modal
     const overlay = document.createElement('div');
     overlay.id = 'rs-modal-grupos-wa';
@@ -1215,7 +1221,7 @@ async function verificarEExibirLinksGrupos(uid, assinaturaId) {
       z-index:9999; display:flex; align-items:center; justify-content:center;
       padding:16px; animation:rsFadeIn .2s ease;
     `;
-    
+
     overlay.innerHTML = `
       <div style="background:var(--rs-card,#fff); border-radius:16px; max-width:420px; width:100%; padding:24px; box-shadow:0 12px 40px rgba(0,0,0,0.35); position:relative;">
         <button onclick="_fecharModalGruposWA()" 
@@ -1261,9 +1267,9 @@ async function verificarEExibirLinksGrupos(uid, assinaturaId) {
         
         <!-- Instruções por dispositivo -->
         <div style="background:var(--rs-bg,#f8fafc); border-radius:10px; padding:12px 14px; margin-bottom:20px; font-size:12px; color:var(--rs-muted,#64748b); line-height:1.5;">
-          ${isMobile 
-            ? '📱 <strong>No celular:</strong> Os links abrirão diretamente no WhatsApp.'
-            : '💻 <strong>No computador:</strong> Os links abrirão o WhatsApp Web. Certifique-se de estar logado.'}
+          ${isMobile
+        ? '📱 <strong>No celular:</strong> Os links abrirão diretamente no WhatsApp.'
+        : '💻 <strong>No computador:</strong> Os links abrirão o WhatsApp Web. Certifique-se de estar logado.'}
           ${!isMobile ? '<br><small>Se não abrir, verifique se o WhatsApp Web está ativo em <a href="https://web.whatsapp.com" target="_blank" style="color:var(--azul);">web.whatsapp.com</a>.</small>' : ''}
         </div>
         
@@ -1275,15 +1281,15 @@ async function verificarEExibirLinksGrupos(uid, assinaturaId) {
         </button>
       </div>
     `;
-    
+
     document.body.appendChild(overlay);
     document.body.style.overflow = 'hidden';
-    
+
     // Fecha com ESC
     const onKey = (e) => { if (e.key === 'Escape') _fecharModalGruposWA(); };
     document.addEventListener('keydown', onKey);
     overlay.dataset.onKeyHandler = '1';
-    
+
   } catch (err) {
     console.warn('[verNL] Erro ao exibir modal de grupos:', err);
   }
@@ -1296,10 +1302,10 @@ function _fecharModalGruposWA() {
     overlay.style.opacity = '0';
     setTimeout(() => overlay.remove(), 200);
   }
-  
+
   // Restaura scroll
   document.body.style.overflow = '';
-  
+
   // Marca como visualizado no Firestore
   _marcarLinksVisualizados();
 }
@@ -1308,12 +1314,12 @@ async function _marcarLinksVisualizados() {
   try {
     const ctx = window._radarUser;
     if (!ctx?.uid || !ctx.assinaturaId) return;
-    
+
     const assinRef = db.collection('usuarios')
       .doc(ctx.uid)
       .collection('assinaturas')
       .doc(ctx.assinaturaId);
-    
+
     // Atualiza flag diretamente na raiz
     await assinRef.update({ links_grupos_ativos: true });
   } catch (err) {
@@ -1334,7 +1340,7 @@ window._fecharModalGruposWA = _fecharModalGruposWA;
 function publicarRadarUser(destinatario, segmento, assinaturaId) {
   const isAssinante = segmento === 'assinantes';
   const uid = isAssinante ? (destinatario._uid || null) : String(destinatario.id || '');
-  
+
   window._radarUser = {
     uid,
     email: destinatario.email || '',
@@ -1444,7 +1450,7 @@ async function validarETocarAudio(url, btn) {
   if (await _checarSessaoCritica()) {
     const wrap = btn.parentElement;
     btn.style.display = 'none'; // Esconde botão
-    
+
     // Injeta player nativo dinamicamente
     const audio = document.createElement('audio');
     audio.controls = true;
@@ -1452,9 +1458,9 @@ async function validarETocarAudio(url, btn) {
     audio.preload = 'metadata';
     audio.style.cssText = 'width:100%;border-radius:8px;outline:none;';
     wrap.appendChild(audio);
-    
+
     // Tenta iniciar reprodução automaticamente após validação
-    try { await audio.play(); } catch(e) { /* autoplay bloqueado pelo browser, usuário clica manualmente */ }
+    try { await audio.play(); } catch (e) { /* autoplay bloqueado pelo browser, usuário clica manualmente */ }
   }
 }
 window.validarETocarAudio = validarETocarAudio; // Expõe para o onclick inline
@@ -1498,17 +1504,17 @@ function _mostrarSheetSessaoBloqueada(motivo) {
       <p style="margin:0 0 22px;font-size:13px;line-height:1.7;
                 color:var(--rs-muted,#64748b)">
         ${isInativa
-          ? 'Sua assinatura foi encerrada. Entre em contato com o suporte para reativar.'
-          : 'Você abriu o Radar SIOPE em muitos dispositivos simultaneamente e esta sessão foi desativada.<br><br>Para retomar o acesso completo, abra o link recebido por e-mail.'}
+      ? 'Sua assinatura foi encerrada. Entre em contato com o suporte para reativar.'
+      : 'Você abriu o Radar SIOPE em muitos dispositivos simultaneamente e esta sessão foi desativada.<br><br>Para retomar o acesso completo, abra o link recebido por e-mail.'}
       </p>
       ${isInativa
-        ? `<a href="/contato.html" target="_blank" rel="noopener"
+      ? `<a href="/contato.html" target="_blank" rel="noopener"
               style="display:block;padding:13px;background:var(--azul,#0A3D62);
                      color:#fff;border-radius:10px;font-size:14px;font-weight:700;
                      text-decoration:none;margin-bottom:10px">
              Falar com o suporte →
            </a>`
-        : `<button onclick="_abrirEmailAcesso()"
+      : `<button onclick="_abrirEmailAcesso()"
                   style="display:block;width:100%;padding:13px;
                          background:var(--azul,#0A3D62);color:#fff;border-radius:10px;
                          font-size:14px;font-weight:700;border:none;cursor:pointer;
@@ -1546,13 +1552,13 @@ function _abrirEmailAcesso(e) {
 }
 
 window._fecharSheetSessao = _fecharSheetSessao;
-window._abrirEmailAcesso  = _abrirEmailAcesso;
+window._abrirEmailAcesso = _abrirEmailAcesso;
 
 // ─── Validação de sessão em background (uma vez a cada 4h) ───────────────
 async function _validarSessaoBackground(sessao) {
   if (!sessao?.session_id || !sessao?.uid) return;
   // ⏱️ Reduzido de 24h para 4h
-  const INTERVALO = 4 * 60 * 60 * 1000; 
+  const INTERVALO = 4 * 60 * 60 * 1000;
   if (Date.now() - (sessao.validado_em || 0) < INTERVALO) return;
 
   try {
@@ -1580,7 +1586,7 @@ async function _validarSessaoBackground(sessao) {
     console.warn('[verNL] Validação background offline:', e.message);
   }
 }
- 
+
 // ─── Modo Assinante (sessão salva, sem parâmetros de URL) ─────────────────
 // Carrega a edição mais recente para assinantes que chegam via PWA/ícone.
 async function _tentarModoAssinante(dadosSessao) {
@@ -1593,61 +1599,61 @@ async function _tentarModoAssinante(dadosSessao) {
     // 🔒 BLOQUEANTE: Valida sessão antes de renderizar qualquer coisa
     // Inicializa session_id no sessionStorage (tab-isolated) antes de validar
     if (sessao.session_id) {
-      try { sessionStorage.setItem('rs_tab_session_id', sessao.session_id); } catch(e) {}
+      try { sessionStorage.setItem('rs_tab_session_id', sessao.session_id); } catch (e) { }
     }
     if (!(await _checarSessaoCritica())) return false;
 
     // Inicia validação em background (silenciosa para atualizar features)
     _validarSessaoBackground(sessao);
- 
+
     // Monta destinatário a partir da sessão local
     const destinatario = {
-      _uid:           sessao.uid,
-      nome:           sessao.nome           || '',
-      email:          sessao.email          || '',
-      plano_slug:     sessao.plano_slug     || null,
-      features:       sessao.features       || {},
-      cod_uf:         sessao.cod_uf         || '',
-      cod_municipio:  sessao.cod_municipio  || '',
+      _uid: sessao.uid,
+      nome: sessao.nome || '',
+      email: sessao.email || '',
+      plano_slug: sessao.plano_slug || null,
+      features: sessao.features || {},
+      cod_uf: sessao.cod_uf || '',
+      cod_municipio: sessao.cod_municipio || '',
       nome_municipio: sessao.nome_municipio || '',
-      perfil:         sessao.perfil         || '',
+      perfil: sessao.perfil || '',
     };
- 
+
     publicarRadarUser(destinatario, 'assinantes', sessao.assinaturaId);
- 
+
     // Busca edição mais recente publicada
     const snap = await db.collection('newsletters')
       .where('enviada', '==', true)
       .orderBy('data_publicacao', 'desc')
       .limit(1)
       .get();
- 
+
     if (snap.empty) {
       // Nenhuma edição publicada ainda → exibe app sem edição
       _exibirAppSemEdicao(destinatario, sessao.assinaturaId);
       return true;
     }
- 
+
     const newsletter = { id: snap.docs[0].id, ...snap.docs[0].data() };
-    const nid        = newsletter.id;
-    const segmento   = 'assinantes';
- 
+    const nid = newsletter.id;
+    const segmento = 'assinantes';
+
     // Acesso sem envio — objeto mínimo (token não necessário para assinante via sessão)
     const envioMinimo = { token_acesso: null, expira_em: null };
-    const acesso      = detectarAcesso(destinatario, newsletter, segmento, envioMinimo);
- 
+    const acesso = detectarAcesso(destinatario, newsletter, segmento, envioMinimo);
+
     const dados = {
-      nome:            destinatario.nome,
-      email:           destinatario.email,
-      edicao:          newsletter.numero || newsletter.edicao || '',
-      titulo:          newsletter.titulo || '',
+      nome: destinatario.nome,
+      email: destinatario.email,
+      edicao: newsletter.numero || newsletter.edicao || '',
+      titulo: newsletter.titulo || '',
       data_publicacao: newsletter.data_publicacao || null,
-      cod_uf:          destinatario.cod_uf,
-      nome_municipio:  destinatario.nome_municipio,
-      perfil:          destinatario.perfil,
-      plano:           destinatario.plano_slug,
+      cod_uf: destinatario.cod_uf,
+      nome_municipio: destinatario.nome_municipio,
+      perfil: destinatario.perfil,
+      plano: destinatario.plano_slug,
     };
- 
+
     renderHeader(newsletter, destinatario);
     const modoPadrao = sessionStorage.getItem('rs_modo_leitura') || acesso.modoPadrao;
     trocarModo(modoPadrao);
@@ -1659,49 +1665,49 @@ async function _tentarModoAssinante(dadosSessao) {
     await renderReactions(nid, sessao.uid);
     renderCTA(acesso, newsletter);
     renderWatermark(destinatario, newsletter);
- 
+
     mostrarApp();
 
     if (typeof window.QuizManager?.init === 'function') {
-        // Aguarda próximo tick para garantir que _radarUser está disponível
-        setTimeout(() => {
-            const user = window._radarUser;
-            if (user && newsletter) {
-                window.QuizManager.init(newsletter, user);
-            }
-        }, 0);
+      // Aguarda próximo tick para garantir que _radarUser está disponível
+      setTimeout(() => {
+        const user = window._radarUser;
+        if (user && newsletter) {
+          window.QuizManager.init(newsletter, user);
+        }
+      }, 0);
     }
 
     iniciarChatFAB(newsletter, sessao.uid, acesso);
     iniciarDrawer(newsletter);
     verificarEdicaoMaisRecente(newsletter);
- 
+
     return true;
- 
+
   } catch (err) {
     console.error('[verNL] Erro no modo assinante:', err);
     return false;
   }
 }
- 
+
 // ─── Exibe app sem edição (usado quando nenhuma edição existe ainda) ───────
 function _exibirAppSemEdicao(destinatario, assinaturaId) {
   publicarRadarUser(destinatario, 'assinantes', assinaturaId);
- 
+
   const nome = (destinatario.nome || '').split(' ')[0];
-  const set  = (id, txt) => { const el = document.getElementById(id); if (el) el.textContent = txt; };
+  const set = (id, txt) => { const el = document.getElementById(id); if (el) el.textContent = txt; };
   set('hd-saudacao', nome ? `Olá, ${nome}!` : '');
-  set('hd-titulo',   'Radar SIOPE');
-  set('hd-edicao',   '');
-  set('hd-data',     '');
+  set('hd-titulo', 'Radar SIOPE');
+  set('hd-edicao', '');
+  set('hd-data', '');
   document.title = 'Radar SIOPE';
- 
+
   ['rs-toggle-modo', 'modo-rapido', 'modo-completo', 'secao-midia',
-   'secao-faq', 'rs-banner-recente', 'rs-watermark', 'rs-cta-wrap'].forEach(id => {
-    const el = document.getElementById(id);
-    if (el) el.style.display = 'none';
-  });
- 
+    'secao-faq', 'rs-banner-recente', 'rs-watermark', 'rs-cta-wrap'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.style.display = 'none';
+    });
+
   const munConteudo = document.getElementById('municipio-conteudo');
   if (munConteudo) {
     munConteudo.innerHTML = `
@@ -1715,7 +1721,7 @@ function _exibirAppSemEdicao(destinatario, assinaturaId) {
     const btn = document.getElementById('btn-toggle-historico');
     if (btn) btn.style.display = 'none';
   }
- 
+
   mostrarApp();
   setTimeout(() => {
     document.getElementById('rs-alertas-btn')?.click();
@@ -1746,14 +1752,14 @@ function _mostrarAvisoSessoes() {
 
 // ─── Ativação de sessão via link pós-pagamento (?ativar=TOKEN&uid=UID) ─────
 async function _executarAtivacaoSessao(token, uid) {
-    mostrarLoading(true);
-    try {
-      const resp = await fetch('/api/pagamentoMP?acao=ativar-sessao', {
-        method:  'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ uid, session_token: token }),
-      });
- 
+  mostrarLoading(true);
+  try {
+    const resp = await fetch('/api/pagamentoMP?acao=ativar-sessao', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ uid, session_token: token }),
+    });
+
     const data = await resp.json().catch(() => ({}));
 
     if (!resp.ok || !data.ok) {
@@ -1763,30 +1769,30 @@ async function _executarAtivacaoSessao(token, uid) {
       );
       return;
     }
- 
+
     // Substitui qualquer sessão anterior (inclusive sessão de lead) pela de assinante
     try {
       localStorage.setItem('rs_pwa_session', JSON.stringify({
-        uid:            data.uid,
-        assinaturaId:   data.assinaturaId,
-        segmento:       'assinante',
-        session_id:     data.session_id,
-        plano_slug:     data.plano_slug,
-        features:       data.features,
-        nome:           data.nome,
-        email:          data.email,
-        cod_uf:         data.cod_uf,
-        cod_municipio:  data.cod_municipio,
+        uid: data.uid,
+        assinaturaId: data.assinaturaId,
+        segmento: 'assinante',
+        session_id: data.session_id,
+        plano_slug: data.plano_slug,
+        features: data.features,
+        nome: data.nome,
+        email: data.email,
+        cod_uf: data.cod_uf,
+        cod_municipio: data.cod_municipio,
         nome_municipio: data.nome_municipio,
-        perfil:         data.tipo_perfil,
+        perfil: data.tipo_perfil,
         municipios_plano: data.municipios_plano || [],
-        validado_em:    Date.now(),
+        validado_em: Date.now(),
       }));
     } catch (e) { /* ignora se localStorage bloqueado */ }
 
     // Grava session_id isolado por aba (sessionStorage é tab-specific)
-    try { sessionStorage.setItem('rs_tab_session_id', data.session_id); } catch(e) {}
- 
+    try { sessionStorage.setItem('rs_tab_session_id', data.session_id); } catch (e) { }
+
     // Limpa os parâmetros da URL sem recarregar (URL fica limpa após ativação)
     try {
       const url = new URL(window.location.href);
@@ -1794,12 +1800,12 @@ async function _executarAtivacaoSessao(token, uid) {
       url.searchParams.delete('uid');
       window.history.replaceState({}, '', url.toString());
     } catch (e) { /* ignora */ }
- 
+
     if (data.aviso_limite_sessoes) _mostrarAvisoSessoes();
 
     // Carrega o app com a sessão recém-criada
     await _tentarModoAssinante(data);
- 
+
   } catch (err) {
     console.error('[verNL] Erro na ativação de sessão:', err);
     mostrarErro('Erro ao ativar sua conta.', 'Verifique sua conexão e tente novamente.');
@@ -1811,14 +1817,14 @@ async function _executarAtivacaoSessao(token, uid) {
 // Carrega usuário da sessão PWA e abre a Central de Mensagens automaticamente.
 // A única mudança real é: se sessao.segmento === 'assinante' → delega para
 // _tentarModoAssinante em vez de exibir o app sem edição.
- 
+
 async function _tentarModoAlerta() {
   let sessao = null;
   try {
     const raw = localStorage.getItem('rs_pwa_session');
     if (raw) sessao = JSON.parse(raw);
   } catch (e) { /* ignora */ }
- 
+
   if (!sessao || !sessao.uid) {
     mostrarErro(
       '<strong>Link inválido ou incompleto.</strong>',
@@ -1826,7 +1832,7 @@ async function _tentarModoAlerta() {
     );
     return;
   }
- 
+
   // ── Assinante com sessão registrada → carrega edição mais recente ────────
   if (sessao.segmento === 'assinante' && sessao.session_id) {
     const ok = await _tentarModoAssinante(sessao);
@@ -1845,9 +1851,9 @@ async function _tentarModoAlerta() {
   if (sessao.segmento === 'assinante' && sessao.assinaturaId) {
     try {
       const _respSessao = await fetch('/api/pagamentoMP?acao=criar-sessao', {
-        method:  'POST',
+        method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ uid: sessao.uid, assinaturaId: sessao.assinaturaId }),
+        body: JSON.stringify({ uid: sessao.uid, assinaturaId: sessao.assinaturaId }),
       });
 
       if (!_respSessao.ok) {
@@ -1863,20 +1869,20 @@ async function _tentarModoAlerta() {
       const _sessaoNova = await _respSessao.json();
       if (_sessaoNova.ok) {
         const _sessaoCompleta = {
-          uid:              _sessaoNova.uid,
-          assinaturaId:     _sessaoNova.assinaturaId,
-          segmento:         'assinante',
-          session_id:       _sessaoNova.session_id,
-          plano_slug:       _sessaoNova.plano_slug,
-          features:         _sessaoNova.features,
+          uid: _sessaoNova.uid,
+          assinaturaId: _sessaoNova.assinaturaId,
+          segmento: 'assinante',
+          session_id: _sessaoNova.session_id,
+          plano_slug: _sessaoNova.plano_slug,
+          features: _sessaoNova.features,
           municipios_plano: _sessaoNova.municipios_plano || [],
-          nome:             _sessaoNova.nome,
-          email:            _sessaoNova.email,
-          cod_uf:           _sessaoNova.cod_uf,
-          cod_municipio:    _sessaoNova.cod_municipio,
-          nome_municipio:   _sessaoNova.nome_municipio,
-          perfil:           _sessaoNova.perfil,
-          validado_em:      Date.now(),
+          nome: _sessaoNova.nome,
+          email: _sessaoNova.email,
+          cod_uf: _sessaoNova.cod_uf,
+          cod_municipio: _sessaoNova.cod_municipio,
+          nome_municipio: _sessaoNova.nome_municipio,
+          perfil: _sessaoNova.perfil,
+          validado_em: Date.now(),
         };
         try { localStorage.setItem('rs_pwa_session', JSON.stringify(_sessaoCompleta)); } catch (e) { /* ignora */ }
         if (_sessaoNova.aviso_limite_sessoes) _mostrarAvisoSessoes();
@@ -1930,7 +1936,7 @@ async function _executarPreview(params) {
 
     // Tenta buscar nome do município via vw_municipio_resumo
     let nomeMun = mun;
-    let ufMun   = '';
+    let ufMun = '';
     try {
       const { data: mdata } = await window.supabase
         .from('vw_municipio_resumo')
@@ -1943,34 +1949,34 @@ async function _executarPreview(params) {
 
     // Destinatário simulado — acesso total como assinante profissional
     const destinatario = {
-      _uid          : 'preview',
-      nome          : 'Admin (Preview)',
-      email         : 'preview@radarsiope.com.br',
-      cod_municipio : mun,
-      cod_uf        : ufMun,
+      _uid: 'preview',
+      nome: 'Admin (Preview)',
+      email: 'preview@radarsiope.com.br',
+      cod_municipio: mun,
+      cod_uf: ufMun,
       nome_municipio: nomeMun,
-      plano_slug    : 'profissional',
-      features      : {
-        newsletter_audio      : true,
+      plano_slug: 'profissional',
+      features: {
+        newsletter_audio: true,
         newsletter_infografico: true,
-        newsletter_video      : true,
+        newsletter_video: true,
         newsletter_mapa_mental: true,
-        alertas_prioritarios  : true,
+        alertas_prioritarios: true,
       },
     };
 
     const segmento = 'assinantes';
-    const acesso   = detectarAcesso(destinatario, newsletter, segmento, null);
-    const dados    = {
-      nome           : destinatario.nome,
-      email          : destinatario.email,
-      edicao         : newsletter.numero || newsletter.edicao || '',
-      titulo         : newsletter.titulo || '',
+    const acesso = detectarAcesso(destinatario, newsletter, segmento, null);
+    const dados = {
+      nome: destinatario.nome,
+      email: destinatario.email,
+      edicao: newsletter.numero || newsletter.edicao || '',
+      titulo: newsletter.titulo || '',
       data_publicacao: newsletter.data_publicacao || null,
-      cod_uf         : ufMun,
-      nome_municipio : nomeMun,
-      perfil         : 'preview',
-      plano          : 'profissional',
+      cod_uf: ufMun,
+      nome_municipio: nomeMun,
+      perfil: 'preview',
+      plano: 'profissional',
     };
 
     // Pipeline de render — idêntico ao fluxo normal
@@ -2027,13 +2033,13 @@ async function VerNewsletterComToken() {
     return;
   }
   // ─────────────────────────────────────────────────────────
-  
+
   // Pré-carrega config pública (cache para uso posterior)
   await _getConfigPublica();
 
   // ── Detecta ativação de sessão pós-pagamento (?ativar=TOKEN&uid=UID) ────
   const _ativarToken = params.get('ativar');
-  const _ativarUid   = normalizeParam(params.get('uid'));
+  const _ativarUid = normalizeParam(params.get('uid'));
   if (_ativarToken && _ativarUid) {
     await _executarAtivacaoSessao(_ativarToken, _ativarUid);
     return;
@@ -2088,9 +2094,9 @@ async function VerNewsletterComToken() {
         if (!_sessaoAtual?.session_id) {
           // Sem sessão ativa — cria uma nova (o servidor verifica se a assinatura está ativa)
           const _respSessao = await fetch('/api/pagamentoMP?acao=criar-sessao', {
-            method:  'POST',
+            method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body:    JSON.stringify({ uid, assinaturaId }),
+            body: JSON.stringify({ uid, assinaturaId }),
           });
 
           if (!_respSessao.ok) {
@@ -2108,20 +2114,20 @@ async function VerNewsletterComToken() {
             if (_sessaoNova.ok) {
               try {
                 localStorage.setItem('rs_pwa_session', JSON.stringify({
-                  uid:              _sessaoNova.uid,
-                  assinaturaId:     _sessaoNova.assinaturaId,
-                  segmento:         'assinante',
-                  session_id:       _sessaoNova.session_id,
-                  plano_slug:       _sessaoNova.plano_slug,
-                  features:         _sessaoNova.features,
+                  uid: _sessaoNova.uid,
+                  assinaturaId: _sessaoNova.assinaturaId,
+                  segmento: 'assinante',
+                  session_id: _sessaoNova.session_id,
+                  plano_slug: _sessaoNova.plano_slug,
+                  features: _sessaoNova.features,
                   municipios_plano: _sessaoNova.municipios_plano || [],
-                  nome:             _sessaoNova.nome,
-                  email:            _sessaoNova.email,
-                  cod_uf:           _sessaoNova.cod_uf,
-                  cod_municipio:    _sessaoNova.cod_municipio,
-                  nome_municipio:   _sessaoNova.nome_municipio,
-                  perfil:           _sessaoNova.perfil,
-                  validado_em:      Date.now(),
+                  nome: _sessaoNova.nome,
+                  email: _sessaoNova.email,
+                  cod_uf: _sessaoNova.cod_uf,
+                  cod_municipio: _sessaoNova.cod_municipio,
+                  nome_municipio: _sessaoNova.nome_municipio,
+                  perfil: _sessaoNova.perfil,
+                  validado_em: Date.now(),
                 }));
               } catch (e) { /* ignora se localStorage bloqueado */ }
               if (_sessaoNova.aviso_limite_sessoes) _mostrarAvisoSessoes();
@@ -2376,7 +2382,7 @@ async function verHistoricoCompleto() {
   // Ocultar resumo, mostrar histórico
   resumo.style.display = 'none';
   historico.style.display = 'block';
-  
+
   // Atualizar botão toggle
   const btn = document.getElementById('btn-toggle-historico');
   if (btn) btn.innerHTML = '🔙 Voltar';
@@ -2447,7 +2453,7 @@ function voltarResumo() {
 
 function toggleHistorico() {
   const historico = document.getElementById('municipio-historico');
-  
+
   if (historico && historico.style.display === 'block') {
     // Está no histórico, voltar para resumo
     voltarResumo();
@@ -2673,7 +2679,7 @@ async function iniciarDrawer(newsletter) {
   window.addEventListener('rs:abrirEdicoes', abrirDrawer);
 
   // 🔒 Guard de sessão no botão Sentinela (intercepta antes dos handlers do menu)
-  document.getElementById('rs-alertas-btn')?.addEventListener('click', async function(e) {
+  document.getElementById('rs-alertas-btn')?.addEventListener('click', async function (e) {
     if (this.dataset.sessaoOk === '1') { this.dataset.sessaoOk = '0'; return; }
     e.preventDefault();
     e.stopImmediatePropagation();
@@ -2859,22 +2865,22 @@ async function abrirTipo(tipoId, tipoNome, tipoIcone) {
   // Para leads: exibir apenas edições que foram enviadas a ele E ainda com expira_em vigente
   const _uid = ctx?.uid;
   let edicoesVisiveis;
-  
+
   if (isAssinante) {
-     const filtro = _drawer.filtroLidas || 'todas';
-     edicoesVisiveis = edicoes.filter(ed => {
+    const filtro = _drawer.filtroLidas || 'todas';
+    edicoesVisiveis = edicoes.filter(ed => {
       const lida = _edicaoLida(_uid, ed.id);
-      if (filtro === 'lidas')     return lida;
+      if (filtro === 'lidas') return lida;
       if (filtro === 'nao_lidas') return !lida;
       return true; // 'todas'
-     });
+    });
   } else {
-     edicoesVisiveis = edicoes.filter(ed => {
-        const envio = enviosLead[ed.id];
-        if (!envio) return false;
-        if (envio.expira_em && new Date(envio.expira_em) <= new Date()) return false;
-        return true;
-     });
+    edicoesVisiveis = edicoes.filter(ed => {
+      const envio = enviosLead[ed.id];
+      if (!envio) return false;
+      if (envio.expira_em && new Date(envio.expira_em) <= new Date()) return false;
+      return true;
+    });
   }
 
   if (isAssinante) {
@@ -2883,8 +2889,8 @@ async function abrirTipo(tipoId, tipoNome, tipoIcone) {
     edicoesVisiveis.sort((a, b) => {
       const fa = _favAtual[a.id], fb = _favAtual[b.id];
       if (fa && !fb) return -1;
-      if (!fa && fb) return  1;
-      if (fa && fb)  return (fb.ts || 0) - (fa.ts || 0);
+      if (!fa && fb) return 1;
+      if (fa && fb) return (fb.ts || 0) - (fa.ts || 0);
       return 0;
     });
     // Filtrar por termo de busca
@@ -2943,14 +2949,14 @@ async function abrirTipo(tipoId, tipoNome, tipoIcone) {
 
 // ─── Card de edição — assinante ──────────────────────────────────────────────
 function _cardEdicaoAssinante(ed, isAtual, temAcesso, uid) {
-  const num       = ed.numero || ed.edicao || '';
-  const titulo    = _esc(ed.titulo || `Edição ${num}`);
-  const data      = _fmtData(ed.data_publicacao);
+  const num = ed.numero || ed.edicao || '';
+  const titulo = _esc(ed.titulo || `Edição ${num}`);
+  const data = _fmtData(ed.data_publicacao);
   const classeAtual = isAtual ? 'rs-drawer-ed-atual' : '';
   const bloqueado = !temAcesso;
-  const lida      = _edicaoLida(uid, ed.id); 
-  const fav       = _edicaoFavoritada(uid, ed.id);
-  
+  const lida = _edicaoLida(uid, ed.id);
+  const fav = _edicaoFavoritada(uid, ed.id);
+
   // 🔒 HTML do botão de favorito (consolidado e sem quebras de string)
   const favHtml = `<button 
     data-fav-nid="${_esc(ed.id)}" 
@@ -2963,7 +2969,7 @@ function _cardEdicaoAssinante(ed, isAtual, temAcesso, uid) {
 
   // Indicador visual: ponto azul = não lida, anel vazio = lida
   const dotStyle = `display:inline-block;width:8px;height:8px;border-radius:50%;background:${lida ? 'transparent' : 'var(--azul,#0A3D62)'};border:1.5px solid var(--azul,#0A3D62);flex-shrink:0;margin-top:3px;cursor:pointer;transition:background .2s;`;
-  const dotHtml = `<span data-lida-nid="${_esc(ed.id)}" style="${dotStyle}" title="${lida ? 'Marcar como não lida' : 'Marcar como lida'}" onclick="event.stopPropagation();toggleLida('${_esc(uid||'')}','${_esc(ed.id)}')"></span>`;
+  const dotHtml = `<span data-lida-nid="${_esc(ed.id)}" style="${dotStyle}" title="${lida ? 'Marcar como não lida' : 'Marcar como lida'}" onclick="event.stopPropagation();toggleLida('${_esc(uid || '')}','${_esc(ed.id)}')"></span>`;
 
   if (bloqueado) {
     return `<div class="rs-drawer-ed-card rs-drawer-ed-bloqueado">
@@ -2994,16 +3000,16 @@ function _cardEdicaoAssinante(ed, isAtual, temAcesso, uid) {
 // quando o usuário for assinante. Inserir este HTML no início de body.innerHTML
 // em abrirTipo(), logo após o upSellBanner e antes da listaOuVazio.
 // O estado do filtro ativo fica em _drawer.filtroLidas.
- 
+
 // Adicionar ao objeto _drawer (onde está definido no código original):
 //   filtroLidas: 'todas',   // 'todas' | 'nao_lidas' | 'lidas'
- 
+
 // HTML dos tabs (inserir em abrirTipo antes de renderizar os cards):
 function _htmlFiltroLidas(filtroAtivo) {
   const tabs = [
-    { key: 'todas',     label: 'Todas'     },
+    { key: 'todas', label: 'Todas' },
     { key: 'nao_lidas', label: 'Não lidas' },
-    { key: 'lidas',     label: 'Lidas'     },
+    { key: 'lidas', label: 'Lidas' },
   ];
   const tabsHtml = tabs.map(t => `
     <button onclick="_setFiltroLidas('${t.key}')"
@@ -3016,14 +3022,14 @@ function _htmlFiltroLidas(filtroAtivo) {
             "
             type="button">${t.label}</button>
   `).join('');
- 
+
   return `
     <div style="display:flex;gap:4px;padding:8px 12px 4px;background:var(--rs-card);
                 position:sticky;top:0;z-index:1;border-bottom:1px solid var(--rs-borda,#e2e8f0)">
       ${tabsHtml}
     </div>`;
 }
- 
+
 function _setFiltroLidas(filtro) {
   _drawer.filtroLidas = filtro;
   // Re-renderiza o nível 2 com o novo filtro
@@ -3072,9 +3078,9 @@ window.toggleFavorito = toggleFavorito;
 function _htmlCabecalhoAssinante(filtroAtivo) {
   const val = _esc(_drawer.termoBusca || '');
   const tabs = [
-    { key: 'todas',     label: 'Todas'     },
+    { key: 'todas', label: 'Todas' },
     { key: 'nao_lidas', label: 'Não lidas' },
-    { key: 'lidas',     label: 'Lidas'     },
+    { key: 'lidas', label: 'Lidas' },
   ];
   const tabsHtml = tabs.map(t => `
     <button onclick="_setFiltroLidas('${t.key}')"
@@ -3202,7 +3208,7 @@ function _mostrarExpirado(edicaoId, titulo, horas) {
 // ─── Voltar para nível 1 ─────────────────────────────────────────────────────
 function voltarParaTipos() {
   _limparContadores();
-  _drawer.termoBusca = ''; 
+  _drawer.termoBusca = '';
   _renderNivel1();
 }
 
@@ -3354,10 +3360,10 @@ async function navegarParaEdicao(edicaoId) {
     // Limpar inline styles que possam ter sido aplicados pelo modo alerta
     // (el.style.display = 'none' tem prioridade sobre classes CSS como .visivel)
     ['rs-toggle-modo', 'rs-banner-recente', 'rs-watermark',
-     'rs-cta-wrap', 'modo-rapido', 'modo-completo'].forEach(id => {
-      const el = document.getElementById(id);
-      if (el) el.style.display = '';
-    });
+      'rs-cta-wrap', 'modo-rapido', 'modo-completo'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.style.display = '';
+      });
 
     // Limpar e re-renderizar
     renderHeader(newsletter, destinatario);
@@ -3375,14 +3381,14 @@ async function navegarParaEdicao(edicaoId) {
 
     // ── Reseta chat ao trocar de edição ──────────────────────────────────────
     window._chatContext = {
-      nid:       newsletter.id,
-      uid:       window._radarUser?.uid || '',
+      nid: newsletter.id,
+      uid: window._radarUser?.uid || '',
       edicaoNum: newsletter.numero || newsletter.edicao || '',
-      titulo:    newsletter.titulo || ''
+      titulo: newsletter.titulo || ''
     };
 
     window._chatMensagens = []; // Limpa histórico
-    
+
     // Notificação de edição mais recente (apenas assinante)
     if (ctx.segmento === 'assinante') {
       verificarEdicaoMaisRecente(newsletter);
@@ -3721,9 +3727,9 @@ async function renderSecaoFeedbacks(newsletter) {
           <small style="color:#666;font-size:12px;">${score}</small>
         </div>
         <div style="display:flex;gap:8px;align-items:center;">
-          <button class="rs-btn-secao-feedback btn-like" style="border:1px solid #0e7490;background:${usuario==='like'?'#0e7490':'transparent'};color:${usuario==='like'?'#fff':'#0e7490'};padding:4px 8px;border-radius:6px;cursor:pointer;" onclick="votarSecao('${_esc(nid)}','${_esc(tipo)}','like')">👍 ${counts.like || 0}</button>
-          <button class="rs-btn-secao-feedback btn-dislike" style="border:1px solid #c026d3;background:${usuario==='dislike'?'#c026d3':'transparent'};color:${usuario==='dislike'?'#fff':'#c026d3'};padding:4px 8px;border-radius:6px;cursor:pointer;" onclick="votarSecao('${_esc(nid)}','${_esc(tipo)}','dislike')">👎 ${counts.dislike || 0}</button>
-          <span style="color:#555;font-size:12px;">${total} voto${total===1?'':'s'}</span>
+          <button class="rs-btn-secao-feedback btn-like" style="border:1px solid #0e7490;background:${usuario === 'like' ? '#0e7490' : 'transparent'};color:${usuario === 'like' ? '#fff' : '#0e7490'};padding:4px 8px;border-radius:6px;cursor:pointer;" onclick="votarSecao('${_esc(nid)}','${_esc(tipo)}','like')">👍 ${counts.like || 0}</button>
+          <button class="rs-btn-secao-feedback btn-dislike" style="border:1px solid #c026d3;background:${usuario === 'dislike' ? '#c026d3' : 'transparent'};color:${usuario === 'dislike' ? '#fff' : '#c026d3'};padding:4px 8px;border-radius:6px;cursor:pointer;" onclick="votarSecao('${_esc(nid)}','${_esc(tipo)}','dislike')">👎 ${counts.dislike || 0}</button>
+          <span style="color:#555;font-size:12px;">${total} voto${total === 1 ? '' : 's'}</span>
         </div>
       </div>`;
   }).join('');
@@ -3732,7 +3738,7 @@ async function renderSecaoFeedbacks(newsletter) {
 }
 
 // ─── Chat FAB — Pergunte ao Radar ────────────────────────────────────────────
- 
+
 function iniciarChatFAB(newsletter, uid, acesso) {
   // Limpa UI anterior
   document.getElementById('rs-chat-fab')?.remove();
@@ -3742,10 +3748,10 @@ function iniciarChatFAB(newsletter, uid, acesso) {
 
   // ── 1. Atualiza contexto global (fonte única de verdade) ──
   window._chatContext = {
-    nid:       newsletter.id,
-    uid:       uid,
+    nid: newsletter.id,
+    uid: uid,
     edicaoNum: newsletter.numero || newsletter.edicao || '',
-    titulo:    newsletter.titulo || ''
+    titulo: newsletter.titulo || ''
   };
 
   // ── 2. Histórico global (evita closure) ──
@@ -3755,9 +3761,9 @@ function iniciarChatFAB(newsletter, uid, acesso) {
     window._chatMensagens._nid = newsletter.id;
   }
 
-  const temChat    = !!acesso.temChat;
+  const temChat = !!acesso.temChat;
   const sessionKey = `rs_chat_seen_${newsletter.id}`;
-  const isNew      = !sessionStorage.getItem(sessionKey);
+  const isNew = !sessionStorage.getItem(sessionKey);
 
   // ── 3. Injeta estilos (com CSS do título corrigido) ──
   if (!document.getElementById('rs-chat-styles')) {
@@ -3824,10 +3830,10 @@ function iniciarChatFAB(newsletter, uid, acesso) {
   function _abrirChat() {
     if (document.getElementById('rs-chat-sheet')) return;
     sessionStorage.setItem(sessionKey, '1');
-    
+
     // 🔒 Trava scroll do fundo e evita que o navegador de scroll sobreponha o input
     document.body.style.overflow = 'hidden';
-    
+
     const backdrop = document.createElement('div');
     backdrop.id = 'rs-chat-backdrop';
     backdrop.onclick = _fecharChat;
@@ -3842,7 +3848,7 @@ function iniciarChatFAB(newsletter, uid, acesso) {
     if (ctx.edicaoNum) partes.push(`Edição: ${ctx.edicaoNum}`);
     if (ctx.titulo) partes.push(ctx.titulo);
     const tituloCompleto = partes.join(' - ');
-    
+
     sheet.innerHTML = `
       <div class="rs-chat-handle-wrap"> <div class="rs-chat-handle"> </div> </div>
       <div class="rs-chat-header">
@@ -3871,7 +3877,7 @@ function iniciarChatFAB(newsletter, uid, acesso) {
       </div>`;
     document.body.appendChild(sheet);
 
-    const input   = document.getElementById('rs-chat-input');
+    const input = document.getElementById('rs-chat-input');
     const sendBtn = document.getElementById('rs-chat-send');
 
     input?.addEventListener('input', () => {
@@ -3928,7 +3934,7 @@ function iniciarChatFAB(newsletter, uid, acesso) {
   }
 
   async function _enviar() {
-    const input   = document.getElementById('rs-chat-input');
+    const input = document.getElementById('rs-chat-input');
     const sendBtn = document.getElementById('rs-chat-send');
     if (!input) return;
     const texto = input.value.trim();
@@ -3941,7 +3947,7 @@ function iniciarChatFAB(newsletter, uid, acesso) {
     const typing = document.createElement('div');
     typing.className = 'rs-chat-msg-row assistant'; typing.id = 'rs-chat-typing-row';
     typing.innerHTML = `<div class="rs-chat-avatar-mini">✦</div><div class="rs-chat-typing"><span></span><span></span><span></span></div>`;
-    wrap?.appendChild(typing); typing?.scrollIntoView({ behavior:'smooth' });
+    wrap?.appendChild(typing); typing?.scrollIntoView({ behavior: 'smooth' });
 
     try {
       const ctx = window._chatContext; // ✅ Lê contexto ATUALIZADO
@@ -3949,12 +3955,12 @@ function iniciarChatFAB(newsletter, uid, acesso) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          pergunta:      texto,
-          nid:           ctx.nid,             // ✅ Usa global
+          pergunta: texto,
+          nid: ctx.nid,             // ✅ Usa global
           municipio_cod: window._radarUser?.municipio_cod || '',
-          uid:           ctx.uid,             // ✅ Usa global
-          segmento:      window._radarUser?.segmento || '',
-          historico:     window._chatMensagens.slice(-6) // ✅ Usa global
+          uid: ctx.uid,             // ✅ Usa global
+          segmento: window._radarUser?.segmento || '',
+          historico: window._chatMensagens.slice(-6) // ✅ Usa global
         }),
       });
       let data; try { data = await res.json(); } catch { _digitando = false; typing?.remove(); return; }
@@ -3984,28 +3990,28 @@ function iniciarChatFAB(newsletter, uid, acesso) {
 
 // Usa localStorage com chave por uid para isolar entre usuários.
 // Estrutura: rs_lidas_<uid> = { "<nid>": { ts: <timestamp>, manual: <bool> } }
- 
+
 function _getLidasKey(uid) {
   return `rs_lidas_${uid || 'anon'}`;
 }
- 
+
 function _getLidas(uid) {
   try {
     return JSON.parse(localStorage.getItem(_getLidasKey(uid)) || '{}');
   } catch { return {}; }
 }
- 
+
 function _salvarLidas(uid, lidas) {
   try {
     localStorage.setItem(_getLidasKey(uid), JSON.stringify(lidas));
   } catch { /* ignora se localStorage bloqueado */ }
 }
- 
+
 // Verifica se uma edição está marcada como lida
 function _edicaoLida(uid, nid) {
   return !!_getLidas(uid)[nid];
 }
- 
+
 // Marca como lida (manual = false para auto, true para clique do usuário)
 function marcarLida(uid, nid, manual = false) {
   const lidas = _getLidas(uid);
@@ -4014,7 +4020,7 @@ function marcarLida(uid, nid, manual = false) {
   _salvarLidas(uid, lidas);
   _atualizarIndicadorCard(nid, true);
 }
- 
+
 // Desmarca como lida (só manual)
 function desmarcarLida(uid, nid) {
   const lidas = _getLidas(uid);
@@ -4022,7 +4028,7 @@ function desmarcarLida(uid, nid) {
   _salvarLidas(uid, lidas);
   _atualizarIndicadorCard(nid, false);
 }
- 
+
 // Toggle lida/não lida
 function toggleLida(uid, nid) {
   if (_edicaoLida(uid, nid)) {
@@ -4036,7 +4042,7 @@ function toggleLida(uid, nid) {
   }
 }
 window.toggleLida = toggleLida;
- 
+
 // Atualiza visualmente o indicador de um card específico (sem re-renderizar tudo)
 function _atualizarIndicadorCard(nid, lida) {
   const dot = document.querySelector(`[data-lida-nid="${nid}"]`);
@@ -4044,7 +4050,7 @@ function _atualizarIndicadorCard(nid, lida) {
   dot.style.background = lida ? 'transparent' : 'var(--azul, #0A3D62)';
   dot.title = lida ? 'Marcar como não lida' : 'Marcar como lida';
 }
- 
+
 // Re-aplica indicadores em todos os cards visíveis no drawer
 function _atualizarIndicadoresDrawer(uid) {
   const lidas = _getLidas(uid);
@@ -4054,17 +4060,17 @@ function _atualizarIndicadoresDrawer(uid) {
     dot.style.background = lida ? 'transparent' : 'var(--azul, #0A3D62)';
   });
 }
- 
- 
+
+
 // ─── AUTO-MARCAR como lida após 45s de leitura ──────────────────────────────
 // Chama esta função logo após mostrarApp() em navegarParaEdicao e no fluxo principal.
- 
+
 let _autoLidaTimer = null;
- 
+
 function iniciarAutoMarcarLida(nid, uid) {
   if (_autoLidaTimer) clearTimeout(_autoLidaTimer);
   if (!nid || !uid) return;
- 
+
   _autoLidaTimer = setTimeout(() => {
     if (!_edicaoLida(uid, nid)) {
       marcarLida(uid, nid, false);
@@ -4077,9 +4083,9 @@ function iniciarAutoMarcarLida(nid, uid) {
 // Distingue assinante (upgrade de plano) de lead (nova assinatura).
 
 const _UPGRADE_INFO = {
-  audio:      { icone: '🎧', nome: 'Podcast', plano: 'Essence',      slug: 'essence' },
-  video:      { icone: '📺', nome: 'Vídeo',   plano: 'Profissional', slug: 'profissional' },
-  infografico:{ icone: '📊', nome: 'Infográfico', plano: 'Profissional', slug: 'profissional' },
+  audio: { icone: '🎧', nome: 'Podcast', plano: 'Essence', slug: 'essence' },
+  video: { icone: '📺', nome: 'Vídeo', plano: 'Profissional', slug: 'profissional' },
+  infografico: { icone: '📊', nome: 'Infográfico', plano: 'Profissional', slug: 'profissional' },
   chat: { icone: '✦', nome: 'Pergunte ao Radar', plano: 'Profissional', slug: 'profissional' },
 };
 
@@ -4155,7 +4161,7 @@ function _fecharUpgradePanel() {
 
 window._solicitarUpgrade = _solicitarUpgrade;
 window._fecharUpgradePanel = _fecharUpgradePanel;
-window._checarSessaoCritica    = _checarSessaoCritica;
+window._checarSessaoCritica = _checarSessaoCritica;
 window._mostrarSheetSessaoBloqueada = _mostrarSheetSessaoBloqueada;
 
 // ─── Inicia ───────────────────────────────────────────────────────────────────
