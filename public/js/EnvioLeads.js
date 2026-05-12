@@ -1737,9 +1737,7 @@ async function listarDescadastramentos() {
 window.listarDescadastramentos = listarDescadastramentos;
 
 function abrirAbaDescadastramentos() { mostrarAba('secao-descadastramentos'); listarDescadastramentos(); }
-function abrirAbaOrientacoes()        { mostrarAba('secao-orientacoes'); }
 window.abrirAbaDescadastramentos = abrirAbaDescadastramentos;
-window.abrirAbaOrientacoes       = abrirAbaOrientacoes;
 
 // ─── Preenchimento de filtros ─────────────────────────────────────────────────
 
