@@ -40,6 +40,16 @@ async function _parseJsonBody(req) {
   });
 }
 
+function _lerBody(req) {
+  if (req.body && typeof req.body === 'object') return Promise.resolve(req.body);
+  return new Promise((resolve, reject) => {
+    let raw = '';
+    req.on('data', chunk => { raw += chunk.toString(); });
+    req.on('end', () => { try { resolve(JSON.parse(raw)); } catch { resolve({}); } });
+    req.on('error', reject);
+  });
+}
+
 /* ==========================================================================
    relatorio-conformidade.js — Radar SIOPE · Backend (Vercel Function)
    Rota: POST /api/relatorio-conformidade
@@ -71,26 +81,18 @@ async function _relatorioConformidade(req, res) {
   const origin = process.env.ALLOWED_ORIGIN || 'https://app.radarsiope.com.br';
   res.setHeader('Access-Control-Allow-Origin', origin);
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
   if (req.method === 'OPTIONS') return res.status(204).end();
- 
-  // ── Autenticação via Firebase ID Token ────────────────────────────────────
-  const authHeader = req.headers.authorization || '';
-  const idToken = authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : null;
-  if (!idToken) return res.status(401).json({ ok: false, error: 'Token não fornecido.' });
- 
-  let uid;
-  try {
-    const decoded = await admin.auth().verifyIdToken(idToken);
-    uid = decoded.uid;
-  } catch {
-    return res.status(401).json({ ok: false, error: 'Token inválido ou expirado.' });
-  }
+  if (req.method !== 'POST') return res.status(405).json({ ok: false, error: 'Método não permitido.' });
  
   // ── Parse de body (compatível com bodyParser:false) ───────────────────────
-  const body = await _parseJsonBody(req);
+  const body = await _lerBody(req);
+  const { uid, cod_municipio } = body;
  
-  // ── Carrega usuário e verifica feature ───────────────────────────────────
+  if (!uid)          return res.status(400).json({ ok: false, error: 'uid obrigatório.' });
+  if (!cod_municipio) return res.status(400).json({ ok: false, error: 'cod_municipio obrigatório.' });
+ 
+  // ── Carrega usuário e verifica feature no Firestore ───────────────────────
   const userSnap = await db.collection('usuarios').doc(uid).get();
   if (!userSnap.exists) return res.status(404).json({ ok: false, error: 'Usuário não encontrado.' });
   const user = userSnap.data();
@@ -103,12 +105,9 @@ async function _relatorioConformidade(req, res) {
     });
   }
  
-  // ── Valida payload ────────────────────────────────────────────────────────
-  const { cod_municipio } = body;
-  if (!cod_municipio) return res.status(400).json({ ok: false, error: 'cod_municipio obrigatório.' });
   const codStr = String(cod_municipio).replace(/\D/g, '').slice(0, 6);
  
-  // ── Supabase: vw_municipio_resumo (últimos 2 anos) ────────────────────────
+  // ── Supabase: vw_municipio_resumo (2 anos) ────────────────────────────────
   const anoAtual    = new Date().getFullYear();
   const anoAnterior = anoAtual - 1;
  
@@ -130,7 +129,7 @@ async function _relatorioConformidade(req, res) {
     .order('bimestre', { ascending: false });
  
   if (siopeErr) {
-    console.error('[relatorio] Supabase error:', siopeErr);
+    console.error('[relatorio] Supabase:', siopeErr);
     return res.status(500).json({ ok: false, error: 'Erro ao consultar dados municipais.' });
   }
  
@@ -140,17 +139,17 @@ async function _relatorioConformidade(req, res) {
     r.pct_mde_aplicado !== null || r.vlr_aplicado_mde !== null
   ) || siopeAnoAtual[0] || null;
  
-  // ── Firestore: alertas do município (últimos 12 meses) ────────────────────
+  // ── Firestore: alertas do município (12 meses) ────────────────────────────
   const dozeAtras = new Date();
   dozeAtras.setMonth(dozeAtras.getMonth() - 12);
   let alertas = [];
   try {
-    const alertasSnap = await db.collection('alertas_disparados')
+    const snap = await db.collection('alertas_disparados')
       .where('disparado_em', '>=', admin.firestore.Timestamp.fromDate(dozeAtras))
       .orderBy('disparado_em', 'desc')
       .limit(60)
       .get();
-    alertas = alertasSnap.docs
+    alertas = snap.docs
       .map(d => ({ id: d.id, ...d.data() }))
       .filter(a => _alertaDoMunicipio(a, codStr))
       .slice(0, 10)
@@ -159,7 +158,7 @@ async function _relatorioConformidade(req, res) {
         titulo:       a.titulo || '',
         disparado_em: a.disparado_em?.toDate?.()?.toISOString() || null,
       }));
-  } catch (e) { console.warn('[relatorio] Alertas:', e.message); }
+  } catch (e) { console.warn('[relatorio] alertas:', e.message); }
  
   // ── Firestore: quiz do assinante ──────────────────────────────────────────
   let quizResultados = [];
@@ -171,21 +170,21 @@ async function _relatorioConformidade(req, res) {
       .get();
     quizResultados = quizSnap.docs.map(d => {
       const data = d.data();
-      const tentativas = Array.isArray(data.tentativas) ? data.tentativas : [];
+      const tentativas     = Array.isArray(data.tentativas) ? data.tentativas : [];
       const melhorPontuacao = tentativas.length > 0
         ? Math.max(...tentativas.map(t => t.pontuacao || 0))
         : (data.pontuacao || 0);
       return {
         newsletter_id:     d.id,
-        newsletter_numero: data.newsletter_numero  || null,
-        newsletter_titulo: data.newsletter_titulo  || '',
+        newsletter_numero: data.newsletter_numero || null,
+        newsletter_titulo: data.newsletter_titulo || '',
         melhor_pontuacao:  melhorPontuacao,
-        tentativas_total:  data.tentativas_total   || tentativas.length || 0,
+        tentativas_total:  data.tentativas_total || tentativas.length || 0,
         aprovado:          tentativas.some(t => t.aprovado) || data.aprovado || false,
         criado_em:         data.criado_em?.toDate?.()?.toISOString() || null,
       };
     });
-  } catch (e) { console.warn('[relatorio] Quiz:', e.message); }
+  } catch (e) { console.warn('[relatorio] quiz:', e.message); }
  
   // ── Firestore: total de edições com quiz ──────────────────────────────────
   let edicoesPublicadas = 0;
@@ -197,8 +196,8 @@ async function _relatorioConformidade(req, res) {
     edicoesPublicadas = edSnap.size;
   } catch { edicoesPublicadas = quizResultados.length; }
  
-  const quizComDados    = quizResultados.filter(q => q.tentativas_total > 0);
-  const mediaPontuacao  = quizComDados.length > 0
+  const quizComDados   = quizResultados.filter(q => q.tentativas_total > 0);
+  const mediaPontuacao = quizComDados.length > 0
     ? Math.round(quizComDados.reduce((s, q) => s + q.melhor_pontuacao, 0) / quizComDados.length)
     : null;
  
@@ -233,17 +232,16 @@ async function _relatorioConformidade(req, res) {
  
 // Helper (mantém junto da função acima)
 function _alertaDoMunicipio(alerta, cod) {
-  const TIPOS_MUNICIPAIS = [
+  const TIPOS = [
     'siope_prazo_proximo','siope_homologado',
     'siope_percentual_baixo','siope_nao_enviado',
     'fundeb_repasse_creditado',
   ];
-  if (!TIPOS_MUNICIPAIS.includes(alerta.tipo)) return false;
-  const codStr = String(cod);
-  if (alerta.parametros?.municipio_cod &&
-      String(alerta.parametros.municipio_cod) === codStr) return true;
+  if (!TIPOS.includes(alerta.tipo)) return false;
+  const c = String(cod);
+  if (alerta.parametros?.municipio_cod && String(alerta.parametros.municipio_cod) === c) return true;
   if (Array.isArray(alerta.filtros) &&
-      alerta.filtros.some(f => f.key === 'municipio_cod' && String(f.value) === codStr)) return true;
+      alerta.filtros.some(f => f.key === 'municipio_cod' && String(f.value) === c)) return true;
   return false;
 }
 
