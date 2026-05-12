@@ -12,23 +12,28 @@
 async function gerarRelatorioConformidade(cod, nome, uf) {
   const btn = document.getElementById('btn-relatorio-conformidade');
   if (btn) { btn.disabled = true; btn.innerHTML = '⏳ Gerando…'; }
- 
+
   try {
     // Usa window._radarUser — padrão do projeto, sem firebase.auth()
     const user = window._radarUser;
     if (!user?.uid) throw new Error('Usuário não autenticado.');
- 
+
     const resp = await fetch('/api/sendViaSES?acao=relatorio_conformidade', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        uid:          user.uid,       // identificação do assinante
-        cod_municipio: cod,
-      }),
+      body: JSON.stringify({ uid: user.uid, cod_municipio: cod }),
     });
- 
-    const dados = await resp.json();
- 
+
+    // Parse defensivo: API pode retornar texto puro em caso de erro 500 do Vercel
+    let dados;
+    const textoResposta = await resp.text();
+    try {
+      dados = JSON.parse(textoResposta);
+    } catch {
+      console.error('[Relatório] Resposta não-JSON da API:', textoResposta.slice(0, 200));
+      throw new Error('Erro interno no servidor. Verifique os logs do Vercel.');
+    }
+
     if (!dados.ok) {
       const msg = resp.status === 403
         ? 'Este recurso não está disponível no seu plano atual.'
@@ -37,26 +42,26 @@ async function gerarRelatorioConformidade(cod, nome, uf) {
       else alert(msg);
       return;
     }
- 
+
     // Abre nova aba com o HTML do relatório
     const html = _montarHTMLRelatorio(dados);
-    const win  = window.open('', '_blank');
- 
+    const win = window.open('', '_blank');
+
     if (!win) {
       // Fallback para popup bloqueado
       const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
-      const url  = URL.createObjectURL(blob);
-      const a    = document.createElement('a');
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
       a.href = url; a.target = '_blank'; a.click();
       setTimeout(() => URL.revokeObjectURL(url), 5000);
       return;
     }
- 
+
     win.document.open();
     win.document.write(html);
     win.document.close();
     win.addEventListener('load', () => setTimeout(() => win.print(), 400));
- 
+
   } catch (err) {
     console.error('[Relatório] Erro:', err);
     const msg = 'Não foi possível gerar o relatório. Tente novamente.';
@@ -73,9 +78,9 @@ function _injetarBotaoRelatorio(cod, nome, uf) {
   document.getElementById('btn-relatorio-conformidade')?.remove();
 
   const btn = document.createElement('button');
-  btn.id        = 'btn-relatorio-conformidade';
+  btn.id = 'btn-relatorio-conformidade';
   btn.innerHTML = '📋 Relatório de Conformidade';
-  btn.title     = 'Gerar relatório de conformidade municipal (PDF)';
+  btn.title = 'Gerar relatório de conformidade municipal (PDF)';
   btn.style.cssText = [
     'display:flex', 'align-items:center', 'gap:6px',
     'margin:8px 0 0 0', 'padding:9px 16px',
@@ -90,14 +95,14 @@ function _injetarBotaoRelatorio(cod, nome, uf) {
   ].join(';');
 
   btn.addEventListener('mouseover', () => {
-    btn.style.background    = 'rgba(10,61,98,0.35)';
-    btn.style.borderColor   = 'rgba(10,61,98,0.7)';
-    btn.style.color         = '#f1f5f9';
+    btn.style.background = 'rgba(10,61,98,0.35)';
+    btn.style.borderColor = 'rgba(10,61,98,0.7)';
+    btn.style.color = '#f1f5f9';
   });
   btn.addEventListener('mouseout', () => {
-    btn.style.background  = 'transparent';
+    btn.style.background = 'transparent';
     btn.style.borderColor = 'rgba(255,255,255,0.18)';
-    btn.style.color       = 'var(--rs-muted,#94a3b8)';
+    btn.style.color = 'var(--rs-muted,#94a3b8)';
   });
 
   btn.addEventListener('click', () => gerarRelatorioConformidade(cod, nome, uf));
@@ -117,26 +122,26 @@ function _montarHTMLRelatorio(d) {
   const { assinante, siope, alertas, quiz, gerado_em } = d;
 
   const anoAtual = siope?.ano_atual || new Date().getFullYear();
-  const bims     = (siope?.bimestres_ano || []).sort((a, b) => a.bimestre - b.bimestre);
-  const ultimo   = siope?.ultimo || null;
+  const bims = (siope?.bimestres_ano || []).sort((a, b) => a.bimestre - b.bimestre);
+  const ultimo = siope?.ultimo || null;
 
   // ── Linha da tabela SIOPE por bimestre ──────────────────────────────────────
   const linhasBim = [1, 2, 3, 4].map(n => {
     const b = bims.find(r => r.bimestre === n);
     if (!b) return _linhaBimVazio(n);
 
-    const situacao    = _labelSituacao(b.situacao);
-    const corSit      = _corSituacao(b.situacao);
-    const prazo       = b.enviado_no_prazo === true  ? '<span class="badge verde">No prazo</span>'
-                      : b.enviado_no_prazo === false ? '<span class="badge vermelho">Fora do prazo</span>'
-                      : '—';
-    const homol       = b.homologado === true  ? '<span class="badge verde">✓</span>'
-                      : b.homologado === false ? '<span class="badge cinza">Não</span>'
-                      : '—';
-    const pctMde      = _pct(b.pct_mde_aplicado);
-    const corMde      = (b.pct_mde_aplicado !== null && b.pct_mde_aplicado < 25)
-                      ? 'color:#b91c1c;font-weight:700' : '';
-    const prazoFmt    = b.prazo_envio ? _dataAbrev(b.prazo_envio) : '—';
+    const situacao = _labelSituacao(b.situacao);
+    const corSit = _corSituacao(b.situacao);
+    const prazo = b.enviado_no_prazo === true ? '<span class="badge verde">No prazo</span>'
+      : b.enviado_no_prazo === false ? '<span class="badge vermelho">Fora do prazo</span>'
+        : '—';
+    const homol = b.homologado === true ? '<span class="badge verde">✓</span>'
+      : b.homologado === false ? '<span class="badge cinza">Não</span>'
+        : '—';
+    const pctMde = _pct(b.pct_mde_aplicado);
+    const corMde = (b.pct_mde_aplicado !== null && b.pct_mde_aplicado < 25)
+      ? 'color:#b91c1c;font-weight:700' : '';
+    const prazoFmt = b.prazo_envio ? _dataAbrev(b.prazo_envio) : '—';
 
     return `
       <tr>
@@ -152,9 +157,9 @@ function _montarHTMLRelatorio(d) {
   // ── Indicadores financeiros do último bimestre disponível ───────────────────
   const indicadores = ultimo ? `
     <div class="ind-grid">
-      ${_indCard('MDE Exigido',    _moeda(ultimo.vlr_exigido_mde),    '')}
-      ${_indCard('MDE Aplicado',   _moeda(ultimo.vlr_aplicado_mde),   ultimo.pct_mde_aplicado !== null && ultimo.pct_mde_aplicado < 25 ? 'alerta' : 'ok')}
-      ${_indCard('% MDE Aplicado', _pct(ultimo.pct_mde_aplicado),     ultimo.pct_mde_aplicado !== null && ultimo.pct_mde_aplicado < 25 ? 'alerta' : 'ok')}
+      ${_indCard('MDE Exigido', _moeda(ultimo.vlr_exigido_mde), '')}
+      ${_indCard('MDE Aplicado', _moeda(ultimo.vlr_aplicado_mde), ultimo.pct_mde_aplicado !== null && ultimo.pct_mde_aplicado < 25 ? 'alerta' : 'ok')}
+      ${_indCard('% MDE Aplicado', _pct(ultimo.pct_mde_aplicado), ultimo.pct_mde_aplicado !== null && ultimo.pct_mde_aplicado < 25 ? 'alerta' : 'ok')}
       ${_indCard('FUNDEB Remuneração', _pct(ultimo.pct_fundeb_remuneracao), '')}
       ${_indCard('FUNDEB não aplicado', _moeda(ultimo.fundeb_nao_utilizado), ultimo.fundeb_nao_utilizado > 0 ? 'alerta' : '')}
       ${_indCard('Invest./aluno (básica)', _moeda(ultimo.invest_aluno_basica), '')}
@@ -165,24 +170,24 @@ function _montarHTMLRelatorio(d) {
   // ── Seção de alertas ─────────────────────────────────────────────────────────
   const listaAlertas = alertas?.length
     ? alertas.map(a =>
-        `<div class="alerta-item">
+      `<div class="alerta-item">
            <span class="alerta-icone">${_iconeAlerta(a.tipo)}</span>
            <span class="alerta-txt">${_escHtml(a.titulo)}</span>
            <span class="alerta-data">${_dataAbrev(a.disparado_em)}</span>
          </div>`
-      ).join('')
+    ).join('')
     : '<p class="sem-dados">Nenhum alerta registrado nos últimos 12 meses.</p>';
 
   // ── Seção de quiz ────────────────────────────────────────────────────────────
-  const qTotal       = quiz?.edicoes_com_quiz    || 0;
+  const qTotal = quiz?.edicoes_com_quiz || 0;
   const qRespondidas = quiz?.edicoes_respondidas || 0;
-  const qTaxa        = quiz?.taxa_participacao   || 0;
-  const qMedia       = quiz?.media_pontuacao;
-  const qPct         = Math.min(100, qTaxa);
-  const qCorBarra    = qTaxa >= 80 ? '#16a34a' : qTaxa >= 50 ? '#d97706' : '#dc2626';
-  const qMediaTxt    = qMedia !== null ? `${qMedia}%` : '—';
-  const qCorMedia    = qMedia !== null && qMedia >= 70 ? '#16a34a'
-                     : qMedia !== null && qMedia >= 50 ? '#d97706' : '#dc2626';
+  const qTaxa = quiz?.taxa_participacao || 0;
+  const qMedia = quiz?.media_pontuacao;
+  const qPct = Math.min(100, qTaxa);
+  const qCorBarra = qTaxa >= 80 ? '#16a34a' : qTaxa >= 50 ? '#d97706' : '#dc2626';
+  const qMediaTxt = qMedia !== null ? `${qMedia}%` : '—';
+  const qCorMedia = qMedia !== null && qMedia >= 70 ? '#16a34a'
+    : qMedia !== null && qMedia >= 50 ? '#d97706' : '#dc2626';
 
   // ── Data e verificação ───────────────────────────────────────────────────────
   const dataGeracao = gerado_em ? new Date(gerado_em).toLocaleDateString('pt-BR', {
@@ -190,7 +195,7 @@ function _montarHTMLRelatorio(d) {
     hour: '2-digit', minute: '2-digit'
   }) : '—';
 
-  const anoRel  = new Date(gerado_em || Date.now()).getFullYear();
+  const anoRel = new Date(gerado_em || Date.now()).getFullYear();
   const verHash = _hashVerif(assinante?.cod_municipio, gerado_em);
 
   return `<!DOCTYPE html>
@@ -526,9 +531,9 @@ function _montarHTMLRelatorio(d) {
           </div>
           <div class="quiz-legenda">
             ${qTaxa >= 80 ? '✅ Excelente engajamento com o conteúdo das edições.'
-            : qTaxa >= 50 ? '📌 Engajamento moderado. Responda as edições pendentes.'
-            : qTotal === 0 ? '—'
-            : '⚠️ Baixa participação. Complete os quizzes para fortalecer sua capacitação.'}
+      : qTaxa >= 50 ? '📌 Engajamento moderado. Responda as edições pendentes.'
+        : qTotal === 0 ? '—'
+          : '⚠️ Baixa participação. Complete os quizzes para fortalecer sua capacitação.'}
           </div>
         </div>
       </div>
@@ -567,11 +572,11 @@ function _linhaBimVazio(n) {
 
 function _labelSituacao(s) {
   const mapa = {
-    enviado:   'Enviado',
-    homologado:'Homologado',
-    pendente:  'Pendente',
-    nao_enviado:'Não enviado',
-    em_analise:'Em análise',
+    enviado: 'Enviado',
+    homologado: 'Homologado',
+    pendente: 'Pendente',
+    nao_enviado: 'Não enviado',
+    em_analise: 'Em análise',
   };
   return mapa[(s || '').toLowerCase()] || (s || '—');
 }
@@ -586,13 +591,13 @@ function _corSituacao(s) {
 
 function _iconeAlerta(tipo) {
   const mapa = {
-    siope_prazo_proximo:      '⏰',
-    siope_homologado:         '✅',
-    siope_percentual_baixo:   '⚠️',
-    siope_nao_enviado:        '🚨',
+    siope_prazo_proximo: '⏰',
+    siope_homologado: '✅',
+    siope_percentual_baixo: '⚠️',
+    siope_nao_enviado: '🚨',
     fundeb_repasse_creditado: '💰',
-    portaria_publicada:       '📋',
-    nova_edicao:              '📡',
+    portaria_publicada: '📋',
+    nova_edicao: '📡',
   };
   return mapa[tipo] || '🔔';
 }
