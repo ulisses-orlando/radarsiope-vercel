@@ -815,7 +815,7 @@ async function atualizarPreview() {
 
 // ─── Upsert usuário no Firestore ──────────────────────────────────────────────
 async function upsertUsuario(dados) {
-  const { nome, cpf, email, telefone, whatsapp, whatsappOptin, perfil, mensagem, preferencia,
+  const { nome, cpf, email, telefone, whatsapp, whatsappOptin, perfil, preferencia,
     cod_uf, cod_municipio, nome_municipio, plano_slug, ciclo, features } = dados;
   const cpfNorm = (cpf || '').replace(/\D/g, '');
   const waNumber = whatsapp ? String(whatsapp).replace(/\D/g, '') : '';
@@ -825,7 +825,7 @@ async function upsertUsuario(dados) {
     whatsapp: whatsapp || null, whatsapp_number: waNumber,
     whatsapp_optin: whatsapp ? (whatsappOptin ?? true) : false,
     whatsapp_optin_em: whatsapp ? firebase.firestore.FieldValue.serverTimestamp() : null,
-    tipo_perfil: perfil || null, ativo: false, mensagem: mensagem || null,
+    tipo_perfil: perfil || null, ativo: false, 
     preferencia_contato: preferencia || null,
     cod_uf: cod_uf || null, cod_municipio: cod6(cod_municipio) || null,
     nome_municipio: nome_municipio || null,
@@ -970,7 +970,6 @@ async function processarEnvioAssinatura(e) {
   const whatsapp = document.getElementById('whatsapp')?.value.trim() || '';
   const wpOptin = !!document.getElementById('whatsapp-optin')?.checked;
   const perfil = document.getElementById('perfil')?.value || '';
-  const mensagem = document.getElementById('mensagem')?.value.trim() || '';
   const preferencia = document.getElementById('preferencia-contato')?.value || '';
   const cupomCod = document.getElementById('cupom')?.value.trim() || '';
   const aceita = !!document.getElementById('aceita-termos')?.checked;
@@ -1037,7 +1036,7 @@ async function processarEnvioAssinatura(e) {
   setStatus('Registrando dados...', '#555');
   try {
     const userId = await upsertUsuario({
-      nome, cpf, email, telefone, whatsapp, whatsappOptin: wpOptin, perfil, mensagem, preferencia,
+      nome, cpf, email, telefone, whatsapp, whatsappOptin: wpOptin, perfil, preferencia,
       cod_uf: dadosUf?.cod_uf, cod_municipio: dadosUf?.cod_municipio, nome_municipio: dadosUf?.nome_municipio,
       plano_slug: _planoAtual.plano_slug, ciclo, features: _planoAtual.features || null,
     });
