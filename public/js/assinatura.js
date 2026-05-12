@@ -15,20 +15,20 @@ firebase.firestore.FieldValue (Firebase SDK)
 function getParam(nome) {
   return new URL(window.location.href).searchParams.get(nome);
 }
-const _origem      = getParam('origem') || 'direto';
-const _planIdUrl   = getParam('planId') || null;
-const _leadIdUrl   = getParam('leadId') || getParam('idLead') || null;
+const _origem = getParam('origem') || 'direto';
+const _planIdUrl = getParam('planId') || null;
+const _leadIdUrl = getParam('leadId') || getParam('idLead') || null;
 
 // ─── Estado global da sessão ──────────────────────────────────────────────────
-let _planoAtual    = null;       // objeto completo do plano selecionado + cicloSelecionado
-let _tiposMap      = {};         // id -> nome dos tipos de newsletter
+let _planoAtual = null;       // objeto completo do plano selecionado + cicloSelecionado
+let _tiposMap = {};         // id -> nome dos tipos de newsletter
 let _cupomAplicado = null;       // objeto cupom validado
-let _planosCache   = {};         // cache local de planos
+let _planosCache = {};         // cache local de planos
 
 // ─── Estado de seleção extra de municípios ────────────────────────────────────
-let _municipiosDisponiveis        = [];
+let _municipiosDisponiveis = [];
 let _municipiosExtrasSelecionados = [];
-let _ufAtual                      = null;
+let _ufAtual = null;
 
 // Normaliza código IBGE para 6 dígitos (Firestore tem 7, Supabase usa 6)
 const cod6 = (c) => String(c || '').replace(/\D/g, '').slice(0, 6);
@@ -76,11 +76,11 @@ async function configurarUIMunicipiosExtra() {
   `;
 
   const triggerEl = document.getElementById('municipios-trigger');
-  const panelEl   = document.getElementById('municipios-panel');
-  const listaEl   = document.getElementById('municipios-lista');
-  const buscaEl   = document.getElementById('municipios-busca');
-  const infoEl    = document.getElementById('municipios-limit-info');
-  const avisoEl   = document.getElementById('municipios-aviso');
+  const panelEl = document.getElementById('municipios-panel');
+  const listaEl = document.getElementById('municipios-lista');
+  const buscaEl = document.getElementById('municipios-busca');
+  const infoEl = document.getElementById('municipios-limit-info');
+  const avisoEl = document.getElementById('municipios-aviso');
 
   // ── Abre/fecha painel ────────────────────────────────────────────────────────
   triggerEl.addEventListener('click', () => {
@@ -151,7 +151,7 @@ async function configurarUIMunicipiosExtra() {
     }
 
     const principal = String(document.getElementById('municipio')?.value || '').trim() || null;
-    const filtro    = termo.toLowerCase();
+    const filtro = termo.toLowerCase();
     const lista = _municipiosDisponiveis.filter(m =>
       String(m.cod_municipio).trim() !== principal &&
       (!filtro || m.nome.toLowerCase().includes(filtro) || m.cod_municipio.includes(filtro))
@@ -194,7 +194,7 @@ async function configurarUIMunicipiosExtra() {
       const row = e.target.closest('[data-cod]');
       if (!row) return;
       const cod = row.dataset.cod;
-      const cb  = row.querySelector('input[type="checkbox"]');
+      const cb = row.querySelector('input[type="checkbox"]');
       if (cb?.disabled) {
         mostrarMensagem(`Limite de ${maxExtras} município(s) adicional(is) atingido.`);
         return;
@@ -286,7 +286,7 @@ function getDescontoPct(plano, cicloMeses) {
   if (plano.descontos_por_ciclo && plano.descontos_por_ciclo[c] !== undefined) {
     return Number(plano.descontos_por_ciclo[c]) || 0;
   }
-  if (c === '6')  return Number(plano.desconto_pct_6m)  || 0;
+  if (c === '6') return Number(plano.desconto_pct_6m) || 0;
   if (c === '12') return Number(plano.desconto_pct_12m) || 0;
   return 0;
 }
@@ -294,7 +294,7 @@ function getDescontoPct(plano, cicloMeses) {
 function getPrecoPlano(plano, cicloMeses) {
   if (!plano) return 0;
   const base = Number(plano.valor_mensal) || Number(plano.valor) || 0;
-  const pct  = getDescontoPct(plano, cicloMeses);
+  const pct = getDescontoPct(plano, cicloMeses);
   return Math.round(base * (1 - pct / 100) * 100) / 100;
 }
 
@@ -344,14 +344,14 @@ async function carregarListaPlanos() {
 
     if (allFeatures.length === 0) {
       allFeatures = [
-        { id: 'newsletter_texto',      nome: 'Newsletter em texto' },
-        { id: 'newsletter_audio',      nome: 'Newsletter em áudio (podcast)' },
-        { id: 'newsletter_video',      nome: 'Newsletter em vídeo' },
-        { id: 'newsletter_infografico',nome: 'Infográfico por edição' },
-        { id: 'alertas_prioritarios',  nome: 'Alertas prioritários' },
-        { id: 'grupo_whatsapp_vip',    nome: 'Grupo VIP WhatsApp' },
-        { id: 'biblioteca_acesso',     nome: 'Biblioteca vitalícia' },
-        { id: 'sugestao_tema_quota',   nome: 'Sugestão de tema' },
+        { id: 'newsletter_texto', nome: 'Newsletter em texto' },
+        { id: 'newsletter_audio', nome: 'Newsletter em áudio (podcast)' },
+        { id: 'newsletter_video', nome: 'Newsletter em vídeo' },
+        { id: 'newsletter_infografico', nome: 'Infográfico por edição' },
+        { id: 'alertas_prioritarios', nome: 'Alertas prioritários' },
+        { id: 'grupo_whatsapp_vip', nome: 'Grupo VIP WhatsApp' },
+        { id: 'biblioteca_acesso', nome: 'Biblioteca vitalícia' },
+        { id: 'sugestao_tema_quota', nome: 'Sugestão de tema' },
         { id: 'consultoria_horas_mes', nome: 'Consultoria direta' },
       ];
     }
@@ -462,13 +462,13 @@ async function carregarListaPlanos() {
 
 // ─── Helper: Cria card de plano ───────────────────────────────────────────────
 function _criarCardPlano(plano, ciclo, allFeatures) {
-  const cor      = plano.cor_destaque || '#0A3D62';
+  const cor = plano.cor_destaque || '#0A3D62';
   const features = plano.features || {};
 
   const featuresHtml = allFeatures.map(f => {
-    const val   = features[f.id];
+    const val = features[f.id];
     const ativo = !!val;
-    let label   = f.nome || f.id;
+    let label = f.nome || f.id;
     if (f.tipo === 'number') {
       const numVal = Number(val);
       if (!isNaN(numVal) && numVal > 0) label += ` (${numVal}/mês)`;
@@ -476,16 +476,16 @@ function _criarCardPlano(plano, ciclo, allFeatures) {
     return `<li class="${ativo ? '' : 'inativo'}">${label}</li>`;
   }).join('');
 
-  const val   = getPrecoPlano(plano, ciclo);
+  const val = getPrecoPlano(plano, ciclo);
   const total = getTotalCiclo(plano, ciclo);
 
   const card = document.createElement('label');
-  card.className   = `plano-card${plano.destaque ? ' destaque' : ''}${plano.em_breve ? ' em-breve' : ''}`;
-  card.dataset.id   = plano.id;
+  card.className = `plano-card${plano.destaque ? ' destaque' : ''}${plano.em_breve ? ' em-breve' : ''}`;
+  card.dataset.id = plano.id;
   card.dataset.ciclo = ciclo;
   card.style.setProperty('--plano-cor', cor);
-  card._planoData   = plano;
-  card._cicloAtual  = Number(ciclo);
+  card._planoData = plano;
+  card._cicloAtual = Number(ciclo);
 
   card.innerHTML = `
     ${plano.em_breve ? '<div class="plano-badge-em-breve">🚀 Em breve</div>' : ''}
@@ -507,11 +507,24 @@ function _criarCardPlano(plano, ciclo, allFeatures) {
   `;
 
   card.addEventListener('click', (e) => {
+    // ✅ 1. Se clicou no link "cadastre-se", ignora a lógica do card e permite a navegação
+    if (e.target.closest('a[href="capturaLead.html"]')) return;
+
+    // 🚫 2. Mantém o bloqueio de seleção para planos "Em breve"
     if (plano.em_breve) return;
+
     e.stopPropagation();
     _onPlanoSelecionado(plano.id, ciclo);
   });
 
+  // ✅ 3. Garantia extra: sobrescreve pointer-events do CSS apenas no link
+  const linkCadastro = card.querySelector('.plano-em-breve-aviso a');
+  if (linkCadastro) {
+    linkCadastro.style.pointerEvents = 'auto';
+    linkCadastro.style.position = 'relative';
+    linkCadastro.style.zIndex = '10';
+    linkCadastro.style.textDecoration = 'underline';
+  }
   return card;
 }
 
@@ -526,7 +539,7 @@ async function _onPlanoSelecionado(planId, cicloInicial = null) {
   _planoAtual = plano;
   _planoAtual.cicloSelecionado = Number(cicloInicial || ciclosDisp[0]);
 
-  const maxMun       = Number(_planoAtual?.features?.max_municipios) || 1;
+  const maxMun = Number(_planoAtual?.features?.max_municipios) || 1;
   const containerMun = document.getElementById('container-municipios-extra');
 
   if (maxMun > 1) {
@@ -579,7 +592,7 @@ function _atualizarCampoParcelas(plano) {
 
 // ─── WhatsApp opt-in ──────────────────────────────────────────────────────────
 function _mostrarWhatsappOptin() {
-  const wpInput   = document.getElementById('whatsapp');
+  const wpInput = document.getElementById('whatsapp');
   const optinWrap = document.getElementById('whatsapp-optin-wrap');
   if (!wpInput || !optinWrap) return;
   const mostrar = () => {
@@ -662,7 +675,7 @@ async function validarCupom(codigo) {
     if (snap.empty) { mostrarMensagem('Cupom não encontrado.'); return null; }
     const cupom = snap.docs[0].data();
     if (cupom.status !== 'ativo') { mostrarMensagem('Cupom inativo.'); return null; }
-    
+
     // Validação de validade (Brasília UTC-3 fixo)
     if (cupom.expira_em) {
       const now = new Date();
@@ -689,20 +702,20 @@ async function validarCupom(codigo) {
 
 // ─── Calcular preview ─────────────────────────────────────────────────────────
 async function calcularPreview(plano, tiposSelecionados = [], cupomObj = null) {
-  const cicloMeses     = plano.cicloSelecionado || 3;
-  const baseMensal     = Number(plano.valor_mensal) || Number(plano.valor) || 0;
-  const pct            = getDescontoPct(plano, cicloMeses);
-  const basePrice      = getPrecoPlano(plano, cicloMeses);
+  const cicloMeses = plano.cicloSelecionado || 3;
+  const baseMensal = Number(plano.valor_mensal) || Number(plano.valor) || 0;
+  const pct = getDescontoPct(plano, cicloMeses);
+  const basePrice = getPrecoPlano(plano, cicloMeses);
   const descontoMensal = Math.round((baseMensal - basePrice) * 100) / 100;
-  const tiposIncl      = Array.isArray(plano.tipos_inclusos) ? plano.tipos_inclusos.map(String) : [];
-  const allowMulti     = !!plano.allow_multi_select;
-  const bundles        = Array.isArray(plano.bundles) ? plano.bundles : [];
+  const tiposIncl = Array.isArray(plano.tipos_inclusos) ? plano.tipos_inclusos.map(String) : [];
+  const allowMulti = !!plano.allow_multi_select;
+  const bundles = Array.isArray(plano.bundles) ? plano.bundles : [];
 
   const items = tiposSelecionados.map(id => ({
     id,
-    nome:     _tiposMap[id] || id,
+    nome: _tiposMap[id] || id,
     included: tiposIncl.includes(String(id)),
-    price:    tiposIncl.includes(String(id)) ? 0 : (Number(plano.price_per_tipo) || basePrice),
+    price: tiposIncl.includes(String(id)) ? 0 : (Number(plano.price_per_tipo) || basePrice),
   }));
 
   let totalMensal = allowMulti
@@ -720,11 +733,11 @@ async function calcularPreview(plano, tiposSelecionados = [], cupomObj = null) {
   let descontoCupom = 0;
   if (cupomObj) {
     if (cupomObj.tipo === 'percentual') descontoCupom = totalMensalBruto * ((Number(cupomObj.valor) || 0) / 100);
-    else if (cupomObj.tipo === 'fixo')  descontoCupom = Number(cupomObj.valor) || 0;
+    else if (cupomObj.tipo === 'fixo') descontoCupom = Number(cupomObj.valor) || 0;
   }
   const totalMensalFinal = Math.max(0, totalMensalBruto - descontoCupom);
-  const totalCiclo       = Math.round(totalMensalFinal * cicloMeses * 100) / 100;
-  const temFidelizacao   = cicloMeses >= 6 && pct > 0;
+  const totalCiclo = Math.round(totalMensalFinal * cicloMeses * 100) / 100;
+  const temFidelizacao = cicloMeses >= 6 && pct > 0;
   const agora = new Date();
   const dataFimFidelizacao = new Date(agora);
   dataFimFidelizacao.setMonth(dataFimFidelizacao.getMonth() + cicloMeses);
@@ -740,14 +753,14 @@ async function calcularPreview(plano, tiposSelecionados = [], cupomObj = null) {
 
 // ─── Atualizar preview no DOM ─────────────────────────────────────────────────
 async function atualizarPreview() {
-  const wrap    = document.getElementById('preview-breakdown');
+  const wrap = document.getElementById('preview-breakdown');
   const itemsEl = document.getElementById('preview-items');
   const totalEl = document.getElementById('preview-total');
   if (!wrap) return;
   if (!_planoAtual) { wrap.style.display = 'none'; return; }
 
   const checks = [...document.querySelectorAll('#grupo-newsletters input[type="checkbox"]:checked')];
-  const tipos  = checks.map(cb => cb.value);
+  const tipos = checks.map(cb => cb.value);
   if (!tipos.length) { wrap.style.display = 'none'; return; }
 
   const pv = await calcularPreview(_planoAtual, tipos, _cupomAplicado);
@@ -768,8 +781,8 @@ async function atualizarPreview() {
     }
 
     const parcelasEl = document.getElementById('parcelas');
-    const parcelas   = parcelasEl ? Number(parcelasEl.value) || 1 : 1;
-    const semJuros   = _planoAtual.permitir_sem_juros && parcelas <= (_planoAtual.parcelas_sem_juros || 1);
+    const parcelas = parcelasEl ? Number(parcelasEl.value) || 1 : 1;
+    const semJuros = _planoAtual.permitir_sem_juros && parcelas <= (_planoAtual.parcelas_sem_juros || 1);
 
     if (pv.desconto_pct > 0 && pv.desconto_mensal > 0) {
       html += `<div class="preview-row desconto"><span>🏷 Desconto ${pv.ciclo_meses} meses (${pv.desconto_pct}% off)</span><span>− ${fmtBRL(pv.desconto_mensal)}/mês</span></div>`;
@@ -800,8 +813,8 @@ async function atualizarPreview() {
 // ─── Upsert usuário no Firestore ──────────────────────────────────────────────
 async function upsertUsuario(dados) {
   const { nome, cpf, email, telefone, whatsapp, whatsappOptin, perfil, mensagem, preferencia,
-          cod_uf, cod_municipio, nome_municipio, plano_slug, ciclo, features } = dados;
-  const cpfNorm  = (cpf || '').replace(/\D/g, '');
+    cod_uf, cod_municipio, nome_municipio, plano_slug, ciclo, features } = dados;
+  const cpfNorm = (cpf || '').replace(/\D/g, '');
   const waNumber = whatsapp ? String(whatsapp).replace(/\D/g, '') : '';
 
   const base = {
@@ -811,7 +824,7 @@ async function upsertUsuario(dados) {
     whatsapp_optin_em: whatsapp ? firebase.firestore.FieldValue.serverTimestamp() : null,
     tipo_perfil: perfil || null, ativo: false, mensagem: mensagem || null,
     preferencia_contato: preferencia || null,
-    cod_uf: cod_uf || null, cod_municipio: cod6(cod_municipio) || null, 
+    cod_uf: cod_uf || null, cod_municipio: cod6(cod_municipio) || null,
     nome_municipio: nome_municipio || null,
     origem: _origem, updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
   };
@@ -835,21 +848,21 @@ async function upsertUsuario(dados) {
 // ─── Registrar assinatura (subcoleção) ───────────────────────────────────────
 async function registrarAssinatura(userId, payload, preview) {
   if (!userId || !payload || !preview) throw new Error('Parâmetros obrigatórios ausentes.');
-  const agora     = new Date();
+  const agora = new Date();
   const cicloMeses = preview.ciclo_meses || 3;
   const renovacao = new Date(agora);
   renovacao.setMonth(renovacao.getMonth() + cicloMeses);
 
   const principalCod = payload.cod_municipio || null;
-  const extrasObjs   = Array.isArray(payload.municipiosExtras) ? payload.municipiosExtras : [];
+  const extrasObjs = Array.isArray(payload.municipiosExtras) ? payload.municipiosExtras : [];
   const principalCod6 = cod6(payload.cod_municipio);
   const municipiosPlano = principalCod6
     ? [
-        { cod_municipio: principalCod6, nome: payload.nome_municipio || principalCod6, uf: payload.cod_uf || '' },
-        ...extrasObjs
-            .map(e => ({ ...e, cod_municipio: cod6(e.cod_municipio) }))
-            .filter(e => e.cod_municipio !== principalCod6),
-      ]
+      { cod_municipio: principalCod6, nome: payload.nome_municipio || principalCod6, uf: payload.cod_uf || '' },
+      ...extrasObjs
+        .map(e => ({ ...e, cod_municipio: cod6(e.cod_municipio) }))
+        .filter(e => e.cod_municipio !== principalCod6),
+    ]
     : [];
 
   const data = {
@@ -879,7 +892,7 @@ async function registrarAssinatura(userId, payload, preview) {
 
 // ─── Criar pedido no backend (Mercado Pago) ───────────────────────────────────
 async function criarPedidoBackend(payload) {
-  const ctrl    = new AbortController();
+  const ctrl = new AbortController();
   const timeout = setTimeout(() => ctrl.abort(), 30000);
   try {
     const resp = await fetch('/api/pagamentoMP?acao=criar-pedido', {
@@ -899,7 +912,7 @@ async function prefillFromLead() {
     const doc = await db.collection('leads').doc(_leadIdUrl).get();
     if (!doc.exists) return null;
     const lead = doc.data();
-    const set  = (id, val) => { if (val && document.getElementById(id)) document.getElementById(id).value = val; };
+    const set = (id, val) => { if (val && document.getElementById(id)) document.getElementById(id).value = val; };
     set('nome', lead.nome); set('email', lead.email); set('telefone', lead.telefone);
     set('whatsapp', lead.whatsapp || lead.telefone); set('perfil', lead.perfil);
     set('preferencia-contato', lead.preferencia_contato);
@@ -943,22 +956,22 @@ function validarCPF(cpf) {
 async function processarEnvioAssinatura(e) {
   e.preventDefault();
   clearErrors();
-  const btn       = document.getElementById('btn-assinar');
-  const status    = document.getElementById('status-envio');
+  const btn = document.getElementById('btn-assinar');
+  const status = document.getElementById('status-envio');
   const setStatus = (msg, cor = '#555') => { if (status) { status.textContent = msg; status.style.color = cor; } };
 
-  const nome       = document.getElementById('nome')?.value.trim()              || '';
-  const cpf        = document.getElementById('cpf')?.value.trim()               || '';
-  const email      = document.getElementById('email')?.value.trim()             || '';
-  const telefone   = document.getElementById('telefone')?.value.trim()          || '';
-  const whatsapp   = document.getElementById('whatsapp')?.value.trim()          || '';
-  const wpOptin    = !!document.getElementById('whatsapp-optin')?.checked;
-  const perfil     = document.getElementById('perfil')?.value                   || '';
-  const mensagem   = document.getElementById('mensagem')?.value.trim()          || '';
-  const preferencia= document.getElementById('preferencia-contato')?.value      || '';
-  const cupomCod   = document.getElementById('cupom')?.value.trim()             || '';
-  const aceita     = !!document.getElementById('aceita-termos')?.checked;
-  const ciclo      = _planoAtual?.cicloSelecionado || 3;
+  const nome = document.getElementById('nome')?.value.trim() || '';
+  const cpf = document.getElementById('cpf')?.value.trim() || '';
+  const email = document.getElementById('email')?.value.trim() || '';
+  const telefone = document.getElementById('telefone')?.value.trim() || '';
+  const whatsapp = document.getElementById('whatsapp')?.value.trim() || '';
+  const wpOptin = !!document.getElementById('whatsapp-optin')?.checked;
+  const perfil = document.getElementById('perfil')?.value || '';
+  const mensagem = document.getElementById('mensagem')?.value.trim() || '';
+  const preferencia = document.getElementById('preferencia-contato')?.value || '';
+  const cupomCod = document.getElementById('cupom')?.value.trim() || '';
+  const aceita = !!document.getElementById('aceita-termos')?.checked;
+  const ciclo = _planoAtual?.cicloSelecionado || 3;
   const tiposSelecionados = [...document.querySelectorAll('#grupo-newsletters input[type="checkbox"]:checked')].map(cb => cb.value);
 
   let temErro = false;
@@ -974,17 +987,17 @@ async function processarEnvioAssinatura(e) {
   } else if (whatsapp && !validarTelefoneFormato(whatsapp)) {
     erro('whatsapp', 'Formato de WhatsApp inválido.');
   }
-  if (!perfil)              { mostrarMensagem('Selecione seu perfil.');                            temErro = true; }
-  if (!aceita)              { setError('aceita_termos', 'Você precisa aceitar os termos.');        temErro = true; }
+  if (!perfil) { mostrarMensagem('Selecione seu perfil.'); temErro = true; }
+  if (!aceita) { setError('aceita_termos', 'Você precisa aceitar os termos.'); temErro = true; }
   if (!tiposSelecionados.length) { mostrarMensagem('Selecione pelo menos um tipo de newsletter.'); temErro = true; }
-  if (!_planoAtual)         { mostrarMensagem('Selecione um plano.');                              temErro = true; }
+  if (!_planoAtual) { mostrarMensagem('Selecione um plano.'); temErro = true; }
   if (temErro) return;
 
   // Verifica assinatura ativa existente
   try {
     const exSnap = await db.collection('usuarios').where('email', '==', email.toLowerCase()).limit(1).get();
     if (!exSnap.empty) {
-      const uid     = exSnap.docs[0].id;
+      const uid = exSnap.docs[0].id;
       const assSnap = await db.collection('usuarios').doc(uid).collection('assinaturas')
         .where('status', 'in', ['ativa', 'aprovada']).get();
       if (!assSnap.empty) {
@@ -1027,15 +1040,15 @@ async function processarEnvioAssinatura(e) {
     });
 
     const assinaturaId = await registrarAssinatura(userId, {
-      planId:             _planoAtual.id,
-      plano_slug:         _planoAtual.plano_slug  || null,
-      plano_nome:         _planoAtual.nome        || null,
+      planId: _planoAtual.id,
+      plano_slug: _planoAtual.plano_slug || null,
+      plano_nome: _planoAtual.nome || null,
       tipos_selecionados: tiposSelecionados,
-      cupom:              cupomCod                || null,
-      features:           _planoAtual.features    || null,
-      cod_uf:             dadosUf?.cod_uf         || '',
-      cod_municipio:      dadosUf?.cod_municipio  || null,
-      nome_municipio:     dadosUf?.nome_municipio || '',
+      cupom: cupomCod || null,
+      features: _planoAtual.features || null,
+      cod_uf: dadosUf?.cod_uf || '',
+      cod_municipio: dadosUf?.cod_municipio || null,
+      nome_municipio: dadosUf?.nome_municipio || '',
       // Extras: array de objetos {cod_municipio, nome, uf}
       municipiosExtras: _municipiosExtrasSelecionados.map(cod => {
         const det = _municipiosDisponiveis.find(m => m.cod_municipio === cod);
@@ -1065,7 +1078,7 @@ async function processarEnvioAssinatura(e) {
     if (backendResp?.pedidoId) {
       db.collection('usuarios').doc(userId).collection('assinaturas').doc(assinaturaId)
         .update({ pedidoId: backendResp.pedidoId, updatedAt: firebase.firestore.FieldValue.serverTimestamp() })
-        .catch(() => {});
+        .catch(() => { });
     }
 
     if (backendResp?.ativadoDireto) {
@@ -1094,9 +1107,9 @@ async function processarEnvioAssinatura(e) {
 // ─── Inicialização ────────────────────────────────────────────────────────────
 async function initAssinatura() {
   const telEl = document.getElementById('telefone');
-  const wpEl  = document.getElementById('whatsapp');
+  const wpEl = document.getElementById('whatsapp');
   if (telEl && typeof aplicarMascaraTelefone === 'function') aplicarMascaraTelefone(telEl);
-  if (wpEl  && typeof aplicarMascaraTelefone === 'function') aplicarMascaraTelefone(wpEl);
+  if (wpEl && typeof aplicarMascaraTelefone === 'function') aplicarMascaraTelefone(wpEl);
 
   document.getElementById('cpf')?.addEventListener('input', function () {
     let v = this.value.replace(/\D/g, '').slice(0, 11);
@@ -1109,12 +1122,12 @@ async function initAssinatura() {
     try {
       const d = await db.collection('leads').doc(_leadIdUrl).get();
       if (d.exists) leadPreload = d.data();
-    } catch (e) {}
+    } catch (e) { }
   }
 
   window.validarUfMunicipio = await inserirCamposUfMunicipio(
     document.getElementById('campo-uf-municipio'),
-    leadPreload?.cod_uf     || '',
+    leadPreload?.cod_uf || '',
     leadPreload?.cod_municipio || ''
   );
 
@@ -1130,27 +1143,27 @@ async function initAssinatura() {
 
   document.getElementById('aplicar-cupom')?.addEventListener('click', async () => {
     const codigo = document.getElementById('cupom')?.value.trim();
-    const fb     = document.getElementById('cupom-feedback');
+    const fb = document.getElementById('cupom-feedback');
     if (!_planoAtual) { mostrarMensagem('Selecione um plano antes de aplicar o cupom.'); return; }
-    if (!codigo)      { mostrarMensagem('Digite um código de cupom.'); return; }
+    if (!codigo) { mostrarMensagem('Digite um código de cupom.'); return; }
 
     const cupom = await validarCupom(codigo);
     if (cupom) {
       _cupomAplicado = cupom;
       if (fb) { fb.textContent = `✅ Cupom "${codigo}" aplicado!${cupom.msgUso ? ' ' + cupom.msgUso : ''}`; fb.style.color = '#16a34a'; }
-      
+
       const isGratuidade = cupom.valor === 100;
       const munContainer = document.getElementById('container-municipios-extra');
-      if (isGratuidade) { 
-        _municipiosExtrasSelecionados = []; 
-        if (munContainer) { munContainer.style.display = 'none'; munContainer.style.pointerEvents = 'none'; munContainer.style.opacity = '0.5'; } 
-        mostrarMensagem('Cupom de gratuidade aplicado.'); 
-      } else { 
-        if (munContainer) { munContainer.style.display = 'block'; munContainer.style.pointerEvents = 'auto'; munContainer.style.opacity = '1'; } 
+      if (isGratuidade) {
+        _municipiosExtrasSelecionados = [];
+        if (munContainer) { munContainer.style.display = 'none'; munContainer.style.pointerEvents = 'none'; munContainer.style.opacity = '0.5'; }
+        mostrarMensagem('Cupom de gratuidade aplicado.');
+      } else {
+        if (munContainer) { munContainer.style.display = 'block'; munContainer.style.pointerEvents = 'auto'; munContainer.style.opacity = '1'; }
       }
       await atualizarPreview();
     } else {
-      _cupomAplicado = null; 
+      _cupomAplicado = null;
       if (fb) fb.textContent = '';
       const munContainer = document.getElementById('container-municipios-extra');
       if (munContainer && _planoAtual?.features?.max_municipios > 1) { munContainer.style.display = 'block'; munContainer.style.pointerEvents = 'auto'; munContainer.style.opacity = '1'; }
