@@ -479,7 +479,7 @@ async function _handleAtivarSessao(req, res) {
       assinaturaId,
       segmento:       'assinante',
       plano_slug:     assinaturaData.plano_slug   || null,
-      features:       assinaturaData.features_snapshot || assinaturaData.features || {},
+      features:       assinaturaData.features || assinaturaData.features_snapshot || {},
       nome:           usuarioData.nome            || '',
       email:          usuarioData.email           || '',
       cod_uf:         usuarioData.cod_uf          || '',
@@ -563,7 +563,7 @@ async function _handleValidarSessao(req, res) {
         if (assnSnap.exists) {
           const d    = assnSnap.data();
           plano_slug = d.plano_slug || null;
-          features   = d.features_snapshot || d.features || {};
+          features   = d.features || d.features_snapshot || {};
           statusAss  = d.status || null;
           municipiosPlano = d.municipios_plano || [];
         }
