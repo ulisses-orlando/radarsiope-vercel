@@ -479,7 +479,7 @@ async function _handleAtivarSessao(req, res) {
       assinaturaId,
       segmento:       'assinante',
       plano_slug:     assinaturaData.plano_slug   || null,
-      features:       assinaturaData.features || assinaturaData.features_snapshot || {},
+      features: usuarioData.features || assinaturaData.features_snapshot || {},
       nome:           usuarioData.nome            || '',
       email:          usuarioData.email           || '',
       cod_uf:         usuarioData.cod_uf          || '',
@@ -558,15 +558,19 @@ async function _handleValidarSessao(req, res) {
  
     if (assinaturaId) {
       try {
-        const assnSnap = await db.collection('usuarios').doc(uid)
-          .collection('assinaturas').doc(assinaturaId).get();
-        if (assnSnap.exists) {
-          const d    = assnSnap.data();
-          plano_slug = d.plano_slug || null;
-          features   = d.features || d.features_snapshot || {};
-          statusAss  = d.status || null;
-          municipiosPlano = d.municipios_plano || [];
-        }
+        const [usuarioSnap, assnSnap] = await Promise.all([
+        db.collection('usuarios').doc(uid).get(),
+        db.collection('usuarios').doc(uid).collection('assinaturas').doc(assinaturaId).get()
+      ]);
+      const userData = usuarioSnap.exists ? usuarioSnap.data() : {};
+
+      if (assnSnap.exists) {
+        const d = assnSnap.data();
+        plano_slug = d.plano_slug || null;
+        features   = userData.features || d.features_snapshot || {}; // ← USUÁRIO PRIMEIRO
+        statusAss  = d.status || null;
+        municipiosPlano = d.municipios_plano || [];
+      }
       } catch (e) { /* não fatal */ }
     }
  
@@ -674,8 +678,8 @@ async function _handleCriarSessao(req, res) {
       uid,
       assinaturaId,
       segmento:       'assinante',
-      plano_slug:     assinaturaData.plano_slug        || null,
-      features:       assinaturaData.features || assinaturaData.features_snapshot || {},
+      plano_slug:     assinaturaData.plano_slug   || null,
+      features:       usuarioData.features        || assinaturaData.features_snapshot || {},
       municipios_plano: assinaturaData.municipios_plano || [],
       nome:           usuarioData.nome            || '',
       email:          usuarioData.email           || '',
