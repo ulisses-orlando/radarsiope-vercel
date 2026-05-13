@@ -675,7 +675,7 @@ async function _handleCriarSessao(req, res) {
       assinaturaId,
       segmento:       'assinante',
       plano_slug:     assinaturaData.plano_slug        || null,
-      features:       assinaturaData.features_snapshot || assinaturaData.features || {},
+      features:       assinaturaData.features || assinaturaData.features_snapshot || {},
       municipios_plano: assinaturaData.municipios_plano || [],
       nome:           usuarioData.nome            || '',
       email:          usuarioData.email           || '',
