@@ -89,7 +89,7 @@ async function _relatorioConformidade(req, res) {
     });
   }
 
-  const codStr     = String(cod_municipio).replace(/\D/g, '').slice(0, 6);
+  const codStr = String(cod_municipio).replace(/\D/g, '');
   const anoAtual   = new Date().getFullYear();
   const anoAnterior = anoAtual - 1;
 
