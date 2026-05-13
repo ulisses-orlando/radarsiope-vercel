@@ -307,7 +307,7 @@ async function _renderResumo() {
       const c = _stColor(a.status);
       const assinId = doc.id;
       const userFeats = a.features_snapshot || {};
-      
+
       // Exibição visual das features ativas na assinatura
       const feats = featuresList
         .filter(f => (a.features_snapshot || {})[f.id])
@@ -386,6 +386,34 @@ async function _renderResumo() {
         </div>`;
     }
 
+    // 🆕 GERAÇÃO DAS FEATURES DO USUÁRIO (ANTES do body.innerHTML)
+    const userFeatChecksUsuario = (() => {
+      const userFeatsNivelUsuario = _drawerDados.features || {};
+      return featuresList.map(f => {
+        const valor = userFeatsNivelUsuario[f.id];
+        if (f.tipo === 'number') {
+          const unidade = f.unidade ? ` ${f.unidade}` : '';
+          return `<div style="display:flex;align-items:center;gap:8px;font-size:12px;padding:4px 6px;border-radius:6px;background:#f8fafc;border:1px solid #e2e8f0">
+            <span style="font-weight:600">${f.icone} ${f.nome}</span>
+            <input type="number" data-feat="${f.id}" value="${Number(valor) || 0}" min="0" max="999" style="width:70px;padding:4px 6px;border:1px solid #cbd5e1;border-radius:4px;font-size:12px">${unidade ? `<span style="color:#64748b;font-size:11px">${unidade}</span>` : ''}
+          </div>`;
+        }
+        if (f.tipo === 'text') {
+          return `<div style="display:flex;flex-direction:column;gap:4px;font-size:12px;padding:4px 6px;border-radius:6px;background:#f8fafc;border:1px solid #e2e8f0">
+            <span style="font-weight:600">${f.icone} ${f.nome}</span>
+            <input type="text" data-feat="${f.id}" value="${(valor || '').toString().replace(/"/g, '&quot;')}" style="width:100%;padding:4px 6px;border:1px solid #cbd5e1;border-radius:4px;font-size:12px" placeholder="Digite o valor...">
+          </div>`;
+        }
+        const isChecked = !!valor;
+        const bg = isChecked ? '#e0f2fe' : '#f1f5f9';
+        const border = isChecked ? '#0284c740' : '#e2e8f0';
+        return `<label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;padding:4px 6px;border-radius:6px;background:${bg};border:1px solid ${border}">
+          <input type="checkbox" data-feat="${f.id}" ${isChecked ? 'checked' : ''} style="width:14px;height:14px;cursor:pointer">${f.icone} ${f.nome}
+        </label>`;
+      }).join('');
+    })();
+
+    // ✅ Agora sim: body.innerHTML pode usar userFeatChecksUsuario
     body.innerHTML = `
       <div class="drawer-secao">
         <div class="drawer-secao-titulo">👤 Dados do usuário</div>
@@ -404,6 +432,18 @@ async function _renderResumo() {
           <button class="btn-drawer-sm" onclick="abrirModalEnvioManual('${uid}')">📧 Enviar e-mail</button>
         </div>
       </div>
+
+      🆕 <div class="drawer-secao">
+        <div class="drawer-secao-titulo">⚙️ Features do Usuário</div>
+        <div id="feat-panel-usuario">
+          <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px">${userFeatChecksUsuario}</div>
+          <button onclick="_salvarFeaturesUsuario('${uid}', this)" style="font-size:12px;padding:4px 14px;border-radius:6px;border:none;background:#0A3D62;color:#fff;cursor:pointer;font-weight:600">
+            💾 Salvar features
+          </button>
+          <span id="feat-status-usuario" style="font-size:11px;color:#64748b;margin-left:8px"></span>
+        </div>
+      </div>
+
       <div class="drawer-secao">
         <div class="drawer-secao-titulo">📑 Assinaturas</div>
         ${assinHtml}
@@ -545,7 +585,7 @@ async function _renderPagamentos() {
 
 // ─── ABA: SOLICITAÇÕES ───────────────────────────────────────────────────────
 async function _renderSolicitacoes() {
-  const body = document.getElementById('drawer-usuario-body'); 
+  const body = document.getElementById('drawer-usuario-body');
   const uid = _drawerUid;
   try {
     const snap = await db.collection('usuarios').doc(uid)
@@ -566,7 +606,7 @@ async function _renderSolicitacoes() {
     snap.forEach(doc => {
       const s = doc.data();
       const status = (s.status || 'pendente').toLowerCase();
-      
+
       // ✅ FILTRO 1: Ignorar completamente solicitações do tipo "sugestao_tema"
       if (s.tipo === 'sugestao_tema') return;
 
@@ -620,13 +660,13 @@ async function _renderSolicitacoes() {
               <div style="display:grid;grid-template-columns:auto 1fr;gap:4px 8px;color:#475569;line-height:1.5">
                 <span>📅 Meses usados:</span><strong>${calculo.meses_usados || '—'}</strong>
                 <span>🔒 Fidelização até:</span><strong>${calculo.data_fim_fidelizacao ? new Date(calculo.data_fim_fidelizacao).toLocaleDateString('pt-BR') : 'Não se aplica'}</strong>
-                <span>💰 Desconto/mês:</span><strong>${calculo.desconto_mensal ? calculo.desconto_mensal.toLocaleString('pt-BR',{style:'currency',currency:'BRL'}) : 'R$ 0,00'}</strong>
-                <span>🧾 Valor do ajuste:</span><strong style="color:${valorMulta > 0 ? '#b45309' : '#16a34a'};font-size:13px">${valorMulta.toLocaleString('pt-BR',{style:'currency',currency:'BRL'})}</strong>
+                <span>💰 Desconto/mês:</span><strong>${calculo.desconto_mensal ? calculo.desconto_mensal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : 'R$ 0,00'}</strong>
+                <span>🧾 Valor do ajuste:</span><strong style="color:${valorMulta > 0 ? '#b45309' : '#16a34a'};font-size:13px">${valorMulta.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</strong>
               </div>
-              ${valorMulta > 0 
-                ? `<button class="btn-drawer-sm" style="background:#2563eb;color:#fff;border:none;margin-top:8px;width:100%" onclick="_gerarLinkMulta('${uid}','${doc.id}',${valorMulta})">🔗 Gerar Link de Multa (MP)</button>`
-                : `<button class="btn-drawer-sm btn-verde" style="margin-top:8px;width:100%" onclick="_confirmarEncerramentoDireto('${uid}','${doc.id}')">✅ Confirmar Encerramento (Isento)</button>`
-              }
+              ${valorMulta > 0
+              ? `<button class="btn-drawer-sm" style="background:#2563eb;color:#fff;border:none;margin-top:8px;width:100%" onclick="_gerarLinkMulta('${uid}','${doc.id}',${valorMulta})">🔗 Gerar Link de Multa (MP)</button>`
+              : `<button class="btn-drawer-sm btn-verde" style="margin-top:8px;width:100%" onclick="_confirmarEncerramentoDireto('${uid}','${doc.id}')">✅ Confirmar Encerramento (Isento)</button>`
+            }
             </div>`;
         } else if (status === 'cancelamento_pendente_multa' && s.mp_link_multa) {
           acoes = `
@@ -671,13 +711,13 @@ async function _renderSolicitacoes() {
 async function _abrirModalGerarLinkMulta(uid, solId, valorReais) {
   const valor = Number(valorReais) || 0;
   const mensagem = `Gerar link de cobrança de ${valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} para o assinante?`;
-  
+
   if (!confirm(mensagem)) return;
 
   const btn = event.target;
-  btn.disabled = true; 
+  btn.disabled = true;
   btn.textContent = '⏳ Gerando...';
-  
+
   try {
     const resp = await fetch('/api/pagamentoMP?acao=gerar-cobranca-cancelamento', {
       method: 'POST',
@@ -688,7 +728,7 @@ async function _abrirModalGerarLinkMulta(uid, solId, valorReais) {
     if (!data.ok) throw new Error(data.message || 'Erro ao gerar link');
 
     await db.collection('usuarios').doc(uid).collection('solicitacoes').doc(solId)
-      .update({ 
+      .update({
         status: 'cancelamento_pendente_multa',
         mp_link_multa: data.link,
         mp_preference_multa: data.preferenceId,
@@ -746,7 +786,7 @@ async function _confirmarEncerramentoCancelamento(uid, solId) {
   if (!confirm('Confirmar o encerramento definitivo da assinatura? Esta ação não pode ser desfeita.')) return;
   try {
     // Busca assinatura ativa
-    const assSnap = await db.collection('usuarios').doc(uid).collection('assinaturas').where('status', 'in', ['ativa','aprovada','cancelamento_pendente_multa','multa_pago']).limit(1).get();
+    const assSnap = await db.collection('usuarios').doc(uid).collection('assinaturas').where('status', 'in', ['ativa', 'aprovada', 'cancelamento_pendente_multa', 'multa_pago']).limit(1).get();
     if (assSnap.empty) throw new Error('Assinatura não encontrada.');
     const assinId = assSnap.docs[0].id;
 
@@ -1063,7 +1103,7 @@ async function _salvarInteracaoUsuario(uid) {
 // ou revogar todas de uma vez. Substitui o modelo antigo de envios/expiração.
 async function _renderAcesso() {
   const body = document.getElementById('drawer-usuario-body');
-  const uid  = _drawerUid;
+  const uid = _drawerUid;
 
   try {
     // ── Assinatura ativa ──────────────────────────────────────────────────────
@@ -1072,7 +1112,7 @@ async function _renderAcesso() {
 
     let assinaturaHtml = '';
     for (const assinDoc of assinSnap.docs) {
-      const a  = assinDoc.data();
+      const a = assinDoc.data();
       const st = a.status || '—';
       const corStatus = {
         ativa: '#22c55e', ativo: '#22c55e',
@@ -1111,13 +1151,13 @@ async function _renderAcesso() {
       sessoesHtml = '<p style="color:#94a3b8;font-size:12px;padding:8px 0">Nenhuma sessão ativa.</p>';
     } else {
       for (const sessDoc of sessoesSnap.docs) {
-        const s        = sessDoc.data();
-        const sessId   = sessDoc.id;
-        const criado   = _fmtData(s.criado_em);
-        const ultimo   = _fmtData(s.ultimo_acesso);
-        const origem   = s.origem === 'link_edicao' ? '🔗 Link de edição'
-                       : s.origem === 'ativar_sessao' ? '📧 Link de ativação'
-                       : '📱 App';
+        const s = sessDoc.data();
+        const sessId = sessDoc.id;
+        const criado = _fmtData(s.criado_em);
+        const ultimo = _fmtData(s.ultimo_acesso);
+        const origem = s.origem === 'link_edicao' ? '🔗 Link de edição'
+          : s.origem === 'ativar_sessao' ? '📧 Link de ativação'
+            : '📱 App';
         const suspeito = s.compartilhamento_suspeito
           ? '<span style="background:#fee2e2;color:#ef4444;border-radius:20px;padding:1px 7px;font-size:10px;margin-left:4px">⚠️ Suspeito</span>'
           : '';
@@ -1134,10 +1174,10 @@ async function _renderAcesso() {
                 Criada: ${criado} · Último acesso: ${ultimo}
               </div>
               ${s.acessos_ua_distintos > 0
-                ? `<div style="font-size:10px;color:#f59e0b;margin-top:1px">
+            ? `<div style="font-size:10px;color:#f59e0b;margin-top:1px">
                      UAs distintos: ${s.acessos_ua_distintos}
                    </div>`
-                : ''}
+            : ''}
             </div>
             <button class="btn-drawer-sm btn-vermelho"
               onclick="_revogarSessao('${sessId}')"
@@ -1183,9 +1223,9 @@ async function _revogarSessao(sessaoId) {
     await db.collection('usuarios').doc(uid)
       .collection('sessoes').doc(sessaoId)
       .update({
-        ativo:             false,
+        ativo: false,
         desativado_motivo: 'revogado_admin',
-        desativado_em:     firebase.firestore.FieldValue.serverTimestamp(),
+        desativado_em: firebase.firestore.FieldValue.serverTimestamp(),
       });
     mostrarMensagem('✅ Sessão revogada.');
     _renderAcesso();
@@ -1202,9 +1242,9 @@ async function _revogarTodasSessoes() {
     if (snap.empty) { mostrarMensagem('Nenhuma sessão ativa.'); return; }
     const batch = db.batch();
     snap.docs.forEach(doc => batch.update(doc.ref, {
-      ativo:             false,
+      ativo: false,
       desativado_motivo: 'revogado_admin',
-      desativado_em:     firebase.firestore.FieldValue.serverTimestamp(),
+      desativado_em: firebase.firestore.FieldValue.serverTimestamp(),
     }));
     await batch.commit();
     mostrarMensagem(`✅ ${snap.size} sessão(ões) revogada(s).`);
@@ -1226,11 +1266,11 @@ async function _resetarFeedbackEnvio(assinId, envioId) {
 }
 
 async function _gerarLinkMulta(uid, solId, valor) {
-const mensagem = `Gerar link de cobrança de ${valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} para o assinante?`;
+  const mensagem = `Gerar link de cobrança de ${valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} para o assinante?`;
 
-if (!confirm(mensagem)) return;
+  if (!confirm(mensagem)) return;
 
-try {
+  try {
     const resp = await fetch('/api/pagamentoMP?acao=gerar-cobranca-cancelamento', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ uid, solicitacaoId: solId, valorReais: valor })
@@ -1256,7 +1296,7 @@ async function _confirmarEncerramentoFinal(uid, solId) {
 
 async function _executarEncerramento(uid, solId, motivo) {
   try {
-    const assSnap = await db.collection('usuarios').doc(uid).collection('assinaturas').where('status', 'in', ['ativa','aprovada','cancelamento_pendente_multa','multa_pago']).limit(1).get();
+    const assSnap = await db.collection('usuarios').doc(uid).collection('assinaturas').where('status', 'in', ['ativa', 'aprovada', 'cancelamento_pendente_multa', 'multa_pago']).limit(1).get();
     if (assSnap.empty) throw new Error('Assinatura ativa não encontrada.');
     const assinId = assSnap.docs[0].id;
 
@@ -1272,6 +1312,38 @@ async function _executarEncerramento(uid, solId, motivo) {
   } catch (e) { mostrarMensagem('❌ Erro: ' + e.message); }
 }
 
+// ─── SALVAR FEATURES DO USUÁRIO (nível documento principal) ───────────────────
+async function _salvarFeaturesUsuario(uid, btn) {
+  const panel = document.getElementById('feat-panel-usuario');
+  const status = document.getElementById('feat-status-usuario');
+  const inputs = panel.querySelectorAll('[data-feat]');
+  const novasFeatures = {};
+
+  inputs.forEach(input => {
+    const featId = input.dataset.feat;
+    const tipo = input.type;
+    if (tipo === 'checkbox') novasFeatures[featId] = input.checked;
+    else if (tipo === 'number') {
+      const val = Number(input.value);
+      novasFeatures[featId] = isNaN(val) ? 0 : val;
+    } else if (tipo === 'text') {
+      novasFeatures[featId] = input.value.trim();
+    }
+  });
+
+  btn.disabled = true; btn.textContent = '⏳ Salvando...'; status.textContent = '';
+  try {
+    await db.collection('usuarios').doc(uid).update({ features: novasFeatures });
+    // Atualiza cache local para manter consistência sem recarregar a aba
+    _drawerDados.features = novasFeatures;
+    status.textContent = '✅ Salvo!'; status.style.color = '#16a34a';
+    setTimeout(() => { status.textContent = ''; }, 3000);
+  } catch (e) {
+    status.textContent = '❌ Erro: ' + e.message; status.style.color = '#dc2626';
+  } finally {
+    btn.disabled = false; btn.textContent = '💾 Salvar features';
+  }
+}
 // ─── Exportações globais ─────────────────────────────────────────────────────
 window._resetarFeedbackEnvio = _resetarFeedbackEnvio;
 window.abrirDrawerUsuario = abrirDrawerUsuario;
@@ -1291,5 +1363,6 @@ window._confirmarEncerramentoDireto = _confirmarEncerramentoDireto;
 window._gerarLinkMulta = _gerarLinkMulta;
 window._confirmarEncerramentoDireto = _confirmarEncerramentoDireto;
 window._confirmarEncerramentoFinal = _confirmarEncerramentoFinal;
+window._salvarFeaturesUsuario = _salvarFeaturesUsuario;
 
 document.addEventListener('DOMContentLoaded', () => setTimeout(atualizarBadgeUsuarios, 1500));
