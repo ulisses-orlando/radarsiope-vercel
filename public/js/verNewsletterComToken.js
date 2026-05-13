@@ -2324,8 +2324,8 @@ async function VerNewsletterComToken() {
             return;
           }
 
-          // features_snapshot tem precedência sobre qualquer features do usuário
-          destinatario.features = assinaturaData.features_snapshot || assinaturaData.features || destinatario.features || {};
+          // features do usuário tem precedencia, mas se estiverem ausentes, usa o snapshot da assinatura 
+          destinatario.features = destinatario.features || assinaturaData.features_snapshot || {};
           destinatario.plano_slug = assinaturaData.plano_slug || destinatario.plano_slug || null;
 
           // Fallback: busca pelo planId se plano_slug não estiver na assinatura
