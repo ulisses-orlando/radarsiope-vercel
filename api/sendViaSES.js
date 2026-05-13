@@ -106,7 +106,7 @@ async function _relatorioConformidade(req, res) {
       'saldo_fundeb','fundeb_nao_utilizado',
       'ideb_iniciais','ideb_finais',
     ].join(','))
-    .eq('cod_municipio', codStr)
+    .eq('cod_municipio', sting(codStr))
     .in('ano', [anoAtual, anoAnterior])
     .order('ano',      { ascending: false })
     .order('bimestre', { ascending: false });
