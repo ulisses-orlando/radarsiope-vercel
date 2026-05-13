@@ -35,11 +35,21 @@ async function gerarRelatorioConformidade(cod, nome, uf) {
     }
 
     if (!dados.ok) {
-      const msg = resp.status === 403
-        ? 'Este recurso não está disponível no seu plano atual.'
-        : (dados.error || 'Erro ao gerar relatório.');
-      if (typeof mostrarMensagem === 'function') mostrarMensagem(msg);
-      else alert(msg);
+      if (resp.status === 403) {
+        // Usa o painel de upgrade padrão do projeto
+        const isAssinante = !!(window._radarUser?.segmento === 'assinante');
+        if (typeof _solicitarUpgrade === 'function') {
+          _solicitarUpgrade('relatorio', isAssinante);
+        } else {
+          // Fallback improvável mas seguro
+          if (typeof mostrarMensagem === 'function')
+            mostrarMensagem('Disponível a partir do plano Profissional.');
+        }
+      } else {
+        const msg = dados.error || 'Erro ao gerar relatório.';
+        if (typeof mostrarMensagem === 'function') mostrarMensagem(msg);
+        else alert(msg);
+      }
       return;
     }
 
