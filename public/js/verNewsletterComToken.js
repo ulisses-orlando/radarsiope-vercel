@@ -619,7 +619,6 @@ async function renderMunicipio(destinatario, acesso, newsletter) {
 function _injetarBotaoRelatorio(cod, nome, uf, temRelatorio) {
   // Remove grupo anterior (troca de município)
   document.getElementById('rs-acoes-municipio')?.remove();
-
   const btnHistorico = document.getElementById('btn-toggle-historico');
   if (!btnHistorico) return; // seção município não renderizou
 
@@ -627,14 +626,8 @@ function _injetarBotaoRelatorio(cod, nome, uf, temRelatorio) {
   const grupo = document.createElement('div');
   grupo.id = 'rs-acoes-municipio';
   grupo.style.cssText = [
-    'display:flex',
-    'gap:8px',
-    'margin-top:8px',
-    'width:100%',
+    'display:flex', 'gap:8px', 'margin-top:8px', 'width:100%',
   ].join(';');
-
-  // ── Move btn-toggle-historico para dentro do grupo ─────────────────────────
-  // (mantém todos os seus event listeners — apenas reposiciona no DOM)
   btnHistorico.style.flex = '1';
   btnHistorico.parentNode.insertBefore(grupo, btnHistorico);
   grupo.appendChild(btnHistorico);
@@ -642,44 +635,32 @@ function _injetarBotaoRelatorio(cod, nome, uf, temRelatorio) {
   // ── Botão do relatório ─────────────────────────────────────────────────────
   const btnRel = document.createElement('button');
   btnRel.id = 'btn-relatorio-conformidade';
+  
+  // ✅ CORREÇÃO: Grava os dados NO DOM no momento da criação
+  btnRel.dataset.cod = String(cod || '');
+  btnRel.dataset.nome = String(nome || '');
+  btnRel.dataset.uf = String(uf || '');
 
   if (temRelatorio) {
-    // ── Liberado: estilo primário discreto ──────────────────────────────────
     btnRel.innerHTML = '📋 Conformidade';
     btnRel.title = 'Gerar Relatório de Conformidade Municipal (PDF)';
     btnRel.style.cssText = [
-      'flex:1',
-      'padding:9px 10px',
-      'background:var(--azul,#0A3D62)',
-      'color:#fff',
-      'border:none',
-      'border-radius:8px',
-      'font-size:13px',
-      'font-weight:600',
-      'cursor:pointer',
-      'white-space:nowrap',
-      'transition:opacity .2s',
+      'flex:1', 'padding:9px 10px', 'background:var(--azul,#0A3D62)',
+      'color:#fff', 'border:none', 'border-radius:8px', 'font-size:13px',
+      'font-weight:600', 'cursor:pointer', 'white-space:nowrap', 'transition:opacity .2s',
     ].join(';');
     btnRel.addEventListener('mouseover', () => { btnRel.style.opacity = '.85'; });
-    btnRel.addEventListener('mouseout', () => { btnRel.style.opacity = '1'; });
+    btnRel.addEventListener('mouseout',  () => { btnRel.style.opacity = '1'; });
+    // ✅ Chama SEM parâmetros. A função lerá diretamente do dataset.
     btnRel.addEventListener('click', () => gerarRelatorioConformidade());
-
   } else {
-    // ── Bloqueado: estilo de upsell com cadeado ─────────────────────────────
     btnRel.innerHTML = '🔒 Conformidade';
     btnRel.title = 'Disponível no plano Profissional';
     btnRel.style.cssText = [
-      'flex:1',
-      'padding:9px 10px',
-      'background:transparent',
-      'color:var(--rs-muted,#94a3b8)',
-      'border:1.5px dashed var(--rs-borda,#334155)',
-      'border-radius:8px',
-      'font-size:13px',
-      'font-weight:600',
-      'cursor:pointer',
-      'white-space:nowrap',
-      'transition:border-color .2s, color .2s',
+      'flex:1', 'padding:9px 10px', 'background:transparent',
+      'color:var(--rs-muted,#94a3b8)', 'border:1.5px dashed var(--rs-borda,#334155)',
+      'border-radius:8px', 'font-size:13px', 'font-weight:600',
+      'cursor:pointer', 'white-space:nowrap', 'transition:border-color .2s, color .2s',
     ].join(';');
     btnRel.addEventListener('mouseover', () => {
       btnRel.style.borderColor = 'var(--azul,#0A3D62)';
@@ -690,12 +671,9 @@ function _injetarBotaoRelatorio(cod, nome, uf, temRelatorio) {
       btnRel.style.color = 'var(--rs-muted,#94a3b8)';
     });
     btnRel.addEventListener('click', () => {
-      if (typeof _solicitarUpgrade === 'function') {
-        _solicitarUpgrade('relatorio', true); // true = já é assinante
-      }
+      if (typeof _solicitarUpgrade === 'function') _solicitarUpgrade('relatorio', true);
     });
   }
-
   grupo.appendChild(btnRel);
 }
 
