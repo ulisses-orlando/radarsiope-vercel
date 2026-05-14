@@ -662,7 +662,7 @@ function _injetarBotaoRelatorio(cod, nome, uf, temRelatorio) {
     ].join(';');
     btnRel.addEventListener('mouseover', () => { btnRel.style.opacity = '.85'; });
     btnRel.addEventListener('mouseout', () => { btnRel.style.opacity = '1'; });
-    btnRel.addEventListener('click', () => gerarRelatorioConformidade(cod, nome, uf));
+    btnRel.addEventListener('click', () => gerarRelatorioConformidade());
 
   } else {
     // ── Bloqueado: estilo de upsell com cadeado ─────────────────────────────

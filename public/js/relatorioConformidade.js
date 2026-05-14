@@ -16,8 +16,11 @@ async function gerarRelatorioConformidade() {
     const user = window._radarUser;
     if (!user?.uid) throw new Error('Usuário não autenticado.');
 
-    // ✅ CORREÇÃO: `dataset` escrito corretamente + validação segura
     const codMun = btn?.dataset?.cod;
+    
+    // Debug temporário (pode remover depois que funcionar)
+    console.log('[Relatório] btn.dataset:', btn?.dataset, '| cod extraído:', codMun);
+
     if (!codMun || codMun === 'undefined' || codMun === '') {
       throw new Error('Município não identificado. Selecione um município válido.');
     }
@@ -54,7 +57,6 @@ async function gerarRelatorioConformidade() {
     win.document.open();
     win.document.write(html);
     win.document.close();
-    // ✅ Impressão manual: botão no relatório cuida disso.
   } catch (err) {
     console.error('[Relatório] Erro:', err);
     if (typeof mostrarMensagem === 'function') mostrarMensagem('Não foi possível gerar o relatório.');
