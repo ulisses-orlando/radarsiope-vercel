@@ -214,7 +214,7 @@ function _montarHTMLRelatorio(d) {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Relatório de Conformidade — ${_escHtml(assinante?.municipio || '')}/${_escHtml(assinante?.uf || '')} — ${anoAtual}</title>
+  <title>Relatório de Conformidade — ${_escHtml(assinante?.municipio || '')}/${_escHtml(assinante?.uf || '')} — ${anoGeracao}</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700&display=swap">
   <style>
