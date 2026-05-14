@@ -118,6 +118,27 @@ async function _relatorioConformidade(req, res) {
     r.pct_mde_aplicado !== null || r.vlr_aplicado_mde !== null
   ) || series[0] || null;
 
+  // ── Firestore: alertas do município (12 meses) ────────────────────────────
+  const dozeAtras = new Date();
+  dozeAtras.setMonth(dozeAtras.getMonth() - 12);
+  let alertas = [];
+  try {
+    const alertasSnap = await db.collection('alertas_disparados')
+      .where('disparado_em', '>=', admin.firestore.Timestamp.fromDate(dozeAtras))
+      .orderBy('disparado_em', 'desc')
+      .limit(60)
+      .get();
+    alertas = alertasSnap.docs
+      .map(d => ({ id: d.id, ...d.data() }))
+      .filter(a => _alertaDoMunicipio(a, codStr))
+      .slice(0, 10)
+      .map(a => ({
+        tipo:         a.tipo || '',
+        titulo:       a.titulo || '',
+        disparado_em: a.disparado_em?.toDate?.()?.toISOString() || null,
+      }));
+  } catch (e) { console.warn('[relatorio] alertas:', e.message); }
+  
   // ── Firestore: quiz do assinante ──────────────────────────────────────────
   let quizResultados = [];
   try {
