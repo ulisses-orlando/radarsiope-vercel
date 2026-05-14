@@ -379,31 +379,42 @@ document.addEventListener('DOMContentLoaded', function() {
   const mdeData = ${JSON.stringify(mdeData)};
   const fundebData = ${JSON.stringify(fundebData)};
 
-  const chartOpts = {
+  // Define o plugin de valores fixos
+  const pluginValoresFixos = {
+    id: 'pluginValoresFixos',
+    afterDatasetsDraw: function(chart) {
+      const { ctx, data } = chart;
+      ctx.save();
+      ctx.font = 'bold 10px Sora, sans-serif';
+      ctx.fillStyle = '#0f172a'; // Cor do texto (escuro para contraste)
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'bottom';
+      
+      data.datasets.forEach(function(dataset, i) {
+        const meta = chart.getDatasetMeta(i);
+        meta.data.forEach(function(point, index) {
+          const value = dataset.data[index];
+          // Só desenha se houver valor
+          if (value !== null && value !== undefined) {
+            ctx.fillText(value + '%', point.x, point.y - 10);
+          }
+        });
+      });
+      ctx.restore();
+    }
+  };
+
+  // Registra o plugin para funcionar nos gráficos
+  if (Chart.register) Chart.register(pluginValoresFixos);
+
+  // Configurações comuns
+  const commonOptions = {
     responsive: true,
     maintainAspectRatio: false,
     plugins: {
       legend: { display: true, position: 'bottom', labels: { boxWidth: 12, font: { size: 10 } } },
-      tooltip: { enabled: true },
-      // ✅ Plugin inline nativo para desenhar valores permanentemente
-      valoresPontos: {
-        afterDatasetsDraw(chart) {
-          const { ctx, data } = chart;
-          ctx.save();
-          ctx.font = 'bold 10px Sora, sans-serif';
-          ctx.fillStyle = '#0f172a';
-          ctx.textAlign = 'center';
-          ctx.textBaseline = 'bottom';
-          data.datasets.forEach((ds, i) => {
-            const meta = chart.getDatasetMeta(i);
-            meta.data.forEach((p, j) => {
-              const v = ds.data[j];
-              if (v !== null && v !== undefined) ctx.fillText(v + '%', p.x, p.y - 8);
-            });
-          });
-          ctx.restore();
-        }
-      }
+      tooltip: { enabled: true }, // Tooltip continua ativo para uso na tela
+      pluginValoresFixos: {} // Ativa o nosso plugin
     },
     scales: {
       x: { ticks: { font: { size: 9 }, maxRotation: 45 }, grid: { display: false } },
@@ -411,19 +422,50 @@ document.addEventListener('DOMContentLoaded', function() {
     }
   };
 
+  // Gráfico MDE
   if (document.getElementById('chartMde')) {
     new Chart(document.getElementById('chartMde'), {
       type: 'line',
-      data: { labels, datasets: [{ label: '% MDE Aplicado', data: mdeData, borderColor: '#0A3D62', backgroundColor: 'rgba(10,61,98,0.1)', tension: 0.3, pointRadius: 3, pointHoverRadius: 5 }] },
-      options: { ...chartOpts, scales: { ...chartOpts.scales, y: { ...chartOpts.scales.y, min: 0, max: 100 } } }
+      data: { 
+        labels, 
+        datasets: [{ 
+          label: '% MDE Aplicado', 
+          data: mdeData, 
+          borderColor: '#0A3D62', 
+          backgroundColor: 'rgba(10,61,98,0.1)', 
+          tension: 0.3, 
+          pointRadius: 4, // Ponto um pouco maior
+          pointBackgroundColor: '#fff', 
+          pointBorderColor: '#0A3D62',
+          pointBorderWidth: 2
+        }] 
+      },
+      options: { 
+        ...commonOptions, 
+        scales: { ...commonOptions.scales, y: { ...commonOptions.scales.y, min: 0, max: 100 } } 
+      }
     });
   }
 
+  // Gráfico FUNDEB
   if (document.getElementById('chartFundeb')) {
     new Chart(document.getElementById('chartFundeb'), {
       type: 'line',
-      data: { labels, datasets: [{ label: '% FUNDEB Remuneração', data: fundebData, borderColor: '#16a34a', backgroundColor: 'rgba(22,163,74,0.1)', tension: 0.3, pointRadius: 3, pointHoverRadius: 5 }] },
-      options: { ...chartOpts }
+      data: { 
+        labels, 
+        datasets: [{ 
+          label: '% FUNDEB Remuneração', 
+          data: fundebData, 
+          borderColor: '#16a34a', 
+          backgroundColor: 'rgba(22,163,74,0.1)', 
+          tension: 0.3, 
+          pointRadius: 4,
+          pointBackgroundColor: '#fff', 
+          pointBorderColor: '#16a34a',
+          pointBorderWidth: 2
+        }] 
+      },
+      options: commonOptions
     });
   }
 });
