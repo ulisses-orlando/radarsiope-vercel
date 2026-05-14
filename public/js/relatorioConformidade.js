@@ -11,11 +11,11 @@ _injetarBotaoRelatorio(cod, nome, uf)      → chamada por renderMunicipio()
 async function gerarRelatorioConformidade(cod, nome, uf) {
   const btn = document.getElementById('btn-relatorio-conformidade');
   if (btn) { btn.disabled = true; btn.innerHTML = '⏳ Gerando…'; }
-  
+
   try {
     const user = window._radarUser;
     if (!user?.uid) throw new Error('Usuário não autenticado.');
-    
+
     // Usa o município passado ou lê do dataset (garante sincronia com o seletor)
     const codMun = cod || btn?.dataset.cod;
     if (!codMun) throw new Error('Município não identificado.');
@@ -28,7 +28,7 @@ async function gerarRelatorioConformidade(cod, nome, uf) {
 
     let dados;
     const textoResposta = await resp.text();
-    try { dados = JSON.parse(textoResposta); } 
+    try { dados = JSON.parse(textoResposta); }
     catch {
       console.error('[Relatório] Resposta não-JSON da API:', textoResposta.slice(0, 200));
       throw new Error('Erro interno no servidor. Verifique os logs do Vercel.');
@@ -63,7 +63,7 @@ async function gerarRelatorioConformidade(cod, nome, uf) {
     win.document.write(html);
     win.document.close();
     // ✅ REMOVIDO: win.addEventListener('load', () => setTimeout(() => win.print(), 400));
-    
+
   } catch (err) {
     console.error('[Relatório] Erro:', err);
     const msg = 'Não foi possível gerar o relatório. Tente novamente.';
@@ -81,7 +81,7 @@ function _injetarBotaoRelatorio(cod, nome, uf) {
   btn.id = 'btn-relatorio-conformidade';
   btn.innerHTML = '📋 Relatório de Conformidade';
   btn.title = 'Gerar relatório de conformidade municipal (PDF)';
-  
+
   // ✅ EVOLUÇÃO 1: Armazena dados no dataset para leitura dinâmica
   btn.dataset.cod = String(cod || '');
   btn.dataset.nome = String(nome || '');
@@ -99,7 +99,7 @@ function _injetarBotaoRelatorio(cod, nome, uf) {
     'justify-content:center',
     'transition:background .2s, border-color .2s, color .2s',
   ].join(';');
-  
+
   btn.addEventListener('mouseover', () => {
     btn.style.background = 'rgba(10,61,98,0.35)';
     btn.style.borderColor = 'rgba(10,61,98,0.7)';
@@ -110,7 +110,7 @@ function _injetarBotaoRelatorio(cod, nome, uf) {
     btn.style.borderColor = 'rgba(255,255,255,0.18)';
     btn.style.color = 'var(--rs-muted,#94a3b8)';
   });
-  
+
   // ✅ EVOLUÇÃO 1: Lê do dataset no momento do clique
   btn.addEventListener('click', () => gerarRelatorioConformidade(btn.dataset.cod, btn.dataset.nome, btn.dataset.uf));
 
@@ -132,16 +132,16 @@ function _montarHTMLRelatorio(d) {
 
   const linhasSeries = series.length > 0
     ? series.map(r => {
-        const corSit = _corSituacao(r.situacao);
-        const sitLabel = _labelSituacao(r.situacao);
-        const prazo = r.enviado_no_prazo === true ? '<span class="badge verde">No prazo</span>'
-                 : r.enviado_no_prazo === false ? '<span class="badge vermelho">Fora do prazo</span>' : '—';
-        const homol = r.homologado === true ? '<span class="badge verde">✓</span>'
-                 : r.homologado === false ? '<span class="badge cinza">Não</span>' : '—';
-        const pctMde = _pct(r.pct_mde_aplicado);
-        const corMde = (r.pct_mde_aplicado !== null && r.pct_mde_aplicado < 25) ? 'color:#b91c1c;font-weight:700' : '';
-        const periodo = r.bimestre ? `${r.ano} · ${r.bimestre}º Bim` : String(r.ano || '—');
-        return `<tr>
+      const corSit = _corSituacao(r.situacao);
+      const sitLabel = _labelSituacao(r.situacao);
+      const prazo = r.enviado_no_prazo === true ? '<span class="badge verde">No prazo</span>'
+        : r.enviado_no_prazo === false ? '<span class="badge vermelho">Fora do prazo</span>' : '—';
+      const homol = r.homologado === true ? '<span class="badge verde">✓</span>'
+        : r.homologado === false ? '<span class="badge cinza">Não</span>' : '—';
+      const pctMde = _pct(r.pct_mde_aplicado);
+      const corMde = (r.pct_mde_aplicado !== null && r.pct_mde_aplicado < 25) ? 'color:#b91c1c;font-weight:700' : '';
+      const periodo = r.bimestre ? `${r.ano} · ${r.bimestre}º Bim` : String(r.ano || '—');
+      return `<tr>
           <td style="font-weight:700;color:#1e3a5f;white-space:nowrap">${periodo}</td>
           <td><span class="badge" style="background:${corSit.bg};color:${corSit.fg}">${sitLabel}</span></td>
           <td>${prazo}</td>
@@ -149,10 +149,10 @@ function _montarHTMLRelatorio(d) {
           <td style="${corMde}">${pctMde}</td>
           <td>${_pct(r.pct_fundeb_remuneracao)}</td>
         </tr>`;
-      }).join('')
+    }).join('')
     : `<tr><td colspan="6" style="text-align:center;color:#94a3b8;font-style:italic;padding:12px">Nenhum dado disponível para este município.</td></tr>`;
 
-  const indicadores = ultimo 
+  const indicadores = ultimo
     ? `<div class="ind-grid">
         ${_indCard('MDE Exigido', _moeda(ultimo.vlr_exigido_mde), '')}
         ${_indCard('MDE Aplicado', _moeda(ultimo.vlr_aplicado_mde), ultimo.pct_mde_aplicado !== null && ultimo.pct_mde_aplicado < 25 ? 'alerta' : 'ok')}
@@ -162,7 +162,7 @@ function _montarHTMLRelatorio(d) {
         ${_indCard('Invest./aluno (básica)', _moeda(ultimo.invest_aluno_basica), '')}
         ${_indCard('Saldo FUNDEB', _moeda(ultimo.saldo_fundeb), '')}
         ${_indCard('IDEB Anos Iniciais', _num(ultimo.ideb_iniciais), '')}
-      </div>` 
+      </div>`
     : '<p class="sem-dados">Indicadores financeiros não disponíveis para o período.</p>';
 
   const listaAlertas = alertas?.length
@@ -178,14 +178,20 @@ function _montarHTMLRelatorio(d) {
   const qMediaTxt = qMedia !== null ? `${qMedia}%` : '—';
   const qCorMedia = qMedia !== null && qMedia >= 70 ? '#16a34a' : qMedia !== null && qMedia >= 50 ? '#d97706' : '#dc2626';
 
-  const dataGeracao = gerado_em ? new Date(gerado_em).toLocaleDateString('pt-BR', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' }) : '—';
+  const dataGeracao = gerado_em ? new Date(gerado_em).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—';
   const anoRel = new Date(gerado_em || Date.now()).getFullYear();
   const verHash = _hashVerif(assinante?.cod_municipio, gerado_em);
 
-  // ✅ EVOLUÇÃO 2: Prepara dados para os gráficos
-  const chartLabels = series.map(r => r.bimestre ? `${r.ano}-${r.bimestre}º` : String(r.ano));
-  const mdeData = series.map(r => r.pct_mde_aplicado !== null ? r.pct_mde_aplicado : null);
-  const fundebData = series.map(r => r.pct_fundeb_remuneracao !== null ? r.pct_fundeb_remuneracao : null);
+  const seriesOrdenadas = [...series].sort((a, b) => {
+    const anoA = a.ano || 0;
+    const anoB = b.ano || 0;
+    if (anoA !== anoB) return anoA - anoB; // Garante 2021 → 2024
+    return (a.bimestre || 0) - (b.bimestre || 0);
+  });
+
+  const chartLabels = seriesOrdenadas.map(r => r.bimestre ? `${r.ano}-${r.bimestre}º` : String(r.ano));
+  const mdeData = seriesOrdenadas.map(r => r.pct_mde_aplicado !== null ? r.pct_mde_aplicado : null);
+  const fundebData = seriesOrdenadas.map(r => r.pct_fundeb_remuneracao !== null ? r.pct_fundeb_remuneracao : null);
 
   return `<!DOCTYPE html>
 <html lang="pt-BR">
@@ -334,7 +340,7 @@ function _montarHTMLRelatorio(d) {
         ${listaAlertas}
       </div>
       <div class="secao">
-        <div class="secao-titulo">🧠 Desempenho nos Quizzes</div>
+        <div class="secao-titulo">🧠 Jornada de Conhecimento</div>
         <div class="quiz-bloco">
           <div class="quiz-metricas">
             <div class="quiz-met"><span class="quiz-met-label">Edições respondidas</span><span class="quiz-met-valor" style="color:#0A3D62">${qRespondidas}/${qTotal}</span></div>
@@ -432,7 +438,7 @@ function _dataAbrev(iso) {
   try { return new Date(iso).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' }); } catch { return '—'; }
 }
 function _escHtml(s) {
-  return String(s || '').replace(/[&<>"']/g, m => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' })[m]);
+  return String(s || '').replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[m]);
 }
 function _hashVerif(cod, gerado_em) {
   const str = `${cod || ''}|${(gerado_em || '').slice(0, 16)}|RS`;
