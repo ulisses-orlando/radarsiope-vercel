@@ -789,6 +789,7 @@ function _renderSeletorMunicipio(tituloEl, municipiosPlano, destinatario, acesso
         btnRel.dataset.cod = String(novo.cod_municipio || '');
         btnRel.dataset.nome = String(novo.nome || '');
         btnRel.dataset.uf = String(novo.uf || '');
+        console.log('[Seletor] Dataset atualizado:', btnRel.dataset);
       }
     } catch (err) {
       console.warn('[verNL] Erro ao trocar município:', err);

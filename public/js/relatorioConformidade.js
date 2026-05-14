@@ -16,10 +16,9 @@ async function gerarRelatorioConformidade() {
     const user = window._radarUser;
     if (!user?.uid) throw new Error('Usuário não autenticado.');
 
+    // ✅ LÊ EXCLUSIVAMENTE DO DATASET
     const codMun = btn?.dataset?.cod;
-    
-    // Debug temporário (pode remover depois que funcionar)
-    console.log('[Relatório] btn.dataset:', btn?.dataset, '| cod extraído:', codMun);
+    console.log('[Relatório] codMun lido:', codMun);
 
     if (!codMun || codMun === 'undefined' || codMun === '') {
       throw new Error('Município não identificado. Selecione um município válido.');
@@ -76,14 +75,14 @@ function _injetarBotaoRelatorio(cod, nome, uf, temRelatorio) {
   const grupo = document.createElement('div');
   grupo.id = 'rs-acoes-municipio';
   grupo.style.cssText = 'display:flex; gap:8px; margin-top:8px; width:100%;';
-  
   btnHistorico.style.flex = '1';
   btnHistorico.parentNode.insertBefore(grupo, btnHistorico);
   grupo.appendChild(btnHistorico);
 
   const btnRel = document.createElement('button');
   btnRel.id = 'btn-relatorio-conformidade';
-  // ✅ Salva dados NO BOTÃO para leitura dinâmica no clique
+  
+  // ✅ CORREÇÃO: Grava os dados NO botão no momento da criação
   btnRel.dataset.cod = String(cod || '');
   btnRel.dataset.nome = String(nome || '');
   btnRel.dataset.uf = String(uf || '');
@@ -91,35 +90,18 @@ function _injetarBotaoRelatorio(cod, nome, uf, temRelatorio) {
   if (temRelatorio) {
     btnRel.innerHTML = '📋 Conformidade';
     btnRel.title = 'Gerar Relatório de Conformidade Municipal (PDF)';
-    btnRel.style.cssText = [
-      'flex:1', 'padding:9px 10px', 'background:var(--azul,#0A3D62)',
-      'color:#fff', 'border:none', 'border-radius:8px', 'font-size:13px',
-      'font-weight:600', 'cursor:pointer', 'white-space:nowrap', 'transition:opacity .2s',
-    ].join(';');
+    btnRel.style.cssText = 'flex:1;padding:9px 10px;background:var(--azul,#0A3D62);color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap;transition:opacity .2s;';
     btnRel.addEventListener('mouseover', () => { btnRel.style.opacity = '.85'; });
     btnRel.addEventListener('mouseout',  () => { btnRel.style.opacity = '1'; });
-    // ✅ Chama SEM parâmetros. A função lerá diretamente do dataset.
+    // ✅ CORREÇÃO: Chama SEM parâmetros. A função lerá diretamente do dataset.
     btnRel.addEventListener('click', () => gerarRelatorioConformidade());
   } else {
     btnRel.innerHTML = '🔒 Conformidade';
     btnRel.title = 'Disponível no plano Profissional';
-    btnRel.style.cssText = [
-      'flex:1', 'padding:9px 10px', 'background:transparent',
-      'color:var(--rs-muted,#94a3b8)', 'border:1.5px dashed var(--rs-borda,#334155)',
-      'border-radius:8px', 'font-size:13px', 'font-weight:600',
-      'cursor:pointer', 'white-space:nowrap', 'transition:border-color .2s, color .2s',
-    ].join(';');
-    btnRel.addEventListener('mouseover', () => {
-      btnRel.style.borderColor = 'var(--azul,#0A3D62)';
-      btnRel.style.color = 'var(--rs-texto,#f1f5f9)';
-    });
-    btnRel.addEventListener('mouseout', () => {
-      btnRel.style.borderColor = 'var(--rs-borda,#334155)';
-      btnRel.style.color = 'var(--rs-muted,#94a3b8)';
-    });
-    btnRel.addEventListener('click', () => {
-      if (typeof _solicitarUpgrade === 'function') _solicitarUpgrade('relatorio', true);
-    });
+    btnRel.style.cssText = 'flex:1;padding:9px 10px;background:transparent;color:var(--rs-muted,#94a3b8);border:1.5px dashed var(--rs-borda,#334155);border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap;transition:border-color .2s, color .2s;';
+    btnRel.addEventListener('mouseover', () => { btnRel.style.borderColor = 'var(--azul,#0A3D62)'; btnRel.style.color = 'var(--rs-texto,#f1f5f9)'; });
+    btnRel.addEventListener('mouseout',  () => { btnRel.style.borderColor = 'var(--rs-borda,#334155)'; btnRel.style.color = 'var(--rs-muted,#94a3b8)'; });
+    btnRel.addEventListener('click', () => { if (typeof _solicitarUpgrade === 'function') _solicitarUpgrade('relatorio', true); });
   }
   grupo.appendChild(btnRel);
 }
