@@ -8,16 +8,16 @@ _injetarBotaoRelatorio(cod, nome, uf)      → chamada por renderMunicipio()
 'use strict';
 
 // ─── Ponto de entrada público ─────────────────────────────────────────────────
-async function gerarRelatorioConformidade() { // ✅ Remove parâmetros fixos
+async function gerarRelatorioConformidade() { 
   const btn = document.getElementById('btn-relatorio-conformidade');
   if (btn) { btn.disabled = true; btn.innerHTML = '⏳ Gerando…'; }
-  
+
   try {
     const user = window._radarUser;
     if (!user?.uid) throw new Error('Usuário não autenticado.');
-    
-    // ✅ FIX 2: Lê sempre do dataset (atualizado em tempo real pelo seletor)
-    const codMun = btn?.dataset.cod;
+
+    // ✅ Lê do dataset NO MOMENTO DO CLIQUE (garante dados atualizados)
+    const codMun = btn?.dataset?.cod;
     if (!codMun) throw new Error('Município não identificado.');
 
     const resp = await fetch('/api/sendViaSES?acao=relatorio_conformidade', {
@@ -28,11 +28,10 @@ async function gerarRelatorioConformidade() { // ✅ Remove parâmetros fixos
 
     let dados;
     const textoResposta = await resp.text();
-    try { dados = JSON.parse(textoResposta); } 
+    try { dados = JSON.parse(textoResposta); }
     catch { throw new Error('Erro interno no servidor.'); }
 
     if (!dados.ok) {
-      // ... (mantenha a lógica de tratamento de erro 403/500 igual ao seu código original)
       const msg = dados.error || 'Erro ao gerar relatório.';
       if (typeof mostrarMensagem === 'function') mostrarMensagem(msg);
       else alert(msg);
@@ -41,11 +40,19 @@ async function gerarRelatorioConformidade() { // ✅ Remove parâmetros fixos
 
     const html = _montarHTMLRelatorio(dados);
     const win = window.open('', '_blank');
-    if (!win) { /* mantenha seu fallback blob */ return; }
+    if (!win) {
+      const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.target = '_blank'; a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 5000);
+      return;
+    }
 
     win.document.open();
     win.document.write(html);
     win.document.close();
+    // ✅ Impresão removida da abertura automática. O botão no relatório cuida disso.
   } catch (err) {
     console.error('[Relatório] Erro:', err);
     if (typeof mostrarMensagem === 'function') mostrarMensagem('Não foi possível gerar o relatório.');
@@ -57,25 +64,57 @@ async function gerarRelatorioConformidade() { // ✅ Remove parâmetros fixos
 }
 
 // ─── Injeta o botão no DOM ─────────────────────────────────────────────────────
-function _injetarBotaoRelatorio(cod, nome, uf) {
+function _injetarBotaoRelatorio(cod, nome, uf, temRelatorio) {
   document.getElementById('btn-relatorio-conformidade')?.remove();
   const btn = document.createElement('button');
   btn.id = 'btn-relatorio-conformidade';
-  btn.innerHTML = '📋 Relatório de Conformidade';
-  
-  // ✅ FIX 2: Salva dados no dataset para leitura dinâmica
+
+  // ✅ Salva dados no dataset para leitura dinâmica
   btn.dataset.cod = String(cod || '');
   btn.dataset.nome = String(nome || '');
   btn.dataset.uf = String(uf || '');
 
-  // ... (mantenha seus estilos CSS inline exatamente como estão) ...
-  
-  // ✅ Chama sem parâmetros. A função lerá do dataset no momento do clique.
-  btn.addEventListener('click', () => gerarRelatorioConformidade());
+  if (temRelatorio) {
+    btn.innerHTML = '📋 Conformidade';
+    btn.title = 'Gerar relatório de conformidade municipal (PDF)';
+    btn.style.cssText = [
+      'flex:1', 'padding:9px 10px', 'background:var(--azul,#0A3D62)',
+      'color:#fff', 'border:none', 'border-radius:8px', 'font-size:13px',
+      'font-weight:600', 'cursor:pointer', 'white-space:nowrap', 'transition:opacity .2s',
+    ].join(';');
+    btn.addEventListener('mouseover', () => { btn.style.opacity = '.85'; });
+    btn.addEventListener('mouseout', () => { btn.style.opacity = '1'; });
+    // ✅ Chama sem parâmetros. A função lerá do dataset.
+    btn.addEventListener('click', () => gerarRelatorioConformidade());
+  } else {
+    btn.innerHTML = '🔒 Conformidade';
+    btn.title = 'Disponível no plano Profissional';
+    btn.style.cssText = [
+      'flex:1', 'padding:9px 10px', 'background:transparent',
+      'color:var(--rs-muted,#94a3b8)', 'border:1.5px dashed var(--rs-borda,#334155)',
+      'border-radius:8px', 'font-size:13px', 'font-weight:600',
+      'cursor:pointer', 'white-space:nowrap',
+    ].join(';');
+    btn.addEventListener('click', () => {
+      if (typeof _solicitarUpgrade === 'function') _solicitarUpgrade('relatorio', true);
+    });
+  }
 
   const ref = document.getElementById('btn-toggle-historico');
-  if (ref?.parentNode) ref.parentNode.insertBefore(btn, ref.nextSibling);
-  else document.getElementById('municipio-conteudo')?.appendChild(btn);
+  if (ref?.parentNode) {
+    // Cria wrapper se não existir
+    let grupo = document.getElementById('rs-acoes-municipio');
+    if (!grupo) {
+      grupo = document.createElement('div');
+      grupo.id = 'rs-acoes-municipio';
+      grupo.style.cssText = 'display:flex; gap:8px; margin-top:8px; width:100%;';
+      ref.parentNode.insertBefore(grupo, ref);
+      ref.parentNode.appendChild(ref); // Move histórico para o grupo
+    }
+    grupo.appendChild(btn);
+  } else {
+    document.getElementById('municipio-conteudo')?.appendChild(btn);
+  }
 }
 
 // ─── Monta o documento HTML completo do relatório ────────────────────────────
@@ -85,9 +124,7 @@ function _montarHTMLRelatorio(d) {
   const ultimo = siope?.ultimo || null;
   const anoGeracao = new Date(gerado_em || Date.now()).getFullYear();
 
-  // ... (mantenha a montagem da tabela `linhasSeries` e `indicadores` igual) ...
-
-  // ✅ FIX 1: Ordena a série cronologicamente (crescente) APENAS para os gráficos
+  // ✅ FIX 1: Ordena série histórica cronologicamente (crescente) para os gráficos
   const seriesGrafico = [...series].sort((a, b) => {
     const anoA = a.ano || 0;
     const anoB = b.ano || 0;
@@ -344,7 +381,7 @@ function _dataAbrev(iso) {
   try { return new Date(iso).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' }); } catch { return '—'; }
 }
 function _escHtml(s) {
-  return String(s || '').replace(/[&<>"']/g, m => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' })[m]);
+  return String(s || '').replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[m]);
 }
 function _hashVerif(cod, gerado_em) {
   const str = `${cod || ''}|${(gerado_em || '').slice(0, 16)}|RS`;
