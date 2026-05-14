@@ -608,7 +608,7 @@ async function renderMunicipio(destinatario, acesso, newsletter) {
     if (acesso.isAssinante && resumo && cod) {
       _injetarBotaoRelatorio(cod, nome, uf, acesso.temRelatorio);
     }
-    
+
   } catch (err) {
     console.warn('[verNL] Município falhou (não fatal):', err);
     container.innerHTML = '';
@@ -619,10 +619,10 @@ async function renderMunicipio(destinatario, acesso, newsletter) {
 function _injetarBotaoRelatorio(cod, nome, uf, temRelatorio) {
   // Remove grupo anterior (troca de município)
   document.getElementById('rs-acoes-municipio')?.remove();
- 
+
   const btnHistorico = document.getElementById('btn-toggle-historico');
   if (!btnHistorico) return; // seção município não renderizou
- 
+
   // ── Wrapper flex que agrupa os dois botões ─────────────────────────────────
   const grupo = document.createElement('div');
   grupo.id = 'rs-acoes-municipio';
@@ -632,21 +632,21 @@ function _injetarBotaoRelatorio(cod, nome, uf, temRelatorio) {
     'margin-top:8px',
     'width:100%',
   ].join(';');
- 
+
   // ── Move btn-toggle-historico para dentro do grupo ─────────────────────────
   // (mantém todos os seus event listeners — apenas reposiciona no DOM)
   btnHistorico.style.flex = '1';
   btnHistorico.parentNode.insertBefore(grupo, btnHistorico);
   grupo.appendChild(btnHistorico);
- 
+
   // ── Botão do relatório ─────────────────────────────────────────────────────
   const btnRel = document.createElement('button');
   btnRel.id = 'btn-relatorio-conformidade';
- 
+
   if (temRelatorio) {
     // ── Liberado: estilo primário discreto ──────────────────────────────────
     btnRel.innerHTML = '📋 Conformidade';
-    btnRel.title     = 'Gerar Relatório de Conformidade Municipal (PDF)';
+    btnRel.title = 'Gerar Relatório de Conformidade Municipal (PDF)';
     btnRel.style.cssText = [
       'flex:1',
       'padding:9px 10px',
@@ -661,13 +661,13 @@ function _injetarBotaoRelatorio(cod, nome, uf, temRelatorio) {
       'transition:opacity .2s',
     ].join(';');
     btnRel.addEventListener('mouseover', () => { btnRel.style.opacity = '.85'; });
-    btnRel.addEventListener('mouseout',  () => { btnRel.style.opacity = '1';   });
+    btnRel.addEventListener('mouseout', () => { btnRel.style.opacity = '1'; });
     btnRel.addEventListener('click', () => gerarRelatorioConformidade(cod, nome, uf));
- 
+
   } else {
     // ── Bloqueado: estilo de upsell com cadeado ─────────────────────────────
     btnRel.innerHTML = '🔒 Conformidade';
-    btnRel.title     = 'Disponível no plano Profissional';
+    btnRel.title = 'Disponível no plano Profissional';
     btnRel.style.cssText = [
       'flex:1',
       'padding:9px 10px',
@@ -683,11 +683,11 @@ function _injetarBotaoRelatorio(cod, nome, uf, temRelatorio) {
     ].join(';');
     btnRel.addEventListener('mouseover', () => {
       btnRel.style.borderColor = 'var(--azul,#0A3D62)';
-      btnRel.style.color       = 'var(--rs-texto,#f1f5f9)';
+      btnRel.style.color = 'var(--rs-texto,#f1f5f9)';
     });
     btnRel.addEventListener('mouseout', () => {
       btnRel.style.borderColor = 'var(--rs-borda,#334155)';
-      btnRel.style.color       = 'var(--rs-muted,#94a3b8)';
+      btnRel.style.color = 'var(--rs-muted,#94a3b8)';
     });
     btnRel.addEventListener('click', () => {
       if (typeof _solicitarUpgrade === 'function') {
@@ -695,7 +695,7 @@ function _injetarBotaoRelatorio(cod, nome, uf, temRelatorio) {
       }
     });
   }
- 
+
   grupo.appendChild(btnRel);
 }
 
@@ -782,6 +782,13 @@ function _renderSeletorMunicipio(tituloEl, municipiosPlano, destinatario, acesso
         if (btn) btn.style.display = 'block';
       } else {
         dadosMunicipioAtual = { cod_municipio: null, nome: null, uf: null };
+      }
+      // Sincroniza o dataset do botão de relatório com o município selecionado
+      const btnRel = document.getElementById('btn-relatorio-conformidade');
+      if (btnRel) {
+        btnRel.dataset.cod = novo.cod_municipio;
+        btnRel.dataset.nome = novo.nome;
+        btnRel.dataset.uf = novo.uf || '';
       }
     } catch (err) {
       console.warn('[verNL] Erro ao trocar município:', err);
@@ -4171,7 +4178,7 @@ const _UPGRADE_INFO = {
   infografico: { icone: '📊', nome: 'Infográfico', plano: 'Profissional', slug: 'profissional' },
   mapaMental: { icone: '📊', nome: 'Mapa Mental', plano: 'Profissional', slug: 'profissional' },
   chat: { icone: '✦', nome: 'Pergunte ao Radar', plano: 'Profissional', slug: 'profissional' },
-  relatorio:  { icone: '📋', nome: 'Relatório de Conformidade', plano: 'Profissional', slug: 'profissional' },
+  relatorio: { icone: '📋', nome: 'Relatório de Conformidade', plano: 'Profissional', slug: 'profissional' },
 };
 
 function _solicitarUpgrade(tipo, isAssinante) {
