@@ -8,7 +8,7 @@ _injetarBotaoRelatorio(cod, nome, uf)      → chamada por renderMunicipio()
 'use strict';
 
 // ─── Ponto de entrada público ─────────────────────────────────────────────────
-async function gerarRelatorioConformidade() { 
+async function gerarRelatorioConformidade() {
   const btn = document.getElementById('btn-relatorio-conformidade');
   if (btn) { btn.disabled = true; btn.innerHTML = '⏳ Gerando…'; }
 
@@ -16,9 +16,11 @@ async function gerarRelatorioConformidade() {
     const user = window._radarUser;
     if (!user?.uid) throw new Error('Usuário não autenticado.');
 
-    // ✅ Lê do dataset NO MOMENTO DO CLIQUE (garante dados atualizados)
+    // ✅ CORREÇÃO: `dataset` escrito corretamente + validação segura
     const codMun = btn?.dataset?.cod;
-    if (!codMun) throw new Error('Município não identificado.');
+    if (!codMun || codMun === 'undefined' || codMun === '') {
+      throw new Error('Município não identificado. Selecione um município válido.');
+    }
 
     const resp = await fetch('/api/sendViaSES?acao=relatorio_conformidade', {
       method: 'POST',
@@ -28,7 +30,7 @@ async function gerarRelatorioConformidade() {
 
     let dados;
     const textoResposta = await resp.text();
-    try { dados = JSON.parse(textoResposta); }
+    try { dados = JSON.parse(textoResposta); } 
     catch { throw new Error('Erro interno no servidor.'); }
 
     if (!dados.ok) {
@@ -52,7 +54,7 @@ async function gerarRelatorioConformidade() {
     win.document.open();
     win.document.write(html);
     win.document.close();
-    // ✅ Impresão removida da abertura automática. O botão no relatório cuida disso.
+    // ✅ Impressão manual: botão no relatório cuida disso.
   } catch (err) {
     console.error('[Relatório] Erro:', err);
     if (typeof mostrarMensagem === 'function') mostrarMensagem('Não foi possível gerar o relatório.');
@@ -65,56 +67,59 @@ async function gerarRelatorioConformidade() {
 
 // ─── Injeta o botão no DOM ─────────────────────────────────────────────────────
 function _injetarBotaoRelatorio(cod, nome, uf, temRelatorio) {
-  document.getElementById('btn-relatorio-conformidade')?.remove();
-  const btn = document.createElement('button');
-  btn.id = 'btn-relatorio-conformidade';
+  document.getElementById('rs-acoes-municipio')?.remove();
+  const btnHistorico = document.getElementById('btn-toggle-historico');
+  if (!btnHistorico) return;
 
-  // ✅ Salva dados no dataset para leitura dinâmica
-  btn.dataset.cod = String(cod || '');
-  btn.dataset.nome = String(nome || '');
-  btn.dataset.uf = String(uf || '');
+  const grupo = document.createElement('div');
+  grupo.id = 'rs-acoes-municipio';
+  grupo.style.cssText = 'display:flex; gap:8px; margin-top:8px; width:100%;';
+  
+  btnHistorico.style.flex = '1';
+  btnHistorico.parentNode.insertBefore(grupo, btnHistorico);
+  grupo.appendChild(btnHistorico);
+
+  const btnRel = document.createElement('button');
+  btnRel.id = 'btn-relatorio-conformidade';
+  // ✅ Salva dados NO BOTÃO para leitura dinâmica no clique
+  btnRel.dataset.cod = String(cod || '');
+  btnRel.dataset.nome = String(nome || '');
+  btnRel.dataset.uf = String(uf || '');
 
   if (temRelatorio) {
-    btn.innerHTML = '📋 Conformidade';
-    btn.title = 'Gerar relatório de conformidade municipal (PDF)';
-    btn.style.cssText = [
+    btnRel.innerHTML = '📋 Conformidade';
+    btnRel.title = 'Gerar Relatório de Conformidade Municipal (PDF)';
+    btnRel.style.cssText = [
       'flex:1', 'padding:9px 10px', 'background:var(--azul,#0A3D62)',
       'color:#fff', 'border:none', 'border-radius:8px', 'font-size:13px',
       'font-weight:600', 'cursor:pointer', 'white-space:nowrap', 'transition:opacity .2s',
     ].join(';');
-    btn.addEventListener('mouseover', () => { btn.style.opacity = '.85'; });
-    btn.addEventListener('mouseout', () => { btn.style.opacity = '1'; });
-    // ✅ Chama sem parâmetros. A função lerá do dataset.
-    btn.addEventListener('click', () => gerarRelatorioConformidade());
+    btnRel.addEventListener('mouseover', () => { btnRel.style.opacity = '.85'; });
+    btnRel.addEventListener('mouseout',  () => { btnRel.style.opacity = '1'; });
+    // ✅ Chama SEM parâmetros. A função lerá diretamente do dataset.
+    btnRel.addEventListener('click', () => gerarRelatorioConformidade());
   } else {
-    btn.innerHTML = '🔒 Conformidade';
-    btn.title = 'Disponível no plano Profissional';
-    btn.style.cssText = [
+    btnRel.innerHTML = '🔒 Conformidade';
+    btnRel.title = 'Disponível no plano Profissional';
+    btnRel.style.cssText = [
       'flex:1', 'padding:9px 10px', 'background:transparent',
       'color:var(--rs-muted,#94a3b8)', 'border:1.5px dashed var(--rs-borda,#334155)',
       'border-radius:8px', 'font-size:13px', 'font-weight:600',
-      'cursor:pointer', 'white-space:nowrap',
+      'cursor:pointer', 'white-space:nowrap', 'transition:border-color .2s, color .2s',
     ].join(';');
-    btn.addEventListener('click', () => {
+    btnRel.addEventListener('mouseover', () => {
+      btnRel.style.borderColor = 'var(--azul,#0A3D62)';
+      btnRel.style.color = 'var(--rs-texto,#f1f5f9)';
+    });
+    btnRel.addEventListener('mouseout', () => {
+      btnRel.style.borderColor = 'var(--rs-borda,#334155)';
+      btnRel.style.color = 'var(--rs-muted,#94a3b8)';
+    });
+    btnRel.addEventListener('click', () => {
       if (typeof _solicitarUpgrade === 'function') _solicitarUpgrade('relatorio', true);
     });
   }
-
-  const ref = document.getElementById('btn-toggle-historico');
-  if (ref?.parentNode) {
-    // Cria wrapper se não existir
-    let grupo = document.getElementById('rs-acoes-municipio');
-    if (!grupo) {
-      grupo = document.createElement('div');
-      grupo.id = 'rs-acoes-municipio';
-      grupo.style.cssText = 'display:flex; gap:8px; margin-top:8px; width:100%;';
-      ref.parentNode.insertBefore(grupo, ref);
-      ref.parentNode.appendChild(ref); // Move histórico para o grupo
-    }
-    grupo.appendChild(btn);
-  } else {
-    document.getElementById('municipio-conteudo')?.appendChild(btn);
-  }
+  grupo.appendChild(btnRel);
 }
 
 // ─── Monta o documento HTML completo do relatório ────────────────────────────

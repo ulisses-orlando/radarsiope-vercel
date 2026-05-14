@@ -786,9 +786,9 @@ function _renderSeletorMunicipio(tituloEl, municipiosPlano, destinatario, acesso
       // Sincroniza o dataset do botão de relatório com o município selecionado
       const btnRel = document.getElementById('btn-relatorio-conformidade');
       if (btnRel) {
-        btnRel.dataset.cod = novo.cod_municipio;
-        btnRel.dataset.nome = novo.nome;
-        btnRel.dataset.uf = novo.uf || '';
+        btnRel.dataset.cod = String(novo.cod_municipio || '');
+        btnRel.dataset.nome = String(novo.nome || '');
+        btnRel.dataset.uf = String(novo.uf || '');
       }
     } catch (err) {
       console.warn('[verNL] Erro ao trocar município:', err);
