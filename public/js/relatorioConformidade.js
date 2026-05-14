@@ -23,11 +23,8 @@ async function gerarRelatorioConformidade(cod, nome, uf) {
 
     const resp = await fetch('/api/sendViaSES?acao=relatorio_conformidade', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`,
-      },
-      body: JSON.stringify({ cod_municipio: cod }),
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ uid: user.uid, cod_municipio: cod }),
     });
 
     const dados = await resp.json();
