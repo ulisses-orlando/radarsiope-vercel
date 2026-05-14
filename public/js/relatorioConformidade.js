@@ -17,8 +17,9 @@ async function gerarRelatorioConformidade(cod, nome, uf) {
   }
 
   try {
-    const user = firebase.auth().currentUser;
-    if (!user) throw new Error('Usuário não autenticado.');
+    // Usa window._radarUser — padrão do projeto, sem firebase.auth()
+    const user = window._radarUser;
+    if (!user?.uid) throw new Error('Usuário não autenticado.');
 
     const token = await user.getIdToken();
 
