@@ -386,7 +386,7 @@ document.addEventListener('DOMContentLoaded', function() {
       const { ctx, data } = chart;
       ctx.save();
       // ✅ Ajuste: Tamanho 10px (mesmo das legendas) e sem negrito
-      ctx.font = '10px Sora, sans-serif';
+      ctx.font = '8px Sora, sans-serif';
       ctx.fillStyle = '#0f172a'; // Cor escura padrão
       ctx.textAlign = 'center';
       ctx.textBaseline = 'bottom';
