@@ -131,38 +131,39 @@ function _injetarBotaoRelatorio(cod, nome, uf) {
 function _montarHTMLRelatorio(d) {
   const { assinante, siope, alertas, quiz, gerado_em } = d;
 
-  const anoAtual = siope?.ano_atual || new Date().getFullYear();
-  const bims = (siope?.bimestres_ano || []).sort((a, b) => a.bimestre - b.bimestre);
+  const series = siope?.series || [];
   const ultimo = siope?.ultimo || null;
+  const anoGeracao = new Date(gerado_em || Date.now()).getFullYear();
 
-  // ── Linha da tabela SIOPE por bimestre ──────────────────────────────────────
-  const linhasBim = [1, 2, 3, 4].map(n => {
-    const b = bims.find(r => r.bimestre === n);
-    if (!b) return _linhaBimVazio(n);
+  // Uma linha por registro histórico (ano + bimestre se existir)
+  const linhasSeries = series.length > 0
+    ? series.map(r => {
+      const corSit = _corSituacao(r.situacao);
+      const sitLabel = _labelSituacao(r.situacao);
+      const prazo = r.enviado_no_prazo === true ? '<span class="badge verde">No prazo</span>'
+        : r.enviado_no_prazo === false ? '<span class="badge vermelho">Fora do prazo</span>'
+          : '—';
+      const homol = r.homologado === true ? '<span class="badge verde">✓</span>'
+        : r.homologado === false ? '<span class="badge cinza">Não</span>'
+          : '—';
+      const pctMde = _pct(r.pct_mde_aplicado);
+      const corMde = (r.pct_mde_aplicado !== null && r.pct_mde_aplicado < 25)
+        ? 'color:#b91c1c;font-weight:700' : '';
+      const periodo = r.bimestre ? `${r.ano} · ${r.bimestre}º Bim` : String(r.ano || '—');
 
-    const situacao = _labelSituacao(b.situacao);
-    const corSit = _corSituacao(b.situacao);
-    const prazo = b.enviado_no_prazo === true ? '<span class="badge verde">No prazo</span>'
-      : b.enviado_no_prazo === false ? '<span class="badge vermelho">Fora do prazo</span>'
-        : '—';
-    const homol = b.homologado === true ? '<span class="badge verde">✓</span>'
-      : b.homologado === false ? '<span class="badge cinza">Não</span>'
-        : '—';
-    const pctMde = _pct(b.pct_mde_aplicado);
-    const corMde = (b.pct_mde_aplicado !== null && b.pct_mde_aplicado < 25)
-      ? 'color:#b91c1c;font-weight:700' : '';
-    const prazoFmt = b.prazo_envio ? _dataAbrev(b.prazo_envio) : '—';
-
-    return `
-      <tr>
-        <td style="font-weight:700;color:#1e3a5f">${n}º Bim</td>
-        <td><span class="badge" style="background:${corSit.bg};color:${corSit.fg}">${situacao}</span></td>
-        <td>${prazo}</td>
-        <td>${homol}</td>
-        <td style="${corMde}">${pctMde}</td>
-        <td style="color:#64748b;font-size:11px">${prazoFmt}</td>
-      </tr>`;
-  }).join('');
+      return `
+          <tr>
+            <td style="font-weight:700;color:#1e3a5f;white-space:nowrap">${periodo}</td>
+            <td><span class="badge" style="background:${corSit.bg};color:${corSit.fg}">${sitLabel}</span></td>
+            <td>${prazo}</td>
+            <td>${homol}</td>
+            <td style="${corMde}">${pctMde}</td>
+            <td>${_pct(r.pct_fundeb_remuneracao)}</td>
+          </tr>`;
+    }).join('')
+    : `<tr><td colspan="6" style="text-align:center;color:#94a3b8;font-style:italic;padding:12px">
+         Nenhum dado disponível para este município.
+       </td></tr>`;
 
   // ── Indicadores financeiros do último bimestre disponível ───────────────────
   const indicadores = ultimo ? `
@@ -463,7 +464,7 @@ function _montarHTMLRelatorio(d) {
       </div>
     </div>
     <div class="cabecalho-direita">
-      <div class="cabecalho-titulo">RELATÓRIO DE CONFORMIDADE ${anoAtual}</div>
+      <div class="cabecalho-titulo">RELATÓRIO DE CONFORMIDADE ${anoGeracao}</div>
       <div class="cabecalho-data">Gerado em: ${dataGeracao}</div>
     </div>
   </div>
@@ -485,7 +486,7 @@ function _montarHTMLRelatorio(d) {
 
     <!-- Tabela SIOPE -->
     <div class="secao">
-      <div class="secao-titulo">📊 SIOPE ${anoAtual} — Status por Bimestre</div>
+      <div class="secao-titulo">📊 SIOPE/FUNDEB — Série Histórica</div>
       <table class="t-siope">
         <thead>
           <tr>
@@ -494,18 +495,18 @@ function _montarHTMLRelatorio(d) {
             <th>Envio</th>
             <th>Homologado</th>
             <th>% MDE Apl.</th>
-            <th>Prazo</th>
+            <th>% Fund. Remun.</th>
           </tr>
         </thead>
         <tbody>
-          ${linhasBim}
+          ${linhasSeries}
         </tbody>
       </table>
     </div>
 
     <!-- Indicadores financeiros -->
     <div class="secao">
-      <div class="secao-titulo">💰 Indicadores Financeiros — Último Bimestre Disponível</div>
+      <div class="secao-titulo">💰 Indicadores Financeiros — Registro Mais Recente</div>
       ${indicadores}
     </div>
 
@@ -571,14 +572,6 @@ function _montarHTMLRelatorio(d) {
 }
 
 // ─── Helpers internos ─────────────────────────────────────────────────────────
-
-function _linhaBimVazio(n) {
-  return `<tr>
-    <td style="font-weight:700;color:#1e3a5f">${n}º Bim</td>
-    <td><span class="badge cinza">—</span></td>
-    <td>—</td><td>—</td><td>—</td><td>—</td>
-  </tr>`;
-}
 
 function _labelSituacao(s) {
   const mapa = {
