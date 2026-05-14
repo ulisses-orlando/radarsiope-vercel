@@ -50,7 +50,7 @@ async function gerarRelatorioConformidade(cod, nome, uf) {
     // Sobrescreve o município no cabeçalho do relatório caso o usuário tenha clicado no botão após mudar o seletor (garante sincronia)
     if (dados && dados.assinante) {
       dados.assinante.municipio = btn?.dataset?.nome || dados.assinante.municipio;
-      dados.assinante.uf        = btn?.dataset?.uf   || dados.assinante.uf;
+      dados.assinante.uf = btn?.dataset?.uf || dados.assinante.uf;
       dados.assinante.cod_municipio = btn?.dataset?.cod || dados.assinante.cod_municipio;
     }
 
@@ -370,38 +370,63 @@ function _montarHTMLRelatorio(d) {
   </div>
 </div>
 
-<!-- ✅ EVOLUÇÃO 2: Script de renderização dos gráficos -->
+<!-- ✅ Script atualizado: valores visíveis em cada ponto (tela + impressão) -->
 <script>
-  document.addEventListener('DOMContentLoaded', function() {
-    if (typeof Chart === 'undefined') return;
-    
-    const labels = ${JSON.stringify(chartLabels)};
-    const mdeData = ${JSON.stringify(mdeData)};
-    const fundebData = ${JSON.stringify(fundebData)};
+document.addEventListener('DOMContentLoaded', function() {
+  if (typeof Chart === 'undefined') return;
+  
+  const labels = ${JSON.stringify(chartLabels)};
+  const mdeData = ${JSON.stringify(mdeData)};
+  const fundebData = ${JSON.stringify(fundebData)};
 
-    const chartOpts = {
-      responsive: true,
-      maintainAspectRatio: false,
-      plugins: { legend: { display: true, position: 'bottom', labels: { boxWidth: 12, font: { size: 10 } } } },
-      scales: { x: { ticks: { font: { size: 9 }, maxRotation: 45 }, grid: { display: false } }, y: { beginAtZero: false, ticks: { font: { size: 9 }, callback: v => v + '%' }, grid: { color: '#e2e8f0' } } }
-    };
-
-    if (document.getElementById('chartMde')) {
-      new Chart(document.getElementById('chartMde'), {
-        type: 'line',
-        data: { labels, datasets: [{ label: '% MDE Aplicado', data: mdeData, borderColor: '#0A3D62', backgroundColor: 'rgba(10,61,98,0.1)', tension: 0.3, pointRadius: 3 }] },
-        options: { ...chartOpts, scales: { ...chartOpts.scales, y: { ...chartOpts.scales.y, min: 0, max: 100 } } }
-      });
+  const chartOpts = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: { display: true, position: 'bottom', labels: { boxWidth: 12, font: { size: 10 } } },
+      tooltip: { enabled: true },
+      // ✅ Plugin inline nativo para desenhar valores permanentemente
+      valoresPontos: {
+        afterDatasetsDraw(chart) {
+          const { ctx, data } = chart;
+          ctx.save();
+          ctx.font = 'bold 10px Sora, sans-serif';
+          ctx.fillStyle = '#0f172a';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'bottom';
+          data.datasets.forEach((ds, i) => {
+            const meta = chart.getDatasetMeta(i);
+            meta.data.forEach((p, j) => {
+              const v = ds.data[j];
+              if (v !== null && v !== undefined) ctx.fillText(v + '%', p.x, p.y - 8);
+            });
+          });
+          ctx.restore();
+        }
+      }
+    },
+    scales: {
+      x: { ticks: { font: { size: 9 }, maxRotation: 45 }, grid: { display: false } },
+      y: { beginAtZero: false, ticks: { font: { size: 9 }, callback: v => v + '%' }, grid: { color: '#e2e8f0' } }
     }
+  };
 
-    if (document.getElementById('chartFundeb')) {
-      new Chart(document.getElementById('chartFundeb'), {
-        type: 'line',
-        data: { labels, datasets: [{ label: '% FUNDEB Remuneração', data: fundebData, borderColor: '#16a34a', backgroundColor: 'rgba(22,163,74,0.1)', tension: 0.3, pointRadius: 3 }] },
-        options: { ...chartOpts }
-      });
-    }
-  });
+  if (document.getElementById('chartMde')) {
+    new Chart(document.getElementById('chartMde'), {
+      type: 'line',
+      data: { labels, datasets: [{ label: '% MDE Aplicado', data: mdeData, borderColor: '#0A3D62', backgroundColor: 'rgba(10,61,98,0.1)', tension: 0.3, pointRadius: 3, pointHoverRadius: 5 }] },
+      options: { ...chartOpts, scales: { ...chartOpts.scales, y: { ...chartOpts.scales.y, min: 0, max: 100 } } }
+    });
+  }
+
+  if (document.getElementById('chartFundeb')) {
+    new Chart(document.getElementById('chartFundeb'), {
+      type: 'line',
+      data: { labels, datasets: [{ label: '% FUNDEB Remuneração', data: fundebData, borderColor: '#16a34a', backgroundColor: 'rgba(22,163,74,0.1)', tension: 0.3, pointRadius: 3, pointHoverRadius: 5 }] },
+      options: { ...chartOpts }
+    });
+  }
+});
 </script>
 </body>
 </html>`;
