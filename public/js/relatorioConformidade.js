@@ -47,6 +47,13 @@ async function gerarRelatorioConformidade(cod, nome, uf) {
       return;
     }
 
+    // Sobrescreve o município no cabeçalho do relatório caso o usuário tenha clicado no botão após mudar o seletor (garante sincronia)
+    if (dados && dados.assinante) {
+      dados.assinante.municipio = btn?.dataset?.nome || dados.assinante.municipio;
+      dados.assinante.uf        = btn?.dataset?.uf   || dados.assinante.uf;
+      dados.assinante.cod_municipio = btn?.dataset?.cod || dados.assinante.cod_municipio;
+    }
+
     const html = _montarHTMLRelatorio(dados);
     const win = window.open('', '_blank');
 
