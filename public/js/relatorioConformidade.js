@@ -385,8 +385,9 @@ document.addEventListener('DOMContentLoaded', function() {
     afterDatasetsDraw: function(chart) {
       const { ctx, data } = chart;
       ctx.save();
-      ctx.font = 'bold 10px Sora, sans-serif';
-      ctx.fillStyle = '#0f172a'; // Cor do texto (escuro para contraste)
+      // ✅ Ajuste: Tamanho 10px (mesmo das legendas) e sem negrito
+      ctx.font = '10px Sora, sans-serif';
+      ctx.fillStyle = '#0f172a'; // Cor escura padrão
       ctx.textAlign = 'center';
       ctx.textBaseline = 'bottom';
       
@@ -413,8 +414,8 @@ document.addEventListener('DOMContentLoaded', function() {
     maintainAspectRatio: false,
     plugins: {
       legend: { display: true, position: 'bottom', labels: { boxWidth: 12, font: { size: 10 } } },
-      tooltip: { enabled: true }, // Tooltip continua ativo para uso na tela
-      pluginValoresFixos: {} // Ativa o nosso plugin
+      tooltip: { enabled: true },
+      pluginValoresFixos: {} // Ativa o plugin de valores
     },
     scales: {
       x: { ticks: { font: { size: 9 }, maxRotation: 45 }, grid: { display: false } },
@@ -434,10 +435,10 @@ document.addEventListener('DOMContentLoaded', function() {
           borderColor: '#0A3D62', 
           backgroundColor: 'rgba(10,61,98,0.1)', 
           tension: 0.3, 
-          pointRadius: 4, // Ponto um pouco maior
+          pointRadius: 3, // Ponto padrão
           pointBackgroundColor: '#fff', 
           pointBorderColor: '#0A3D62',
-          pointBorderWidth: 2
+          pointBorderWidth: 1.5
         }] 
       },
       options: { 
@@ -459,10 +460,10 @@ document.addEventListener('DOMContentLoaded', function() {
           borderColor: '#16a34a', 
           backgroundColor: 'rgba(22,163,74,0.1)', 
           tension: 0.3, 
-          pointRadius: 4,
+          pointRadius: 3,
           pointBackgroundColor: '#fff', 
           pointBorderColor: '#16a34a',
-          pointBorderWidth: 2
+          pointBorderWidth: 1.5
         }] 
       },
       options: commonOptions
