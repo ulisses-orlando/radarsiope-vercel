@@ -42,7 +42,6 @@
     _dados = mm;
     _injetarCSS();
     _renderizarCard();
-    console.log('[mapaMental.js] modulo carregado.');
   }
 
   // ══════════════════════════════════════════════════════════════════════

@@ -2069,6 +2069,9 @@ async function _executarPreview(params) {
       window.QuizManager.init(newsletter, userParaQuiz);
     }
 
+    acesso.temChat = true;
+    acesso.temRelatorio = true;
+
     mostrarApp();
 
     iniciarChatFAB(newsletter, null, acesso);
