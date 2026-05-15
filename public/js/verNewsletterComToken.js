@@ -2071,6 +2071,8 @@ async function _executarPreview(params) {
 
     mostrarApp();
 
+    iniciarChatFAB(newsletter, sessao.uid, acesso);
+
     // Banner fixo de preview
     const banner = document.createElement('div');
     banner.style.cssText = `
