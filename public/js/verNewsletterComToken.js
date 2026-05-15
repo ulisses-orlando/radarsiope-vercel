@@ -635,7 +635,7 @@ function _injetarBotaoRelatorio(cod, nome, uf, temRelatorio) {
   // ── Botão do relatório ─────────────────────────────────────────────────────
   const btnRel = document.createElement('button');
   btnRel.id = 'btn-relatorio-conformidade';
-  
+
   // ✅ CORREÇÃO: Grava os dados NO DOM no momento da criação
   btnRel.dataset.cod = String(cod || '');
   btnRel.dataset.nome = String(nome || '');
@@ -650,7 +650,7 @@ function _injetarBotaoRelatorio(cod, nome, uf, temRelatorio) {
       'font-weight:600', 'cursor:pointer', 'white-space:nowrap', 'transition:opacity .2s',
     ].join(';');
     btnRel.addEventListener('mouseover', () => { btnRel.style.opacity = '.85'; });
-    btnRel.addEventListener('mouseout',  () => { btnRel.style.opacity = '1'; });
+    btnRel.addEventListener('mouseout', () => { btnRel.style.opacity = '1'; });
     // ✅ Chama SEM parâmetros. A função lerá diretamente do dataset.
     btnRel.addEventListener('click', () => gerarRelatorioConformidade());
   } else {
@@ -2058,6 +2058,16 @@ async function _executarPreview(params) {
     renderFAQ(newsletter, acesso);
     await renderReactions(nid, 'preview');
     renderCTA(acesso, newsletter);
+
+    if (window.QuizManager && newsletter?.quiz) {
+      const userParaQuiz = {
+        uid: destinatario._uid || destinatario.id || uid,
+        segmento: segmento,
+        plano_slug: destinatario.plano_slug || null,
+        features: destinatario.features || {}
+      };
+      window.QuizManager.init(newsletter, userParaQuiz);
+    }
 
     mostrarApp();
 
