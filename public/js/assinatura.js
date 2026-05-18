@@ -506,8 +506,8 @@ function _criarCardPlano(plano, ciclo, allFeatures) {
       </div>
       ${plano.descricao ? `<div class="plano-descricao">${plano.descricao}</div>` : ''}
       <ul class="plano-features">${featuresHtml}</ul>
-      ${plano.em_breve ? `<div class="plano-em-breve-aviso">Em breve — <a href="capturaLead.html">cadastre-se</a></div>` : ''}
-      ${plano.sob_consulta ? `<div class="plano-sob-consulta-aviso">Condições sob consulta — <a href="faleConosco.html">entre em contato</a></div>` : ''}
+      ${plano.em_breve ? `<div class="plano-em-breve-aviso">Em breve — <a href="capturaLead.html">entre em contato</a></div>` : ''}
+      ${plano.sob_consulta ? `<div class="plano-sob-consulta-aviso">Condições sob consulta — <a href="capturaLead.html">entre em contato</a></div>` : ''}
     </div>
   `;
 
