@@ -24,7 +24,7 @@ export const config = { runtime: "nodejs" };
 const sesClient = new SESClient({
   region: process.env.AWS_REGION || "sa-east-1",
   credentials: {
-    accessKeyId:     process.env.AWS_ACCESS_KEY_ID,
+    accessKeyId: process.env.AWS_ACCESS_KEY_ID,
     secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
   },
 });
@@ -33,9 +33,9 @@ const sesClient = new SESClient({
 if (!admin.apps.length) {
   admin.initializeApp({
     credential: admin.credential.cert({
-      projectId:   process.env.FIREBASE_PROJECT_ID,
+      projectId: process.env.FIREBASE_PROJECT_ID,
       clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-      privateKey:  process.env.FIREBASE_PRIVATE_KEY.replace(/\\\\n/g, "\n"),
+      privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\\\n/g, "\n"),
     }),
   });
 }
@@ -48,8 +48,8 @@ const supabase = createClient(
 );
 
 // ─── Configurações ────────────────────────────────────────────────────────────
-const SES_SOURCE  = '"Radar SIOPE - Newsletter" <contato@radarsiope.com.br>';
-const CHUNK_SIZE  = 10;   // envios paralelos por rodada
+const SES_SOURCE = '"Radar SIOPE - Newsletter" <contato@radarsiope.com.br>';
+const CHUNK_SIZE = 10;   // envios paralelos por rodada
 const SES_TIMEOUT = 8000; // ms — fix B6: evita travar o handler
 
 // fix B2: origens permitidas para CORS
@@ -74,33 +74,33 @@ function aplicarPlaceholders(template, dados) {
   const fmt = (v) => (v == null ? "" : String(v));
   const dataFormatada = dados.data_publicacao
     ? (() => {
-        const d = dados.data_publicacao.toDate
-          ? dados.data_publicacao.toDate()
-          : new Date(dados.data_publicacao);
-        return d.toLocaleDateString("pt-BR");
-      })()
+      const d = dados.data_publicacao.toDate
+        ? dados.data_publicacao.toDate()
+        : new Date(dados.data_publicacao);
+      return d.toLocaleDateString("pt-BR");
+    })()
     : "";
 
   return template
-    .replace(/{{nome}}/gi,            _esc(fmt(dados.nome)))
-    .replace(/{{email}}/gi,           _esc(fmt(dados.email)))
-    .replace(/{{edicao}}/gi,          _esc(fmt(dados.edicao)))
-    .replace(/{{titulo}}/gi,          _esc(fmt(dados.titulo)))
+    .replace(/{{nome}}/gi, _esc(fmt(dados.nome)))
+    .replace(/{{email}}/gi, _esc(fmt(dados.email)))
+    .replace(/{{edicao}}/gi, _esc(fmt(dados.edicao)))
+    .replace(/{{titulo}}/gi, _esc(fmt(dados.titulo)))
     .replace(/{{data_publicacao}}/gi, dataFormatada)
-    .replace(/{{uf}}/gi,              _esc(fmt(dados.cod_uf)))
-    .replace(/{{municipio}}/gi,       _esc(fmt(dados.nome_municipio)))
-    .replace(/{{cargo}}/gi,           _esc(fmt(dados.perfil)))
-    .replace(/{{plano}}/gi,           _esc(fmt(dados.plano)))
-    .replace(/{{token}}/gi,           fmt(dados.token_acesso));
+    .replace(/{{uf}}/gi, _esc(fmt(dados.cod_uf)))
+    .replace(/{{municipio}}/gi, _esc(fmt(dados.nome_municipio)))
+    .replace(/{{cargo}}/gi, _esc(fmt(dados.perfil)))
+    .replace(/{{plano}}/gi, _esc(fmt(dados.plano)))
+    .replace(/{{token}}/gi, fmt(dados.token_acesso));
 }
 
 // Monta o HTML final da newsletter para um destinatário
 // (equivalente backend de montarHtmlNewsletterParaEnvio + aplicarRastreamento)
 function montarHtml(newsletter, dadosDestinatario, segmento, registroEnvioId, newsletterId, assinaturaId, token) {
   // ── Blocos filtrados por segmento e destino ───────────────────────────────
-  const htmlBase  = newsletter.html_conteudo || newsletter.conteudo_html_completo || "";
-  const blocos    = newsletter.blocos || [];
-  let htmlBlocos  = "";
+  const htmlBase = newsletter.html_conteudo || newsletter.conteudo_html_completo || "";
+  const blocos = newsletter.blocos || [];
+  let htmlBlocos = "";
 
   blocos.forEach((b) => {
     if (segmento && b.acesso !== "todos" && b.acesso !== segmento) return;
@@ -120,10 +120,10 @@ function montarHtml(newsletter, dadosDestinatario, segmento, registroEnvioId, ne
   // ── Placeholders do destinatário ──────────────────────────────────────────
   htmlFinal = aplicarPlaceholders(htmlFinal, {
     ...dadosDestinatario,
-    edicao:          newsletter.edicao          || newsletter.numero || "",
-    titulo:          newsletter.titulo          || "",
+    edicao: newsletter.edicao || newsletter.numero || "",
+    titulo: newsletter.titulo || "",
     data_publicacao: newsletter.data_publicacao || null,
-    token_acesso:    token,
+    token_acesso: token,
   });
 
   // ── Pixel de abertura ─────────────────────────────────────────────────────
@@ -140,8 +140,8 @@ function montarHtml(newsletter, dadosDestinatario, segmento, registroEnvioId, ne
     `uid=${dadosDestinatario.id || ""}`,
   ];
   if (assinaturaId) parts.push(`assinaturaId=${assinaturaId}`);
-  if (token)        parts.push(`token=${token}`);
-  const b64    = Buffer.from(parts.join("&")).toString("base64");
+  if (token) parts.push(`token=${token}`);
+  const b64 = Buffer.from(parts.join("&")).toString("base64");
   const linkApp = `https://app.radarsiope.com.br/verNewsletterComToken.html?d=${encodeURIComponent(b64)}`;
 
   htmlFinal = htmlFinal.replace(
@@ -178,15 +178,15 @@ function montarHtml(newsletter, dadosDestinatario, segmento, registroEnvioId, ne
 // fix B6: AbortController garante que a promessa não trava indefinidamente
 async function enviarUmEmail(item) {
   const controller = new AbortController();
-  const timeoutId  = setTimeout(() => controller.abort(), SES_TIMEOUT);
+  const timeoutId = setTimeout(() => controller.abort(), SES_TIMEOUT);
 
   try {
     const command = new SendEmailCommand({
-      Source:      SES_SOURCE,
+      Source: SES_SOURCE,
       Destination: { ToAddresses: [item.email] },
       Message: {
         Subject: { Charset: "UTF-8", Data: item.assunto || "Radar SIOPE - Newsletter" },
-        Body:    { Html: { Charset: "UTF-8", Data: item.mensagemHtml } },
+        Body: { Html: { Charset: "UTF-8", Data: item.mensagemHtml } },
       },
     });
     const resp = await sesClient.send(command, { abortSignal: controller.signal });
@@ -231,7 +231,7 @@ async function verificarEMarcarNewsletterEnviada(newsletterId, envioId) {
       .collection("lotes")
       .get();
 
-    const lotes     = lotesSnap.docs.map((d) => d.data());
+    const lotes = lotesSnap.docs.map((d) => d.data());
     const pendentes = lotes.filter((l) => l.status === "pendente");
 
     if (pendentes.length > 0) {
@@ -254,13 +254,13 @@ export default async function handler(req, res) {
   // fix B2: CORS dinâmico para múltiplas origens
   const origem = req.headers.origin || "";
   const origemPermitida = ALLOWED_ORIGINS.includes(origem) ? origem : ALLOWED_ORIGINS[0];
-  /* res.setHeader("Access-Control-Allow-Origin",  origemPermitida);
-  res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, x-admin-token");
 
+  res.setHeader("Access-Control-Allow-Origin", origemPermitida);
+  res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
   if (req.method === "OPTIONS") return res.status(200).end();
-  if (req.method !== "POST")   return res.status(405).json({ ok: false, error: "Método não permitido" });
- */
+  if (req.method !== "POST") return res.status(405).json({ ok: false, error: "Método não permitido" });
+
   // ── Autenticação via Firebase ID Token ──────────────────────────────────────
   // O frontend (EnvioLeads.js) envia o token gerado automaticamente pelo Firebase Auth.
   // Verificamos aqui se o token é válido E se o usuário é Admin no Firestore.
@@ -301,7 +301,7 @@ export default async function handler(req, res) {
   }
   const newsletter = newsletterSnap.data();
 
-  const agora      = admin.firestore.Timestamp.now();
+  const agora = admin.firestore.Timestamp.now();
   const resultados = [];
 
   // ─── Envia em chunks paralelos ────────────────────────────────────────────
@@ -311,14 +311,14 @@ export default async function handler(req, res) {
     const settled = await Promise.allSettled(
       chunk.map(async (item) => {
         const {
-          envioId:        registroEnvioId,
+          envioId: registroEnvioId,
           destinatarioId, tipo, assinaturaId,
           email, nome, token,
         } = item;
 
         // fix C2: monta o HTML aqui no backend com dados do destinatário
-        const segmento     = tipo === "leads" ? "leads" : "assinantes";
-        const dadosDest    = { id: destinatarioId, nome, email };
+        const segmento = tipo === "leads" ? "leads" : "assinantes";
+        const dadosDest = { id: destinatarioId, nome, email };
         const mensagemHtml = montarHtml(
           newsletter,
           dadosDest,
@@ -340,7 +340,7 @@ export default async function handler(req, res) {
             ? `Timeout SES (>${SES_TIMEOUT}ms) para ${email}`
             : (err.message || String(err));
           console.error(`❌ SES falhou para ${email}:`, erroMsg);
-          await atualizarStatusDestinatario(itemComHtml, false, erroMsg, agora).catch(() => {});
+          await atualizarStatusDestinatario(itemComHtml, false, erroMsg, agora).catch(() => { });
           return { envioId: registroEnvioId, destinatarioId, tipo, ok: false, error: erroMsg };
         }
       })
@@ -357,9 +357,9 @@ export default async function handler(req, res) {
 
   // ─── Totais ───────────────────────────────────────────────────────────────
   const totalEnviados = resultados.filter((r) => r.ok).length;
-  const statusLote    =
+  const statusLote =
     totalEnviados === emails.length ? "completo" :
-    totalEnviados > 0              ? "parcial"  : "erro";
+      totalEnviados > 0 ? "parcial" : "erro";
 
   // ─── Atualiza lote + log no Firestore ─────────────────────────────────────
   const loteRef = db
@@ -370,8 +370,8 @@ export default async function handler(req, res) {
   const batch = db.batch();
 
   batch.set(loteRef, {
-    enviados:   totalEnviados,
-    status:     statusLote,
+    enviados: totalEnviados,
+    status: statusLote,
     data_envio: agora,
   }, { merge: true });
 
@@ -379,11 +379,11 @@ export default async function handler(req, res) {
   batch.set(loteRef.collection("envios_log").doc(), {
     data_envio: agora,
     quantidade: emails.length,
-    enviados:   totalEnviados,
-    erros:      emails.length - totalEnviados,
-    origem:     "bulk",
+    enviados: totalEnviados,
+    erros: emails.length - totalEnviados,
+    origem: "bulk",
     operador,
-    status:     statusLote,
+    status: statusLote,
   });
 
   await batch.commit();
@@ -392,15 +392,15 @@ export default async function handler(req, res) {
   try {
     const loteGeralSnap = await db
       .collection("lotes_gerais")
-      .where("loteId",  "==", loteId)
+      .where("loteId", "==", loteId)
       .where("envioId", "==", envioId)
       .limit(1)
       .get();
 
     if (!loteGeralSnap.empty) {
       await loteGeralSnap.docs[0].ref.update({
-        enviados:   totalEnviados,
-        status:     statusLote,
+        enviados: totalEnviados,
+        status: statusLote,
         data_envio: agora,
       });
     }
@@ -417,10 +417,10 @@ export default async function handler(req, res) {
   const resultadosLimpos = resultados.map(({ mensagemHtml: _, ...r }) => r);
 
   return res.status(200).json({
-    ok:        true,
-    enviados:  totalEnviados,
-    total:     emails.length,
-    status:    statusLote,
+    ok: true,
+    enviados: totalEnviados,
+    total: emails.length,
+    status: statusLote,
     resultados: resultadosLimpos,
   });
 }
