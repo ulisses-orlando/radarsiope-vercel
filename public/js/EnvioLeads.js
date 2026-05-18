@@ -1372,7 +1372,7 @@ async function enviarLoteEmMassa(newsletterId, envioId, loteId) {
 
         for (let i = 0; i < destinatarios.length; i += CHUNK_SIZE) {
             const chunk = destinatarios.slice(i, i + CHUNK_SIZE);
-
+console.log(`Processando chunk ${i / CHUNK_SIZE + 1} de ${Math.ceil(destinatarios.length / CHUNK_SIZE)}`, chunk);
             const settled = await Promise.allSettled(
                 chunk.map(async (dest) => {
                     const tipo         = dest.tipo || (dest.assinaturaId ? 'usuarios' : 'leads');
@@ -1385,6 +1385,7 @@ async function enviarLoteEmMassa(newsletterId, envioId, loteId) {
                     let registroEnvioId;
 
                     if (tipo === 'leads') {
+                        console.log(`Criando registro de envio para lead ${emailDest} (ID: ${idDest})`);
                         // fix #C1: usa upsert para evitar duplicata
                         const { data, error } = await window.supabase
                             .from('leads_envios')
@@ -1405,6 +1406,7 @@ async function enviarLoteEmMassa(newsletterId, envioId, loteId) {
                         if (error) throw new Error(`Supabase upsert falhou para ${emailDest}: ${error.message}`);
                         if (!data) throw new Error(`Sem retorno para ${emailDest} (possível duplicata ignorada)`);
                         registroEnvioId = String(data.id);
+                        console.log(`Registro de envio criado para lead ${emailDest} com ID ${registroEnvioId}`);
 
                     } else {
                         const envioRef = await db
@@ -1424,7 +1426,7 @@ async function enviarLoteEmMassa(newsletterId, envioId, loteId) {
                             });
                         registroEnvioId = envioRef.id;
                     }
-
+console.log(`Registro de envio criado para ${emailDest} com ID ${registroEnvioId}`);
                     // Payload de metadados apenas (sem HTML)
                     return {
                         envioId:        registroEnvioId,
@@ -1438,7 +1440,7 @@ async function enviarLoteEmMassa(newsletterId, envioId, loteId) {
                     };
                 })
             );
-
+console.log('Resultados do chunk:', settled);
             settled.forEach((s, idx) => {
                 if (s.status === 'fulfilled' && s.value) {
                     payloadEmails.push(s.value);
@@ -1451,7 +1453,7 @@ async function enviarLoteEmMassa(newsletterId, envioId, loteId) {
 
             _logProgresso(`Preparados ${Math.min(i + CHUNK_SIZE, destinatarios.length)}/${destinatarios.length}...`);
         }
-
+console.log('Payload final de emails:', payloadEmails);
         if (payloadEmails.length === 0) {
             _logProgresso('⚠️ Nenhum destinatário pôde ser processado.', 'aviso');
             mostrarMensagem('⚠️ Nenhum destinatário processado. Verifique o log.');
