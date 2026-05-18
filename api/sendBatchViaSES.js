@@ -200,26 +200,39 @@ async function enviarUmEmail(item) {
 
 // ─── Atualizar status do destinatário após envio ──────────────────────────────
 async function atualizarStatusDestinatario(item, ok, erroMsg, agora) {
-  const { envioId: registroId, destinatarioId, tipo, assinaturaId } = item;
-  const status = ok ? "enviado" : "erro";
+    const { envioId: registroId, destinatarioId, tipo, assinaturaId } = item;
+    const status = ok ? "enviado" : "erro";
 
-  if (tipo === "leads") {
-    const { error } = await supabase
-      .from("leads_envios")
-      .update({ status, updated_at: agora.toDate().toISOString() })
-      .eq("id", registroId)
-    if (error) console.warn(`⚠️ Supabase update falhou para lead ${destinatarioId}:`, error.message);
-  } else {
-    try {
-      await db
-        .collection("usuarios").doc(destinatarioId)
-        .collection("assinaturas").doc(assinaturaId)
-        .collection("envios").doc(registroId)
-        .set({ status, erro: erroMsg || null }, { merge: true });
-    } catch (err) {
-      console.warn(`⚠️ Firestore update falhou para usuario ${destinatarioId}:`, err.message);
+    console.log(`[DEBUG] Tentando atualizar ${destinatarioId} | Tipo: ${tipo} | ID Supabase: "${registroId}"`);
+
+    if (tipo === "leads") {
+        const { data, error } = await supabase
+            .from("leads_envios")
+            .update({ 
+                status, 
+                updated_at: agora.toDate().toISOString() 
+            })
+            .eq("id", registroId) 
+            .select("id");        
+
+        if (error) {
+            console.error(`❌ ERRO SUPABASE:`, error.message, error.details);
+        } else if (!data || data.length === 0) {
+            console.warn(`⚠️ ID NÃO ENCONTRADO: O Supabase não atualizou nada. Verifique se "${registroId}" existe na tabela leads_envios.`);
+        } else {
+            console.log(`✅ SUCESSO: Status atualizado para ${data[0].id}`);
+        }
+    } else {
+        try {
+            await db
+                .collection("usuarios").doc(destinatarioId)
+                .collection("assinaturas").doc(assinaturaId)
+                .collection("envios").doc(registroId)
+                .set({ status, erro: erroMsg || null }, { merge: true });
+        } catch (err) {
+            console.warn(`⚠️ Firestore update falhou:`, err.message);
+        }
     }
-  }
 }
 
 // ─── Verificar se todos os lotes do envio estão completos ou parciais ─────────
