@@ -209,10 +209,14 @@ async function carregarPlanos() {
       // status colorido — considera em_breve
       const statusColor = d.em_breve
         ? '#d97706'
-        : (d.status === 'ativo' ? '#16a34a' : '#dc2626');
+        : d.sob_consulta
+          ? '#7C3AED'
+          : (d.status === 'ativo' ? '#16a34a' : '#dc2626');
       const statusLabel = d.em_breve
         ? '🚀 Em breve'
-        : (d.status === 'ativo' ? '● Ativo' : '● Inativo');
+        : d.sob_consulta
+          ? '📋 Sob consulta'
+          : (d.status === 'ativo' ? '● Ativo' : '● Inativo');
       const statusDot = `<span style="color:${statusColor};font-weight:600;font-size:12px">${statusLabel}</span>`;
 
       tr.innerHTML = `
@@ -293,6 +297,8 @@ async function abrirModalPlano(id = null, editar = false) {
     permitir_sem_juros: false,
     parcelas_sem_juros: '',
     status: 'ativo',
+    em_breve: false,
+    sob_consulta: false,
     ordem: 99,
     destaque: false,
     badge: '',
@@ -692,20 +698,31 @@ async function abrirModalPlano(id = null, editar = false) {
   `;
   body.appendChild(statusWrap);
 
-  // Seção: Disponibilidade (em breve)
+  // Seção: Disponibilidade (em breve / sob consulta)
   body.appendChild(_secLabel('🚀 Disponibilidade'));
   const dispWrap = document.createElement('div');
-  dispWrap.style.cssText = 'padding:12px;background:#fffbeb;border:1px solid #fde68a;border-radius:6px';
+  dispWrap.style.cssText = 'display:flex;flex-direction:column;gap:10px';
   dispWrap.innerHTML = `
-    <label style="display:flex;align-items:flex-start;gap:8px;cursor:pointer">
+    <label style="display:flex;align-items:flex-start;gap:8px;cursor:pointer;padding:12px;background:#fffbeb;border:1px solid #fde68a;border-radius:6px">
       <input type="checkbox" id="pl-em-breve" ${d.em_breve ? 'checked' : ''}
         style="margin-top:3px;width:16px;height:16px;cursor:pointer">
       <div>
         <span style="font-size:13px;font-weight:600;color:#92400e">Marcar como "Em breve"</span>
         <div style="font-size:12px;color:#78350f;margin-top:3px;line-height:1.5">
-          O plano aparece no formulário de assinatura com uma tarja <em>"Em breve"</em>,
-          mas não pode ser selecionado pelo assinante. Use para apresentar planos futuros
-          e criar expectativa sem abrir a venda ainda.
+          O plano aparece no formulário com a tarja <em>"Em breve"</em>, mas não pode ser selecionado.
+          Use para apresentar planos futuros e criar expectativa sem abrir a venda.
+        </div>
+      </div>
+    </label>
+    <label style="display:flex;align-items:flex-start;gap:8px;cursor:pointer;padding:12px;background:#f5f3ff;border:1px solid #ddd6fe;border-radius:6px">
+      <input type="checkbox" id="pl-sob-consulta" ${d.sob_consulta ? 'checked' : ''}
+        style="margin-top:3px;width:16px;height:16px;cursor:pointer">
+      <div>
+        <span style="font-size:13px;font-weight:600;color:#5b21b6">Marcar como "Sob consulta"</span>
+        <div style="font-size:12px;color:#6d28d9;margin-top:3px;line-height:1.5">
+          O plano aparece no formulário com a tarja <em>"Sob consulta"</em> e direciona o interessado
+          para o canal de contato. Use para planos enterprise, negociações personalizadas ou
+          precificação variável.
         </div>
       </div>
     </label>
@@ -797,6 +814,7 @@ async function _salvarPlano(id, editar) {
   const allowMulti = !!document.getElementById('pl-allow-multi')?.checked;
   const vagasRaw = document.getElementById('pl-vagas')?.value;
   const emBreve = !!document.getElementById('pl-em-breve')?.checked;
+  const sobConsulta = !!document.getElementById('pl-sob-consulta')?.checked;
   const metodosPagamento = Array.from(
     document.querySelectorAll('.mp-metodo-check:checked')
   ).map(cb => cb.value);
@@ -868,6 +886,7 @@ async function _salvarPlano(id, editar) {
     parcelas_sem_juros,
     status: statusVal,
     em_breve: emBreve,
+    sob_consulta: sobConsulta,
     ordem: safeNumber(ordemRaw) || 99,
     destaque,
     badge,

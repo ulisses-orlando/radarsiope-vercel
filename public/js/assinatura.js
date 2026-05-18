@@ -483,7 +483,7 @@ function _criarCardPlano(plano, ciclo, allFeatures) {
   const total = getTotalCiclo(plano, ciclo);
 
   const card = document.createElement('label');
-  card.className = `plano-card${plano.destaque ? ' destaque' : ''}${plano.em_breve ? ' em-breve' : ''}`;
+  card.className = `plano-card${plano.destaque ? ' destaque' : ''}${plano.em_breve ? ' em-breve' : ''}${plano.sob_consulta ? ' sob-consulta' : ''}`;
   card.dataset.id = plano.id;
   card.dataset.ciclo = ciclo;
   card.style.setProperty('--plano-cor', cor);
@@ -492,29 +492,32 @@ function _criarCardPlano(plano, ciclo, allFeatures) {
 
   card.innerHTML = `
     ${plano.em_breve ? '<div class="plano-badge-em-breve">🚀 Em breve</div>' : ''}
-    ${!plano.em_breve && plano.destaque && plano.badge ? `<div class="plano-badge-destaque">${plano.badge}</div>` : ''}
-    <input type="radio" name="plano-selecionado" value="${plano.id}-${ciclo}" ${plano.em_breve ? 'disabled' : ''}>
-    <div class="plano-content${plano.em_breve ? ' plano-content--bloqueado' : ''}">
+    ${plano.sob_consulta ? '<div class="plano-badge-sob-consulta">📋 Sob consulta</div>' : ''}
+    ${!plano.em_breve && !plano.sob_consulta && plano.destaque && plano.badge ? `<div class="plano-badge-destaque">${plano.badge}</div>` : ''}
+    <input type="radio" name="plano-selecionado" value="${plano.id}-${ciclo}" ${(plano.em_breve || plano.sob_consulta) ? 'disabled' : ''}>
+    <div class="plano-content${(plano.em_breve || plano.sob_consulta) ? ' plano-content--bloqueado' : ''}">
       <div class="plano-nome">${plano.nome || plano.id}</div>
       <div class="plano-preco-wrap">
-        <span class="plano-preco-valor" style="color:${cor}">${fmtBRL(val)}</span>
+        <span class="plano-preco-valor" style="color:${cor}">${plano.sob_consulta ? '—' : fmtBRL(val)}</span>
         <div class="plano-preco-total" style="font-size:11px;color:#666;margin-top:1px">
-          ${Number(ciclo) > 1 ? `Total: ${fmtBRL(total)}` : ''}
+          ${!plano.sob_consulta && Number(ciclo) > 1 ? `Total: ${fmtBRL(total)}` : ''}
         </div>
-        <span class="plano-preco-ciclo">/mês</span>
+        ${!plano.sob_consulta ? '<span class="plano-preco-ciclo">/mês</span>' : ''}
       </div>
       ${plano.descricao ? `<div class="plano-descricao">${plano.descricao}</div>` : ''}
       <ul class="plano-features">${featuresHtml}</ul>
       ${plano.em_breve ? `<div class="plano-em-breve-aviso">Em breve — <a href="capturaLead.html">cadastre-se</a></div>` : ''}
+      ${plano.sob_consulta ? `<div class="plano-sob-consulta-aviso">Condições sob consulta — <a href="faleConosco.html">entre em contato</a></div>` : ''}
     </div>
   `;
 
   card.addEventListener('click', (e) => {
-    // ✅ 1. Se clicou no link "cadastre-se", ignora a lógica do card e permite a navegação
+    // ✅ 1. Se clicou em link de ação do card bloqueado, permite a navegação
     if (e.target.closest('a[href="capturaLead.html"]')) return;
+    if (e.target.closest('a[href="faleConosco.html"]')) return;
 
-    // 🚫 2. Mantém o bloqueio de seleção para planos "Em breve"
-    if (plano.em_breve) return;
+    // 🚫 2. Mantém o bloqueio de seleção para planos indisponíveis
+    if (plano.em_breve || plano.sob_consulta) return;
 
     e.stopPropagation();
     _onPlanoSelecionado(plano.id, ciclo);
@@ -534,7 +537,8 @@ function _criarCardPlano(plano, ciclo, allFeatures) {
 // ─── Ao selecionar um plano ───────────────────────────────────────────────────
 async function _onPlanoSelecionado(planId, cicloInicial = null) {
   const plano = await carregarPlano(planId);
-  if (!plano || plano.em_breve) return;
+  
+  if (!plano || plano.em_breve || plano.sob_consulta) return;
 
   const ciclosDisp = Array.isArray(plano.ciclos_disponiveis) && plano.ciclos_disponiveis.length
     ? plano.ciclos_disponiveis : ['3'];
