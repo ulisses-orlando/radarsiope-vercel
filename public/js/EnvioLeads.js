@@ -1489,7 +1489,6 @@ async function enviarLoteEmMassa(newsletterId, envioId, loteId) {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'x-firebase-token': 0, //firebaseToken,
             },
             body: JSON.stringify({ newsletterId, envioId, loteId, operador, emails: payloadEmails }),
         });
