@@ -203,25 +203,18 @@ async function atualizarStatusDestinatario(item, ok, erroMsg, agora) {
     const { envioId: registroId, destinatarioId, tipo, assinaturaId } = item;
     const status = ok ? "enviado" : "erro";
 
-    console.log(`[DEBUG] Tentando atualizar ${destinatarioId} | Tipo: ${tipo} | ID Supabase: "${registroId}"`);
+    if (!registroId) {
+        console.warn(`⚠️ [SKIP] ID de registro ausente para destinatário ${destinatarioId}`);
+        return;
+    }
 
     if (tipo === "leads") {
-        const { data, error } = await supabase
+        const { error } = await supabase
             .from("leads_envios")
-            .update({ 
-                status, 
-                updated_at: agora.toDate().toISOString() 
-            })
-            .eq("id", registroId) 
-            .select("id");        
+            .update({ status, updated_at: agora.toDate().toISOString() })
+            .eq("id", registroId); 
 
-        if (error) {
-            console.error(`❌ ERRO SUPABASE:`, error.message, error.details);
-        } else if (!data || data.length === 0) {
-            console.warn(`⚠️ ID NÃO ENCONTRADO: O Supabase não atualizou nada. Verifique se "${registroId}" existe na tabela leads_envios.`);
-        } else {
-            console.log(`✅ SUCESSO: Status atualizado para ${data[0].id}`);
-        }
+        if (error) console.warn(`⚠️ Supabase update falhou para lead ${destinatarioId}:`, error.message);
     } else {
         try {
             await db
@@ -230,7 +223,7 @@ async function atualizarStatusDestinatario(item, ok, erroMsg, agora) {
                 .collection("envios").doc(registroId)
                 .set({ status, erro: erroMsg || null }, { merge: true });
         } catch (err) {
-            console.warn(`⚠️ Firestore update falhou:`, err.message);
+            console.warn(`⚠️ Firestore update falhou para usuario ${destinatarioId}:`, err.message);
         }
     }
 }
