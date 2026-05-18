@@ -57,6 +57,8 @@ const ALLOWED_ORIGINS = [
   "https://radarsiope-vercel.vercel.app",
   "https://app.radarsiope.com.br",
   "https://admin.radarsiope.com.br",
+  "https://www.radarsiope.com.br", 
+  "https://api.radarsiope.com.br", 
   ...(process.env.ALLOWED_ORIGIN ? [process.env.ALLOWED_ORIGIN] : []),
 ];
 
@@ -251,15 +253,16 @@ async function verificarEMarcarNewsletterEnviada(newsletterId, envioId) {
 
 // ─── Handler principal ────────────────────────────────────────────────────────
 export default async function handler(req, res) {
-  // fix B2: CORS dinâmico para múltiplas origens
-  const origem = req.headers.origin || "";
-  const origemPermitida = ALLOWED_ORIGINS.includes(origem) ? origem : ALLOWED_ORIGINS[0];
+// ✅ CORS - ATIVO E CORRIGIDO
+    const origem = req.headers.origin || "";
+    const origemPermitida = ALLOWED_ORIGINS.includes(origem) ? origem : ALLOWED_ORIGINS[0];
 
-  res.setHeader("Access-Control-Allow-Origin", origemPermitida);
-  res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
-  if (req.method === "OPTIONS") return res.status(200).end();
-  if (req.method !== "POST") return res.status(405).json({ ok: false, error: "Método não permitido" });
+    res.setHeader("Access-Control-Allow-Origin", origemPermitida);
+    res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
+    res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+
+    if (req.method === "OPTIONS") return res.status(200).end();
+    if (req.method !== "POST") return res.status(405).json({ ok: false, error: "Método não permitido" });
 
   // ── Autenticação via Firebase ID Token ──────────────────────────────────────
   // O frontend (EnvioLeads.js) envia o token gerado automaticamente pelo Firebase Auth.
