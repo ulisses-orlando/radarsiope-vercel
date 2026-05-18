@@ -264,7 +264,7 @@ export default async function handler(req, res) {
   // ── Autenticação via Firebase ID Token ──────────────────────────────────────
   // O frontend (EnvioLeads.js) envia o token gerado automaticamente pelo Firebase Auth.
   // Verificamos aqui se o token é válido E se o usuário é Admin no Firestore.
-  c/* onst firebaseToken = req.headers["x-firebase-token"];
+  /* const firebaseToken = req.headers["x-firebase-token"];
   if (!firebaseToken) {
     return res.status(401).json({ ok: false, error: "Token de autenticação ausente." });
   }
