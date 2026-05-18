@@ -132,7 +132,7 @@ function _injetarBotaoRelatorio(cod, nome, uf) {
 
 // ─── Monta o documento HTML completo do relatório ────────────────────────────
 function _montarHTMLRelatorio(d) {
-  const { assinante, siope, alertas, quiz, gerado_em } = d;
+  const { assinante, siope, alertas, quiz, cauc, gerado_em } = d;
   const series = siope?.series || [];
   const ultimo = siope?.ultimo || null;
   const anoGeracao = new Date(gerado_em || Date.now()).getFullYear();
@@ -282,6 +282,16 @@ function _montarHTMLRelatorio(d) {
     .chart-container { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px; height: 220px; position: relative; }
     .chart-container canvas { max-height: 180px; }
 
+    /* CAUC */
+    .cauc-tabela { width: 100%; border-collapse: collapse; font-size: 10.5px; }
+    .cauc-tabela thead tr { background: #0A3D62; color: #fff; }
+    .cauc-tabela thead th { padding: 5px 8px; text-align: left; font-weight: 600; font-size: 10px; letter-spacing: .3px; }
+    .cauc-tabela tbody tr { border-bottom: 1px solid #e2e8f0; }
+    .cauc-tabela tbody tr:nth-child(even) { background: #f8fafc; }
+    .cauc-tabela td { padding: 5px 8px; vertical-align: middle; }
+    .cauc-tabela td.item-cod { font-weight: 700; color: #0A3D62; white-space: nowrap; }
+    .cauc-indisponivel { padding: 8px 12px; background: #fff7ed; border: 1px solid #fed7aa; border-radius: 6px; font-size: 10.5px; color: #92400e; }
+
     @media print {
       html, body { background: #fff; }
       .pagina { width: 100%; min-height: unset; max-height: unset; margin: 0; box-shadow: none; page-break-after: always; }
@@ -339,6 +349,35 @@ function _montarHTMLRelatorio(d) {
     <div class="secao">
       <div class="secao-titulo">💰 Indicadores Financeiros — Registro Mais Recente</div>
       ${indicadores}
+    </div>
+
+    <div class="secao">
+      <div class="secao-titulo">🏛️ CAUC — Situação nos Itens de Educação</div>
+      ${(() => {
+        if (!cauc) {
+          return '<p class="sem-dados">Dados do CAUC não carregados.</p>';
+        }
+        if (!cauc.disponivel) {
+          return `<div class="cauc-indisponivel">⚠️ <strong>CAUC indisponível:</strong> ${_escHtml(cauc.motivo || 'Não foi possível consultar o CAUC agora.')}</div>`;
+        }
+        if (!cauc.itens || cauc.itens.length === 0) {
+          return '<p class="sem-dados">Nenhum dos itens de educação (3.2.3, 5.1, 5.5, 5.6, 5.7) foi retornado pelo CAUC para este município. Verifique o log diagnóstico.</p>';
+        }
+        const linhas = cauc.itens.map(item => {
+          const { cor, fg } = _corSituacaoCauc(item.situacao);
+          return `<tr>
+            <td class="item-cod">${_escHtml(item.cod_item)}</td>
+            <td>${_escHtml(item.descricao)}</td>
+            <td><span class="badge" style="background:${cor};color:${fg}">${_escHtml(item.situacao)}</span></td>
+            <td style="color:#64748b;white-space:nowrap">${item.data_consulta ? _dataAbrev(item.data_consulta) : '—'}</td>
+          </tr>`;
+        }).join('');
+        return `<table class="cauc-tabela">
+          <thead><tr><th>Item</th><th>Descrição</th><th>Situação</th><th>Consultado em</th></tr></thead>
+          <tbody>${linhas}</tbody>
+        </table>
+        <div style="font-size:9px;color:#94a3b8;margin-top:4px">Fonte: CAUC/STN (id_ente ${_escHtml(cauc.cod7 || '')} · ${cauc.fonte === 'cache' ? 'cache local 24h' : 'consulta direta'})</div>`;
+      })()}
     </div>
 
     <div class="grid-2">
@@ -494,6 +533,13 @@ function _iconeAlerta(tipo) {
 function _indCard(label, valor, status) {
   const cls = status === 'ok' ? 'ok' : status === 'alerta' ? 'alerta' : '';
   return `<div class="ind-card ${cls}"><div class="ind-card-label">${label}</div><div class="ind-card-valor">${valor}</div></div>`;
+}
+function _corSituacaoCauc(s) {
+  const l = (s || '').toLowerCase();
+  if (l === 'regular')   return { cor: '#dcfce7', fg: '#166534' };
+  if (l === 'irregular') return { cor: '#fee2e2', fg: '#991b1b' };
+  if (l === 'pendente')  return { cor: '#fef9c3', fg: '#854d0e' };
+  return { cor: '#f1f5f9', fg: '#475569' };
 }
 function _pct(v) {
   if (v === null || v === undefined) return '—';
