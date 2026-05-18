@@ -1389,14 +1389,12 @@ async function enviarLoteEmMassa(newsletterId, envioId, loteId) {
                             .select('id, status')
                             .eq('lead_id', idDest)
                             .eq('newsletter_id', newsletterId)
-                            .eq('status', 'pendente')  // ← Só evita duplicata de "pendente"
+                            .eq('status', 'pendente')
                             .order('data_envio', { ascending: false })
                             .limit(1)
                             .maybeSingle();
 
                         if (queryError) throw new Error(`Erro ao consultar leads_envios: ${queryError.message}`);
-
-                        let registroEnvioId;
 
                         if (existente) {
                             // ✅ Já existe um "pendente": atualiza token e expiração (reenvio)
@@ -1406,7 +1404,6 @@ async function enviarLoteEmMassa(newsletterId, envioId, loteId) {
                                     data_envio: new Date().toISOString(),
                                     token_acesso: token,
                                     expira_em: expiraEm.toISOString(),
-                                    // Mantém status 'pendente' e outros campos
                                 })
                                 .eq('id', existente.id);
 
@@ -1432,7 +1429,6 @@ async function enviarLoteEmMassa(newsletterId, envioId, loteId) {
                             if (insertError) throw new Error(`Erro ao inserir registro: ${insertError.message}`);
                             registroEnvioId = String(data.id);
                         }
-
                     } else {
                         const envioRef = await db
                             .collection('usuarios').doc(idDest)
