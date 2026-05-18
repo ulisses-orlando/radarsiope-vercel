@@ -1485,35 +1485,6 @@ async function enviarLoteEmMassa(newsletterId, envioId, loteId) {
         // ── Envia para o backend ─────────────────────────────────────────────
         _logProgresso(`📤 Enviando ${payloadEmails.length} e-mail(s) via SES...`);
 
-        // Obtém o Firebase ID Token do usuário admin logado.
-        // O token é gerado automaticamente, dura 1h e se renova sozinho —
-        // o operador não precisa digitar nem lembrar nada.
-        let firebaseToken = '';
-        try {
-            const currentUser = firebase.auth().currentUser;
-            if (currentUser) {
-                firebaseToken = await currentUser.getIdToken(/* forceRefresh */ false);
-            } else {
-                // currentUser pode ser null se o Firebase Auth ainda está inicializando.
-                // Aguarda até 3s pela sessão restaurada antes de falhar.
-                firebaseToken = await new Promise((resolve, reject) => {
-                    const unsubscribe = firebase.auth().onAuthStateChanged(user => {
-                        unsubscribe();
-                        if (user) {
-                            user.getIdToken().then(resolve).catch(reject);
-                        } else {
-                            reject(new Error('Sessão Firebase não encontrada. Faça login novamente.'));
-                        }
-                    });
-                    setTimeout(() => reject(new Error('Timeout ao obter token Firebase.')), 3000);
-                });
-            }
-        } catch (authErr) {
-            _logProgresso('❌ Erro de autenticação: ' + authErr.message, 'erro');
-            mostrarMensagem('❌ Não foi possível autenticar. Faça login novamente.');
-            return;
-        }
-
         const response = await fetch('https://api.radarsiope.com.br/api/sendBatchViaSES', {
             method: 'POST',
             headers: {
