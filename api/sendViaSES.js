@@ -73,23 +73,39 @@ const CAUC_ITENS_KEYS = Object.keys(CAUC_ITENS_EDUCACAO);
 // ─── Busca código IBGE 7 dígitos no Firestore (UF/{uf}/Municipio) ────────────
 async function _buscarCod7Firestore(cod6, cod_uf) {
   if (!cod6 || !cod_uf) return null;
+
   try {
     const uf = String(cod_uf).toUpperCase().trim();
+    
+    // 1. Converter a busca para Número (pois o campo no Firestore é int64)
+    const strLimpo = String(cod6).replace(/\D/g, '');
+    const numBase = Number(strLimpo);
+    if (isNaN(numBase)) return null;
+
+    // 2. Calcular o intervalo numérico de busca
+    // Se buscamos o prefixo "35001", queremos números entre 350010 e 350019.
+    const startVal = numBase * 10;       
+    const endVal = startVal + 10;        // O operador '<' exclui este valor final
+
+    // 3. Query com filtros numéricos (>= e <)
     const snap = await db.collection('UF').doc(uf)
       .collection('Municipio')
-      .orderBy('cod_municipio')
-      .startAt(cod6)
-      .endAt(cod6 + '\uf8ff')
+      .where('cod_municipio', '>=', startVal) 
+      .where('cod_municipio', '<', endVal)
       .limit(1)
       .get();
+
     if (!snap.empty) {
-      const d = snap.docs[0];
-      const raw = String(d.data().cod_municipio || d.data().codigo || d.id).replace(/\D/g, '');
-      if (raw.length === 7) return raw;
-      const docId = String(d.id).replace(/\D/g, '');
-      if (docId.length === 7) return docId;
+      const doc = snap.docs[0];
+      const val = doc.data().cod_municipio;
+
+      // Retorna o valor encontrado formatado como string de 7 dígitos
+      // (padStart garante zeros à esquerda se o banco salvou como int sem eles)
+      return val ? String(val).padStart(7, '0') : null;
     }
+    
     return null;
+
   } catch (e) {
     console.warn('[cauc] Erro ao buscar cod7 no Firestore:', e.message);
     return null;
@@ -288,7 +304,7 @@ async function _relatorioConformidade(req, res) {
   let caucResult;
   const cod7 = await _buscarCod7Firestore(codStr, user.cod_uf);
   if (!cod7) {
-    caucResult = { disponivel: false, motivo: `${codStr}: user.cod_uf ${user.cod_uf} -  Código IBGE de 7 dígitos não localizado no Firestore.` };
+    caucResult = { disponivel: false, motivo: `${cod7}: user.cod_uf ${user.cod_uf} -  Código IBGE de 7 dígitos não localizado no Firestore.` };
   } else {
     const cauc = await _buscarCaucComCache(cod7);
     if (!cauc.ok) {
