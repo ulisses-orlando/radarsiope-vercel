@@ -288,7 +288,7 @@ async function _relatorioConformidade(req, res) {
   let caucResult;
   const cod7 = await _buscarCod7Firestore(codStr, user.cod_uf);
   if (!cod7) {
-    caucResult = { disponivel: false, motivo: 'Código IBGE de 7 dígitos não localizado no Firestore.' };
+    caucResult = { disponivel: false, motivo: 'Código IBGE de 7 dígitos não localizado no Firestore.', cod6: codStr, uf: user.cod_uf || '' };
   } else {
     const cauc = await _buscarCaucComCache(cod7);
     if (!cauc.ok) {
