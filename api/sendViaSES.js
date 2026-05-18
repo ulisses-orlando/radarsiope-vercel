@@ -60,6 +60,110 @@ function _alertaDoMunicipio(alerta, cod) {
   return false;
 }
 
+// ─── CAUC: itens de educação monitorados ─────────────────────────────────────
+const CAUC_ITENS_EDUCACAO = {
+  '3.2.3': 'Aplicação mínima em MDE (25% das receitas de impostos)',
+  '5.1':   'Comprovação de aplicação dos recursos do FUNDEB',
+  '5.5':   'Prestação de contas dos recursos do FUNDEB',
+  '5.6':   'Aplicação mínima de 70% do FUNDEB em remuneração do magistério',
+  '5.7':   'Funcionamento do CACS-FUNDEB',
+};
+const CAUC_ITENS_KEYS = Object.keys(CAUC_ITENS_EDUCACAO);
+
+// ─── Busca código IBGE 7 dígitos no Firestore (UF/{uf}/Municipio) ────────────
+async function _buscarCod7Firestore(cod6, cod_uf) {
+  if (!cod6 || !cod_uf) return null;
+  try {
+    const uf = String(cod_uf).toUpperCase().trim();
+    const snap = await db.collection('UF').doc(uf)
+      .collection('Municipio')
+      .orderBy('cod_municipio')
+      .startAt(cod6)
+      .endAt(cod6 + '\uf8ff')
+      .limit(1)
+      .get();
+    if (!snap.empty) {
+      const d = snap.docs[0];
+      const raw = String(d.data().cod_municipio || d.data().codigo || d.id).replace(/\D/g, '');
+      if (raw.length === 7) return raw;
+      const docId = String(d.id).replace(/\D/g, '');
+      if (docId.length === 7) return docId;
+    }
+    return null;
+  } catch (e) {
+    console.warn('[cauc] Erro ao buscar cod7 no Firestore:', e.message);
+    return null;
+  }
+}
+
+// ─── Busca CAUC com cache Firestore (TTL 24h) ─────────────────────────────────
+async function _buscarCaucComCache(cod7) {
+  const TTL_MS = 24 * 60 * 60 * 1000;
+  const cacheRef = db.collection('cauc_cache').doc(cod7);
+
+  // Tenta cache
+  try {
+    const snap = await cacheRef.get();
+    if (snap.exists) {
+      const c = snap.data();
+      const idade = Date.now() - (c.cached_at?.toDate?.()?.getTime() || 0);
+      if (idade < TTL_MS) {
+        console.log(`[cauc] Cache hit — ${cod7} (${Math.round(idade / 3600000)}h atrás)`);
+        return { ok: true, itens: c.itens || [], fonte: 'cache' };
+      }
+    }
+  } catch (e) { console.warn('[cauc] Erro ao ler cache:', e.message); }
+
+  // Chama API STN com timeout de 10s
+  const url = `https://apidatalake.tesouro.gov.br/ords/sadipem/tt/cauc?id_ente=${cod7}`;
+  let rawData;
+  try {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 10000);
+    const resp = await fetch(url, { headers: { Accept: 'application/json' }, signal: ctrl.signal });
+    clearTimeout(timer);
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    rawData = await resp.json();
+    // ── Log diagnóstico completo ──────────────────────────────────────────────
+    console.log(`[cauc] Payload bruto (${cod7}):`, JSON.stringify(rawData).slice(0, 3000));
+  } catch (e) {
+    console.error('[cauc] Falha na API STN:', e.message);
+    return { ok: false, erro: `API do CAUC indisponível: ${e.message}` };
+  }
+
+  // Normaliza — a API pode retornar array direto ou envelope { items / data }
+  const lista = Array.isArray(rawData) ? rawData
+    : Array.isArray(rawData?.items) ? rawData.items
+    : Array.isArray(rawData?.data)  ? rawData.data
+    : [];
+
+  // Filtra e mapeia apenas itens de educação
+  const itens = lista
+    .filter(item => CAUC_ITENS_KEYS.includes(
+      String(item.cod_item || item.codigo_item || item.item || '').trim()
+    ))
+    .map(item => {
+      const cod = String(item.cod_item || item.codigo_item || item.item || '').trim();
+      return {
+        cod_item:      cod,
+        descricao:     item.descricao || item.ds_item || CAUC_ITENS_EDUCACAO[cod] || cod,
+        situacao:      item.situacao  || item.ds_situacao || item.status || '—',
+        data_consulta: item.data_consulta || item.dt_consulta || item.data_verificacao || null,
+      };
+    });
+
+  // Persiste cache
+  try {
+    await cacheRef.set({
+      cod7,
+      itens,
+      cached_at: admin.firestore.FieldValue.serverTimestamp(),
+    });
+  } catch (e) { console.warn('[cauc] Erro ao gravar cache:', e.message); }
+
+  return { ok: true, itens, fonte: 'api' };
+}
+
 // ─── Relatório de Conformidade ────────────────────────────────────────────────
 async function _relatorioConformidade(req, res) {
   const origin = process.env.ALLOWED_ORIGIN || 'https://app.radarsiope.com.br';
@@ -180,6 +284,20 @@ async function _relatorioConformidade(req, res) {
     ? Math.round(quizComDados.reduce((s, q) => s + q.melhor_pontuacao, 0) / quizComDados.length)
     : null;
 
+  // ── CAUC: situação nos itens de educação ──────────────────────────────────
+  let caucResult;
+  const cod7 = await _buscarCod7Firestore(codStr, user.cod_uf);
+  if (!cod7) {
+    caucResult = { disponivel: false, motivo: 'Código IBGE de 7 dígitos não localizado no Firestore.' };
+  } else {
+    const cauc = await _buscarCaucComCache(cod7);
+    if (!cauc.ok) {
+      caucResult = { disponivel: false, motivo: cauc.erro };
+    } else {
+      caucResult = { disponivel: true, cod7, itens: cauc.itens, fonte: cauc.fonte };
+    }
+  }
+
   return res.status(200).json({
     ok: true,
     assinante: {
@@ -202,6 +320,7 @@ async function _relatorioConformidade(req, res) {
       media_pontuacao: mediaPontuacao,
       resultados: quizResultados,
     },
+    cauc: caucResult,
     gerado_em: new Date().toISOString(),
   });
 }
