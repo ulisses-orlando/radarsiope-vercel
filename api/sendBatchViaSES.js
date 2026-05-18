@@ -254,13 +254,13 @@ export default async function handler(req, res) {
   // fix B2: CORS dinâmico para múltiplas origens
   const origem = req.headers.origin || "";
   const origemPermitida = ALLOWED_ORIGINS.includes(origem) ? origem : ALLOWED_ORIGINS[0];
-  res.setHeader("Access-Control-Allow-Origin",  origemPermitida);
+  /* res.setHeader("Access-Control-Allow-Origin",  origemPermitida);
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, x-admin-token");
 
   if (req.method === "OPTIONS") return res.status(200).end();
   if (req.method !== "POST")   return res.status(405).json({ ok: false, error: "Método não permitido" });
-
+ */
   // ── Autenticação via Firebase ID Token ──────────────────────────────────────
   // O frontend (EnvioLeads.js) envia o token gerado automaticamente pelo Firebase Auth.
   // Verificamos aqui se o token é válido E se o usuário é Admin no Firestore.
