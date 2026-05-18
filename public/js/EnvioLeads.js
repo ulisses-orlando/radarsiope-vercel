@@ -105,7 +105,7 @@ function mostrarAba(id) {
     const todas = [
         'secao-newsletters-envio', 'secao-envio-leads', 'secao-envio-usuarios',
         'secao-preview-envio', 'secao-lotes-envio', 'secao-relatorio-envios',
-        'secao-descadastramentos', 'secao-todos-os-lotes', 'secao-orientacoes',
+        'secao-descadastramentos', 'secao-todos-os-lotes',
         'secao-historico-reenvios'
     ];
     todas.forEach(sec => {
