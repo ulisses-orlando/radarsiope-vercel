@@ -162,9 +162,9 @@ function extrairTrechosRelevantes(texto, pergunta, maxChars = 20000) {
 
   // Tokeniza a pergunta em palavras significativas (≥4 chars)
   const stopwords = new Set([
-    'para','como','qual','que','este','essa','este','isso','pelo','pela',
-    'com','seu','sua','quando','onde','quem','mais','pode','deve','seria',
-    'sobre','entre','ainda','também','após','antes','uma','com','do','da'
+    'para', 'como', 'qual', 'que', 'este', 'essa', 'este', 'isso', 'pelo', 'pela',
+    'com', 'seu', 'sua', 'quando', 'onde', 'quem', 'mais', 'pode', 'deve', 'seria',
+    'sobre', 'entre', 'ainda', 'também', 'após', 'antes', 'uma', 'com', 'do', 'da'
   ]);
 
   const palavras = pergunta
@@ -221,6 +221,7 @@ export default async function handler(req, res) {
     municipio_cod,
     uid,
     segmento,
+    acesso_pro_temp,
     historico = [],
   } = req.body || {};
 
@@ -231,7 +232,7 @@ export default async function handler(req, res) {
   if (!nid) {
     return res.status(400).json({ erro: 'ID da edição ausente.' });
   }
-  if (segmento !== 'assinante') {
+  if (segmento !== 'assinante' && !acesso_pro_temp) {
     return res.status(403).json({ erro: 'Recurso disponível apenas para assinantes.' });
   }
   if (pergunta.length > 500) {
