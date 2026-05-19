@@ -110,16 +110,20 @@ async function syncCaucData({ force = false } = {}) {
 
   try {
     console.log('[CAUC Sync] ⬇️ Baixando CSV...');
+    // 3. Baixa e parseia o CSV FORÇANDO UTF-8
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 30000);
 
     const response = await fetch(CSV_URL, { cache: 'no-store', signal: controller.signal });
     clearTimeout(timeout);
 
-    if (!response.ok) throw new Error(`HTTP ${response.status} - ${response.statusText}`);
-    const csvText = await response.text();
-    console.log(`[CAUC Sync] 📄 CSV baixado (${csvText.length} bytes)`);
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
+    // 🔧 Lê como ArrayBuffer e decodifica explicitamente como UTF-8
+    const buffer = await response.arrayBuffer();
+    const csvText = new TextDecoder('utf-8').decode(buffer);
+
+    console.log(`[CAUC Sync] 📄 CSV baixado e decodificado (${csvText.length} bytes)`);
     const rows = parseCsvTesouro(csvText);
     console.log(`[CAUC Sync] 🔍 ${rows.length} linhas parseadas`);
 
@@ -133,27 +137,28 @@ async function syncCaucData({ force = false } = {}) {
       });
     }
 
-    // Prepara records COM OS NOMES REAIS DO CSV
+    // Prepara records COM FALLBACKS PARA ENCODING QUEBRADO
     const records = rows.map(r => {
-      // 🔧 Nomes corretos dos campos no CSV do Tesouro:
-      // - "Código IBGE" pode vir com encoding quebrado; tente variações
+      // 🔧 Tenta múltiplas variações do nome do campo (encoding UTF-8 vs latin1)
       const codRaw = String(
-        r['Código IBGE'] ||
-        r['Cdigo IBGE'] ||  // ← Fallback para encoding quebrado
-        r['cod_ibge'] ||
+        r['Código IBGE'] ||      // Normal
+        r['Cdigo IBGE'] ||      // Encoding quebrado ( = ó)
+        r['Codigo IBGE'] ||      // Sem acento
+        r['cod_ibge'] ||         // Minúsculo
         r['codigo_ibge'] ||
         ''
       ).replace(/\D/g, '');
 
       const cod_ibge = codRaw ? codRaw.padStart(7, '0') : '';
 
-      // UF: campo correto
+      // UF: campo simples
       const uf = String(r['UF'] || r['uf'] || '').substring(0, 2).toUpperCase();
 
-      // 🔧 Município: nome REAL no CSV é "Nome do Ente Federado"
+      // Município: nome REAL no CSV + fallbacks
       const municipio = String(
-        r['Nome do Ente Federado'] ||  // ← CORRETO
-        r['Município'] ||              // ← Fallback
+        r['Nome do Ente Federado'] ||  // Nome correto no CSV
+        r['Município'] ||
+        r['Municipio'] ||
         r['municipio'] ||
         ''
       ).substring(0, 255);
@@ -165,15 +170,25 @@ async function syncCaucData({ force = false } = {}) {
         cod_ibge,
         uf,
         municipio,
-        // 🔧 Itens de educação: nomes exatos do CSV
-        item_3_2_3: r['3.2.3'] || r['item_3_2_3'] || null,
-        item_5_1: r['5.1'] || r['item_5_1'] || null,
-        item_5_5: r['5.5'] || r['item_5_5'] || null,
-        item_5_6: r['5.6'] || r['item_5_6'] || null,
-        item_5_7: r['5.7'] || r['item_5_7'] || null,
+        // Itens de educação: fallbacks para encoding
+        item_3_2_3: r['3.2.3'] || null,
+        item_5_1: r['5.1'] || null,
+        item_5_5: r['5.5'] || null,
+        item_5_6: r['5.6'] || null,
+        item_5_7: r['5.7'] || null,
         data_referencia: null,
       };
     }).filter(r => r !== null);
+
+    // Log de confirmação
+    const sample = records.find(r => r.cod_ibge === '1200385');
+    if (sample) {
+      console.log('[CAUC Sync] ✅ 1200385 MAPEADO:', sample);
+    } else {
+      // Debug: mostra alguns códigos AC para validar
+      const acSamples = records.filter(r => r.uf === 'AC').slice(0, 3);
+      console.log('[CAUC Sync] 🧪 Amstras AC mapeadas:', acSamples.map(r => r.cod_ibge));
+    }
 
     // 🔧 Deduplica por cod_ibge (evita erro "ON CONFLICT... second time")
     const uniqueRecords = [...new Map(records.map(r => [r.cod_ibge, r])).values()];
