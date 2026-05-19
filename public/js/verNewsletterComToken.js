@@ -4048,11 +4048,12 @@ function iniciarChatFAB(newsletter, uid, acesso) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           pergunta: texto,
-          nid: ctx.nid,             // ✅ Usa global
+          nid: ctx.nid,
           municipio_cod: window._radarUser?.municipio_cod || '',
-          uid: ctx.uid,             // ✅ Usa global
+          uid: ctx.uid,
           segmento: window._radarUser?.segmento || '',
-          historico: window._chatMensagens.slice(-6) // ✅ Usa global
+          acesso_pro_temp: window._leadAcessoProTemp === true,
+          historico: window._chatMensagens.slice(-6)
         }),
       });
       let data; try { data = await res.json(); } catch { _digitando = false; typing?.remove(); return; }
