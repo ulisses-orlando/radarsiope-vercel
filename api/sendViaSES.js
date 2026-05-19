@@ -32,37 +32,21 @@ const supabase = createClient(
 );
 
 // ─── Parser CSV do Tesouro Transparente ──────────────────────────────────────
+// Parser por índice: ignora headers corrompidos e retorna Array<string[]>
 function parseCsvTesouro(csvText) {
-  console.log('[CAUC Parse] Iniciando, tamanho:', csvText.length);
-
   const lines = csvText.trim().split(/\r?\n/).filter(l => l.trim());
-  if (lines.length < 2) return [];
-
-  // 1️⃣ Encontra a linha de cabeçalho REAL (deve conter "IBGE" e ter ~30+ colunas)
-  let headerIdx = 0;
-  for (let i = 0; i < Math.min(10, lines.length); i++) {
-    const parts = lines[i].split(';').length;
-    if (lines[i].includes('IBGE') && parts > 20) {
-      headerIdx = i;
-      break;
-    }
-  }
-
-  const headers = lines[headerIdx].split(';').map(h => h.replace(/^"|"$/g, '').trim());
-  console.log(`[CAUC Parse] Header na linha ${headerIdx} | Colunas: ${headers.length}`);
-  console.log('[CAUC Parse] Headers esperados:', headers.slice(0, 10));
+  // O CSV do Tesouro tem 3 linhas de metadados + 1 header. Dados começam na linha 4.
+  if (lines.length < 5) return [];
 
   const rows = [];
-  for (let i = headerIdx + 1; i < lines.length; i++) {
-    // Parse inteligente respeitando aspas
+  for (let i = 4; i < lines.length; i++) {
     const values = [];
     let current = '';
     let inQuotes = false;
 
     for (let char of lines[i]) {
-      if (char === '"') {
-        inQuotes = !inQuotes;
-      } else if (char === ';' && !inQuotes) {
+      if (char === '"') inQuotes = !inQuotes;
+      else if (char === ';' && !inQuotes) {
         values.push(current.replace(/^"|"$/g, '').trim());
         current = '';
       } else {
@@ -71,13 +55,9 @@ function parseCsvTesouro(csvText) {
     }
     values.push(current.replace(/^"|"$/g, '').trim());
 
-    // Monta objeto
-    const row = {};
-    headers.forEach((h, idx) => { row[h] = values[idx] || ''; });
-    rows.push(row);
+    // Só adiciona se tiver colunas suficientes (evita linhas vazias/malformadas)
+    if (values.length >= 35) rows.push(values);
   }
-
-  console.log(`[CAUC Parse] Finalizado: ${rows.length} registros`);
   return rows;
 }
 
@@ -121,7 +101,7 @@ async function syncCaucData({ force = false } = {}) {
 
     // 🔧 Lê como ArrayBuffer e decodifica explicitamente como UTF-8
     const buffer = await response.arrayBuffer();
-    const csvText = new TextDecoder('utf-8').decode(buffer);
+    const csvText = await response.text();
 
     console.log(`[CAUC Sync] 📄 CSV baixado e decodificado (${csvText.length} bytes)`);
     const rows = parseCsvTesouro(csvText);
@@ -137,46 +117,23 @@ async function syncCaucData({ force = false } = {}) {
       });
     }
 
-    // Prepara records COM FALLBACKS PARA ENCODING QUEBRADO
-    const records = rows.map(r => {
-      // 🔧 Tenta múltiplas variações do nome do campo (encoding UTF-8 vs latin1)
-      const codRaw = String(
-        r['Código IBGE'] ||      // Normal
-        r['Cdigo IBGE'] ||      // Encoding quebrado ( = ó)
-        r['Codigo IBGE'] ||      // Sem acento
-        r['cod_ibge'] ||         // Minúsculo
-        r['codigo_ibge'] ||
-        ''
-      ).replace(/\D/g, '');
+    // Mapeamento por ÍNDICE (imune a encoding quebrado)
+    // 0=UF | 1=Nome | 2=IBGE | 18=3.2.3 | 28=5.1 | 32=5.5 | 33=5.6 | 34=5.7
+    const records = rows.map(cols => {
+      const codRaw = String(cols[2] || '').replace(/\D/g, ''); // Índice 2
+      const cod_ibge = codRaw.padStart(7, '0');
 
-      const cod_ibge = codRaw ? codRaw.padStart(7, '0') : '';
-
-      // UF: campo simples
-      const uf = String(r['UF'] || r['uf'] || '').substring(0, 2).toUpperCase();
-
-      // Município: nome REAL no CSV + fallbacks
-      const municipio = String(
-        r['Nome do Ente Federado'] ||  // Nome correto no CSV
-        r['Município'] ||
-        r['Municipio'] ||
-        r['municipio'] ||
-        ''
-      ).substring(0, 255);
-
-      // Validação mínima
-      if (!cod_ibge || cod_ibge.length !== 7 || !uf) return null;
+      if (!cod_ibge || cod_ibge.length !== 7) return null;
 
       return {
         cod_ibge,
-        uf,
-        municipio,
-        // Itens de educação: fallbacks para encoding
-        item_3_2_3: r['3.2.3'] || null,
-        item_5_1: r['5.1'] || null,
-        item_5_5: r['5.5'] || null,
-        item_5_6: r['5.6'] || null,
-        item_5_7: r['5.7'] || null,
-        data_referencia: null,
+        uf: String(cols[0] || '').substring(0, 2).toUpperCase(), // Índice 0
+        municipio: String(cols[1] || '').substring(0, 255),      // Índice 1
+        item_3_2_3: cols[18] || null,
+        item_5_1: cols[28] || null,
+        item_5_5: cols[32] || null,
+        item_5_6: cols[33] || null,
+        item_5_7: cols[34] || null,
       };
     }).filter(r => r !== null);
 
