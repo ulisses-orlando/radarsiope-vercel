@@ -31,6 +31,124 @@ const supabase = createClient(
   process.env.VITE_SUPABASE_SERVICE_KEY
 );
 
+// ─── Parser CSV do Tesouro Transparente ──────────────────────────────────────
+function parseCsvTesouro(csvText) {
+  const lines = csvText.trim().split(/\r?\n/);
+  if (lines.length < 2) return [];
+
+  const headers = lines[0].split(';').map(h => h.replace(/^"|"$/g, '').trim());
+  const rows = [];
+
+  for (let i = 1; i < lines.length; i++) {
+    // Split inteligente que respeita aspas
+    const values = [];
+    let current = '';
+    let inQuotes = false;
+
+    for (let char of lines[i]) {
+      if (char === '"') {
+        inQuotes = !inQuotes;
+      } else if (char === ';' && !inQuotes) {
+        values.push(current.replace(/^"|"$/g, '').trim());
+        current = '';
+      } else {
+        current += char;
+      }
+    }
+    values.push(current.replace(/^"|"$/g, '').trim());
+
+    // Monta objeto mapeando headers → valores
+    const row = {};
+    headers.forEach((h, idx) => { row[h] = values[idx] || ''; });
+    rows.push(row);
+  }
+  return rows;
+}
+
+// ─── Sync CAUC: baixa CSV do Tesouro e atualiza Supabase ─────────────────────
+async function syncCaucData({ force = false } = {}) {
+  const CSV_URL = 'https://www.tesourotransparente.gov.br/ckan/dataset/72b5f371-0c35-4613-8076-c99c821a6410/resource/07af297a-5e59-494a-a88a-55ddfd2f4b01/download/relatorio-situacao-de-varios-entes---municipios---uf-todas---abrangencia-1.csv';
+
+  // 1. Verifica se já sincronizou nas últimas 24h (a menos que force)
+  if (!force) {
+    const { data: meta } = await supabase
+      .from('cauc_cache_meta')
+      .select('last_sync, sync_status')
+      .eq('id', 1)
+      .maybeSingle();
+
+    if (meta?.sync_status === 'success' &&
+      new Date(meta.last_sync) > new Date(Date.now() - 24 * 60 * 60 * 1000)) {
+      return { skipped: true, message: 'Cache válido (24h)' };
+    }
+  }
+
+  // 2. Atualiza status para "pending"
+  await supabase.from('cauc_cache_meta').upsert({
+    id: 1, sync_status: 'pending', last_sync: new Date()
+  });
+
+  try {
+    // 3. Baixa e parseia o CSV (com timeout para não travar a Vercel)
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 30000); // 30s
+
+    const response = await fetch(CSV_URL, {
+      cache: 'no-store',
+      signal: controller.signal
+    });
+    clearTimeout(timeout);
+
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const csvText = await response.text();
+    const rows = parseCsvTesouro(csvText);
+
+    // 4. Prepara batch de upsert (apenas itens de educação)
+    const records = rows.map(r => ({
+      cod_ibge: String(r['Código IBGE'] || '').padStart(7, '0'),
+      uf: r['UF'] || '',
+      municipio: r['Município'] || '',
+      item_3_2_3: r['3.2.3'] || null,
+      item_5_1: r['5.1'] || null,
+      item_5_5: r['5.5'] || null,
+      item_5_6: r['5.6'] || null,
+      item_5_7: r['5.7'] || null,
+      data_referencia: r['Data de referência'] ?
+        new Date(r['Data de referência'].split('/').reverse().join('-')) : null,
+    })).filter(r => r.cod_ibge && r.cod_ibge.length === 7); // Filtra inválidos
+
+    // 5. Upsert em batch (Supabase: até 1000 por chamada)
+    for (let i = 0; i < records.length; i += 1000) {
+      const batch = records.slice(i, i + 1000);
+      const { error } = await supabase
+        .from('cauc_municipios')
+        .upsert(batch, { onConflict: 'cod_ibge', ignoreDuplicates: false });
+      if (error) throw new Error(`Upsert falhou: ${error.message}`);
+    }
+
+    // 6. Atualiza meta com sucesso
+    await supabase.from('cauc_cache_meta').upsert({
+      id: 1,
+      sync_status: 'success',
+      last_sync: new Date(),
+      source_url: CSV_URL,
+      error_log: null
+    });
+
+    console.log(`[CAUC Sync] ✅ ${records.length} registros processados`);
+    return { success: true, processed: records.length };
+
+  } catch (err) {
+    // 7. Em caso de erro, mantém cache antigo e registra falha
+    await supabase.from('cauc_cache_meta').upsert({
+      id: 1,
+      sync_status: 'failed',
+      error_log: err.message
+    });
+    console.error('[CAUC Sync] ❌ Falha:', err.message);
+    throw err; // Propaga para fallback no caller
+  }
+}
 // ─── Helper: lê body com stream (bodyParser:false) ────────────────────────────
 function _lerBody(req) {
   if (req.body && typeof req.body === 'object') return Promise.resolve(req.body);
@@ -62,11 +180,11 @@ function _alertaDoMunicipio(alerta, cod) {
 
 // ─── CAUC: itens de educação monitorados ─────────────────────────────────────
 const CAUC_ITENS_EDUCACAO = {
-  '3.2.3': 'Aplicação mínima em MDE (25% das receitas de impostos)',
-  '5.1':   'Comprovação de aplicação dos recursos do FUNDEB',
-  '5.5':   'Prestação de contas dos recursos do FUNDEB',
-  '5.6':   'Aplicação mínima de 70% do FUNDEB em remuneração do magistério',
-  '5.7':   'Funcionamento do CACS-FUNDEB',
+  '3.2.3': 'Encaminhamento do Anexo 8 do Relatório Resumido de Execução Orçamentária ao Siope',
+  '5.1': 'Aplicação Mínima de recursos em Educação',
+  '5.5': 'Regularidade na aplicação mínima do Fundeb para pagamento de profissionais da educação básica',
+  '5.6': 'Regularidade na aplicação mínima da complementação da União ao Fundeb em despesas de capital',
+  '5.7': 'Regularidade na aplicação de 50% da complementação VAAT do Fundeb na educação infantil',
 };
 const CAUC_ITENS_KEYS = Object.keys(CAUC_ITENS_EDUCACAO);
 
@@ -76,7 +194,7 @@ async function _buscarCod7Firestore(cod6, cod_uf) {
 
   try {
     const uf = String(cod_uf).toUpperCase().trim();
-    
+
     // 1. Converter a busca para Número (pois o campo no Firestore é int64)
     const strLimpo = String(cod6).replace(/\D/g, '');
     const numBase = Number(strLimpo);
@@ -84,13 +202,13 @@ async function _buscarCod7Firestore(cod6, cod_uf) {
 
     // 2. Calcular o intervalo numérico de busca
     // Se buscamos o prefixo "35001", queremos números entre 350010 e 350019.
-    const startVal = numBase * 10;       
+    const startVal = numBase * 10;
     const endVal = startVal + 10;        // O operador '<' exclui este valor final
 
     // 3. Query com filtros numéricos (>= e <)
     const snap = await db.collection('UF').doc(uf)
       .collection('Municipio')
-      .where('cod_municipio', '>=', startVal) 
+      .where('cod_municipio', '>=', startVal)
       .where('cod_municipio', '<', endVal)
       .limit(1)
       .get();
@@ -103,7 +221,7 @@ async function _buscarCod7Firestore(cod6, cod_uf) {
       // (padStart garante zeros à esquerda se o banco salvou como int sem eles)
       return val ? String(val).padStart(7, '0') : null;
     }
-    
+
     return null;
 
   } catch (e) {
@@ -112,72 +230,81 @@ async function _buscarCod7Firestore(cod6, cod_uf) {
   }
 }
 
-// ─── Busca CAUC com cache Firestore (TTL 24h) ─────────────────────────────────
+// ─── Busca CAUC via Supabase (com fallback para sync on-demand) ──────────────
 async function _buscarCaucComCache(cod7) {
-  const TTL_MS = 24 * 60 * 60 * 1000;
-  const cacheRef = db.collection('cauc_cache').doc(cod7);
+  const codStr = String(cod7).padStart(7, '0');
 
-  // Tenta cache
-  try {
-    const snap = await cacheRef.get();
-    if (snap.exists) {
-      const c = snap.data();
-      const idade = Date.now() - (c.cached_at?.toDate?.()?.getTime() || 0);
-      if (idade < TTL_MS) {
-        console.log(`[cauc] Cache hit — ${cod7} (${Math.round(idade / 3600000)}h atrás)`);
-        return { ok: true, itens: c.itens || [], fonte: 'cache' };
-      }
-    }
-  } catch (e) { console.warn('[cauc] Erro ao ler cache:', e.message); }
+  // 1. Tenta buscar no cache do Supabase
+  const { data, error } = await supabase
+    .from('cauc_municipios')
+    .select('item_3_2_3, item_5_1, item_5_5, item_5_6, item_5_7, updated_at')
+    .eq('cod_ibge', codStr)
+    .maybeSingle();
 
-  // Chama API STN com timeout de 10s
-  const url = `https://apidatalake.tesouro.gov.br/ords/sadipem/tt/cauc?id_ente=${cod7}`;
-  let rawData;
-  try {
-    const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), 10000);
-    const resp = await fetch(url, { headers: { Accept: 'application/json' }, signal: ctrl.signal });
-    clearTimeout(timer);
-    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-    rawData = await resp.json();
-    // ── Log diagnóstico completo ──────────────────────────────────────────────
-    console.log(`[cauc] Payload bruto (${cod7}):`, JSON.stringify(rawData).slice(0, 3000));
-  } catch (e) {
-    console.error('[cauc] Falha na API STN:', e.message);
-    return { ok: false, erro: `API do CAUC indisponível: ${e.message}` };
+  if (error) {
+    console.warn(`[CAUC] Erro na query: ${error.message}`);
+    return { ok: false, erro: 'Erro ao consultar dados do CAUC.' };
   }
 
-  // Normaliza — a API pode retornar array direto ou envelope { items / data }
-  const lista = Array.isArray(rawData) ? rawData
-    : Array.isArray(rawData?.items) ? rawData.items
-    : Array.isArray(rawData?.data)  ? rawData.data
-    : [];
+  // 2. Se encontrou, retorna os dados
+  if (data) {
+    const itens = [
+      { cod_item: '3.2.3', situacao: data.item_3_2_3, descricao: 'Encaminhamento do Anexo 8 do Relatório Resumido de Execução Orçamentária ao Siope' },
+      { cod_item: '5.1', situacao: data.item_5_1, descricao: 'Aplicação Mínima de recursos em Educação' },
+      { cod_item: '5.5', situacao: data.item_5_5, descricao: 'Regularidade na aplicação mínima do Fundeb para pagamento de profissionais da educação básica' },
+      { cod_item: '5.6', situacao: data.item_5_6, descricao: 'Regularidade na aplicação mínima da complementação da União ao Fundeb em despesas de capital' },
+      { cod_item: '5.7', situacao: data.item_5_7, descricao: 'Regularidade na aplicação de 50% da complementação VAAT do Fundeb na educação infantil' },
+    ].filter(i => i.situacao && i.situacao.trim() !== '');
 
-  // Filtra e mapeia apenas itens de educação
-  const itens = lista
-    .filter(item => CAUC_ITENS_KEYS.includes(
-      String(item.cod_item || item.codigo_item || item.item || '').trim()
-    ))
-    .map(item => {
-      const cod = String(item.cod_item || item.codigo_item || item.item || '').trim();
-      return {
-        cod_item:      cod,
-        descricao:     item.descricao || item.ds_item || CAUC_ITENS_EDUCACAO[cod] || cod,
-        situacao:      item.situacao  || item.ds_situacao || item.status || '—',
-        data_consulta: item.data_consulta || item.dt_consulta || item.data_verificacao || null,
-      };
-    });
+    // Verifica se os dados estão "frescos" (< 48h)
+    const horasDesdeSync = (Date.now() - new Date(data.updated_at)) / (1000 * 60 * 60);
+    const fonte = horasDesdeSync < 24 ? 'cache (atualizado hoje)' : 'cache (atualizado recentemente)';
 
-  // Persiste cache
+    return { ok: true, itens, fonte, updated_at: data.updated_at };
+  }
+
+  // 3. Não encontrou: tenta sync on-demand (apenas se ainda não falhou hoje)
   try {
-    await cacheRef.set({
-      cod7,
-      itens,
-      cached_at: admin.firestore.FieldValue.serverTimestamp(),
-    });
-  } catch (e) { console.warn('[cauc] Erro ao gravar cache:', e.message); }
+    const { data: meta } = await supabase
+      .from('cauc_cache_meta')
+      .select('sync_status, last_sync')
+      .eq('id', 1)
+      .maybeSingle();
 
-  return { ok: true, itens, fonte: 'api' };
+    const podeTentarSync = !meta ||
+      meta.sync_status !== 'failed' ||
+      (meta.last_sync && new Date(meta.last_sync) < new Date(Date.now() - 4 * 60 * 60 * 1000));
+
+    if (podeTentarSync) {
+      console.log(`[CAUC] Cache miss para ${codStr} — tentando sync on-demand...`);
+      await syncCaucData({ force: false });
+
+      // Tenta buscar novamente após o sync
+      const { data: data2, error: error2 } = await supabase
+        .from('cauc_municipios')
+        .select('item_3_2_3, item_5_1, item_5_5, item_5_6, item_5_7, updated_at')
+        .eq('cod_ibge', codStr)
+        .maybeSingle();
+
+      if (data2) {
+        const itens = [
+          { cod_item: '3.2.3', situacao: data2.item_3_2_3, descricao: 'Encaminhamento do Anexo 8 do Relatório Resumido de Execução Orçamentária ao Siope' },
+          { cod_item: '5.1', situacao: data2.item_5_1, descricao: 'Aplicação Mínima de recursos em Educação' },
+          { cod_item: '5.5', situacao: data2.item_5_5, descricao: 'Regularidade na aplicação mínima do Fundeb para pagamento de profissionais da educação básica' },
+          { cod_item: '5.6', situacao: data2.item_5_6, descricao: 'Regularidade na aplicação mínima da complementação da União ao Fundeb em despesas de capital' },
+          { cod_item: '5.7', situacao: data2.item_5_7, descricao: 'Regularidade na aplicação de 50% da complementação VAAT do Fundeb na educação infantil' },
+        ].filter(i => i.situacao && i.situacao.trim() !== '');
+
+        return { ok: true, itens, fonte: 'api (sincronizado agora)', updated_at: data2.updated_at };
+      }
+    }
+  } catch (syncErr) {
+    console.warn(`[CAUC] Sync on-demand falhou: ${syncErr.message}`);
+    // Continua para fallback abaixo
+  }
+
+  // 4. Fallback: município não encontrado
+  return { ok: false, erro: `Município ${codStr} não encontrado na base do CAUC.` };
 }
 
 // ─── Relatório de Conformidade ────────────────────────────────────────────────
@@ -253,12 +380,12 @@ async function _relatorioConformidade(req, res) {
       .filter(a => _alertaDoMunicipio(a, codStr))
       .slice(0, 10)
       .map(a => ({
-        tipo:         a.tipo || '',
-        titulo:       a.titulo || '',
+        tipo: a.tipo || '',
+        titulo: a.titulo || '',
         disparado_em: a.disparado_em?.toDate?.()?.toISOString() || null,
       }));
   } catch (e) { console.warn('[relatorio] alertas:', e.message); }
-  
+
   // ── Firestore: quiz do assinante ──────────────────────────────────────────
   let quizResultados = [];
   try {
@@ -347,6 +474,21 @@ export default async function handler(req, res) {
 
   if (acao === 'relatorio_conformidade') {
     return _relatorioConformidade(req, res);
+  }
+
+  // Dentro do handler principal, após a verificação de 'relatorio_conformidade':
+  if (acao === 'sync_cauc') {
+    // Endpoint protegido por token simples (ajuste conforme sua segurança)
+    const token = req.headers['x-admin-token'];
+    if (token !== process.env.ADMIN_TOKEN) {
+      return res.status(403).json({ ok: false, error: 'Acesso negado' });
+    }
+    try {
+      const result = await syncCaucData({ force: true });
+      return res.status(200).json({ ok: true, ...result });
+    } catch (err) {
+      return res.status(500).json({ ok: false, error: err.message });
+    }
   }
 
   // ── SES: envio de e-mail ───────────────────────────────────────────────────
