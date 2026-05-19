@@ -33,29 +33,36 @@ const supabase = createClient(
 
 // ─── Parser CSV do Tesouro Transparente ──────────────────────────────────────
 function parseCsvTesouro(csvText) {
+  console.log('[CAUC Parse] Iniciando, tamanho:', csvText.length);
+
   const lines = csvText.trim().split(/\r?\n/).filter(l => l.trim());
   if (lines.length < 2) return [];
 
-  // 1️⃣ Encontra a linha de cabeçalho real (contém "IBGE")
+  // 1️⃣ Encontra a linha de cabeçalho REAL (deve conter "IBGE" e ter ~30+ colunas)
   let headerIdx = 0;
-  for (let i = 0; i < Math.min(5, lines.length); i++) {
-    if (lines[i].includes('IBGE')) {
+  for (let i = 0; i < Math.min(10, lines.length); i++) {
+    const parts = lines[i].split(';').length;
+    if (lines[i].includes('IBGE') && parts > 20) {
       headerIdx = i;
       break;
     }
   }
 
   const headers = lines[headerIdx].split(';').map(h => h.replace(/^"|"$/g, '').trim());
-  console.log(`[CAUC Parse] Header na linha ${headerIdx} | Colunas:`, headers.slice(0, 6));
+  console.log(`[CAUC Parse] Header na linha ${headerIdx} | Colunas: ${headers.length}`);
+  console.log('[CAUC Parse] Headers esperados:', headers.slice(0, 10));
 
   const rows = [];
   for (let i = headerIdx + 1; i < lines.length; i++) {
+    // Parse inteligente respeitando aspas
     const values = [];
     let current = '';
     let inQuotes = false;
+
     for (let char of lines[i]) {
-      if (char === '"') inQuotes = !inQuotes;
-      else if (char === ';' && !inQuotes) {
+      if (char === '"') {
+        inQuotes = !inQuotes;
+      } else if (char === ';' && !inQuotes) {
         values.push(current.replace(/^"|"$/g, '').trim());
         current = '';
       } else {
@@ -64,10 +71,13 @@ function parseCsvTesouro(csvText) {
     }
     values.push(current.replace(/^"|"$/g, '').trim());
 
+    // Monta objeto
     const row = {};
     headers.forEach((h, idx) => { row[h] = values[idx] || ''; });
     rows.push(row);
   }
+
+  console.log(`[CAUC Parse] Finalizado: ${rows.length} registros`);
   return rows;
 }
 
@@ -113,40 +123,67 @@ async function syncCaucData({ force = false } = {}) {
     const rows = parseCsvTesouro(csvText);
     console.log(`[CAUC Sync] 🔍 ${rows.length} linhas parseadas`);
 
-    // Prepara records
-    const records = rows.map(r => ({
-      cod_ibge: String(r['Código IBGE'] || '').replace(/\D/g, '').padStart(7, '0'),
-      uf: r['UF'] || '',
-      municipio: r['Município'] || '',
-      item_3_2_3: r['3.2.3'] || null,
-      item_5_1: r['5.1'] || null,
-      item_5_5: r['5.5'] || null,
-      item_5_6: r['5.6'] || null,
-      item_5_7: r['5.7'] || null,
-      data_referencia: null, // O CSV não tem essa coluna por linha; pode ajustar depois se necessário
-    })).filter(r => r.cod_ibge && r.cod_ibge.length === 7);
+    // Prepara records COM VALIDAÇÕES DE TIPO
+    const records = rows.map(r => {
+      // Extrai e valida Código IBGE
+      const codRaw = String(r['Código IBGE'] || r['cod_ibge'] || '').replace(/\D/g, '');
+      const cod_ibge = codRaw ? codRaw.padStart(7, '0') : '';
 
-    // 🔧 Deduplica por cod_ibge para evitar erro "ON CONFLICT DO UPDATE..."
+      // UF: garante máximo 2 caracteres (evita erro "varchar(2)")
+      const uf = String(r['UF'] || r['uf'] || '').substring(0, 2).toUpperCase();
+
+      // Validação mínima: só inclui se tiver cod_ibge válido
+      if (!cod_ibge || cod_ibge.length !== 7 || !uf) return null;
+
+      return {
+        cod_ibge,
+        uf, // ← Agora garantido: máximo 2 chars
+        municipio: String(r['Município'] || r['municipio'] || '').substring(0, 255),
+        item_3_2_3: r['3.2.3'] || r['item_3_2_3'] || null,
+        item_5_1: r['5.1'] || r['item_5_1'] || null,
+        item_5_5: r['5.5'] || r['item_5_5'] || null,
+        item_5_6: r['5.6'] || r['item_5_6'] || null,
+        item_5_7: r['5.7'] || r['item_5_7'] || null,
+        data_referencia: null, // CSV não tem data por linha; pode ajustar depois
+      };
+    }).filter(r => r !== null); // Remove inválidos
+
+    // 🔧 Deduplica por cod_ibge (evita erro "ON CONFLICT... second time")
     const uniqueRecords = [...new Map(records.map(r => [r.cod_ibge, r])).values()];
-    console.log(`[CAUC Sync] ${records.length} linhas parseadas → ${uniqueRecords.length} registros únicos`);
+    console.log(`[CAUC Sync] ${records.length} → ${uniqueRecords.length} únicos`);
 
-    // Verifica se 1200385 está no batch
+    // Verifica se 1200385 está presente
     const target = uniqueRecords.find(r => r.cod_ibge === '1200385');
     if (target) {
-      console.log('[CAUC Sync] ✅ 1200385 encontrado no batch:', target);
+      console.log('[CAUC Sync] ✅ 1200385 pronto:', { cod_ibge: target.cod_ibge, uf: target.uf });
     } else {
-      console.warn('[CAUC Sync] ⚠️ 1200385 NÃO encontrado no batch!');
+      console.warn('[CAUC Sync] ⚠️ 1200385 ainda não encontrado!');
+      // Debug: mostra alguns códigos próximos para investigar
+      const samples = uniqueRecords.filter(r => r.cod_ibge.startsWith('120')).slice(0, 3);
+      if (samples.length) console.log('[CAUC Sync] Amstras AC:', samples.map(s => s.cod_ibge));
     }
 
     // Upsert em batch
     for (let i = 0; i < uniqueRecords.length; i += 1000) {
       const batch = uniqueRecords.slice(i, i + 1000);
+
       const { error } = await supabase
         .from('cauc_municipios')
-        .upsert(batch, { onConflict: 'cod_ibge', ignoreDuplicates: false });
+        .upsert(batch, {
+          onConflict: 'cod_ibge',
+          ignoreDuplicates: false // Tenta atualizar; se falhar por duplicata no batch, o Map já resolveu
+        });
 
-      if (error) throw new Error(`Upsert falhou: ${error.message}`);
-      console.log(`[CAUC Sync] Batch ${i}-${i + batch.length} processado`);
+      if (error) {
+        // Fallback: tenta com ignoreDuplicates: true (só insere, não atualiza)
+        console.warn('[CAUC Sync] Tentando fallback com ignoreDuplicates...');
+        const { error: error2 } = await supabase
+          .from('cauc_municipios')
+          .upsert(batch, { onConflict: 'cod_ibge', ignoreDuplicates: true });
+
+        if (error2) throw new Error(`Upsert falhou: ${error2.message}`);
+      }
+      console.log(`[CAUC Sync] Batch ${i}-${i + batch.length} OK`);
     }
 
     // Atualiza meta
