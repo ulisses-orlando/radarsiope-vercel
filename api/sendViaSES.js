@@ -123,30 +123,57 @@ async function syncCaucData({ force = false } = {}) {
     const rows = parseCsvTesouro(csvText);
     console.log(`[CAUC Sync] 🔍 ${rows.length} linhas parseadas`);
 
-    // Prepara records COM VALIDAÇÕES DE TIPO
+    // Debug: mostra como está sendo parseada a primeira linha
+    if (rows[0]) {
+      console.log('[CAUC Debug] Amostra da primeira linha:', {
+        cod_ibge_raw: rows[0]['Código IBGE'] || rows[0]['Cdigo IBGE'] || 'N/A',
+        municipio_raw: rows[0]['Nome do Ente Federado'] || rows[0]['Município'] || 'N/A',
+        uf_raw: rows[0]['UF'],
+        item_3_2_3_raw: rows[0]['3.2.3'],
+      });
+    }
+
+    // Prepara records COM OS NOMES REAIS DO CSV
     const records = rows.map(r => {
-      // Extrai e valida Código IBGE
-      const codRaw = String(r['Código IBGE'] || r['cod_ibge'] || '').replace(/\D/g, '');
+      // 🔧 Nomes corretos dos campos no CSV do Tesouro:
+      // - "Código IBGE" pode vir com encoding quebrado; tente variações
+      const codRaw = String(
+        r['Código IBGE'] ||
+        r['Cdigo IBGE'] ||  // ← Fallback para encoding quebrado
+        r['cod_ibge'] ||
+        r['codigo_ibge'] ||
+        ''
+      ).replace(/\D/g, '');
+
       const cod_ibge = codRaw ? codRaw.padStart(7, '0') : '';
 
-      // UF: garante máximo 2 caracteres (evita erro "varchar(2)")
+      // UF: campo correto
       const uf = String(r['UF'] || r['uf'] || '').substring(0, 2).toUpperCase();
 
-      // Validação mínima: só inclui se tiver cod_ibge válido
+      // 🔧 Município: nome REAL no CSV é "Nome do Ente Federado"
+      const municipio = String(
+        r['Nome do Ente Federado'] ||  // ← CORRETO
+        r['Município'] ||              // ← Fallback
+        r['municipio'] ||
+        ''
+      ).substring(0, 255);
+
+      // Validação mínima
       if (!cod_ibge || cod_ibge.length !== 7 || !uf) return null;
 
       return {
         cod_ibge,
-        uf, // ← Agora garantido: máximo 2 chars
-        municipio: String(r['Município'] || r['municipio'] || '').substring(0, 255),
+        uf,
+        municipio,
+        // 🔧 Itens de educação: nomes exatos do CSV
         item_3_2_3: r['3.2.3'] || r['item_3_2_3'] || null,
         item_5_1: r['5.1'] || r['item_5_1'] || null,
         item_5_5: r['5.5'] || r['item_5_5'] || null,
         item_5_6: r['5.6'] || r['item_5_6'] || null,
         item_5_7: r['5.7'] || r['item_5_7'] || null,
-        data_referencia: null, // CSV não tem data por linha; pode ajustar depois
+        data_referencia: null,
       };
-    }).filter(r => r !== null); // Remove inválidos
+    }).filter(r => r !== null);
 
     // 🔧 Deduplica por cod_ibge (evita erro "ON CONFLICT... second time")
     const uniqueRecords = [...new Map(records.map(r => [r.cod_ibge, r])).values()];
