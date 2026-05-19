@@ -33,154 +33,141 @@ const supabase = createClient(
 
 // ─── Parser CSV do Tesouro Transparente ──────────────────────────────────────
 function parseCsvTesouro(csvText) {
-    console.log('[CAUC Parse] Iniciando parse, tamanho do CSV:', csvText.length);
-    
-    const lines = csvText.trim().split(/\r?\n/).filter(l => l.trim());
-    console.log(`[CAUC Parse] Total de linhas: ${lines.length}`);
-    
-    if (lines.length < 2) return [];
-    
-    const headers = lines[0].split(';').map(h => h.replace(/^"|"$/g, '').trim());
-    console.log('[CAUC Parse] Headers:', headers.slice(0, 10), '...');
-    
-    const rows = [];
-    let encontrados = 0;
-    
-    for (let i = 1; i < lines.length; i++) {
-        const values = [];
-        let current = '';
-        let inQuotes = false;
-        
-        for (let char of lines[i]) {
-            if (char === '"') {
-                inQuotes = !inQuotes;
-            } else if (char === ';' && !inQuotes) {
-                values.push(current.replace(/^"|"$/g, '').trim());
-                current = '';
-            } else {
-                current += char;
-            }
-        }
-        values.push(current.replace(/^"|"$/g, '').trim());
-        
-        const row = {};
-        headers.forEach((h, idx) => { row[h] = values[idx] || ''; });
-        
-        // Filtra apenas se tiver Código IBGE válido
-        const codIbge = String(row['Código IBGE'] || '').replace(/\D/g, '').padStart(7, '0');
-        if (codIbge.length === 7) {
-            rows.push(row);
-            if (codIbge === '1200385') {
-                console.log('[CAUC Parse] ✅ Encontrado 1200385:', {
-                    uf: row['UF'],
-                    municipio: row['Município'],
-                    item_3_2_3: row['3.2.3'],
-                    item_5_1: row['5.1']
-                });
-                encontrados++;
-            }
-        }
+  const lines = csvText.trim().split(/\r?\n/).filter(l => l.trim());
+  if (lines.length < 2) return [];
+
+  // 1️⃣ Encontra a linha de cabeçalho real (contém "IBGE")
+  let headerIdx = 0;
+  for (let i = 0; i < Math.min(5, lines.length); i++) {
+    if (lines[i].includes('IBGE')) {
+      headerIdx = i;
+      break;
     }
-    
-    console.log(`[CAUC Parse] Finalizado: ${rows.length} registros válidos, 1200385 encontrado: ${encontrados > 0}`);
-    return rows;
+  }
+
+  const headers = lines[headerIdx].split(';').map(h => h.replace(/^"|"$/g, '').trim());
+  console.log(`[CAUC Parse] Header na linha ${headerIdx} | Colunas:`, headers.slice(0, 6));
+
+  const rows = [];
+  for (let i = headerIdx + 1; i < lines.length; i++) {
+    const values = [];
+    let current = '';
+    let inQuotes = false;
+    for (let char of lines[i]) {
+      if (char === '"') inQuotes = !inQuotes;
+      else if (char === ';' && !inQuotes) {
+        values.push(current.replace(/^"|"$/g, '').trim());
+        current = '';
+      } else {
+        current += char;
+      }
+    }
+    values.push(current.replace(/^"|"$/g, '').trim());
+
+    const row = {};
+    headers.forEach((h, idx) => { row[h] = values[idx] || ''; });
+    rows.push(row);
+  }
+  return rows;
 }
 
 // ─── Sync CAUC: baixa CSV do Tesouro e atualiza Supabase ─────────────────────
 async function syncCaucData({ force = false } = {}) {
-    const CSV_URL = 'https://www.tesourotransparente.gov.br/ckan/dataset/72b5f371-0c35-4613-8076-c99c821a6410/resource/07af297a-5e59-494a-a88a-55ddfd2f4b01/download/relatorio-situacao-de-varios-entes---municipios---uf-todas---abrangencia-1.csv';
-    
-    console.log('[CAUC Sync] Iniciando sync, force:', force);
-    
-    // 1. Verifica cache
-    if (!force) {
-        const { data: meta } = await supabase
-            .from('cauc_cache_meta')
-            .select('last_sync, sync_status')
-            .eq('id', 1)
-            .maybeSingle();
-        
-        console.log('[CAUC Sync] Meta atual:', meta);
-        
-        if (meta?.sync_status === 'success' && 
-            new Date(meta.last_sync) > new Date(Date.now() - 24*60*60*1000)) {
-            console.log('[CAUC Sync] Cache válido, pulando sync');
-            return { skipped: true, message: 'Cache válido (24h)' };
-        }
+  const CSV_URL = 'https://www.tesourotransparente.gov.br/ckan/dataset/72b5f371-0c35-4613-8076-c99c821a6410/resource/07af297a-5e59-494a-a88a-55ddfd2f4b01/download/relatorio-situacao-de-varios-entes---municipios---uf-todas---abrangencia-1.csv';
+
+  console.log('[CAUC Sync] Iniciando sync, force:', force);
+
+  // 1. Verifica cache
+  if (!force) {
+    const { data: meta } = await supabase
+      .from('cauc_cache_meta')
+      .select('last_sync, sync_status')
+      .eq('id', 1)
+      .maybeSingle();
+
+    console.log('[CAUC Sync] Meta atual:', meta);
+
+    if (meta?.sync_status === 'success' &&
+      new Date(meta.last_sync) > new Date(Date.now() - 24 * 60 * 60 * 1000)) {
+      console.log('[CAUC Sync] Cache válido, pulando sync');
+      return { skipped: true, message: 'Cache válido (24h)' };
+    }
+  }
+
+  await supabase.from('cauc_cache_meta').upsert({
+    id: 1, sync_status: 'pending', last_sync: new Date()
+  });
+
+  try {
+    console.log('[CAUC Sync] ⬇️ Baixando CSV...');
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 30000);
+
+    const response = await fetch(CSV_URL, { cache: 'no-store', signal: controller.signal });
+    clearTimeout(timeout);
+
+    if (!response.ok) throw new Error(`HTTP ${response.status} - ${response.statusText}`);
+    const csvText = await response.text();
+    console.log(`[CAUC Sync] 📄 CSV baixado (${csvText.length} bytes)`);
+
+    const rows = parseCsvTesouro(csvText);
+    console.log(`[CAUC Sync] 🔍 ${rows.length} linhas parseadas`);
+
+    // Prepara records
+    const records = rows.map(r => ({
+      cod_ibge: String(r['Código IBGE'] || '').replace(/\D/g, '').padStart(7, '0'),
+      uf: r['UF'] || '',
+      municipio: r['Município'] || '',
+      item_3_2_3: r['3.2.3'] || null,
+      item_5_1: r['5.1'] || null,
+      item_5_5: r['5.5'] || null,
+      item_5_6: r['5.6'] || null,
+      item_5_7: r['5.7'] || null,
+      data_referencia: null, // O CSV não tem essa coluna por linha; pode ajustar depois se necessário
+    })).filter(r => r.cod_ibge && r.cod_ibge.length === 7);
+
+    // 🔧 Deduplica por cod_ibge para evitar erro "ON CONFLICT DO UPDATE..."
+    const uniqueRecords = [...new Map(records.map(r => [r.cod_ibge, r])).values()];
+    console.log(`[CAUC Sync] ${records.length} linhas parseadas → ${uniqueRecords.length} registros únicos`);
+
+    // Verifica se 1200385 está no batch
+    const target = uniqueRecords.find(r => r.cod_ibge === '1200385');
+    if (target) {
+      console.log('[CAUC Sync] ✅ 1200385 encontrado no batch:', target);
+    } else {
+      console.warn('[CAUC Sync] ⚠️ 1200385 NÃO encontrado no batch!');
     }
 
+    // Upsert em batch
+    for (let i = 0; i < uniqueRecords.length; i += 1000) {
+      const batch = uniqueRecords.slice(i, i + 1000);
+      const { error } = await supabase
+        .from('cauc_municipios')
+        .upsert(batch, { onConflict: 'cod_ibge', ignoreDuplicates: false });
+
+      if (error) throw new Error(`Upsert falhou: ${error.message}`);
+      console.log(`[CAUC Sync] Batch ${i}-${i + batch.length} processado`);
+    }
+
+    // Atualiza meta
     await supabase.from('cauc_cache_meta').upsert({
-        id: 1, sync_status: 'pending', last_sync: new Date()
+      id: 1, sync_status: 'success', last_sync: new Date(), source_url: CSV_URL, error_log: null
     });
 
-    try {
-        console.log('[CAUC Sync] Baixando CSV...');
-        const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 30000);
-        
-        const response = await fetch(CSV_URL, { cache: 'no-store', signal: controller.signal });
-        clearTimeout(timeout);
-        
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        const csvText = await response.text();
-        console.log('[CAUC Sync] CSV baixado, tamanho:', csvText.length);
-        
-        const rows = parseCsvTesouro(csvText);
-        console.log('[CAUC Sync] Rows parseadas:', rows.length);
+    console.log('[CAUC Sync] ✅ Sync concluído com sucesso');
+    return { success: true, processed: records.length };
 
-        // Prepara records
-        const records = rows.map(r => ({
-            cod_ibge: String(r['Código IBGE'] || '').replace(/\D/g, '').padStart(7, '0'),
-            uf: r['UF'] || '',
-            municipio: r['Município'] || '',
-            item_3_2_3: r['3.2.3'] || null,
-            item_5_1: r['5.1'] || null,
-            item_5_5: r['5.5'] || null,
-            item_5_6: r['5.6'] || null,
-            item_5_7: r['5.7'] || null,
-            data_referencia: r['Data da Pesquisa'] ? 
-                new Date(r['Data da Pesquisa'].split('/')[2] + '-' + r['Data da Pesquisa'].split('/')[1] + '-' + r['Data da Pesquisa'].split('/')[0]) : null,
-        })).filter(r => r.cod_ibge && r.cod_ibge.length === 7);
-
-        console.log('[CAUC Sync] Records preparados:', records.length);
-        
-        // Verifica se 1200385 está no batch
-        const target = records.find(r => r.cod_ibge === '1200385');
-        if (target) {
-            console.log('[CAUC Sync] ✅ 1200385 no batch de upsert:', target);
-        } else {
-            console.warn('[CAUC Sync] ⚠️ 1200385 NÃO encontrado no batch!');
-        }
-
-        // Upsert em batch
-        for (let i = 0; i < records.length; i += 1000) {
-            const batch = records.slice(i, i + 1000);
-            const { data, error } = await supabase
-                .from('cauc_municipios')
-                .upsert(batch, { onConflict: 'cod_ibge', ignoreDuplicates: false });
-            
-            if (error) {
-                console.error('[CAUC Sync] ❌ Erro no upsert:', error);
-                throw new Error(`Upsert falhou: ${error.message}`);
-            }
-            console.log(`[CAUC Sync] Batch ${i}-${i+batch.length} processado`);
-        }
-
-        // Atualiza meta
-        await supabase.from('cauc_cache_meta').upsert({
-            id: 1, sync_status: 'success', last_sync: new Date(), source_url: CSV_URL, error_log: null
-        });
-
-        console.log('[CAUC Sync] ✅ Sync concluído com sucesso');
-        return { success: true, processed: records.length };
-
-    } catch (err) {
-        console.error('[CAUC Sync] ❌ Falha crítica:', err.message);
-        await supabase.from('cauc_cache_meta').upsert({
-            id: 1, sync_status: 'failed', error_log: err.message
-        });
-        throw err;
-    }
+  } catch (err) {
+    console.error('[CAUC Sync] ❌ FALHA DETALHADA:', {
+      message: err.message,
+      stack: err.stack,
+      name: err.name
+    });
+    await supabase.from('cauc_cache_meta').upsert({
+      id: 1, sync_status: 'failed', error_log: err.message
+    });
+    throw err;
+  }
 }
 
 // ─── Helper: lê body com stream (bodyParser:false) ────────────────────────────
@@ -266,81 +253,81 @@ async function _buscarCod7Firestore(cod6, cod_uf) {
 
 // ─── Busca CAUC via Supabase (com fallback para sync on-demand) ──────────────
 async function _buscarCaucComCache(cod7) {
-    const codStr = String(cod7).padStart(7, '0');
-    console.log(`[CAUC Busca] Procurando cod_ibge: "${codStr}"`);
-    
-    // 1. Tenta buscar no cache
-    const { data, error } = await supabase
+  const codStr = String(cod7).padStart(7, '0');
+  console.log(`[CAUC Busca] Procurando cod_ibge: "${codStr}"`);
+
+  // 1. Tenta buscar no cache
+  const { data, error } = await supabase
+    .from('cauc_municipios')
+    .select('item_3_2_3, item_5_1, item_5_5, item_5_6, item_5_7, updated_at, cod_ibge, uf, municipio')
+    .eq('cod_ibge', codStr)
+    .maybeSingle();
+
+  console.log('[CAUC Busca] Resultado da query:', {
+    found: !!data,
+    error: error?.message,
+    data: data ? { cod_ibge: data.cod_ibge, uf: data.uf } : null
+  });
+
+  if (error) {
+    console.warn(`[CAUC] Erro na query: ${error.message}`);
+    return { ok: false, erro: 'Erro ao consultar dados do CAUC.' };
+  }
+
+  if (data) {
+    const itens = [
+      { cod_item: '3.2.3', situacao: data.item_3_2_3, descricao: 'Anexo 8 RREO no Siope' },
+      { cod_item: '5.1', situacao: data.item_5_1, descricao: 'Aplicação dos recursos do FUNDEB' },
+      { cod_item: '5.5', situacao: data.item_5_5, descricao: 'Prestação de contas FUNDEB' },
+      { cod_item: '5.6', situacao: data.item_5_6, descricao: '70% FUNDEB em magistério' },
+      { cod_item: '5.7', situacao: data.item_5_7, descricao: 'Funcionamento do CACS-FUNDEB' },
+    ].filter(i => i.situacao && i.situacao.trim() !== '');
+
+    const horasDesdeSync = (Date.now() - new Date(data.updated_at)) / (1000 * 60 * 60);
+    const fonte = horasDesdeSync < 24 ? 'cache (atualizado hoje)' : 'cache (atualizado recentemente)';
+
+    console.log(`[CAUC Busca] ✅ Encontrado, ${itens.length} itens, fonte: ${fonte}`);
+    return { ok: true, itens, fonte, updated_at: data.updated_at };
+  }
+
+  // 2. Não encontrou: tenta sync on-demand
+  console.log(`[CAUC Busca] ❌ Não encontrado, tentando sync on-demand...`);
+  try {
+    const { data: meta } = await supabase
+      .from('cauc_cache_meta')
+      .select('sync_status, last_sync')
+      .eq('id', 1)
+      .maybeSingle();
+
+    const podeTentarSync = !meta ||
+      meta.sync_status !== 'failed' ||
+      (meta.last_sync && new Date(meta.last_sync) < new Date(Date.now() - 4 * 60 * 60 * 1000));
+
+    if (podeTentarSync) {
+      await syncCaucData({ force: false });
+
+      // Tenta buscar novamente
+      const { data: data2, error: error2 } = await supabase
         .from('cauc_municipios')
-        .select('item_3_2_3, item_5_1, item_5_5, item_5_6, item_5_7, updated_at, cod_ibge, uf, municipio')
+        .select('item_3_2_3, item_5_1, item_5_5, item_5_6, item_5_7, updated_at, cod_ibge')
         .eq('cod_ibge', codStr)
         .maybeSingle();
-    
-    console.log('[CAUC Busca] Resultado da query:', { 
-        found: !!data, 
-        error: error?.message,
-        data: data ? { cod_ibge: data.cod_ibge, uf: data.uf } : null 
-    });
-    
-    if (error) {
-        console.warn(`[CAUC] Erro na query: ${error.message}`);
-        return { ok: false, erro: 'Erro ao consultar dados do CAUC.' };
+
+      console.log('[CAUC Busca] Resultado pós-sync:', { found: !!data2, error: error2?.message });
+
+      if (data2) {
+        const itens = [ /* mesmo mapeamento acima */].filter(i => i.situacao?.trim());
+        return { ok: true, itens, fonte: 'api (sincronizado agora)', updated_at: data2.updated_at };
+      }
+    } else {
+      console.warn('[CAUC Busca] Sync bloqueado por falha recente');
     }
-    
-    if (data) {
-        const itens = [
-            { cod_item: '3.2.3', situacao: data.item_3_2_3, descricao: 'Anexo 8 RREO no Siope' },
-            { cod_item: '5.1',   situacao: data.item_5_1,   descricao: 'Aplicação dos recursos do FUNDEB' },
-            { cod_item: '5.5',   situacao: data.item_5_5,   descricao: 'Prestação de contas FUNDEB' },
-            { cod_item: '5.6',   situacao: data.item_5_6,   descricao: '70% FUNDEB em magistério' },
-            { cod_item: '5.7',   situacao: data.item_5_7,   descricao: 'Funcionamento do CACS-FUNDEB' },
-        ].filter(i => i.situacao && i.situacao.trim() !== '');
-        
-        const horasDesdeSync = (Date.now() - new Date(data.updated_at)) / (1000 * 60 * 60);
-        const fonte = horasDesdeSync < 24 ? 'cache (atualizado hoje)' : 'cache (atualizado recentemente)';
-        
-        console.log(`[CAUC Busca] ✅ Encontrado, ${itens.length} itens, fonte: ${fonte}`);
-        return { ok: true, itens, fonte, updated_at: data.updated_at };
-    }
-    
-    // 2. Não encontrou: tenta sync on-demand
-    console.log(`[CAUC Busca] ❌ Não encontrado, tentando sync on-demand...`);
-    try {
-        const { data: meta } = await supabase
-            .from('cauc_cache_meta')
-            .select('sync_status, last_sync')
-            .eq('id', 1)
-            .maybeSingle();
-        
-        const podeTentarSync = !meta || 
-            meta.sync_status !== 'failed' || 
-            (meta.last_sync && new Date(meta.last_sync) < new Date(Date.now() - 4*60*60*1000));
-        
-        if (podeTentarSync) {
-            await syncCaucData({ force: false });
-            
-            // Tenta buscar novamente
-            const { data: data2, error: error2 } = await supabase
-                .from('cauc_municipios')
-                .select('item_3_2_3, item_5_1, item_5_5, item_5_6, item_5_7, updated_at, cod_ibge')
-                .eq('cod_ibge', codStr)
-                .maybeSingle();
-            
-            console.log('[CAUC Busca] Resultado pós-sync:', { found: !!data2, error: error2?.message });
-            
-            if (data2) {
-                const itens = [ /* mesmo mapeamento acima */ ].filter(i => i.situacao?.trim());
-                return { ok: true, itens, fonte: 'api (sincronizado agora)', updated_at: data2.updated_at };
-            }
-        } else {
-            console.warn('[CAUC Busca] Sync bloqueado por falha recente');
-        }
-    } catch (syncErr) {
-        console.warn(`[CAUC] Sync on-demand falhou: ${syncErr.message}`);
-    }
-    
-    console.log(`[CAUC Busca] ❌ Fallback: município ${codStr} não encontrado`);
-    return { ok: false, erro: `Município ${codStr} não encontrado na base do CAUC.` };
+  } catch (syncErr) {
+    console.warn(`[CAUC] Sync on-demand falhou: ${syncErr.message}`);
+  }
+
+  console.log(`[CAUC Busca] ❌ Fallback: município ${codStr} não encontrado`);
+  return { ok: false, erro: `Município ${codStr} não encontrado na base do CAUC.` };
 }
 
 // ─── Relatório de Conformidade ────────────────────────────────────────────────
@@ -513,17 +500,13 @@ export default async function handler(req, res) {
   }
 
   // Dentro do handler principal, após a verificação de 'relatorio_conformidade':
-  if (acao === 'sync_cauc') {
-    // Endpoint protegido por token simples (ajuste conforme sua segurança)
-    const token = req.headers['x-admin-token'];
-    if (token !== process.env.ADMIN_TOKEN) {
-      return res.status(403).json({ ok: false, error: 'Acesso negado' });
-    }
+  if (req.query.acao === 'sync_cauc') {
+    const force = req.query.force === 'true';
     try {
-      const result = await syncCaucData({ force: true });
+      const result = await syncCaucData({ force });
       return res.status(200).json({ ok: true, ...result });
     } catch (err) {
-      return res.status(500).json({ ok: false, error: err.message });
+      return res.status(500).json({ ok: false, error: err.message, log: err.stack });
     }
   }
 
