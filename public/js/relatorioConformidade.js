@@ -354,30 +354,37 @@ function _montarHTMLRelatorio(d) {
     <div class="secao">
       <div class="secao-titulo">🏛️ CAUC — Situação nos Itens de Educação</div>
       ${(() => {
-        if (!cauc) {
-          return '<p class="sem-dados">Dados do CAUC não carregados.</p>';
-        }
-        if (!cauc.disponivel) {
-          return `<div class="cauc-indisponivel">⚠️ <strong>CAUC indisponível:</strong> ${_escHtml(cauc.motivo || 'Não foi possível consultar o CAUC agora.')}</div>`;
-        }
-        if (!cauc.itens || cauc.itens.length === 0) {
-          return '<p class="sem-dados">Nenhum dos itens de educação (3.2.3, 5.1, 5.5, 5.6, 5.7) foi retornado pelo CAUC para este município. Verifique o log diagnóstico.</p>';
-        }
-        const linhas = cauc.itens.map(item => {
-          const { cor, fg } = _corSituacaoCauc(item.situacao);
-          return `<tr>
-            <td class="item-cod">${_escHtml(item.cod_item)}</td>
-            <td>${_escHtml(item.descricao)}</td>
-            <td><span class="badge" style="background:${cor};color:${fg}">${_escHtml(item.situacao)}</span></td>
-            <td style="color:#64748b;white-space:nowrap">${item.data_consulta ? _dataAbrev(item.data_consulta) : '—'}</td>
-          </tr>`;
-        }).join('');
-        return `<table class="cauc-tabela">
-          <thead><tr><th>Item</th><th>Descrição</th><th>Situação</th><th>Consultado em</th></tr></thead>
+      if (!cauc) {
+        return '<p class="sem-dados">Dados do CAUC não carregados.</p>';
+      }
+      if (!cauc.disponivel) {
+        return `<div class="cauc-indisponivel">⚠️ <strong>CAUC indisponível:</strong> ${_escHtml(cauc.motivo || 'Não foi possível consultar o CAUC agora.')}</div>`;
+      }
+      if (!cauc.itens || cauc.itens.length === 0) {
+        return '<p class="sem-dados">Nenhum dos itens de educação (3.2.3, 5.1, 5.5, 5.6, 5.7) foi retornado pelo CAUC para este município. Verifique o log diagnóstico.</p>';
+      }
+      const linhas = cauc.itens.map(item => {
+        // 🔧 Nova regra: "!" = A comprovar (vermelho) | Data = Comprovado (verde)
+        const situacaoRaw = (item.situacao || '').trim();
+        const ehComprovado = situacaoRaw === '!'; // "!" significa que NÃO enviou → precisa comprovar
+
+        // Texto e cor conforme a regra
+        const textoSituacao = ehComprovado ? 'A comprovar' : 'Comprovado';
+        const corBg = ehComprovado ? '#fee2e2' : '#dcfce7';      // vermelho claro / verde claro
+        const corFg = ehComprovado ? '#991b1b' : '#166534';      // vermelho escuro / verde escuro
+
+        return `<tr>
+        <td class="item-cod">${_escHtml(item.cod_item)}</td>
+        <td>${_escHtml(item.descricao)}</td>
+        <td><span class="badge" style="background:${corBg};color:${corFg};font-weight:600">${_escHtml(textoSituacao)}</span></td>
+    </tr>`;
+      }).join('');
+      return `<table class="cauc-tabela">
+          <thead><tr><th>Item</th><th>Descrição</th><th>Situação</th></tr></thead>
           <tbody>${linhas}</tbody>
         </table>
         <div style="font-size:9px;color:#94a3b8;margin-top:4px">Fonte: CAUC/STN (id_ente ${_escHtml(cauc.cod7 || '')} · ${cauc.fonte === 'cache' ? 'cache local 24h' : 'consulta direta'})</div>`;
-      })()}
+    })()}
     </div>
 
     <div class="grid-2">
@@ -533,13 +540,6 @@ function _iconeAlerta(tipo) {
 function _indCard(label, valor, status) {
   const cls = status === 'ok' ? 'ok' : status === 'alerta' ? 'alerta' : '';
   return `<div class="ind-card ${cls}"><div class="ind-card-label">${label}</div><div class="ind-card-valor">${valor}</div></div>`;
-}
-function _corSituacaoCauc(s) {
-  const l = (s || '').toLowerCase();
-  if (l === 'regular')   return { cor: '#dcfce7', fg: '#166534' };
-  if (l === 'irregular') return { cor: '#fee2e2', fg: '#991b1b' };
-  if (l === 'pendente')  return { cor: '#fef9c3', fg: '#854d0e' };
-  return { cor: '#f1f5f9', fg: '#475569' };
 }
 function _pct(v) {
   if (v === null || v === undefined) return '—';
