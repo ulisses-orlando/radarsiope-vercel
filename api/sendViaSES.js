@@ -49,8 +49,7 @@ function parseCsvTesouro(csvText) {
   }
 
   const headers = lines[headerIdx].split(';').map(h => h.replace(/^"|"$/g, '').trim());
-  console.log(`[CAUC Parse] Header na linha ${headerIdx} | ${headers.length} colunas`);
-
+  
   const rows = [];
   for (let i = headerIdx + 1; i < lines.length; i++) {
     const values = [];
@@ -70,15 +69,12 @@ function parseCsvTesouro(csvText) {
 
     if (values.length >= 35) rows.push(values); // Garante linha completa
   }
-  console.log(`[CAUC Parse] ✅ ${rows.length} registros válidos`);
   return rows;
 }
 
 // ─── Sync CAUC: baixa CSV do Tesouro e atualiza Supabase ─────────────────────
 async function syncCaucData({ force = false } = {}) {
   const CSV_URL = 'https://www.tesourotransparente.gov.br/ckan/dataset/72b5f371-0c35-4613-8076-c99c821a6410/resource/07af297a-5e59-494a-a88a-55ddfd2f4b01/download/relatorio-situacao-de-varios-entes---municipios---uf-todas---abrangencia-1.csv';
-
-  console.log('[CAUC Sync] Iniciando sync, force:', force);
 
   // 1. Verifica cache
   if (!force) {
@@ -88,11 +84,8 @@ async function syncCaucData({ force = false } = {}) {
       .eq('id', 1)
       .maybeSingle();
 
-    console.log('[CAUC Sync] Meta atual:', meta);
-
     if (meta?.sync_status === 'success' &&
       new Date(meta.last_sync) > new Date(Date.now() - 24 * 60 * 60 * 1000)) {
-      console.log('[CAUC Sync] Cache válido, pulando sync');
       return { skipped: true, message: 'Cache válido (24h)' };
     }
   }
@@ -102,7 +95,6 @@ async function syncCaucData({ force = false } = {}) {
   });
 
   try {
-    console.log('[CAUC Sync] ⬇️ Baixando CSV...');
     // 3. Baixa e parseia o CSV FORÇANDO UTF-8
     // 3. Baixa e parseia o CSV (leitura ÚNICA do corpo)
     const controller = new AbortController();
@@ -119,19 +111,7 @@ async function syncCaucData({ force = false } = {}) {
     // 🔧 LEITURA ÚNICA: usa .text() diretamente (não arrayBuffer + TextDecoder)
     const csvText = await response.text();
 
-    console.log(`[CAUC Sync] 📄 CSV baixado (${csvText.length} bytes)`);
     const rows = parseCsvTesouro(csvText);
-    console.log(`[CAUC Sync] 🔍 ${rows.length} linhas parseadas`);
-
-    // Debug: mostra como está sendo parseada a primeira linha
-    if (rows[0]) {
-      console.log('[CAUC Debug] Amostra da primeira linha:', {
-        cod_ibge_raw: rows[0]['Código IBGE'] || rows[0]['Cdigo IBGE'] || 'N/A',
-        municipio_raw: rows[0]['Nome do Ente Federado'] || rows[0]['Município'] || 'N/A',
-        uf_raw: rows[0]['UF'],
-        item_3_2_3_raw: rows[0]['3.2.3'],
-      });
-    }
 
     // Mapeamento POR ÍNDICE (imune a encoding quebrado nos headers)
     // Estrutura conhecida do CSV do Tesouro:
@@ -156,15 +136,12 @@ async function syncCaucData({ force = false } = {}) {
 
     // Deduplica por cod_ibge (evita erro "ON CONFLICT... second time")
     const uniqueRecords = [...new Map(records.map(r => [r.cod_ibge, r])).values()];
-    console.log(`[CAUC Sync] ${records.length} → ${uniqueRecords.length} únicos`);
 
     // Debug: confirma se 1200385 está presente
     const target = uniqueRecords.find(r => r.cod_ibge === '1200385');
     if (target) {
-      console.log('[CAUC Sync] ✅ 1200385 pronto:', { cod_ibge: target.cod_ibge, uf: target.uf });
     } else {
       const acSamples = uniqueRecords.filter(r => r.uf === 'AC').slice(0, 3);
-      console.log('[CAUC Sync] 🧪 Amstras AC:', acSamples.map(r => r.cod_ibge));
     }
 
     // Upsert em batch
@@ -187,7 +164,6 @@ async function syncCaucData({ force = false } = {}) {
 
         if (error2) throw new Error(`Upsert falhou: ${error2.message}`);
       }
-      console.log(`[CAUC Sync] Batch ${i}-${i + batch.length} OK`);
     }
 
     // Atualiza meta
@@ -195,7 +171,6 @@ async function syncCaucData({ force = false } = {}) {
       id: 1, sync_status: 'success', last_sync: new Date(), source_url: CSV_URL, error_log: null
     });
 
-    console.log('[CAUC Sync] ✅ Sync concluído com sucesso');
     return { success: true, processed: records.length };
 
   } catch (err) {
@@ -295,7 +270,6 @@ async function _buscarCod7Firestore(cod6, cod_uf) {
 // ─── Busca CAUC via Supabase (com fallback para sync on-demand) ──────────────
 async function _buscarCaucComCache(cod7) {
   const codStr = String(cod7).padStart(7, '0');
-  console.log(`[CAUC Busca] Procurando cod_ibge: "${codStr}"`);
 
   // 1. Tenta buscar no cache
   const { data, error } = await supabase
@@ -304,12 +278,6 @@ async function _buscarCaucComCache(cod7) {
     .eq('cod_ibge', codStr)
     .maybeSingle();
 
-  console.log('[CAUC Busca] Resultado da query:', {
-    found: !!data,
-    error: error?.message,
-    data: data ? { cod_ibge: data.cod_ibge, uf: data.uf } : null
-  });
-
   if (error) {
     console.warn(`[CAUC] Erro na query: ${error.message}`);
     return { ok: false, erro: 'Erro ao consultar dados do CAUC.' };
@@ -317,22 +285,20 @@ async function _buscarCaucComCache(cod7) {
 
   if (data) {
     const itens = [
-      { cod_item: '3.2.3', situacao: data.item_3_2_3, descricao: 'Anexo 8 RREO no Siope' },
-      { cod_item: '5.1', situacao: data.item_5_1, descricao: 'Aplicação dos recursos do FUNDEB' },
-      { cod_item: '5.5', situacao: data.item_5_5, descricao: 'Prestação de contas FUNDEB' },
-      { cod_item: '5.6', situacao: data.item_5_6, descricao: '70% FUNDEB em magistério' },
-      { cod_item: '5.7', situacao: data.item_5_7, descricao: 'Funcionamento do CACS-FUNDEB' },
+      { cod_item: '3.2.3', situacao: data.item_3_2_3, descricao: 'Encaminhamento do Anexo 8 do Relatório Resumido de Execução Orçamentária ao Siope' },
+      { cod_item: '5.1', situacao: data.item_5_1, descricao: 'Aplicação Mínima de recursos em Educação' },
+      { cod_item: '5.5', situacao: data.item_5_5, descricao: 'Regularidade na aplicação mínima do Fundeb para pagamento de profissionais da educação básica' },
+      { cod_item: '5.6', situacao: data.item_5_6, descricao: 'Regularidade na aplicação mínima da complementação da União ao Fundeb em despesas de capital' },
+      { cod_item: '5.7', situacao: data.item_5_7, descricao: 'Regularidade na aplicação de 50% da complementação VAAT do Fundeb na educação infantil' },
     ].filter(i => i.situacao && i.situacao.trim() !== '');
 
     const horasDesdeSync = (Date.now() - new Date(data.updated_at)) / (1000 * 60 * 60);
     const fonte = horasDesdeSync < 24 ? 'cache (atualizado hoje)' : 'cache (atualizado recentemente)';
 
-    console.log(`[CAUC Busca] ✅ Encontrado, ${itens.length} itens, fonte: ${fonte}`);
     return { ok: true, itens, fonte, updated_at: data.updated_at };
   }
 
   // 2. Não encontrou: tenta sync on-demand
-  console.log(`[CAUC Busca] ❌ Não encontrado, tentando sync on-demand...`);
   try {
     const { data: meta } = await supabase
       .from('cauc_cache_meta')
@@ -354,8 +320,6 @@ async function _buscarCaucComCache(cod7) {
         .eq('cod_ibge', codStr)
         .maybeSingle();
 
-      console.log('[CAUC Busca] Resultado pós-sync:', { found: !!data2, error: error2?.message });
-
       if (data2) {
         const itens = [ /* mesmo mapeamento acima */].filter(i => i.situacao?.trim());
         return { ok: true, itens, fonte: 'api (sincronizado agora)', updated_at: data2.updated_at };
@@ -367,7 +331,6 @@ async function _buscarCaucComCache(cod7) {
     console.warn(`[CAUC] Sync on-demand falhou: ${syncErr.message}`);
   }
 
-  console.log(`[CAUC Busca] ❌ Fallback: município ${codStr} não encontrado`);
   return { ok: false, erro: `Município ${codStr} não encontrado na base do CAUC.` };
 }
 
