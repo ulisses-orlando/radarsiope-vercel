@@ -35,11 +35,24 @@ const supabase = createClient(
 // Parser por índice: ignora headers corrompidos e retorna Array<string[]>
 function parseCsvTesouro(csvText) {
   const lines = csvText.trim().split(/\r?\n/).filter(l => l.trim());
-  // O CSV do Tesouro tem 3 linhas de metadados + 1 header. Dados começam na linha 4.
+  // CSV do Tesouro: 3 linhas de metadados + header na linha 3 (índice 3)
   if (lines.length < 5) return [];
 
+  // Encontra header real (deve ter ~35 colunas e conter "IBGE")
+  let headerIdx = 3; // Padrão conhecido do CSV oficial
+  for (let i = 0; i < Math.min(6, lines.length); i++) {
+    const parts = lines[i].split(';').length;
+    if (parts > 30 && lines[i].includes('IBGE')) {
+      headerIdx = i;
+      break;
+    }
+  }
+
+  const headers = lines[headerIdx].split(';').map(h => h.replace(/^"|"$/g, '').trim());
+  console.log(`[CAUC Parse] Header na linha ${headerIdx} | ${headers.length} colunas`);
+
   const rows = [];
-  for (let i = 4; i < lines.length; i++) {
+  for (let i = headerIdx + 1; i < lines.length; i++) {
     const values = [];
     let current = '';
     let inQuotes = false;
@@ -55,9 +68,9 @@ function parseCsvTesouro(csvText) {
     }
     values.push(current.replace(/^"|"$/g, '').trim());
 
-    // Só adiciona se tiver colunas suficientes (evita linhas vazias/malformadas)
-    if (values.length >= 35) rows.push(values);
+    if (values.length >= 35) rows.push(values); // Garante linha completa
   }
+  console.log(`[CAUC Parse] ✅ ${rows.length} registros válidos`);
   return rows;
 }
 
@@ -91,19 +104,22 @@ async function syncCaucData({ force = false } = {}) {
   try {
     console.log('[CAUC Sync] ⬇️ Baixando CSV...');
     // 3. Baixa e parseia o CSV FORÇANDO UTF-8
+    // 3. Baixa e parseia o CSV (leitura ÚNICA do corpo)
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 30000);
 
-    const response = await fetch(CSV_URL, { cache: 'no-store', signal: controller.signal });
+    const response = await fetch(CSV_URL, {
+      cache: 'no-store',
+      signal: controller.signal
+    });
     clearTimeout(timeout);
 
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    if (!response.ok) throw new Error(`HTTP ${response.status} - ${response.statusText}`);
 
-    // 🔧 Lê como ArrayBuffer e decodifica explicitamente como UTF-8
-    const buffer = await response.arrayBuffer();
+    // 🔧 LEITURA ÚNICA: usa .text() diretamente (não arrayBuffer + TextDecoder)
     const csvText = await response.text();
 
-    console.log(`[CAUC Sync] 📄 CSV baixado e decodificado (${csvText.length} bytes)`);
+    console.log(`[CAUC Sync] 📄 CSV baixado (${csvText.length} bytes)`);
     const rows = parseCsvTesouro(csvText);
     console.log(`[CAUC Sync] 🔍 ${rows.length} linhas parseadas`);
 
@@ -117,18 +133,19 @@ async function syncCaucData({ force = false } = {}) {
       });
     }
 
-    // Mapeamento por ÍNDICE (imune a encoding quebrado)
+    // Mapeamento POR ÍNDICE (imune a encoding quebrado nos headers)
+    // Estrutura conhecida do CSV do Tesouro:
     // 0=UF | 1=Nome | 2=IBGE | 18=3.2.3 | 28=5.1 | 32=5.5 | 33=5.6 | 34=5.7
     const records = rows.map(cols => {
-      const codRaw = String(cols[2] || '').replace(/\D/g, ''); // Índice 2
+      const codRaw = String(cols[2] || '').replace(/\D/g, '');
       const cod_ibge = codRaw.padStart(7, '0');
 
       if (!cod_ibge || cod_ibge.length !== 7) return null;
 
       return {
         cod_ibge,
-        uf: String(cols[0] || '').substring(0, 2).toUpperCase(), // Índice 0
-        municipio: String(cols[1] || '').substring(0, 255),      // Índice 1
+        uf: String(cols[0] || '').substring(0, 2).toUpperCase(),
+        municipio: String(cols[1] || '').substring(0, 255),
         item_3_2_3: cols[18] || null,
         item_5_1: cols[28] || null,
         item_5_5: cols[32] || null,
@@ -137,29 +154,17 @@ async function syncCaucData({ force = false } = {}) {
       };
     }).filter(r => r !== null);
 
-    // Log de confirmação
-    const sample = records.find(r => r.cod_ibge === '1200385');
-    if (sample) {
-      console.log('[CAUC Sync] ✅ 1200385 MAPEADO:', sample);
-    } else {
-      // Debug: mostra alguns códigos AC para validar
-      const acSamples = records.filter(r => r.uf === 'AC').slice(0, 3);
-      console.log('[CAUC Sync] 🧪 Amstras AC mapeadas:', acSamples.map(r => r.cod_ibge));
-    }
-
-    // 🔧 Deduplica por cod_ibge (evita erro "ON CONFLICT... second time")
+    // Deduplica por cod_ibge (evita erro "ON CONFLICT... second time")
     const uniqueRecords = [...new Map(records.map(r => [r.cod_ibge, r])).values()];
     console.log(`[CAUC Sync] ${records.length} → ${uniqueRecords.length} únicos`);
 
-    // Verifica se 1200385 está presente
+    // Debug: confirma se 1200385 está presente
     const target = uniqueRecords.find(r => r.cod_ibge === '1200385');
     if (target) {
       console.log('[CAUC Sync] ✅ 1200385 pronto:', { cod_ibge: target.cod_ibge, uf: target.uf });
     } else {
-      console.warn('[CAUC Sync] ⚠️ 1200385 ainda não encontrado!');
-      // Debug: mostra alguns códigos próximos para investigar
-      const samples = uniqueRecords.filter(r => r.cod_ibge.startsWith('120')).slice(0, 3);
-      if (samples.length) console.log('[CAUC Sync] Amstras AC:', samples.map(s => s.cod_ibge));
+      const acSamples = uniqueRecords.filter(r => r.uf === 'AC').slice(0, 3);
+      console.log('[CAUC Sync] 🧪 Amstras AC:', acSamples.map(r => r.cod_ibge));
     }
 
     // Upsert em batch
