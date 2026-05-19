@@ -419,8 +419,8 @@ function detectarAcesso(destinatario, newsletter, segmento, envio) {
     temVideo: isAssinante ? !!features.newsletter_video : acessoProTemp,
     temMapaMental: isAssinante ? !!features.newsletter_mapa_mental : acessoProTemp,
     temAlertas: isAssinante && !!features.alertas_prioritarios,
-    temChat: isAssinante && !!features.pergunta_edicao,
-    temRelatorio: isAssinante && !!features.relatorio_conformidade,
+    temChat: isAssinante ? !!features.pergunta_edicao : acessoProTemp,
+    temRelatorio: isAssinante ? !!features.relatorio_conformidade : acessoProTemp,
     blurMunicipio: !isAssinante && !acessoProTemp,
     truncarTexto: !isAssinante && !acessoProTemp,
     modoPadrao: isAssinante && window.innerWidth > 768 ? 'completo' : 'rapido',
@@ -605,7 +605,7 @@ async function renderMunicipio(destinatario, acesso, newsletter) {
       dadosMunicipioAtual = { cod_municipio: null, nome: null, uf: null };
     }
 
-    if (acesso.isAssinante && resumo && cod) {
+    if ((acesso.isAssinante || acesso.acessoProTemp) && resumo && cod) {
       _injetarBotaoRelatorio(cod, nome, uf, acesso.temRelatorio);
     }
 
@@ -1467,6 +1467,10 @@ document.addEventListener('visibilitychange', () => {
 });
 
 async function _checarSessaoCritica() {
+
+  // Lead com acesso pro temporário: verificação de sessão de assinante não se aplica
+  if (window._leadAcessoProTemp === true) return true;
+
   // Se sessão já foi bloqueada nesta aba, exibe sheet e nega acesso direto
   if (_sessaoBloqueada) {
     _mostrarSheetSessaoBloqueada('sessao_invalida');
@@ -2069,8 +2073,8 @@ async function _executarPreview(params) {
       window.QuizManager.init(newsletter, userParaQuiz);
     }
 
+    // Habilita chat para testes internos (mesmo sem token de acesso válido)  
     acesso.temChat = true;
-    acesso.temRelatorio = true;
 
     mostrarApp();
 
@@ -2362,6 +2366,9 @@ async function VerNewsletterComToken() {
 
     // 8. Regras de acesso
     const acesso = detectarAcesso(destinatario, newsletter, segmento, envio);
+
+    // Registra acesso pro temporário de lead para uso em _checarSessaoCritica()
+    window._leadAcessoProTemp = !assinaturaId && acesso.acessoProTemp;
 
     // 9. Side effects não bloqueantes
     // registrarClique só se aplica a leads — assinantes usam o sistema de sessão
@@ -3828,7 +3835,8 @@ function iniciarChatFAB(newsletter, uid, acesso) {
   document.getElementById('rs-chat-fab')?.remove();
   document.getElementById('rs-chat-sheet')?.remove();
   document.getElementById('rs-chat-backdrop')?.remove();
-  if (!acesso?.isAssinante) return;
+
+  if (!acesso?.isAssinante && !acesso?.temChat) return;
 
   // ── 1. Atualiza contexto global (fonte única de verdade) ──
   window._chatContext = {
@@ -4058,7 +4066,7 @@ function iniciarChatFAB(newsletter, uid, acesso) {
   }
 
   fab.onclick = () => {
-    if (!temChat) { _solicitarUpgrade('chat', true); return; }
+    if (!temChat) { _solicitarUpgrade('chat', acesso.isAssinante); return; }
     sessionStorage.setItem(sessionKey, '1');
     fab.querySelector('.rs-chat-badge')?.remove();
     _abrirChat();
