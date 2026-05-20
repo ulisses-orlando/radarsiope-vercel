@@ -23,7 +23,12 @@ async function gerarRelatorioConformidade(cod, nome, uf) {
     const resp = await fetch('/api/sendViaSES?acao=relatorio_conformidade', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ uid: user.uid, cod_municipio: codMun }),
+      body: JSON.stringify({
+        uid: user.uid,
+        cod_municipio: codMun,
+        acesso_pro_temp: window._leadAcessoProTemp === true,
+        cod_uf: user.cod_uf || uf || '',
+      }),
     });
 
     let dados;
