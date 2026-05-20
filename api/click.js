@@ -12,7 +12,7 @@ if (!admin.apps.length) {
 const db = admin.firestore();
 
 export default async function handler(req, res) {
-    // ── NOVO: Endpoint para config pública (variáveis de ambiente) ─────────────
+  // ── NOVO: Endpoint para config pública (variáveis de ambiente) ─────────────
   if (req.query.acao === 'config') {
     // Retorna APENAS variáveis com prefixo NEXT_PUBLIC_ (seguro para frontend)
     return res.status(200).json({
@@ -51,7 +51,16 @@ export default async function handler(req, res) {
       .collection("envios")
       .doc(envioId);
 
-    // Documento fixo por destinatário
+    const envioSnap = await envioRef.get();
+    if (!envioSnap.exists) {
+      let destino = decodeURIComponent(url);
+      try { destino = decodeURIComponent(destino); } catch { }
+      if (!destino.startsWith('http://') && !destino.startsWith('https://')) {
+        destino = 'https://' + destino;
+      }
+      return res.redirect(destino);
+    }
+
     const cliqueRef = envioRef.collection("cliques").doc(destinatarioId);
     const snap = await cliqueRef.get();
 
