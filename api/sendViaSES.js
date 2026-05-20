@@ -478,7 +478,7 @@ async function _relatorioConformidade(req, res) {
 
   // ── CAUC: situação nos itens de educação ──────────────────────────────────
   let caucResult;
-  const ufParaCauc = user.cod_uf || cod_uf || '';
+  const ufParaCauc = user.cod_uf || cod_uf || series?.[0]?.uf || '';
   const cod7 = await _buscarCod7Firestore(codStr, ufParaCauc);
   if (!cod7) {
     caucResult = { disponivel: false, motivo: `Código IBGE de 7 dígitos não localizado (cod: ${codStr}, uf: ${ufParaCauc}).` };
