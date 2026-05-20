@@ -49,7 +49,7 @@ function parseCsvTesouro(csvText) {
   }
 
   const headers = lines[headerIdx].split(';').map(h => h.replace(/^"|"$/g, '').trim());
-  
+
   const rows = [];
   for (let i = headerIdx + 1; i < lines.length; i++) {
     const values = [];
@@ -344,16 +344,38 @@ async function _relatorioConformidade(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ ok: false, error: 'Método não permitido.' });
 
   // ── Parse de body ──────────────────────────────────────────────────────────
+  // Depois:
   const body = await _lerBody(req);
-  const { uid, cod_municipio } = body;
+  const { uid, cod_municipio, acesso_pro_temp, cod_uf } = body;
 
   if (!uid) return res.status(400).json({ ok: false, error: 'uid obrigatório.' });
   if (!cod_municipio) return res.status(400).json({ ok: false, error: 'cod_municipio obrigatório.' });
 
   // ── Carrega usuário e verifica feature ────────────────────────────────────
-  const userSnap = await db.collection('usuarios').doc(uid).get();
-  if (!userSnap.exists) return res.status(404).json({ ok: false, error: 'Usuário não encontrado.' });
-  const user = userSnap.data();
+  let user = null;
+
+  if (acesso_pro_temp) {
+    // Lead com acesso pro temporário: sem verificação de feature no Firestore
+    user = {
+      nome: '',
+      nome_municipio: '',
+      cod_uf: cod_uf || '',
+      plano_slug: 'acesso_pro_temp',
+      features: { relatorio_conformidade: true },
+    };
+  } else {
+    const userSnap = await db.collection('usuarios').doc(uid).get();
+    if (!userSnap.exists) return res.status(404).json({ ok: false, error: 'Usuário não encontrado.' });
+    user = userSnap.data();
+
+    if (!user.features?.relatorio_conformidade) {
+      return res.status(403).json({
+        ok: false,
+        error: 'Recurso não disponível no plano atual.',
+        upgrade_slug: 'profissional',
+      });
+    }
+  }
 
   if (!user.features?.relatorio_conformidade) {
     return res.status(403).json({
@@ -456,9 +478,10 @@ async function _relatorioConformidade(req, res) {
 
   // ── CAUC: situação nos itens de educação ──────────────────────────────────
   let caucResult;
-  const cod7 = await _buscarCod7Firestore(codStr, user.cod_uf);
+  const ufParaCauc = user.cod_uf || cod_uf || '';
+  const cod7 = await _buscarCod7Firestore(codStr, ufParaCauc);
   if (!cod7) {
-    caucResult = { disponivel: false, motivo: `${cod7}: user.cod_uf ${user.cod_uf} -  Código IBGE de 7 dígitos não localizado no Firestore.` };
+    caucResult = { disponivel: false, motivo: `Código IBGE de 7 dígitos não localizado (cod: ${codStr}, uf: ${ufParaCauc}).` };
   } else {
     const cauc = await _buscarCaucComCache(cod7);
     if (!cauc.ok) {
