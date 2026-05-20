@@ -60,21 +60,49 @@ async function gerarRelatorioConformidade(cod, nome, uf) {
     }
 
     const html = _montarHTMLRelatorio(dados);
-    const win = window.open('', '_blank');
 
-    if (!win) {
-      const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url; a.target = '_blank'; a.click();
-      setTimeout(() => URL.revokeObjectURL(url), 5000);
-      return;
-    }
+    // Remove overlay anterior se existir
+    const overlayExistente = document.getElementById('rs-relatorio-overlay');
+    if (overlayExistente) overlayExistente.remove();
 
-    win.document.open();
-    win.document.write(html);
-    win.document.close();
-    // ✅ REMOVIDO: win.addEventListener('load', () => setTimeout(() => win.print(), 400));
+    // Cria overlay in-app (sem abrir nova aba — compatível com PWA instalado)
+    const overlay = document.createElement('div');
+    overlay.id = 'rs-relatorio-overlay';
+    overlay.style.cssText = `
+      position: fixed; inset: 0; z-index: 9999;
+      background: #fff; display: flex; flex-direction: column;
+    `;
+
+    const barra = document.createElement('div');
+    barra.style.cssText = `
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 10px 16px; background: var(--cor-primaria, #1a56a0);
+      color: #fff; flex-shrink: 0;
+    `;
+    barra.innerHTML = `
+      <span style="font-weight:600;font-size:15px;">📋 Relatório de Conformidade</span>
+      <button id="btn-fechar-relatorio"
+        style="background:none;border:none;color:#fff;font-size:22px;cursor:pointer;line-height:1;">✕</button>
+    `;
+
+    const iframe = document.createElement('iframe');
+    iframe.style.cssText = 'flex:1; border:none; width:100%;';
+    iframe.setAttribute('srcdoc', html);
+
+    overlay.appendChild(barra);
+    overlay.appendChild(iframe);
+    document.body.appendChild(overlay);
+
+    document.getElementById('btn-fechar-relatorio')
+      .addEventListener('click', () => overlay.remove());
+
+    const _escRelatorio = (e) => {
+      if (e.key === 'Escape') {
+        overlay.remove();
+        document.removeEventListener('keydown', _escRelatorio);
+      }
+    };
+    document.addEventListener('keydown', _escRelatorio);
 
   } catch (err) {
     console.error('[Relatório] Erro:', err);
