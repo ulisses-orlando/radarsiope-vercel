@@ -27,7 +27,12 @@ export default async function handler(req, res) {
       .collection("envios")
       .doc(envioId);
 
-    // 🔹 Documento fixo por destinatário
+    const envioSnap = await envioRef.get();
+    if (!envioSnap.exists) {
+      res.setHeader("Content-Type", "image/gif");
+      return res.send(Buffer.from("R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==", "base64"));
+    }
+
     const aberturaRef = envioRef.collection("aberturas").doc(destinatarioId);
     const snap = await aberturaRef.get();
 
