@@ -21,13 +21,13 @@
     if (acao === 'indicacao') {
       const ini = _tsMs(cicloDoc.inicio_indicacao);
       const fim = _tsMs(cicloDoc.fim_indicacao);
-      if (!ini || agora < ini) return { valido: false, erro: 'Período de indicação ainda não abriu.' };
-      if (fim && agora > fim) return { valido: false, erro: 'Período de indicação já encerrou.' };
+      if (!ini || agora < ini) return { valido: false, erro: 'O período de sugestão de tema ainda não abriu.' };
+      if (fim && agora > fim) return { valido: false, erro: 'Período de sugestão de tema já encerrou.' };
     } else if (acao === 'votacao') {
       const ini = _tsMs(cicloDoc.inicio_votacao);
       const fim = _tsMs(cicloDoc.fim_votacao);
-      if (!ini || agora < ini) return { valido: false, erro: 'Votação ainda não abriu.' };
-      if (fim && agora > fim) return { valido: false, erro: 'Votação já encerrou.' };
+      if (!ini || agora < ini) return { valido: false, erro: 'O período de votação ainda não abriu.' };
+      if (fim && agora > fim) return { valido: false, erro: 'O período de votação já encerrou.' };
     }
     return { valido: true, ciclo: cicloDoc };
   }
@@ -84,6 +84,30 @@
   // ── Render principal ──────────────────────────────────────────────────────
   async function _renderDrawer(tipoAtivo = 'mensagem') {
     const body = document.getElementById('rs-fc-body');
+    const user = window._radarUser;
+
+    // Lead com acesso pro temporário: exibe card explicativo, bloqueia acesso
+    if (window._leadAcessoProTemp === true) {
+      body.innerHTML = `
+      <div style="display:flex;flex-direction:column;align-items:center;gap:14px;padding:32px 16px;text-align:center;">
+        <span style="font-size:40px;">💬</span>
+        <strong style="font-size:15px;color:var(--rs-text,#f8fafc);font-family:'Syne',system-ui,sans-serif;">
+          Canal Direto com a Equipe
+        </strong>
+        <p style="font-size:13px;color:var(--rs-muted,#94a3b8);line-height:1.6;margin:0;">
+          Envie dúvidas, sinalize irregularidades e sugira temas para as próximas edições.
+          Assinantes têm retorno direto da equipe Radar SIOPE.
+        </p>
+        <button onclick="if(typeof _solicitarUpgrade==='function')_solicitarUpgrade('acoes',false)"
+          style="margin-top:8px;padding:11px 24px;background:#0e7490;color:#fff;border:none;
+                 border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;
+                 font-family:'Syne',system-ui,sans-serif;">
+          Assinar para enviar mensagens
+        </button>
+      </div>`;
+      return;
+    }
+    
     body.innerHTML = '<div class="rs-fc-loading">Carregando…</div>';
     const user = window._radarUser;
     if (!user) { body.innerHTML = '<div class="rs-fc-vazio"><span>🔒</span>Faça login para enviar mensagens.</div>'; return; }
