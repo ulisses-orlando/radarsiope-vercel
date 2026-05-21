@@ -11,6 +11,12 @@ if (!admin.apps.length) {
 }
 const db = admin.firestore();
 
+import { createClient } from '@supabase/supabase-js';
+const supabase = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_KEY
+);
+
 export default async function handler(req, res) {
   // ── NOVO: Endpoint para config pública (variáveis de ambiente) ─────────────
   if (req.query.acao === 'config') {
@@ -53,11 +59,32 @@ export default async function handler(req, res) {
 
     const envioSnap = await envioRef.get();
     if (!envioSnap.exists) {
+      // Lead: registrar clique no Supabase
+      try {
+        const { data: envioLead } = await supabase
+          .from('leads_envios')
+          .select('id, clicado_em, total_cliques')
+          .eq('id', parseInt(envioId, 10))
+          .eq('lead_id', destinatarioId)
+          .single();
+
+        if (envioLead) {
+          await supabase
+            .from('leads_envios')
+            .update({
+              clicado_em: envioLead.clicado_em || new Date().toISOString(),
+              total_cliques: (envioLead.total_cliques || 0) + 1,
+              ultimo_clique_em: new Date().toISOString(),
+            })
+            .eq('id', envioLead.id);
+        }
+      } catch (e) {
+        console.error('[click] Erro Supabase:', e.message);
+      }
+
       let destino = decodeURIComponent(url);
       try { destino = decodeURIComponent(destino); } catch { }
-      if (!destino.startsWith('http://') && !destino.startsWith('https://')) {
-        destino = 'https://' + destino;
-      }
+      if (!destino.startsWith('http://') && !destino.startsWith('https://')) destino = 'https://' + destino;
       return res.redirect(destino);
     }
 

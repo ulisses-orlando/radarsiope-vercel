@@ -12,6 +12,12 @@ if (!admin.apps.length) {
 }
 const db = admin.firestore();
 
+import { createClient } from '@supabase/supabase-js';
+const supabase = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_KEY
+);
+
 export default async function handler(req, res) {
   const { envioId, destinatarioId, newsletterId } = req.query;
 
@@ -29,6 +35,29 @@ export default async function handler(req, res) {
 
     const envioSnap = await envioRef.get();
     if (!envioSnap.exists) {
+      // Lead: registrar abertura no Supabase
+      try {
+        const { data: envioLead } = await supabase
+          .from('leads_envios')
+          .select('id, aberto_em, total_aberturas')
+          .eq('id', parseInt(envioId, 10))
+          .eq('lead_id', destinatarioId)
+          .single();
+
+        if (envioLead) {
+          await supabase
+            .from('leads_envios')
+            .update({
+              aberto_em: envioLead.aberto_em || new Date().toISOString(),
+              total_aberturas: (envioLead.total_aberturas || 0) + 1,
+              ultimo_acesso_email: new Date().toISOString(),
+            })
+            .eq('id', envioLead.id);
+        }
+      } catch (e) {
+        console.error('[pixel] Erro Supabase:', e.message);
+      }
+
       res.setHeader("Content-Type", "image/gif");
       return res.send(Buffer.from("R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==", "base64"));
     }
