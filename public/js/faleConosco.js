@@ -109,7 +109,7 @@
     }
     
     body.innerHTML = '<div class="rs-fc-loading">Carregando…</div>';
-    const user = window._radarUser;
+    
     if (!user) { body.innerHTML = '<div class="rs-fc-vazio"><span>🔒</span>Faça login para enviar mensagens.</div>'; return; }
     const isAssinante = user.segmento === 'assinante';
     let quotaTema = 0; let usoTemaMes = 0;
