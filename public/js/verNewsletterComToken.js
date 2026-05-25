@@ -726,6 +726,9 @@ function _renderSeletorMunicipio(tituloEl, municipiosPlano, destinatario, acesso
       cod_uf: novo.uf || '',
     };
 
+    // Notifica o calendário sobre a troca de município (se estiver aberto)
+    window._calAtualizarMunicipio?.(novo.cod_municipio);
+
     const container = document.getElementById('municipio-conteudo');
     const btn = document.getElementById('btn-toggle-historico');
     const resumoEl = document.getElementById('municipio-resumo');
@@ -2241,7 +2244,7 @@ async function VerNewsletterComToken() {
 
       if (leErr || !leRow) {
         mostrarErro('Envio não encontrado.',
-          'O link pode ter expirado. Assine agora <a href="/assinatura.html">Assine agora</a>.');
+          'O link pode ter expirado. <a href="/assinatura.html">Assine agora</a>.');
         return;
       }
 
@@ -2253,7 +2256,7 @@ async function VerNewsletterComToken() {
       // Validar expiração
       if (leRow.expira_em && new Date() > new Date(leRow.expira_em)) {
         mostrarErro('Este link expirou.',
-          'Assine agora<a href="/assinatura.html">Assine agora</a> para continuar tendo acesso.');
+          '<a href="/assinatura.html">Assine agora</a> para continuar tendo acesso.');
         return;
       }
 
@@ -2700,6 +2703,65 @@ function _getCtx() {
   } catch (e) { return null; }
 }
 
+// ─── Calendário: painel de tela cheia ─────────────────────────────────────────
+function _abrirCalendario() {
+  // Cria o painel apenas uma vez
+  const PAINEL_ID = 'rs-cal-fullscreen';
+  let painel = document.getElementById(PAINEL_ID);
+
+  if (!painel) {
+    painel = document.createElement('div');
+    painel.id = PAINEL_ID;
+    painel.style.cssText = [
+      'position:fixed', 'inset:0', 'z-index:800',
+      'background:var(--rs-bg,#0f172a)',
+      'overflow-y:auto',
+      'animation:rsFadeIn .2s ease',
+      'display:flex', 'flex-direction:column',
+    ].join(';');
+
+    // Botão fechar
+    const btnFechar = document.createElement('button');
+    btnFechar.innerHTML = '← Voltar';
+    btnFechar.style.cssText = [
+      'position:sticky', 'top:0', 'z-index:10',
+      'background:var(--rs-bg,#0f172a)',
+      'border:none', 'border-bottom:1px solid #1e293b',
+      'color:#94a3b8', 'font-size:13px', 'font-weight:700',
+      'padding:14px 16px', 'text-align:left',
+      'cursor:pointer', 'font-family:inherit', 'width:100%',
+    ].join(';');
+    btnFechar.addEventListener('click', () => {
+      painel.style.opacity = '0';
+      painel.style.transition = 'opacity .2s';
+      setTimeout(() => {
+        painel.style.opacity = '';
+        painel.style.transition = '';
+        painel.style.display = 'none';
+      }, 200);
+    });
+
+    // Container do calendário
+    const container = document.createElement('div');
+    container.id = 'rs-cal-container';
+    container.style.flex = '1';
+
+    painel.appendChild(btnFechar);
+    painel.appendChild(container);
+    document.body.appendChild(painel);
+  } else {
+    painel.style.display = 'flex';
+  }
+
+  // Renderiza / re-renderiza o calendário
+  const container = document.getElementById('rs-cal-container');
+  if (container && typeof window.renderizarCalendario === 'function') {
+    const acesso = window._radarUser || {};
+    const edicao = window._edicaoAtual || {};  // edição corrente se disponível
+    window.renderizarCalendario(container, { acesso, edicao });
+  }
+}
+
 // ─── Inicializar drawer ──────────────────────────────────────────────────────
 async function iniciarDrawer(newsletter) {
   // Salvar contexto de identidade no sessionStorage (proteção contra reload)
@@ -2768,6 +2830,8 @@ async function iniciarDrawer(newsletter) {
 
   // Registrar event listeners
   window.addEventListener('rs:abrirEdicoes', abrirDrawer);
+
+  window.addEventListener('rs:abrirCalendario', _abrirCalendario);
 
   // 🔒 Guard de sessão no botão Sentinela (intercepta antes dos handlers do menu)
   document.getElementById('rs-alertas-btn')?.addEventListener('click', async function (e) {
@@ -4182,6 +4246,7 @@ const _UPGRADE_INFO = {
   mapaMental: { icone: '📊', nome: 'Mapa Mental', plano: 'Profissional', slug: 'profissional' },
   chat: { icone: '✦', nome: 'Pergunte ao Radar', plano: 'Profissional', slug: 'profissional' },
   relatorio: { icone: '📋', nome: 'Relatório de Conformidade', plano: 'Profissional', slug: 'profissional' },
+  calendario: { icone: '📅', nome: 'Calendário', plano: 'Essence', slug: 'essence' },
 };
 
 function _solicitarUpgrade(tipo, isAssinante) {

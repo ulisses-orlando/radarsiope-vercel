@@ -134,6 +134,7 @@
       #rs-menu-dropdown.open .rs-menu-item:nth-child(2) { transition: opacity .16s ease .06s, transform .16s ease .06s, filter .15s; }
       #rs-menu-dropdown.open .rs-menu-item:nth-child(3) { transition: opacity .16s ease .10s, transform .16s ease .10s, filter .15s; }
       #rs-menu-dropdown.open .rs-menu-item:nth-child(4) { transition: opacity .16s ease .14s, transform .16s ease .14s, filter .15s; }
+      #rs-menu-dropdown.open .rs-menu-item:nth-child(5) { transition: opacity .16s ease .18s, transform .16s ease .18s, filter .15s; }
       .rs-menu-item:hover { filter: brightness(1.15); }
       .rs-menu-item:active { transform: scale(.97); }
 
@@ -204,6 +205,11 @@
           <span class="rs-menu-item-label">Sentinela</span>
           <span class="rs-menu-item-badge" id="rs-menu-badge-alertas" style="display:none">0</span>
         </button>
+        <button class="rs-menu-item" id="rs-menu-calendario"
+          style="background:#164e63" role="menuitem">
+          <span class="rs-menu-item-icon">📅</span>
+          <span class="rs-menu-item-label">Calendário</span>
+        </button>
         <button class="rs-menu-item" id="rs-menu-fale"
           style="background:#0e6a82" role="menuitem">
           <span class="rs-menu-item-icon">💬</span>
@@ -224,58 +230,67 @@
   }
 
   // ── Bind de eventos ───────────────────────────────────────────────────────
-function _bindEventos() {
-  const wrap = document.getElementById('rs-menu-wrap');
-  if (!wrap) return;
-  document.getElementById('rs-menu-btn')
-    ?.addEventListener('click', _toggleMenu);
+  function _bindEventos() {
+    const wrap = document.getElementById('rs-menu-wrap');
+    if (!wrap) return;
+    document.getElementById('rs-menu-btn')
+      ?.addEventListener('click', _toggleMenu);
 
-  document.getElementById('rs-menu-overlay')
-    ?.addEventListener('click', _fecharMenu);
+    document.getElementById('rs-menu-overlay')
+      ?.addEventListener('click', _fecharMenu);
 
-  // 📚 Edições — fluxo original (já validado em abrirDrawer)
-  document.getElementById('rs-menu-edicoes')
-    ?.addEventListener('click', () => {
-      _fecharMenu();
-      window.dispatchEvent(new CustomEvent('rs:abrirEdicoes'));
+    // 📚 Edições — fluxo original (já validado em abrirDrawer)
+    document.getElementById('rs-menu-edicoes')
+      ?.addEventListener('click', () => {
+        _fecharMenu();
+        window.dispatchEvent(new CustomEvent('rs:abrirEdicoes'));
+      });
+
+    // 🔔 Sentinela — COM VALIDAÇÃO DE SESSÃO
+    document.getElementById('rs-menu-alertas')
+      ?.addEventListener('click', async () => {
+        _fecharMenu();
+        if (typeof window._checarSessaoCritica === 'function') {
+          if (!(await window._checarSessaoCritica())) return;
+        }
+        window._rsAlertasAbrir?.();
+      });
+
+    document.getElementById('rs-menu-calendario')
+      ?.addEventListener('click', async () => {
+        _fecharMenu();
+        if (typeof window._checarSessaoCritica === 'function') {
+          if (!(await window._checarSessaoCritica())) return;
+        }
+        window.dispatchEvent(new CustomEvent('rs:abrirCalendario'));
+      });
+
+    // 💬 Ações — COM VALIDAÇÃO DE SESSÃO
+    document.getElementById('rs-menu-fale')
+      ?.addEventListener('click', async () => {
+        _fecharMenu();
+        if (typeof window._checarSessaoCritica === 'function') {
+          if (!(await window._checarSessaoCritica())) return;
+        }
+        window._rsFcAbrir?.();
+      });
+
+    // 👤 Minha Área — abre modal com iframe
+    document.getElementById('rs-menu-area')
+      ?.addEventListener('click', () => {
+        _fecharMenu();
+        _abrirModalLogin();
+      });
+
+    // ESC fecha
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape') _fecharMenu();
     });
 
-  // 🔔 Sentinela — COM VALIDAÇÃO DE SESSÃO
-  document.getElementById('rs-menu-alertas')
-    ?.addEventListener('click', async () => {
-      _fecharMenu();
-      if (typeof window._checarSessaoCritica === 'function') {
-        if (!(await window._checarSessaoCritica())) return;
-      }
-      window._rsAlertasAbrir?.();
-    });
-
-  // 💬 Ações — COM VALIDAÇÃO DE SESSÃO
-  document.getElementById('rs-menu-fale')
-    ?.addEventListener('click', async () => {
-      _fecharMenu();
-      if (typeof window._checarSessaoCritica === 'function') {
-        if (!(await window._checarSessaoCritica())) return;
-      }
-      window._rsFcAbrir?.();
-    });
-
-  // 👤 Minha Área — abre modal com iframe
-  document.getElementById('rs-menu-area')
-    ?.addEventListener('click', () => {
-      _fecharMenu();
-      _abrirModalLogin();
-    });
-
-  // ESC fecha
-  document.addEventListener('keydown', e => {
-    if (e.key === 'Escape') _fecharMenu();
-  });
-
-  // Atualiza badges periodicamente
-  setInterval(_atualizarBadges, 30000);
-  setTimeout(_atualizarBadges, 1000);
-}
+    // Atualiza badges periodicamente
+    setInterval(_atualizarBadges, 30000);
+    setTimeout(_atualizarBadges, 1000);
+  }
 
   // ── Toggle / Abrir / Fechar ───────────────────────────────────────────────
   let _aberto = false;
@@ -319,17 +334,17 @@ function _bindEventos() {
   function _atualizarTotalBadge() {
     // Lê badges individuais
     const bAlertas = _getBadgeCount('rs-alertas-badge');
-    const bFc      = _getBadgeCount('rs-fc-badge');
-    const total    = bAlertas + bFc;
+    const bFc = _getBadgeCount('rs-fc-badge');
+    const total = bAlertas + bFc;
 
     // Atualiza badges individuais no menu
     _setBadge('rs-menu-badge-alertas', bAlertas);
-    _setBadge('rs-menu-badge-fc',      bFc, true);
+    _setBadge('rs-menu-badge-fc', bFc, true);
 
     // Atualiza total no hamburger
     const tb = document.getElementById('rs-menu-total-badge');
     if (tb) {
-      tb.textContent   = total > 9 ? '9+' : String(total);
+      tb.textContent = total > 9 ? '9+' : String(total);
       tb.style.display = total > 0 ? 'block' : 'none';
     }
   }
@@ -343,25 +358,25 @@ function _bindEventos() {
   function _setBadge(id, count) {
     const el = document.getElementById(id);
     if (!el) return;
-    el.textContent   = count > 9 ? '9+' : String(count);
+    el.textContent = count > 9 ? '9+' : String(count);
     el.style.display = count > 0 ? 'inline-block' : 'none';
   }
 
   // ── Modal de login ───────────────────────────────────────────────────────
   function _abrirModalLogin() {
-  if (!document.getElementById('rs-login-modal')) {
-    const modal = document.createElement('div');
-    modal.id = 'rs-login-modal';
-    modal.style.cssText = `
+    if (!document.getElementById('rs-login-modal')) {
+      const modal = document.createElement('div');
+      modal.id = 'rs-login-modal';
+      modal.style.cssText = `
       position: fixed; inset: 0; z-index: 9000;
       background: rgba(0,0,0,.7);
       display: flex; align-items: center; justify-content: center;
       backdrop-filter: blur(3px);
       animation: rsFadeIn .2s ease;
     `;
-    const _emailParam = window._radarUser?.email
-      ? '?email=' + encodeURIComponent(window._radarUser.email) : '';
-    modal.innerHTML = `
+      const _emailParam = window._radarUser?.email
+        ? '?email=' + encodeURIComponent(window._radarUser.email) : '';
+      modal.innerHTML = `
       <style>
         @keyframes rsFadeIn { from { opacity:0 } to { opacity:1 } }
         @keyframes rsSlideUp { from { opacity:0; transform:translateY(20px) } to { opacity:1; transform:translateY(0) } }
@@ -388,23 +403,23 @@ function _bindEventos() {
         <iframe id="rs-login-iframe" src="/login.html${_emailParam}" title="Minha Área"></iframe>
       </div>`;
 
-    modal.addEventListener('click', e => {
-      if (e.target === modal) _fecharModalLogin();
-    });
-    document.body.appendChild(modal);
+      modal.addEventListener('click', e => {
+        if (e.target === modal) _fecharModalLogin();
+      });
+      document.body.appendChild(modal);
 
-    // ── Injeta loginUsuario no iframe após carregamento ──────────────────────
-    // Necessário porque site.js pode não estar carregado no contexto do iframe
-    const iframe = document.getElementById('rs-login-iframe');
-    iframe.addEventListener('load', function () {
-      // site.js já carregado em login.html — loginUsuario disponível nativamente
-      // Nenhuma injeção necessária
-    });
+      // ── Injeta loginUsuario no iframe após carregamento ──────────────────────
+      // Necessário porque site.js pode não estar carregado no contexto do iframe
+      const iframe = document.getElementById('rs-login-iframe');
+      iframe.addEventListener('load', function () {
+        // site.js já carregado em login.html — loginUsuario disponível nativamente
+        // Nenhuma injeção necessária
+      });
 
-  } else {
-    document.getElementById('rs-login-modal').style.display = 'flex';
+    } else {
+      document.getElementById('rs-login-modal').style.display = 'flex';
+    }
   }
-}
 
   function _fecharModalLogin() {
     const modal = document.getElementById('rs-login-modal');
@@ -415,32 +430,32 @@ function _bindEventos() {
     }
   }
 
-window._rsFecharLogin = _fecharModalLogin;
+  window._rsFecharLogin = _fecharModalLogin;
 
-// ── Recebe mensagens do iframe de login ──────────────────────────────────────
-window.addEventListener('message', function (e) {
-  // Botão "← Voltar ao app" dentro do iframe
-  if (e.data?.tipo === 'rs:fecharModal') {
-    _fecharModalLogin();
-    return;
-  }
-
-  // Login concluído: navega o iframe para painel.html
-  if (e.data?.tipo === 'rs:loginSucesso') {
-    const destino = e.data?.destino || 'painel.html';
-    const iframe  = document.getElementById('rs-login-iframe');
-    const wrap    = document.getElementById('rs-login-iframe-wrap');
-    if (wrap) {
-      wrap.style.width  = 'min(700px, 96vw)';
-      wrap.style.height = 'min(700px, 92vh)';
+  // ── Recebe mensagens do iframe de login ──────────────────────────────────────
+  window.addEventListener('message', function (e) {
+    // Botão "← Voltar ao app" dentro do iframe
+    if (e.data?.tipo === 'rs:fecharModal') {
+      _fecharModalLogin();
+      return;
     }
-    if (iframe) iframe.src = '/' + destino;
-    return;
-  }
-});
+
+    // Login concluído: navega o iframe para painel.html
+    if (e.data?.tipo === 'rs:loginSucesso') {
+      const destino = e.data?.destino || 'painel.html';
+      const iframe = document.getElementById('rs-login-iframe');
+      const wrap = document.getElementById('rs-login-iframe-wrap');
+      if (wrap) {
+        wrap.style.width = 'min(700px, 96vw)';
+        wrap.style.height = 'min(700px, 92vh)';
+      }
+      if (iframe) iframe.src = '/' + destino;
+      return;
+    }
+  });
 
   // Expõe para uso externo
-  window._rsMenuFechar          = _fecharMenu;
+  window._rsMenuFechar = _fecharMenu;
   window._rsMenuAtualizarBadges = _atualizarTotalBadge;
 
   // ── Boot ──────────────────────────────────────────────────────────────────
