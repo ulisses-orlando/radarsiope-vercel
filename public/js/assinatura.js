@@ -396,7 +396,16 @@ async function carregarListaPlanos() {
     if (!document.getElementById('css-assinatura-dinamico')) {
       const style = document.createElement('style');
       style.id = 'css-assinatura-dinamico';
-      style.textContent = `@media(max-width:768px){#grid-planos-dinamico{grid-template-columns:1fr !important;}}`;
+      style.textContent = `
+        @media(max-width:768px){#grid-planos-dinamico{grid-template-columns:1fr !important;}}
+        .plano-features { list-style: none; padding: 0; margin: 8px 0 0; font-size: 13px; line-height: 1.5; }
+        .plano-features li { padding: 2px 0; color: #334155; }
+        .plano-features li.inativo { color: #94a3b8; text-decoration: line-through; opacity: 0.7; }
+        .btn-ver-mais-features { display:block; background:none; border:none; color:#0A3D62; font-size:12px; font-weight:500; cursor:pointer; padding:4px 0; margin-top:4px; text-align:left; width:100%; }
+        .btn-ver-mais-features:hover { text-decoration: underline; color: #0f172a; }
+        .features-expanded { animation: fadeIn 0.2s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
+      `;
       document.head.appendChild(style);
     }
     wrap.appendChild(gridContainer);
@@ -465,19 +474,40 @@ function _criarCardPlano(plano, ciclo, allFeatures) {
   const cor = plano.cor_destaque || '#0A3D62';
   const features = plano.features || {};
 
-  const featuresHtml = allFeatures.map(f => {
+  const MAX_VISIBLE = 3;
+  const formatFeature = (f) => {
     const val = features[f.id];
-    const ativo = !!val;
     let label = f.nome || f.id;
     if (f.tipo === 'number') {
       const numVal = Number(val);
       if (!isNaN(numVal) && numVal > 0) {
-        const unidade = f.unidade || '/mês'; // ✅ Usa a unidade do Firestore (com fallback)
-        label += `(${numVal}${unidade})`;
+        label += `(${numVal}${f.unidade || '/mês'})`;
       }
     }
-    return `<li class="${ativo ? '' : 'inativo'}">${label}</li>`;
-  }).join('');
+    return label;
+  };
+
+  const ativos = allFeatures.filter(f => !!features[f.id]);
+  const inativos = allFeatures.filter(f => !features[f.id]);
+
+  // Renderiza apenas os 3 primeiros ativos
+  let featuresHtml = `<ul class="plano-features">${ativos.slice(0, MAX_VISIBLE).map(f => `<li>${formatFeature(f)}</li>`).join('')}</ul>`;
+
+  const extrasCount = Math.max(0, ativos.length - MAX_VISIBLE) + inativos.length;
+  if (extrasCount > 0) {
+    const hiddenList = [
+      ...ativos.slice(MAX_VISIBLE).map(f => `<li>${formatFeature(f)}</li>`),
+      ...inativos.map(f => `<li class="inativo">${f.nome || f.id}</li>`),
+    ].join('');
+
+    featuresHtml += `
+    <button type="button" class="btn-ver-mais-features" style="display:block;background:none;border:none;color:#0A3D62;font-size:12px;font-weight:500;cursor:pointer;padding:4px 0;margin-top:4px;text-align:left;width:100%;">
+      📋 Ver todos os recursos (+${extrasCount})
+    </button>
+    <div class="features-expanded" style="display:none; margin-top:6px; border-top:1px solid #f1f5f9; padding-top:6px;">
+      <ul class="plano-features">${hiddenList}</ul>
+    </div>`;
+  }
 
   const val = getPrecoPlano(plano, ciclo);
   const total = getTotalCiclo(plano, ciclo);
@@ -499,10 +529,11 @@ function _criarCardPlano(plano, ciclo, allFeatures) {
       <div class="plano-nome">${plano.nome || plano.id}</div>
       <div class="plano-preco-wrap">
         <span class="plano-preco-valor" style="color:${cor}">${plano.sob_consulta ? '—' : fmtBRL(val)}</span>
+        ${!plano.sob_consulta ? '<span class="plano-preco-ciclo">/mês</span>' : ''}
         <div class="plano-preco-total" style="font-size:11px;color:#666;margin-top:1px">
           ${!plano.sob_consulta && Number(ciclo) > 1 ? `Total: ${fmtBRL(total)}` : ''}
         </div>
-        ${!plano.sob_consulta ? '<span class="plano-preco-ciclo">/mês</span>' : ''}
+        
       </div>
       ${plano.descricao ? `<div class="plano-descricao">${plano.descricao}</div>` : ''}
       <ul class="plano-features">${featuresHtml}</ul>
@@ -537,7 +568,7 @@ function _criarCardPlano(plano, ciclo, allFeatures) {
 // ─── Ao selecionar um plano ───────────────────────────────────────────────────
 async function _onPlanoSelecionado(planId, cicloInicial = null) {
   const plano = await carregarPlano(planId);
-  
+
   if (!plano || plano.em_breve || plano.sob_consulta) return;
 
   const ciclosDisp = Array.isArray(plano.ciclos_disponiveis) && plano.ciclos_disponiveis.length
@@ -829,7 +860,7 @@ async function upsertUsuario(dados) {
     whatsapp: whatsapp || null, whatsapp_number: waNumber,
     whatsapp_optin: whatsapp ? (whatsappOptin ?? true) : false,
     whatsapp_optin_em: whatsapp ? firebase.firestore.FieldValue.serverTimestamp() : null,
-    tipo_perfil: perfil || null, ativo: false, 
+    tipo_perfil: perfil || null, ativo: false,
     preferencia_contato: preferencia || null,
     cod_uf: cod_uf || null, cod_municipio: cod6(cod_municipio) || null,
     nome_municipio: nome_municipio || null,
@@ -1178,6 +1209,21 @@ async function initAssinatura() {
 
   document.getElementById('parcelas')?.addEventListener('change', atualizarPreview);
   document.getElementById('form-assinatura')?.addEventListener('submit', processarEnvioAssinatura);
+
+  // Delegação para o toggle de features
+  document.addEventListener('click', (e) => {
+    const btn = e.target.closest('.btn-ver-mais-features');
+    if (!btn) return;
+    e.stopPropagation(); // ⚠️ Impede que o card seja selecionado ao clicar no botão
+    const card = btn.closest('.plano-card');
+    const wrapper = card.querySelector('.features-expanded');
+    const isHidden = wrapper.style.display === 'none';
+
+    wrapper.style.display = isHidden ? 'block' : 'none';
+    btn.textContent = isHidden
+      ? '🔼 Ocultar recursos'
+      : '📋 Ver todos os recursos (+' + (btn.textContent.match(/\+(\d+)/)?.[1] || '') + ')';
+  });
 }
 
 // ── Auto-init ──────────────────────────────────────────────────────────────────
