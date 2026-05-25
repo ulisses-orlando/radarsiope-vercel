@@ -1,1146 +1,2268 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
-
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Radar SIOPE — Revista eletrônica e central técnica para gestão educacional</title>
-  <meta name="description"
-    content="Conteúdo técnico, alertas e orientações práticas sobre Fundeb, SIOPE, CACS-Fundeb e Salário-Educação para secretários, técnicos e contadores da educação pública." />
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link
-    href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&family=Lora:ital,wght@0,400;0,600;1,400&display=swap"
-    rel="stylesheet" />
-
-  <style>
-    /* ── TOKENS ─────────────────────────────────── */
-    :root {
-      --navy: #07172e;
-      --navy2: #0d2145;
-      --blue: #1a5fd4;
-      --blue2: #2e7cf6;
-      --sky: #e8f1ff;
-      --gold: #f5c842;
-      --white: #ffffff;
-      --gray50: #f7f9fc;
-      --gray100: #eef1f7;
-      --gray400: #8a96ac;
-      --gray700: #3d4a5c;
-      --text: #1a2332;
-      --radius: 10px;
-      --shadow: 0 4px 24px rgba(7, 23, 46, .10);
-      --shadowM: 0 8px 40px rgba(7, 23, 46, .16);
-      --font-head: 'Sora', sans-serif;
-      --font-body: 'Lora', Georgia, serif;
-    }
-
-    /* ── RESET ──────────────────────────────────── */
-    *,
-    *::before,
-    *::after {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-    }
-
-    html {
-      scroll-behavior: smooth;
-    }
-
-    body {
-      font-family: var(--font-body);
-      font-size: 16px;
-      color: var(--text);
-      background: var(--white);
-      -webkit-font-smoothing: antialiased;
-    }
-
-    img {
-      display: block;
-      max-width: 100%;
-    }
-
-    a {
-      color: inherit;
-      text-decoration: none;
-    }
-
-    /* ── UTILITIES ──────────────────────────────── */
-    .container {
-      max-width: 1080px;
-      margin: 0 auto;
-      padding: 0 24px;
-    }
-
-    .sr-only {
-      position: absolute;
-      width: 1px;
-      height: 1px;
-      overflow: hidden;
-      clip: rect(0, 0, 0, 0);
-    }
-
-    /* ── NAV ────────────────────────────────────── */
-    .nav {
-      position: sticky;
-      top: 0;
-      z-index: 100;
-      background: var(--navy);
-      box-shadow: 0 2px 16px rgba(0, 0, 0, .25);
-    }
-
-    .nav__inner {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      height: 60px;
-    }
-
-    .nav__logo {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      font-family: var(--font-head);
-      font-weight: 800;
-      font-size: 1.15rem;
-      color: var(--white);
-      letter-spacing: -.01em;
-    }
-
-    .nav__logo-icon {
-      width: 34px;
-      height: 34px;
-      background: var(--blue2);
-      border-radius: 8px;
-      display: grid;
-      place-items: center;
-      font-size: 18px;
-    }
-
-    .nav__logo span {
-      color: var(--gold);
-    }
-
-    /* hamburger */
-    .nav__toggle {
-      display: none;
-      background: none;
-      border: none;
-      cursor: pointer;
-      padding: 6px;
-      color: var(--white);
-      font-size: 22px;
-    }
-
-    .nav__menu {
-      display: flex;
-      align-items: center;
-      gap: 4px;
-      list-style: none;
-    }
-
-    .nav__menu a {
-      font-family: var(--font-head);
-      font-size: .82rem;
-      font-weight: 600;
-      color: rgba(255, 255, 255, .78);
-      padding: 6px 11px;
-      border-radius: 6px;
-      transition: color .18s, background .18s;
-      white-space: nowrap;
-    }
-
-    .nav__menu a:hover,
-    .nav__menu a.active {
-      color: var(--white);
-      background: rgba(255, 255, 255, .10);
-    }
-
-    .nav__menu .nav__cta a {
-      background: var(--blue2);
-      color: var(--white);
-      padding: 7px 16px;
-    }
-
-    .nav__menu .nav__cta a:hover {
-      background: #4890ff;
-    }
-
-    /* dropdown */
-    .nav__item--drop {
-      position: relative;
-    }
-
-    .nav__dropdown {
-      display: none;
-      position: absolute;
-      top: calc(100% + 6px);
-      left: 0;
-      background: var(--white);
-      border: 1px solid var(--gray100);
-      border-radius: var(--radius);
-      box-shadow: var(--shadowM);
-      min-width: 180px;
-      overflow: hidden;
-    }
-
-    .nav__item--drop:hover .nav__dropdown {
-      display: block;
-    }
-
-    .nav__dropdown a {
-      display: block;
-      color: var(--gray700) !important;
-      padding: 10px 16px !important;
-      font-size: .83rem !important;
-      border-radius: 0 !important;
-      background: none !important;
-    }
-
-    .nav__dropdown a:hover {
-      background: var(--gray50) !important;
-      color: var(--blue) !important;
-    }
-
-    /* ── HERO ───────────────────────────────────── */
-    .hero {
-      position: relative;
-      background: linear-gradient(135deg, var(--navy) 0%, var(--navy2) 55%, #0e3170 100%);
-      overflow: hidden;
-      padding: 80px 0 72px;
-    }
-
-    .hero::before {
-      content: '';
-      position: absolute;
-      inset: 0;
-      background:
-        radial-gradient(ellipse 60% 80% at 80% 50%, rgba(42, 110, 220, .18) 0%, transparent 70%),
-        url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.025'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
-      pointer-events: none;
-    }
-
-    .hero__inner {
-      position: relative;
-      display: grid;
-      grid-template-columns: 1fr auto;
-      gap: 48px;
-      align-items: center;
-    }
-
-    .hero__eyebrow {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      font-family: var(--font-head);
-      font-size: .72rem;
-      font-weight: 700;
-      letter-spacing: .12em;
-      text-transform: uppercase;
-      color: var(--gold);
-      background: rgba(245, 200, 66, .12);
-      border: 1px solid rgba(245, 200, 66, .28);
-      padding: 4px 12px;
-      border-radius: 999px;
-      margin-bottom: 20px;
-    }
-
-    .hero__title {
-      font-family: var(--font-head);
-      font-weight: 800;
-      font-size: clamp(1.75rem, 4vw, 2.6rem);
-      line-height: 1.18;
-      color: var(--white);
-      margin-bottom: 18px;
-    }
-
-    .hero__title em {
-      font-style: normal;
-      color: var(--gold);
-    }
-
-    .hero__subtitle {
-      font-size: 1.05rem;
-      line-height: 1.65;
-      color: rgba(255, 255, 255, .78);
-      max-width: 560px;
-      margin-bottom: 32px;
-    }
-
-    .hero__tags {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
-      margin-bottom: 36px;
-    }
-
-    .hero__tag {
-      font-family: var(--font-head);
-      font-size: .75rem;
-      font-weight: 600;
-      background: rgba(255, 255, 255, .10);
-      color: rgba(255, 255, 255, .85);
-      border: 1px solid rgba(255, 255, 255, .16);
-      padding: 4px 12px;
-      border-radius: 999px;
-    }
-
-    .hero__actions {
-      display: flex;
-      gap: 12px;
-      flex-wrap: wrap;
-    }
-
-    .btn {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      font-family: var(--font-head);
-      font-weight: 700;
-      border-radius: var(--radius);
-      cursor: pointer;
-      transition: all .18s;
-      border: none;
-      text-decoration: none;
-    }
-
-    .btn--primary {
-      background: var(--blue2);
-      color: var(--white);
-      padding: 13px 28px;
-      font-size: .95rem;
-      box-shadow: 0 4px 18px rgba(30, 100, 230, .35);
-    }
-
-    .btn--primary:hover {
-      background: #4890ff;
-      transform: translateY(-2px);
-      box-shadow: 0 8px 28px rgba(30, 100, 230, .40);
-    }
-
-    .btn--ghost {
-      background: rgba(255, 255, 255, .10);
-      color: var(--white);
-      padding: 13px 24px;
-      font-size: .95rem;
-      border: 1px solid rgba(255, 255, 255, .22);
-    }
-
-    .btn--ghost:hover {
-      background: rgba(255, 255, 255, .16);
-      transform: translateY(-2px);
-    }
-
-    .hero__card {
-      background: rgba(255, 255, 255, .07);
-      border: 1px solid rgba(255, 255, 255, .13);
-      border-radius: 14px;
-      padding: 28px 22px;
-      min-width: 220px;
-      backdrop-filter: blur(8px);
-    }
-
-    .hero__stat {
-      text-align: center;
-      padding: 14px 0;
-      border-bottom: 1px solid rgba(255, 255, 255, .1);
-    }
-
-    .hero__stat:last-child {
-      border-bottom: none;
-      padding-bottom: 0;
-    }
-
-    .hero__stat-n {
-      font-family: var(--font-head);
-      font-size: 1.9rem;
-      font-weight: 800;
-      color: var(--gold);
-      line-height: 1;
-    }
-
-    .hero__stat-l {
-      font-family: var(--font-head);
-      font-size: .72rem;
-      font-weight: 600;
-      color: rgba(255, 255, 255, .6);
-      text-transform: uppercase;
-      letter-spacing: .08em;
-      margin-top: 4px;
-    }
-
-    /* ── FEATURES ───────────────────────────────── */
-    .features {
-      background: var(--gray50);
-      padding: 80px 0;
-    }
-
-    .section__label {
-      font-family: var(--font-head);
-      font-size: .72rem;
-      font-weight: 700;
-      letter-spacing: .12em;
-      text-transform: uppercase;
-      color: var(--blue);
-      margin-bottom: 10px;
-    }
-
-    .section__title {
-      font-family: var(--font-head);
-      font-weight: 800;
-      font-size: clamp(1.4rem, 3vw, 2rem);
-      color: var(--navy);
-      line-height: 1.25;
-      margin-bottom: 12px;
-    }
-
-    .section__lead {
-      font-size: 1.02rem;
-      color: var(--gray700);
-      line-height: 1.65;
-      max-width: 580px;
-      margin-bottom: 48px;
-    }
-
-    .features__grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-      gap: 20px;
-    }
-
-    .feature-card {
-      background: var(--white);
-      border: 1px solid var(--gray100);
-      border-radius: 12px;
-      padding: 28px 22px;
-      transition: box-shadow .2s, transform .2s, border-color .2s;
-      position: relative;
-      overflow: hidden;
-    }
-
-    .feature-card::before {
-      content: '';
-      position: absolute;
-      top: 0;
-      left: 0;
-      right: 0;
-      height: 3px;
-      background: linear-gradient(90deg, var(--blue), var(--blue2));
-      transform: scaleX(0);
-      transform-origin: left;
-      transition: transform .25s;
-    }
-
-    .feature-card:hover {
-      box-shadow: var(--shadowM);
-      transform: translateY(-4px);
-      border-color: #d0dff7;
-    }
-
-    .feature-card:hover::before {
-      transform: scaleX(1);
-    }
-
-    .feature-card__icon {
-      width: 46px;
-      height: 46px;
-      border-radius: 10px;
-      background: var(--sky);
-      display: grid;
-      place-items: center;
-      font-size: 20px;
-      margin-bottom: 16px;
-    }
-
-    .feature-card__title {
-      font-family: var(--font-head);
-      font-weight: 700;
-      font-size: .95rem;
-      color: var(--navy);
-      margin-bottom: 8px;
-    }
-
-    .feature-card__text {
-      font-size: .88rem;
-      color: var(--gray700);
-      line-height: 1.55;
-    }
-
-    /* ── CTA STRIP ──────────────────────────────── */
-    .cta-strip {
-      background: linear-gradient(135deg, var(--navy2) 0%, #0e3170 100%);
-      padding: 72px 0;
-      position: relative;
-      overflow: hidden;
-    }
-
-    .cta-strip::after {
-      content: '';
-      position: absolute;
-      bottom: -60px;
-      right: -60px;
-      width: 280px;
-      height: 280px;
-      background: radial-gradient(circle, rgba(42, 124, 214, .3), transparent 70%);
-      pointer-events: none;
-    }
-
-    .cta-strip__inner {
-      position: relative;
-      display: grid;
-      grid-template-columns: 1fr auto;
-      gap: 40px;
-      align-items: center;
-    }
-
-    .cta-strip__label {
-      font-family: var(--font-head);
-      font-size: .72rem;
-      font-weight: 700;
-      letter-spacing: .12em;
-      text-transform: uppercase;
-      color: var(--gold);
-      margin-bottom: 10px;
-    }
-
-    .cta-strip__title {
-      font-family: var(--font-head);
-      font-weight: 800;
-      font-size: clamp(1.3rem, 3vw, 1.9rem);
-      color: var(--white);
-      line-height: 1.25;
-      margin-bottom: 12px;
-    }
-
-    .cta-strip__text {
-      font-size: .97rem;
-      color: rgba(255, 255, 255, .72);
-      line-height: 1.65;
-      max-width: 520px;
-    }
-
-    .cta-strip__actions {
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-      align-items: flex-start;
-      min-width: 200px;
-    }
-
-    .btn--cta {
-      width: 100%;
-      background: var(--gold);
-      color: var(--navy);
-      padding: 14px 28px;
-      font-size: .95rem;
-      justify-content: center;
-      box-shadow: 0 4px 20px rgba(245, 200, 66, .30);
-    }
-
-    .btn--cta:hover {
-      background: #ffd733;
-      transform: translateY(-2px);
-    }
-
-    .btn--outline-white {
-      width: 100%;
-      background: transparent;
-      color: var(--white);
-      padding: 12px 24px;
-      font-size: .88rem;
-      border: 1px solid rgba(255, 255, 255, .3);
-      justify-content: center;
-    }
-
-    .btn--outline-white:hover {
-      background: rgba(255, 255, 255, .08);
-    }
-
-    /* ── ABOUT (área do assinante) ──────────────── */
-    .about {
-      padding: 80px 0;
-      background: var(--white);
-    }
-
-    .about__inner {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 64px;
-      align-items: center;
-    }
-
-    .about__text p {
-      font-size: 1rem;
-      color: var(--gray700);
-      line-height: 1.72;
-      margin-bottom: 16px;
-    }
-
-    .about__text p:last-of-type {
-      margin-bottom: 28px;
-    }
-
-    .about__highlights {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 16px;
-    }
-
-    .about__hl {
-      background: var(--sky);
-      border-radius: var(--radius);
-      padding: 16px;
-    }
-
-    .about__hl-icon {
-      font-size: 22px;
-      margin-bottom: 6px;
-    }
-
-    .about__hl-title {
-      font-family: var(--font-head);
-      font-weight: 700;
-      font-size: .88rem;
-      color: var(--navy);
-      margin-bottom: 4px;
-    }
-
-    .about__hl-text {
-      font-size: .8rem;
-      color: var(--gray700);
-      line-height: 1.45;
-    }
-
-    /* ── CONTACT BANNER ─────────────────────────── */
-    .contact-banner {
-      background: var(--gray50);
-      border-top: 1px solid var(--gray100);
-      border-bottom: 1px solid var(--gray100);
-      padding: 52px 0;
-    }
-
-    .contact-banner__inner {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 32px;
-      flex-wrap: wrap;
-    }
-
-    .contact-banner__title {
-      font-family: var(--font-head);
-      font-weight: 700;
-      font-size: 1.25rem;
-      color: var(--navy);
-      margin-bottom: 6px;
-    }
-
-    .contact-banner__text {
-      font-size: .95rem;
-      color: var(--gray700);
-    }
-
-    .btn--blue {
-      background: var(--blue);
-      color: var(--white);
-      padding: 13px 28px;
-      font-size: .92rem;
-      white-space: nowrap;
-    }
-
-    .btn--blue:hover {
-      background: var(--blue2);
-      transform: translateY(-2px);
-      box-shadow: 0 6px 20px rgba(26, 95, 212, .25);
-    }
-
-    /* ── FOOTER ─────────────────────────────────── */
-    footer {
-      background: var(--navy);
-      padding: 48px 0 28px;
-      color: rgba(255, 255, 255, .6);
-    }
-
-    .footer__top {
-      display: grid;
-      grid-template-columns: 1.4fr 1fr 1fr 1fr;
-      gap: 40px;
-      margin-bottom: 40px;
-    }
-
-    .footer__brand p {
-      font-size: .85rem;
-      line-height: 1.6;
-      margin-top: 12px;
-      max-width: 240px;
-    }
-
-    .footer__col-title {
-      font-family: var(--font-head);
-      font-weight: 700;
-      font-size: .78rem;
-      text-transform: uppercase;
-      letter-spacing: .1em;
-      color: var(--white);
-      margin-bottom: 14px;
-    }
-
-    .footer__links {
-      list-style: none;
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-    }
-
-    .footer__links a {
-      font-size: .84rem;
-      color: rgba(255, 255, 255, .55);
-      transition: color .15s;
-    }
-
-    .footer__links a:hover {
-      color: var(--white);
-    }
-
-    .footer__bottom {
-      border-top: 1px solid rgba(255, 255, 255, .1);
-      padding-top: 24px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      flex-wrap: wrap;
-      gap: 12px;
-      font-size: .8rem;
-    }
-
-    .footer__bottom a {
-      color: rgba(255, 255, 255, .5);
-    }
-
-    .footer__bottom a:hover {
-      color: var(--white);
-    }
-
-    /* ── ANIMATIONS ─────────────────────────────── */
-    @keyframes fadeUp {
-      from {
-        opacity: 0;
-        transform: translateY(24px);
-      }
-
-      to {
-        opacity: 1;
-        transform: translateY(0);
-      }
-    }
-
-    .anim {
-      opacity: 0;
-    }
-
-    .anim.visible {
-      animation: fadeUp .55s ease forwards;
-    }
-
-    .anim-d1 {
-      animation-delay: .05s;
-    }
-
-    .anim-d2 {
-      animation-delay: .12s;
-    }
-
-    .anim-d3 {
-      animation-delay: .19s;
-    }
-
-    .anim-d4 {
-      animation-delay: .26s;
-    }
-
-    .anim-d5 {
-      animation-delay: .33s;
-    }
-
-    /* ── RESPONSIVE ─────────────────────────────── */
-    @media (max-width: 900px) {
-      .hero__inner {
-        grid-template-columns: 1fr;
-      }
-
-      .hero__card {
-        display: none;
-      }
-
-      .cta-strip__inner {
-        grid-template-columns: 1fr;
-      }
-
-      .cta-strip__actions {
-        flex-direction: row;
-        min-width: unset;
-      }
-
-      .cta-strip__actions .btn {
-        width: auto;
-      }
-
-      .about__inner {
-        grid-template-columns: 1fr;
-      }
-
-      .footer__top {
-        grid-template-columns: 1fr 1fr;
-      }
-    }
-
-    @media (max-width: 640px) {
-      .nav__toggle {
-        display: block;
-      }
-
-      .nav__menu {
-        display: none;
-        position: absolute;
-        top: 60px;
-        left: 0;
-        right: 0;
-        background: var(--navy2);
-        flex-direction: column;
-        align-items: stretch;
-        padding: 12px 16px 16px;
-        gap: 2px;
-        border-bottom: 2px solid var(--blue);
-      }
-
-      .nav__menu.open {
-        display: flex;
-      }
-
-      .nav__menu a {
-        padding: 10px 12px;
-      }
-
-      .nav__dropdown {
-        position: static;
-        box-shadow: none;
-        border: none;
-        background: rgba(255, 255, 255, .05);
-      }
-
-      .nav__item--drop:hover .nav__dropdown {
-        display: none;
-      }
-
-      .nav__item--drop.open .nav__dropdown {
-        display: block;
-      }
-
-      .nav__dropdown a {
-        color: rgba(255, 255, 255, .7) !important;
-      }
-
-      .features__grid {
-        grid-template-columns: 1fr 1fr;
-      }
-
-      .about__highlights {
-        grid-template-columns: 1fr;
-      }
-
-      .footer__top {
-        grid-template-columns: 1fr;
-      }
-
-      .contact-banner__inner {
-        flex-direction: column;
-        align-items: flex-start;
-      }
-    }
-
-    @media (max-width: 400px) {
-      .features__grid {
-        grid-template-columns: 1fr;
-      }
-    }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Radar SIOPE — Inteligência Municipal em Educação</title>
+    <meta name="description" content="Plataforma PWA de monitoramento, conformidade e capacitação para gestores municipais de educação no Brasil.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #0f172a;
+            --primary-light: #1e293b;
+            --accent: #3b82f6;
+            --accent-glow: rgba(59, 130, 246, 0.3);
+            --accent-secondary: #06b6d4;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --text: #f8fafc;
+            --text-muted: #94a3b8;
+            --text-dim: #64748b;
+            --surface: #0f172a;
+            --surface-elevated: #1e293b;
+            --surface-card: #162032;
+            --border: rgba(148, 163, 184, 0.1);
+            --gradient-hero: linear-gradient(135deg, #0f172a 0%, #1e3a5f 50%, #0f172a 100%);
+            --gradient-accent: linear-gradient(135deg, #3b82f6 0%, #06b6d4 100%);
+            --shadow-sm: 0 1px 2px rgba(0,0,0,0.3);
+            --shadow-md: 0 4px 6px -1px rgba(0,0,0,0.4);
+            --shadow-lg: 0 10px 15px -3px rgba(0,0,0,0.5);
+            --shadow-glow: 0 0 40px rgba(59, 130, 246, 0.15);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html {
+            scroll-behavior: smooth;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--surface);
+            color: var(--text);
+            line-height: 1.6;
+            overflow-x: hidden;
+        }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: var(--primary);
+        }
+        ::-webkit-scrollbar-thumb {
+            background: var(--accent);
+            border-radius: 4px;
+        }
+
+        /* Animations */
+        @keyframes fadeInUp {
+            from { opacity: 0; transform: translateY(30px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        @keyframes slideInLeft {
+            from { opacity: 0; transform: translateX(-40px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+
+        @keyframes slideInRight {
+            from { opacity: 0; transform: translateX(40px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-10px); }
+        }
+
+        @keyframes gradientShift {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+
+        @keyframes drawLine {
+            from { stroke-dashoffset: 1000; }
+            to { stroke-dashoffset: 0; }
+        }
+
+        .animate-on-scroll {
+            opacity: 0;
+            transform: translateY(30px);
+            transition: opacity 0.8s ease, transform 0.8s ease;
+        }
+
+        .animate-on-scroll.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .delay-1 { transition-delay: 0.1s; }
+        .delay-2 { transition-delay: 0.2s; }
+        .delay-3 { transition-delay: 0.3s; }
+        .delay-4 { transition-delay: 0.4s; }
+        .delay-5 { transition-delay: 0.5s; }
+
+        /* Navigation */
+        .navbar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 1000;
+            padding: 1rem 2rem;
+            background: rgba(15, 23, 42, 0.8);
+            backdrop-filter: blur(20px);
+            border-bottom: 1px solid var(--border);
+            transition: all 0.3s ease;
+        }
+
+        .navbar.scrolled {
+            padding: 0.75rem 2rem;
+            background: rgba(15, 23, 42, 0.95);
+            box-shadow: var(--shadow-lg);
+        }
+
+        .nav-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            text-decoration: none;
+        }
+
+        .logo-icon {
+            width: 40px;
+            height: 40px;
+            background: var(--gradient-accent);
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 800;
+            font-size: 1.1rem;
+            color: white;
+            box-shadow: 0 0 20px var(--accent-glow);
+        }
+
+        .logo-text {
+            font-family: 'Space Grotesk', sans-serif;
+            font-weight: 700;
+            font-size: 1.25rem;
+            color: var(--text);
+            letter-spacing: -0.02em;
+        }
+
+        .logo-text span {
+            color: var(--accent);
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 2rem;
+            align-items: center;
+        }
+
+        .nav-links a {
+            color: var(--text-muted);
+            text-decoration: none;
+            font-size: 0.875rem;
+            font-weight: 500;
+            transition: color 0.3s ease;
+            position: relative;
+        }
+
+        .nav-links a::after {
+            content: '';
+            position: absolute;
+            bottom: -4px;
+            left: 0;
+            width: 0;
+            height: 2px;
+            background: var(--accent);
+            transition: width 0.3s ease;
+        }
+
+        .nav-links a:hover {
+            color: var(--text);
+        }
+
+        .nav-links a:hover::after {
+            width: 100%;
+        }
+
+        .nav-cta {
+            background: var(--gradient-accent);
+            color: white;
+            padding: 0.625rem 1.25rem;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 0.875rem;
+            text-decoration: none;
+            transition: all 0.3s ease;
+            box-shadow: 0 0 20px var(--accent-glow);
+        }
+
+        .nav-cta:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 0 30px var(--accent-glow);
+        }
+
+        .mobile-menu-btn {
+            display: none;
+            background: none;
+            border: none;
+            color: var(--text);
+            font-size: 1.5rem;
+            cursor: pointer;
+        }
+
+        /* Hero Section */
+        .hero {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            padding: 8rem 2rem 4rem;
+            overflow: hidden;
+            background: var(--gradient-hero);
+        }
+
+        .hero-bg {
+            position: absolute;
+            inset: 0;
+            overflow: hidden;
+        }
+
+        .hero-grid {
+            position: absolute;
+            inset: 0;
+            background-image: 
+                linear-gradient(rgba(59, 130, 246, 0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(59, 130, 246, 0.03) 1px, transparent 1px);
+            background-size: 60px 60px;
+            mask-image: radial-gradient(ellipse at center, black 40%, transparent 70%);
+        }
+
+        .hero-orb {
+            position: absolute;
+            border-radius: 50%;
+            filter: blur(80px);
+            opacity: 0.4;
+            animation: float 6s ease-in-out infinite;
+        }
+
+        .hero-orb-1 {
+            width: 400px;
+            height: 400px;
+            background: var(--accent);
+            top: -10%;
+            right: -5%;
+            animation-delay: 0s;
+        }
+
+        .hero-orb-2 {
+            width: 300px;
+            height: 300px;
+            background: var(--accent-secondary);
+            bottom: -10%;
+            left: -5%;
+            animation-delay: 2s;
+        }
+
+        .hero-orb-3 {
+            width: 200px;
+            height: 200px;
+            background: var(--success);
+            top: 40%;
+            left: 30%;
+            opacity: 0.2;
+            animation-delay: 4s;
+        }
+
+        .hero-content {
+            max-width: 1200px;
+            width: 100%;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 4rem;
+            align-items: center;
+            position: relative;
+            z-index: 1;
+        }
+
+        .hero-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            background: rgba(59, 130, 246, 0.1);
+            border: 1px solid rgba(59, 130, 246, 0.2);
+            padding: 0.5rem 1rem;
+            border-radius: 100px;
+            font-size: 0.875rem;
+            color: var(--accent);
+            margin-bottom: 1.5rem;
+            animation: fadeInUp 0.6s ease;
+        }
+
+        .hero-badge .pulse-dot {
+            width: 8px;
+            height: 8px;
+            background: var(--accent);
+            border-radius: 50%;
+            animation: pulse 2s ease-in-out infinite;
+        }
+
+        .hero-title {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 3.5rem;
+            font-weight: 800;
+            line-height: 1.1;
+            letter-spacing: -0.03em;
+            margin-bottom: 1.5rem;
+            animation: fadeInUp 0.6s ease 0.1s both;
+        }
+
+        .hero-title .gradient-text {
+            background: var(--gradient-accent);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .hero-subtitle {
+            font-size: 1.125rem;
+            color: var(--text-muted);
+            max-width: 500px;
+            margin-bottom: 2rem;
+            animation: fadeInUp 0.6s ease 0.2s both;
+        }
+
+        .hero-cta-group {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 3rem;
+            animation: fadeInUp 0.6s ease 0.3s both;
+        }
+
+        .btn-primary {
+            background: var(--gradient-accent);
+            color: white;
+            padding: 1rem 2rem;
+            border-radius: 12px;
+            font-weight: 600;
+            font-size: 1rem;
+            text-decoration: none;
+            border: none;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 0 30px var(--accent-glow);
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 0 40px var(--accent-glow);
+        }
+
+        .btn-secondary {
+            background: transparent;
+            color: var(--text);
+            padding: 1rem 2rem;
+            border-radius: 12px;
+            font-weight: 600;
+            font-size: 1rem;
+            text-decoration: none;
+            border: 1px solid var(--border);
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .btn-secondary:hover {
+            background: var(--surface-elevated);
+            border-color: var(--accent);
+        }
+
+        .hero-stats {
+            display: flex;
+            gap: 2.5rem;
+            animation: fadeInUp 0.6s ease 0.4s both;
+        }
+
+        .stat-item {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .stat-value {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 1.75rem;
+            font-weight: 700;
+            color: var(--accent);
+        }
+
+        .stat-label {
+            font-size: 0.875rem;
+            color: var(--text-dim);
+        }
+
+        /* Hero Visual */
+        .hero-visual {
+            position: relative;
+            animation: fadeIn 1s ease 0.5s both;
+        }
+
+        .phone-mockup {
+            width: 100%;
+            max-width: 340px;
+            margin: 0 auto;
+            position: relative;
+        }
+
+        .phone-frame {
+            background: var(--surface-elevated);
+            border-radius: 40px;
+            padding: 12px;
+            box-shadow: 
+                0 25px 50px -12px rgba(0, 0, 0, 0.5),
+                0 0 0 1px rgba(255, 255, 255, 0.05),
+                inset 0 0 0 1px rgba(255, 255, 255, 0.05);
+            position: relative;
+        }
+
+        .phone-screen {
+            background: var(--primary);
+            border-radius: 32px;
+            overflow: hidden;
+            aspect-ratio: 9/19;
+            position: relative;
+        }
+
+        .phone-notch {
+            position: absolute;
+            top: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 120px;
+            height: 28px;
+            background: var(--surface-elevated);
+            border-radius: 0 0 20px 20px;
+            z-index: 10;
+        }
+
+        .screen-content {
+            padding: 3rem 1.25rem 1.25rem;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+        }
+
+        .screen-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.5rem;
+        }
+
+        .screen-title {
+            font-size: 0.875rem;
+            font-weight: 600;
+            color: var(--text);
+        }
+
+        .screen-date {
+            font-size: 0.75rem;
+            color: var(--text-dim);
+        }
+
+        .screen-card {
+            background: var(--surface-card);
+            border-radius: 16px;
+            padding: 1rem;
+            border: 1px solid var(--border);
+        }
+
+        .card-label {
+            font-size: 0.625rem;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            color: var(--accent);
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+        }
+
+        .card-title {
+            font-size: 0.875rem;
+            font-weight: 600;
+            color: var(--text);
+            margin-bottom: 0.5rem;
+            line-height: 1.4;
+        }
+
+        .card-meta {
+            display: flex;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+        }
+
+        .meta-tag {
+            font-size: 0.625rem;
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            background: rgba(59, 130, 246, 0.1);
+            color: var(--accent);
+        }
+
+        .screen-alert {
+            background: linear-gradient(135deg, rgba(239, 68, 68, 0.1), rgba(245, 158, 11, 0.1));
+            border: 1px solid rgba(239, 68, 68, 0.2);
+            border-radius: 12px;
+            padding: 0.875rem;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .alert-icon {
+            width: 32px;
+            height: 32px;
+            background: rgba(239, 68, 68, 0.2);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--danger);
+            font-size: 1rem;
+            flex-shrink: 0;
+        }
+
+        .alert-text {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            line-height: 1.4;
+        }
+
+        .alert-text strong {
+            color: var(--text);
+            display: block;
+            margin-bottom: 0.25rem;
+        }
+
+        .screen-chart {
+            background: var(--surface-card);
+            border-radius: 16px;
+            padding: 1rem;
+            border: 1px solid var(--border);
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .chart-bars {
+            display: flex;
+            align-items: flex-end;
+            gap: 0.5rem;
+            height: 80px;
+            margin-top: auto;
+        }
+
+        .chart-bar {
+            flex: 1;
+            border-radius: 4px 4px 0 0;
+            background: var(--gradient-accent);
+            opacity: 0.7;
+            transition: all 0.3s ease;
+        }
+
+        .chart-bar:nth-child(3) {
+            opacity: 1;
+            box-shadow: 0 0 10px var(--accent-glow);
+        }
+
+        .fab {
+            position: absolute;
+            bottom: 1.5rem;
+            right: 1.5rem;
+            width: 48px;
+            height: 48px;
+            background: var(--gradient-accent);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 1.25rem;
+            box-shadow: 0 4px 15px var(--accent-glow);
+            animation: float 3s ease-in-out infinite;
+            cursor: pointer;
+            z-index: 20;
+        }
+
+        /* Floating elements around phone */
+        .float-card {
+            position: absolute;
+            background: var(--surface-elevated);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 0.75rem 1rem;
+            box-shadow: var(--shadow-lg);
+            font-size: 0.75rem;
+            animation: float 4s ease-in-out infinite;
+        }
+
+        .float-card-1 {
+            top: 10%;
+            right: -20px;
+            animation-delay: 0s;
+        }
+
+        .float-card-2 {
+            bottom: 20%;
+            left: -30px;
+            animation-delay: 1.5s;
+        }
+
+        .float-card-3 {
+            top: 50%;
+            right: -40px;
+            animation-delay: 3s;
+        }
+
+        /* Section Styles */
+        .section {
+            padding: 6rem 2rem;
+            position: relative;
+        }
+
+        .section-container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .section-header {
+            text-align: center;
+            max-width: 640px;
+            margin: 0 auto 4rem;
+        }
+
+        .section-label {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.875rem;
+            font-weight: 600;
+            color: var(--accent);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 1rem;
+        }
+
+        .section-title {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 2.5rem;
+            font-weight: 700;
+            line-height: 1.2;
+            margin-bottom: 1rem;
+            letter-spacing: -0.02em;
+        }
+
+        .section-desc {
+            font-size: 1.125rem;
+            color: var(--text-muted);
+        }
+
+        /* Problem Section */
+        .problem-section {
+            background: var(--primary-light);
+        }
+
+        .problem-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 1.5rem;
+        }
+
+        .problem-card {
+            background: var(--surface-card);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 2rem;
+            transition: all 0.3s ease;
+        }
+
+        .problem-card:hover {
+            transform: translateY(-5px);
+            border-color: rgba(59, 130, 246, 0.3);
+            box-shadow: var(--shadow-glow);
+        }
+
+        .problem-icon {
+            width: 48px;
+            height: 48px;
+            background: rgba(239, 68, 68, 0.1);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            margin-bottom: 1.25rem;
+        }
+
+        .problem-card h3 {
+            font-size: 1.125rem;
+            font-weight: 600;
+            margin-bottom: 0.75rem;
+        }
+
+        .problem-card p {
+            font-size: 0.9375rem;
+            color: var(--text-muted);
+            line-height: 1.6;
+        }
+
+        /* Features Section */
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 1.5rem;
+        }
+
+        .feature-card {
+            background: var(--surface-card);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            padding: 2rem;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .feature-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: var(--gradient-accent);
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .feature-card:hover::before {
+            opacity: 1;
+        }
+
+        .feature-card:hover {
+            transform: translateY(-5px);
+            border-color: rgba(59, 130, 246, 0.2);
+            box-shadow: var(--shadow-glow);
+        }
+
+        .feature-icon {
+            width: 56px;
+            height: 56px;
+            background: rgba(59, 130, 246, 0.1);
+            border-radius: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.75rem;
+            margin-bottom: 1.25rem;
+        }
+
+        .feature-card h3 {
+            font-size: 1.25rem;
+            font-weight: 600;
+            margin-bottom: 0.75rem;
+        }
+
+        .feature-card p {
+            font-size: 0.9375rem;
+            color: var(--text-muted);
+            line-height: 1.6;
+            margin-bottom: 1rem;
+        }
+
+        .feature-tags {
+            display: flex;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+        }
+
+        .feature-tag {
+            font-size: 0.75rem;
+            padding: 0.375rem 0.75rem;
+            border-radius: 100px;
+            background: rgba(59, 130, 246, 0.1);
+            color: var(--accent);
+            font-weight: 500;
+        }
+
+        /* Media Showcase */
+        .media-section {
+            background: var(--primary-light);
+        }
+
+        .media-showcase {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 1rem;
+        }
+
+        .media-item {
+            background: var(--surface-card);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 1.5rem;
+            text-align: center;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .media-item:hover {
+            transform: translateY(-8px);
+            border-color: var(--accent);
+            box-shadow: var(--shadow-glow);
+        }
+
+        .media-item.featured {
+            border-color: var(--accent);
+            box-shadow: 0 0 20px var(--accent-glow);
+        }
+
+        .media-item.featured::after {
+            content: 'NOVO';
+            position: absolute;
+            top: 12px;
+            right: -28px;
+            background: var(--accent);
+            color: white;
+            font-size: 0.625rem;
+            font-weight: 700;
+            padding: 0.25rem 2rem;
+            transform: rotate(45deg);
+        }
+
+        .media-icon {
+            font-size: 2.5rem;
+            margin-bottom: 1rem;
+            display: block;
+        }
+
+        .media-name {
+            font-weight: 600;
+            font-size: 1rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .media-desc {
+            font-size: 0.8125rem;
+            color: var(--text-muted);
+            line-height: 1.5;
+        }
+
+        /* AI Section */
+        .ai-section {
+            position: relative;
+            overflow: hidden;
+        }
+
+        .ai-bg-grid {
+            position: absolute;
+            inset: 0;
+            background-image: 
+                linear-gradient(rgba(6, 182, 212, 0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(6, 182, 212, 0.03) 1px, transparent 1px);
+            background-size: 40px 40px;
+        }
+
+        .ai-container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 4rem;
+            align-items: center;
+            position: relative;
+            z-index: 1;
+        }
+
+        .ai-visual {
+            position: relative;
+        }
+
+        .ai-chat {
+            background: var(--surface-card);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            padding: 1.5rem;
+            max-width: 420px;
+            box-shadow: var(--shadow-lg);
+        }
+
+        .chat-header {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            margin-bottom: 1.25rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .chat-avatar {
+            width: 40px;
+            height: 40px;
+            background: var(--gradient-accent);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.25rem;
+        }
+
+        .chat-info h4 {
+            font-size: 0.9375rem;
+            font-weight: 600;
+        }
+
+        .chat-info span {
+            font-size: 0.75rem;
+            color: var(--success);
+            display: flex;
+            align-items: center;
+            gap: 0.25rem;
+        }
+
+        .chat-messages {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .chat-message {
+            display: flex;
+            gap: 0.75rem;
+        }
+
+        .chat-message.user {
+            flex-direction: row-reverse;
+        }
+
+        .message-bubble {
+            background: var(--surface-elevated);
+            border-radius: 12px;
+            padding: 0.875rem 1rem;
+            font-size: 0.875rem;
+            line-height: 1.5;
+            max-width: 280px;
+        }
+
+        .chat-message.user .message-bubble {
+            background: var(--gradient-accent);
+            color: white;
+        }
+
+        .message-time {
+            font-size: 0.6875rem;
+            color: var(--text-dim);
+            margin-top: 0.25rem;
+        }
+
+        .chat-input {
+            display: flex;
+            gap: 0.75rem;
+            margin-top: 1.25rem;
+            padding-top: 1rem;
+            border-top: 1px solid var(--border);
+        }
+
+        .chat-input-field {
+            flex: 1;
+            background: var(--surface-elevated);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 0.75rem 1rem;
+            color: var(--text);
+            font-size: 0.875rem;
+        }
+
+        .chat-input-field::placeholder {
+            color: var(--text-dim);
+        }
+
+        .chat-send {
+            width: 40px;
+            height: 40px;
+            background: var(--gradient-accent);
+            border: none;
+            border-radius: 10px;
+            color: white;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .ai-features {
+            display: flex;
+            flex-direction: column;
+            gap: 1.25rem;
+        }
+
+        .ai-feature-item {
+            display: flex;
+            gap: 1rem;
+            align-items: flex-start;
+        }
+
+        .ai-feature-icon {
+            width: 40px;
+            height: 40px;
+            background: rgba(6, 182, 212, 0.1);
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.25rem;
+            flex-shrink: 0;
+        }
+
+        .ai-feature-text h4 {
+            font-size: 1rem;
+            font-weight: 600;
+            margin-bottom: 0.25rem;
+        }
+
+        .ai-feature-text p {
+            font-size: 0.875rem;
+            color: var(--text-muted);
+        }
+
+        /* Pricing Section */
+        .pricing-section {
+            background: var(--primary-light);
+        }
+
+        .pricing-tabs {
+            display: flex;
+            justify-content: center;
+            gap: 0.5rem;
+            margin-bottom: 3rem;
+            background: var(--surface-card);
+            padding: 0.5rem;
+            border-radius: 12px;
+            width: fit-content;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        .pricing-tab {
+            padding: 0.625rem 1.5rem;
+            border-radius: 8px;
+            border: none;
+            background: transparent;
+            color: var(--text-muted);
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 0.9375rem;
+        }
+
+        .pricing-tab.active {
+            background: var(--gradient-accent);
+            color: white;
+            box-shadow: 0 0 15px var(--accent-glow);
+        }
+
+        .pricing-grid {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 1rem;
+            align-items: start;
+        }
+
+        .pricing-card {
+            background: var(--surface-card);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            padding: 1.75rem;
+            transition: all 0.3s ease;
+            position: relative;
+        }
+
+        .pricing-card:hover {
+            transform: translateY(-8px);
+            border-color: rgba(59, 130, 246, 0.3);
+            box-shadow: var(--shadow-glow);
+        }
+
+        .pricing-card.popular {
+            border-color: var(--accent);
+            box-shadow: 0 0 30px var(--accent-glow);
+            transform: scale(1.05);
+        }
+
+        .pricing-card.popular:hover {
+            transform: scale(1.05) translateY(-8px);
+        }
+
+        .popular-badge {
+            position: absolute;
+            top: -12px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--gradient-accent);
+            color: white;
+            padding: 0.375rem 1rem;
+            border-radius: 100px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            box-shadow: 0 4px 10px var(--accent-glow);
+        }
+
+        .plan-name {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 1.125rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+        }
+
+        .plan-desc {
+            font-size: 0.8125rem;
+            color: var(--text-muted);
+            margin-bottom: 1.25rem;
+            min-height: 40px;
+        }
+
+        .plan-price {
+            margin-bottom: 1.5rem;
+        }
+
+        .price-value {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 2.25rem;
+            font-weight: 800;
+            color: var(--text);
+        }
+
+        .price-period {
+            font-size: 0.875rem;
+            color: var(--text-muted);
+        }
+
+        .price-original {
+            font-size: 0.875rem;
+            color: var(--text-dim);
+            text-decoration: line-through;
+            margin-left: 0.5rem;
+        }
+
+        .plan-features {
+            list-style: none;
+            margin-bottom: 1.5rem;
+        }
+
+        .plan-features li {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.875rem;
+            color: var(--text-muted);
+            margin-bottom: 0.75rem;
+        }
+
+        .plan-features li.included::before {
+            content: '✓';
+            color: var(--success);
+            font-weight: 700;
+            width: 20px;
+            text-align: center;
+        }
+
+        .plan-features li.not-included {
+            opacity: 0.4;
+        }
+
+        .plan-features li.not-included::before {
+            content: '—';
+            color: var(--text-dim);
+            width: 20px;
+            text-align: center;
+        }
+
+        .plan-cta {
+            width: 100%;
+            padding: 0.875rem;
+            border-radius: 10px;
+            border: 1px solid var(--border);
+            background: transparent;
+            color: var(--text);
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 0.9375rem;
+        }
+
+        .plan-cta:hover {
+            background: var(--surface-elevated);
+            border-color: var(--accent);
+        }
+
+        .pricing-card.popular .plan-cta {
+            background: var(--gradient-accent);
+            border: none;
+            color: white;
+            box-shadow: 0 0 20px var(--accent-glow);
+        }
+
+        .pricing-card.popular .plan-cta:hover {
+            box-shadow: 0 0 30px var(--accent-glow);
+        }
+
+        .fidelity-note {
+            text-align: center;
+            margin-top: 2rem;
+            font-size: 0.875rem;
+            color: var(--text-muted);
+        }
+
+        .fidelity-note strong {
+            color: var(--accent);
+        }
+
+        /* Retention Section */
+        .retention-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 1.5rem;
+        }
+
+        .retention-card {
+            background: var(--surface-card);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 2rem;
+            transition: all 0.3s ease;
+        }
+
+        .retention-card:hover {
+            transform: translateY(-5px);
+            border-color: var(--accent);
+            box-shadow: var(--shadow-glow);
+        }
+
+        .retention-icon {
+            width: 48px;
+            height: 48px;
+            background: rgba(16, 185, 129, 0.1);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            margin-bottom: 1.25rem;
+        }
+
+        .retention-card h3 {
+            font-size: 1.125rem;
+            font-weight: 600;
+            margin-bottom: 0.75rem;
+        }
+
+        .retention-card p {
+            font-size: 0.9375rem;
+            color: var(--text-muted);
+            line-height: 1.6;
+        }
+
+        /* CTA Section */
+        .cta-section {
+            position: relative;
+            overflow: hidden;
+            padding: 8rem 2rem;
+        }
+
+        .cta-bg {
+            position: absolute;
+            inset: 0;
+            background: var(--gradient-hero);
+        }
+
+        .cta-orb {
+            position: absolute;
+            border-radius: 50%;
+            filter: blur(100px);
+            opacity: 0.3;
+        }
+
+        .cta-orb-1 {
+            width: 500px;
+            height: 500px;
+            background: var(--accent);
+            top: -50%;
+            left: -10%;
+        }
+
+        .cta-orb-2 {
+            width: 400px;
+            height: 400px;
+            background: var(--accent-secondary);
+            bottom: -50%;
+            right: -10%;
+        }
+
+        .cta-content {
+            position: relative;
+            z-index: 1;
+            text-align: center;
+            max-width: 700px;
+            margin: 0 auto;
+        }
+
+        .cta-title {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 3rem;
+            font-weight: 800;
+            line-height: 1.1;
+            margin-bottom: 1.5rem;
+            letter-spacing: -0.02em;
+        }
+
+        .cta-desc {
+            font-size: 1.25rem;
+            color: var(--text-muted);
+            margin-bottom: 2.5rem;
+        }
+
+        .cta-buttons {
+            display: flex;
+            gap: 1rem;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        /* Footer */
+        .footer {
+            border-top: 1px solid var(--border);
+            padding: 3rem 2rem;
+            background: var(--primary);
+        }
+
+        .footer-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: 2fr 1fr 1fr 1fr;
+            gap: 3rem;
+        }
+
+        .footer-brand {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .footer-brand .logo-text {
+            font-size: 1.5rem;
+        }
+
+        .footer-brand p {
+            font-size: 0.875rem;
+            color: var(--text-muted);
+            line-height: 1.6;
+            max-width: 300px;
+        }
+
+        .footer-links h4 {
+            font-size: 0.875rem;
+            font-weight: 600;
+            margin-bottom: 1rem;
+            color: var(--text);
+        }
+
+        .footer-links ul {
+            list-style: none;
+        }
+
+        .footer-links li {
+            margin-bottom: 0.75rem;
+        }
+
+        .footer-links a {
+            color: var(--text-muted);
+            text-decoration: none;
+            font-size: 0.875rem;
+            transition: color 0.3s ease;
+        }
+
+        .footer-links a:hover {
+            color: var(--accent);
+        }
+
+        .footer-bottom {
+            max-width: 1200px;
+            margin: 3rem auto 0;
+            padding-top: 2rem;
+            border-top: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .footer-bottom p {
+            font-size: 0.8125rem;
+            color: var(--text-dim);
+        }
+
+        /* Responsive */
+        @media (max-width: 1024px) {
+            .hero-content {
+                grid-template-columns: 1fr;
+                text-align: center;
+            }
+
+            .hero-subtitle {
+                margin-left: auto;
+                margin-right: auto;
+            }
+
+            .hero-cta-group {
+                justify-content: center;
+            }
+
+            .hero-stats {
+                justify-content: center;
+            }
+
+            .hero-visual {
+                order: -1;
+            }
+
+            .phone-mockup {
+                max-width: 280px;
+            }
+
+            .features-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .media-showcase {
+                grid-template-columns: repeat(2, 1fr);
+            }
+
+            .ai-container {
+                grid-template-columns: 1fr;
+            }
+
+            .ai-visual {
+                order: 1;
+            }
+
+            .pricing-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+
+            .pricing-card.popular {
+                transform: none;
+                grid-column: span 2;
+            }
+
+            .pricing-card.popular:hover {
+                transform: translateY(-8px);
+            }
+
+            .problem-grid,
+            .retention-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .footer-container {
+                grid-template-columns: 1fr 1fr;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .navbar {
+                padding: 1rem;
+            }
+
+            .nav-links {
+                display: none;
+            }
+
+            .mobile-menu-btn {
+                display: block;
+            }
+
+            .hero-title {
+                font-size: 2.25rem;
+            }
+
+            .section-title {
+                font-size: 1.875rem;
+            }
+
+            .media-showcase {
+                grid-template-columns: 1fr;
+            }
+
+            .pricing-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .pricing-card.popular {
+                grid-column: span 1;
+            }
+
+            .cta-title {
+                font-size: 2rem;
+            }
+
+            .footer-container {
+                grid-template-columns: 1fr;
+                gap: 2rem;
+            }
+
+            .footer-bottom {
+                flex-direction: column;
+                gap: 1rem;
+                text-align: center;
+            }
+        }
+
+        /* Mobile Menu */
+        .mobile-menu {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: var(--surface);
+            z-index: 999;
+            padding: 5rem 2rem 2rem;
+            flex-direction: column;
+            gap: 1.5rem;
+        }
+
+        .mobile-menu.active {
+            display: flex;
+        }
+
+        .mobile-menu a {
+            color: var(--text);
+            text-decoration: none;
+            font-size: 1.25rem;
+            font-weight: 600;
+            padding: 0.75rem 0;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .mobile-menu .nav-cta {
+            margin-top: 1rem;
+            text-align: center;
+            justify-content: center;
+        }
+    </style>
 </head>
-
 <body>
+    <!-- Navigation -->
+    <nav class="navbar" id="navbar">
+        <div class="nav-container">
+            <a href="#" class="logo">
+                <div class="logo-icon">R</div>
+                <div class="logo-text">Radar <span>SIOPE</span></div>
+            </a>
+            <div class="nav-links">
+                <a href="#problema">O Problema</a>
+                <a href="#funcionalidades">Funcionalidades</a>
+                <a href="#midias">Mídias</a>
+                <a href="#ia">Assistente IA</a>
+                <a href="#planos">Planos</a>
+                <a href="#retencao">Retenção</a>
+                <a href="noticias.html">Notícias</a>
+                <a href="login.html" class="nav-cta" style="background:transparent;border:1px solid var(--border);color:var(--text);box-shadow:none;">Área do Assinante</a>
+                <a href="assinatura.html?origem=site" class="nav-cta">Começar Agora</a>
+            </div>
+            <button class="mobile-menu-btn" onclick="toggleMobileMenu()">☰</button>
+        </div>
+    </nav>
 
-  <!-- ── NAV ──────────────────────────────────────── -->
-  <nav class="nav" role="navigation" aria-label="Menu principal">
-    <div class="container nav__inner">
-      <a href="/" class="nav__logo" aria-label="Radar SIOPE — Página inicial">
-        <img src="/icons/icon-192x192-transparent.png" class="rs-logo" alt="Radar SIOPE"
-          onerror="this.style.display='none'"
-          style="width:32px; height:32px; object-fit:contain; margin-bottom:0; margin-right:8px;">
-        Radar <span>SIOPE</span>
-      </a>
-
-      <button class="nav__toggle" id="nav-toggle" aria-label="Abrir menu" aria-expanded="false">☰</button>
-
-      <ul class="nav__menu" id="nav-menu" role="list">
-        <li><a href="/" class="active">Início</a></li>
-        <!-- <li><a href="newsletters.html" target="_blank" rel="noopener">Newsletters</a></li> -->
-        <li><a href="noticias.html" target="_blank" rel="noopener">Notícias</a></li>
-        <li class="nav__item--drop" id="drop-privacidade">
-          <a href="#" aria-haspopup="true" aria-expanded="false">Privacidade e Termos ▾</a>
-          <ul class="nav__dropdown" role="list">
-            <li><a href="privacidade.html" target="_blank" rel="noopener">Política de Privacidade</a></li>
-            <li><a href="termos.html" target="_blank" rel="noopener">Termos de Uso</a></li>
-          </ul>
-        </li>
-        <li><a href="capturaLead.html" target="_blank" rel="noopener">Entre em contato</a></li>
-        <li class="nav__cta"><a href="login.html">Área do assinante</a></li>
-      </ul>
+    <!-- Mobile Menu -->
+    <div class="mobile-menu" id="mobileMenu">
+        <a href="#problema" onclick="toggleMobileMenu()">O Problema</a>
+        <a href="#funcionalidades" onclick="toggleMobileMenu()">Funcionalidades</a>
+        <a href="#midias" onclick="toggleMobileMenu()">Mídias</a>
+        <a href="#ia" onclick="toggleMobileMenu()">Assistente IA</a>
+        <a href="#planos" onclick="toggleMobileMenu()">Planos</a>
+        <a href="#retencao" onclick="toggleMobileMenu()">Retenção</a>
+        <a href="noticias.html" onclick="toggleMobileMenu()">Notícias</a>
+        <a href="login.html" onclick="toggleMobileMenu()">Área do Assinante</a>
+        <a href="assinatura.html?origem=site" class="nav-cta" onclick="toggleMobileMenu()">Começar Agora</a>
     </div>
-  </nav>
 
-  <!-- ── HERO ─────────────────────────────────────── -->
-  <section class="hero" aria-labelledby="hero-title">
-    <div class="container hero__inner">
-      <div>
-        <div class="hero__eyebrow">
-          <span>📡</span> Revista eletrônica · Central técnica
+    <!-- Hero Section -->
+    <section class="hero">
+        <div class="hero-bg">
+            <div class="hero-grid"></div>
+            <div class="hero-orb hero-orb-1"></div>
+            <div class="hero-orb hero-orb-2"></div>
+            <div class="hero-orb hero-orb-3"></div>
         </div>
-        <h1 class="hero__title" id="hero-title">
-          Decisões certas para a<br>
-          <em>gestão dos recursos<br>da educação</em>
-        </h1>
-        <p class="hero__subtitle">
-          Conteúdo técnico, alertas e orientações práticas para quem precisa dominar o Fundeb e o SIOPE na linha de
-          frente da educação pública municipal.
-        </p>
-        <div class="hero__tags">
-          <span class="hero__tag">Fundeb</span>
-          <span class="hero__tag">SIOPE</span>
-          <span class="hero__tag">CACS-Fundeb</span>
-          <span class="hero__tag">Salário-Educação</span>
-          <span class="hero__tag">sisCACS</span>
+        <div class="hero-content">
+            <div class="hero-text">
+                <div class="hero-badge">
+                    <span class="pulse-dot"></span>
+                    Plataforma PWA — Sem instalação
+                </div>
+                <h1 class="hero-title">
+                    Inteligência municipal<br>
+                    para a <span class="gradient-text">gestão educacional</span>
+                </h1>
+                <p class="hero-subtitle">
+                    Monitoramento, conformidade e capacitação especializada para gestores municipais de educação. Tudo sobre FUNDEB, SIOPE, CACS e Salário-Educação em um só lugar.
+                </p>
+                <div class="hero-cta-group">
+                    <a href="assinatura.html?origem=site" class="btn-primary">
+                        Ver Planos
+                        <span>→</span>
+                    </a>
+                    <a href="#funcionalidades" class="btn-secondary">
+                        Conhecer Funcionalidades
+                    </a>
+                </div>
+                <div class="hero-stats">
+                    <div class="stat-item">
+                        <span class="stat-value">5</span>
+                        <span class="stat-label">Formatos de conteúdo</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-value">24h</span>
+                        <span class="stat-label">Alertas em tempo real</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-value">IA</span>
+                        <span class="stat-label">Assistente especializado</span>
+                    </div>
+                </div>
+            </div>
+            <div class="hero-visual">
+                <div class="phone-mockup">
+                    <div class="phone-frame">
+                        <div class="phone-screen">
+                            <div class="phone-notch"></div>
+                            <div class="screen-content">
+                                <div class="screen-header">
+                                    <span class="screen-title">Radar SIOPE</span>
+                                    <span class="screen-date">Edição #142</span>
+                                </div>
+                                <div class="screen-card">
+                                    <div class="card-label">Newsletter</div>
+                                    <div class="card-title">Novas regras de prestação de contas do FUNDEB 2024</div>
+                                    <div class="card-meta">
+                                        <span class="meta-tag">🎧 Áudio</span>
+                                        <span class="meta-tag">🎬 Vídeo</span>
+                                        <span class="meta-tag">🧠 Mapa Mental</span>
+                                    </div>
+                                </div>
+                                <div class="screen-alert">
+                                    <div class="alert-icon">⚠</div>
+                                    <div class="alert-text">
+                                        <strong>Prazo em 7 dias</strong>
+                                        Envio do SIOPE módulo 3
+                                    </div>
+                                </div>
+                                <div class="screen-chart">
+                                    <div class="card-label">Seu município</div>
+                                    <div class="chart-bars">
+                                        <div class="chart-bar" style="height: 45%"></div>
+                                        <div class="chart-bar" style="height: 62%"></div>
+                                        <div class="chart-bar" style="height: 78%"></div>
+                                        <div class="chart-bar" style="height: 55%"></div>
+                                        <div class="chart-bar" style="height: 90%"></div>
+                                        <div class="chart-bar" style="height: 67%"></div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="fab">💬</div>
+                        </div>
+                    </div>
+                    <div class="float-card float-card-1">
+                        <strong>🔔 Alerta</strong><br>
+                        <small>Publicação FNDE hoje</small>
+                    </div>
+                    <div class="float-card float-card-2">
+                        <strong>📊 Dados</strong><br>
+                        <small>Comparativo regional</small>
+                    </div>
+                    <div class="float-card float-card-3">
+                        <strong>🤖 IA</strong><br>
+                        <small>Dúvida respondida</small>
+                    </div>
+                </div>
+            </div>
         </div>
-        <div class="hero__actions">
-          <a href="assinatura.html?origem=site" class="btn btn--primary" target="_blank" rel="noopener">🚀 Quero assinar</a>
-          <a href="capturaLead.html" class="btn btn--ghost" target="_blank" rel="noopener">Entre em contato</a>
-        </div>
-      </div>
+    </section>
 
-      <div class="hero__card" aria-hidden="true">
-        <div class="hero__stat">
-          <div class="hero__stat-n">100%</div>
-          <div class="hero__stat-l">Foco em municípios</div>
+    <!-- Problem Section -->
+    <section class="section problem-section" id="problema">
+        <div class="section-container">
+            <div class="section-header animate-on-scroll">
+                <div class="section-label">⚡ O Desafio</div>
+                <h2 class="section-title">Gestores sob pressão, sem suporte especializado</h2>
+                <p class="section-desc">A rotatividade eleitoral, os prazos legais apertados e a complexidade da legislação criam um cenário de alto risco para gestores municipais de educação.</p>
+            </div>
+            <div class="problem-grid">
+                <div class="problem-card animate-on-scroll delay-1">
+                    <div class="problem-icon">⏰</div>
+                    <h3>Prazos apertados</h3>
+                    <p>Prestação de contas do FUNDEB, envios do SIOPE e obrigações do CACS-Fundeb operam em ciclos rigorosos. Um atraso pode gerar penalidades institucionais severas.</p>
+                </div>
+                <div class="problem-card animate-on-scroll delay-2">
+                    <div class="problem-icon">🔄</div>
+                    <h3>Alta rotatividade</h3>
+                    <p>A cada ciclo eleitoral, uma parcela significativa dos gestores é renovada. O conhecimento institucional se perde e a curva de aprendizado recomeça do zero.</p>
+                </div>
+                <div class="problem-card animate-on-scroll delay-3">
+                    <div class="problem-icon">🏛️</div>
+                    <h3>Sem suporte local</h3>
+                    <p>Raramente o município conta com assessoria técnica especializada em FUNDEB e SIOPE no próprio quadro. A dependência de consultorias externas é estrutural.</p>
+                </div>
+            </div>
         </div>
-        <div class="hero__stat">
-          <div class="hero__stat-n">LGPD</div>
-          <div class="hero__stat-l">Dados protegidos</div>
-        </div>
-        <div class="hero__stat">
-          <div class="hero__stat-n">24h</div>
-          <div class="hero__stat-l">Alertas em tempo real</div>
-        </div>
-      </div>
-    </div>
-  </section>
+    </section>
 
-  <!-- ── O QUE VOCÊ ENCONTRA ──────────────────────── -->
-  <section class="features" aria-labelledby="features-title">
-    <div class="container">
-      <p class="section__label anim">Recursos</p>
-      <h2 class="section__title anim anim-d1" id="features-title">O que você encontra no Radar SIOPE</h2>
-      <p class="section__lead anim anim-d2">
-        Conteúdo especializado, atualizações legislativas e ferramentas práticas para secretários, técnicos, contadores
-        e conselheiros da educação pública.
-      </p>
+    <!-- Features Section -->
+    <section class="section" id="funcionalidades">
+        <div class="section-container">
+            <div class="section-header animate-on-scroll">
+                <div class="section-label">🛠️ Funcionalidades</div>
+                <h2 class="section-title">Tudo que você precisa em uma só plataforma</h2>
+                <p class="section-desc">Do monitoramento de prazos ao suporte técnico individualizado, o Radar SIOPE cobre todo o ciclo de gestão educacional municipal.</p>
+            </div>
+            <div class="features-grid">
+                <div class="feature-card animate-on-scroll delay-1">
+                    <div class="feature-icon">📰</div>
+                    <h3>Newsletter Multimídia</h3>
+                    <p>Cada edição é entregue por link personalizado com acesso controlado. Conteúdo em múltiplos formatos: texto editorial, áudio (podcast), vídeo, infográfico e mapa mental.</p>
+                    <div class="feature-tags">
+                        <span class="feature-tag">Texto</span>
+                        <span class="feature-tag">Áudio</span>
+                        <span class="feature-tag">Vídeo</span>
+                        <span class="feature-tag">Infográfico</span>
+                        <span class="feature-tag">Mapa Mental</span>
+                    </div>
+                </div>
+                <div class="feature-card animate-on-scroll delay-2">
+                    <div class="feature-icon">🔔</div>
+                    <h3>Alertas Prioritários</h3>
+                    <p>Notificações push e via WhatsApp para eventos críticos: prazos de prestação de contas, publicações do FNDE, mudanças na legislação do FUNDEB, abertura e fechamento do SIOPE.</p>
+                    <div class="feature-tags">
+                        <span class="feature-tag">Push</span>
+                        <span class="feature-tag">WhatsApp</span>
+                        <span class="feature-tag">OneSignal</span>
+                    </div>
+                </div>
+                <div class="feature-card animate-on-scroll delay-3">
+                    <div class="feature-icon">📊</div>
+                    <h3>Gráficos Municipalizados</h3>
+                    <p>Indicadores com série histórica renderizados em SVG. Cada assinante visualiza os dados do próprio município comparados com médias regionais e nacionais.</p>
+                    <div class="feature-tags">
+                        <span class="feature-tag">SVG</span>
+                        <span class="feature-tag">Firestore</span>
+                        <span class="feature-tag">Comparativo</span>
+                    </div>
+                </div>
+                <div class="feature-card animate-on-scroll delay-4">
+                    <div class="feature-icon">👥</div>
+                    <h3>Grupo VIP WhatsApp</h3>
+                    <p>Canal exclusivo para assinantes dos planos superiores. Envio sequencial gerenciado pelo painel de alertas push com opt-in LGPD no momento do pagamento.</p>
+                    <div class="feature-tags">
+                        <span class="feature-tag">VIP</span>
+                        <span class="feature-tag">LGPD</span>
+                        <span class="feature-tag">Exclusivo</span>
+                    </div>
+                </div>
+                <div class="feature-card animate-on-scroll delay-1">
+                    <div class="feature-icon">📚</div>
+                    <h3>Biblioteca Vitalícia</h3>
+                    <p>Acesso ao arquivo histórico de edições mesmo após o cancelamento da assinatura. Valor de longo prazo que reduz a objeção de cancelamento.</p>
+                    <div class="feature-tags">
+                        <span class="feature-tag">Retenção</span>
+                        <span class="feature-tag">Arquivo</span>
+                        <span class="feature-tag">Vitalício</span>
+                    </div>
+                </div>
+                <div class="feature-card animate-on-scroll delay-2">
+                    <div class="feature-icon">🎓</div>
+                    <h3>Trilha de Conhecimento</h3>
+                    <p>Módulo estruturado de formação sobre FUNDEB, SIOPE, CACS-Fundeb e Salário-Educação. Guias práticos como argumento de retenção frente a conteúdo genérico gratuito.</p>
+                    <div class="feature-tags">
+                        <span class="feature-tag">Capacitação</span>
+                        <span class="feature-tag">Guias</span>
+                        <span class="feature-tag">Retenção</span>
+                    </div>
+                </div>
+                <div class="feature-card animate-on-scroll delay-3">
+                    <div class="feature-icon">💼</div>
+                    <h3>Consultorias</h3>
+                    <p>Sessões remotas de suporte técnico individualizado e atendimento presencial no município para planos superiores. Quantificadas em horas mensais por plano.</p>
+                    <div class="feature-tags">
+                        <span class="feature-tag">Online</span>
+                        <span class="feature-tag">In loco</span>
+                        <span class="feature-tag">4h/mês</span>
+                    </div>
+                </div>
+                <div class="feature-card animate-on-scroll delay-4">
+                    <div class="feature-icon">🔐</div>
+                    <h3>Controle de Acesso</h3>
+                    <p>Sessão PWA com verificação de status a cada 24h, limite de 3 dispositivos simultâneos e detecção de compartilhamento excessivo. Links de leads com expiração via token.</p>
+                    <div class="feature-tags">
+                        <span class="feature-tag">Segurança</span>
+                        <span class="feature-tag">LGPD</span>
+                        <span class="feature-tag">Anti-fraude</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
 
-      <div class="features__grid">
-        <div class="feature-card anim anim-d1">
-          <div class="feature-card__icon">📚</div>
-          <h3 class="feature-card__title">Conteúdo Técnico</h3>
-          <p class="feature-card__text">Artigos e guias detalhados para entender e aplicar corretamente as regras do
-            Fundeb e do SIOPE.</p>
+    <!-- Media Section -->
+    <section class="section media-section" id="midias">
+        <div class="section-container">
+            <div class="section-header animate-on-scroll">
+                <div class="section-label">🎨 Mídias</div>
+                <h2 class="section-title">Cinco formatos para cada perfil de aprendizado</h2>
+                <p class="section-desc">A mesma informação, adaptada ao seu estilo. Escolha como consome o conteúdo — ou consuma em todos os formatos.</p>
+            </div>
+            <div class="media-showcase">
+                <div class="media-item animate-on-scroll delay-1">
+                    <span class="media-icon">📝</span>
+                    <div class="media-name">Texto</div>
+                    <div class="media-desc">Edição completa em formato editorial, com aprofundamento técnico e referências legais.</div>
+                </div>
+                <div class="media-item animate-on-scroll delay-2">
+                    <span class="media-icon">🎧</span>
+                    <div class="media-name">Áudio</div>
+                    <div class="media-desc">Versão narrada em podcast para consumo durante deslocamentos e rotinas.</div>
+                </div>
+                <div class="media-item animate-on-scroll delay-3">
+                    <span class="media-icon">🎬</span>
+                    <div class="media-name">Vídeo</div>
+                    <div class="media-desc">Apresentação audiovisual com demonstrações práticas de sistemas e processos.</div>
+                </div>
+                <div class="media-item animate-on-scroll delay-4">
+                    <span class="media-icon">📊</span>
+                    <div class="media-name">Infográfico</div>
+                    <div class="media-desc">Resumo visual com dados, fluxos e timelines para consulta rápida.</div>
+                </div>
+                <div class="media-item featured animate-on-scroll delay-5">
+                    <span class="media-icon">🧠</span>
+                    <div class="media-name">Mapa Mental</div>
+                    <div class="media-desc">Visão estruturada e hierárquica dos temas. Ideal para gestores visuais e para revisão rápida antes de reuniões e prestações de contas.</div>
+                </div>
+            </div>
         </div>
-        <div class="feature-card anim anim-d2">
-          <div class="feature-card__icon">📰</div>
-          <h3 class="feature-card__title">Notícias Atualizadas</h3>
-          <p class="feature-card__text">Acompanhe mudanças na legislação e novidades que impactam a gestão educacional
-            municipal.</p>
-        </div>
-        <div class="feature-card anim anim-d3">
-          <div class="feature-card__icon">🗂️</div>
-          <h3 class="feature-card__title">Orientações Práticas</h3>
-          <p class="feature-card__text">Passo a passo para resolver pendências, otimizar processos e garantir
-            conformidade com os prazos.</p>
-        </div>
-        <div class="feature-card anim anim-d4">
-          <div class="feature-card__icon">🎓</div>
-          <h3 class="feature-card__title">Capacitação</h3>
-          <p class="feature-card__text">Treinamentos e workshops para equipes com foco em resultados e conformidade
-            técnica.</p>
-        </div>
-        <div class="feature-card anim anim-d5">
-          <div class="feature-card__icon">🔔</div>
-          <h3 class="feature-card__title">Envio de Alertas</h3>
-          <p class="feature-card__text">Alertas personalizados sobre prazos críticos e mudanças legislativas diretamente
-            no seu e-mail.</p>
-        </div>
-      </div>
-    </div>
-  </section>
+    </section>
 
-  <!-- ── SOBRE / ÁREA DO ASSINANTE ────────────────── -->
-  <section class="about" aria-labelledby="about-title">
-    <div class="container about__inner">
-      <div class="about__text">
-        <p class="section__label anim">Área exclusiva</p>
-        <h2 class="section__title anim anim-d1" id="about-title">Bem-vindo a sua área exclusiva</h2>
-        <p class="anim anim-d2">
-          Aqui você acessa com facilidade seus dados, assinaturas, suporte técnico e nossas publicações especializadas —
-          conteúdos pensados para atender diretamente às suas demandas.
-        </p>
-        <p class="anim anim-d3">
-          Nosso compromisso é mantê-lo sempre bem informado sobre os temas que impactam a gestão educacional: Fundeb,
-          SIOPE, CACS-Fundeb e Salário-Educação.
-        </p>
-        <a href="login.html" class="btn btn--blue anim anim-d4">Acessar minha conta →</a>
-      </div>
-
-      <div class="about__highlights">
-        <div class="about__hl anim anim-d1">
-          <div class="about__hl-icon">📖</div>
-          <div class="about__hl-title">Revista Eletrônica</div>
-          <div class="about__hl-text">Publicação objetiva com análises técnicas exclusivas por edição.</div>
+    <!-- AI Section -->
+    <section class="section ai-section" id="ia">
+        <div class="ai-bg-grid"></div>
+        <div class="section-container ai-container">
+            <div class="ai-visual animate-on-scroll">
+                <div class="ai-chat">
+                    <div class="chat-header">
+                        <div class="chat-avatar">🤖</div>
+                        <div class="chat-info">
+                            <h4>Pergunte ao Radar</h4>
+                            <span>🟢 Online — Gemini 2.0 Flash Lite</span>
+                        </div>
+                    </div>
+                    <div class="chat-messages">
+                        <div class="chat-message user">
+                            <div>
+                                <div class="message-bubble">Qual o prazo para envio do SIOPE módulo 3 este ano?</div>
+                                <div class="message-time">10:23</div>
+                            </div>
+                        </div>
+                        <div class="chat-message">
+                            <div class="chat-avatar" style="width:32px;height:32px;font-size:1rem;">🤖</div>
+                            <div>
+                                <div class="message-bubble">O prazo para envio do SIOPE módulo 3 em 2024 é <strong>30 de junho</strong>. Conforme a edição #138 do Radar, o FNDE antecipou em 15 dias em relação ao ano passado. Você precisa de ajuda com o preenchimento?</div>
+                                <div class="message-time">10:23</div>
+                            </div>
+                        </div>
+                        <div class="chat-message user">
+                            <div>
+                                <div class="message-bubble">Sim, como lançar a despesa de transporte escolar no CACS?</div>
+                                <div class="message-time">10:24</div>
+                            </div>
+                        </div>
+                        <div class="chat-message">
+                            <div class="chat-avatar" style="width:32px;height:32px;font-size:1rem;">🤖</div>
+                            <div>
+                                <div class="message-bubble">💡 Baseado na edição #124 e no Guia Prático de CACS-Fundeb: a despesa de transporte escolar deve ser lançada na categoria <strong>"Manutenção e Desenvolvimento do Ensino"</strong>, subcódigo <strong>33.90.39</strong> (Serviços de Transporte Escolar)...</div>
+                                <div class="message-time">10:24</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="chat-input">
+                        <input type="text" class="chat-input-field" placeholder="Digite sua dúvida sobre FUNDEB, SIOPE...">
+                        <button class="chat-send">➤</button>
+                    </div>
+                </div>
+            </div>
+            <div class="ai-features">
+                <div class="animate-on-scroll">
+                    <div class="section-label">🤖 Inteligência Artificial</div>
+                    <h2 class="section-title">Assistente especializado em gestão educacional</h2>
+                    <p class="section-desc" style="margin-bottom: 2rem;">Chat integrado via FAB flutuante com contexto injetado das edições publicadas. RAG simplificado por extração de trechos relevantes.</p>
+                </div>
+                <div class="ai-feature-item animate-on-scroll delay-1">
+                    <div class="ai-feature-icon">📖</div>
+                    <div class="ai-feature-text">
+                        <h4>Contexto das Edições</h4>
+                        <p>A IA acessa o conteúdo histórico das newsletters para responder com base em informações atualizadas e verificadas.</p>
+                    </div>
+                </div>
+                <div class="ai-feature-item animate-on-scroll delay-2">
+                    <div class="ai-feature-icon">⚡</div>
+                    <div class="ai-feature-text">
+                        <h4>Gemini 2.0 Flash Lite</h4>
+                        <p>Modelo otimizado para respostas rápidas e precisas sobre regulamentação do FNDE, FUNDEB e SIOPE.</p>
+                    </div>
+                </div>
+                <div class="ai-feature-item animate-on-scroll delay-3">
+                    <div class="ai-feature-icon">🔒</div>
+                    <div class="ai-feature-text">
+                        <h4>Exclusivo para Assinantes</h4>
+                        <p>Acesso disponível apenas para assinantes ativos, garantindo valor agregado ao plano contratado.</p>
+                    </div>
+                </div>
+            </div>
         </div>
-        <div class="about__hl anim anim-d2">
-          <div class="about__hl-icon">🛠️</div>
-          <div class="about__hl-title">Central Técnica</div>
-          <div class="about__hl-text">Suporte prático e confiável para dúvidas operacionais do dia a dia.</div>
+    </section>
+
+    <!-- Pricing Section -->
+    <section class="section pricing-section" id="planos">
+        <div class="section-container">
+            <div class="section-header animate-on-scroll">
+                <div class="section-label">💰 Planos</div>
+                <h2 class="section-title">Escolha o radar ideal para seu município</h2>
+                <p class="section-desc">Cinco planos com features progressivas. Fidelize e economize com ciclos de 6 ou 12 meses.</p>
+            </div>
+            <div class="pricing-tabs animate-on-scroll">
+                <button class="pricing-tab active" onclick="switchTab(this, 'monthly')">Mensal</button>
+                <button class="pricing-tab" onclick="switchTab(this, 'semester')">6 meses <span style="color:var(--success)">-10%</span></button>
+                <button class="pricing-tab" onclick="switchTab(this, 'annual')">12 meses <span style="color:var(--success)">-20%</span></button>
+            </div>
+            <div class="pricing-grid" id="pricingGrid">
+                <div class="pricing-card animate-on-scroll delay-1">
+                    <div class="plan-name">Radar Básico</div>
+                    <div class="plan-desc">Entrada inteligente no monitoramento educacional</div>
+                    <div class="plan-price">
+                        <span class="price-value" data-monthly="189" data-semester="170" data-annual="151">R$ 189</span>
+                        <span class="price-period">/mês</span>
+                    </div>
+                    <ul class="plan-features">
+                        <li class="included">Newsletter texto</li>
+                        <li class="included">Biblioteca vitalícia</li>
+                        <li class="included">Acesso PWA</li>
+                        <li class="not-included">Áudio (podcast)</li>
+                        <li class="not-included">Vídeo e infográfico</li>
+                        <li class="not-included">Alertas prioritários</li>
+                        <li class="not-included">Gráficos municipalizados</li>
+                        <li class="not-included">Assistente IA</li>
+                        <li class="not-included">Grupo VIP WhatsApp</li>
+                        <li class="not-included">Consultoria</li>
+                    </ul>
+                    <a href="assinatura.html?origem=site&plano=basico" class="plan-cta" style="display:inline-block;text-align:center;text-decoration:none;">Assinar Básico</a>
+                </div>
+                <div class="pricing-card animate-on-scroll delay-2">
+                    <div class="plan-name">Radar Essence</div>
+                    <div class="plan-desc">Conteúdo multimídia para gestores em movimento</div>
+                    <div class="plan-price">
+                        <span class="price-value" data-monthly="295" data-semester="266" data-annual="236">R$ 295</span>
+                        <span class="price-period">/mês</span>
+                    </div>
+                    <ul class="plan-features">
+                        <li class="included">Tudo do Básico</li>
+                        <li class="included">Áudio (podcast)</li>
+                        <li class="not-included">Vídeo e infográfico</li>
+                        <li class="not-included">Alertas prioritários</li>
+                        <li class="not-included">Gráficos municipalizados</li>
+                        <li class="not-included">Assistente IA</li>
+                        <li class="not-included">Grupo VIP WhatsApp</li>
+                        <li class="not-included">Consultoria</li>
+                    </ul>
+                    <a href="assinatura.html?origem=site&plano=essence" class="plan-cta" style="display:inline-block;text-align:center;text-decoration:none;">Assinar Essence</a>
+                </div>
+                <div class="pricing-card popular animate-on-scroll delay-3">
+                    <div class="popular-badge">Mais Popular</div>
+                    <div class="plan-name">Radar Profissional</div>
+                    <div class="plan-desc">Monitoramento completo com alertas e dados</div>
+                    <div class="plan-price">
+                        <span class="price-value" data-monthly="395" data-semester="356" data-annual="316">R$ 395</span>
+                        <span class="price-period">/mês</span>
+                    </div>
+                    <ul class="plan-features">
+                        <li class="included">Tudo do Essence</li>
+                        <li class="included">Vídeo e infográfico</li>
+                        <li class="included">Alertas prioritários</li>
+                        <li class="included">Gráficos municipalizados</li>
+                        <li class="included">Mapa mental</li>
+                        <li class="not-included">Assistente IA</li>
+                        <li class="not-included">Grupo VIP WhatsApp</li>
+                        <li class="not-included">Consultoria</li>
+                    </ul>
+                    <a href="assinatura.html?origem=site&plano=profissional" class="plan-cta" style="display:inline-block;text-align:center;text-decoration:none;">Assinar Profissional</a>
+                </div>
+                <div class="pricing-card animate-on-scroll delay-4">
+                    <div class="plan-name">Radar Premium</div>
+                    <div class="plan-desc">Comunidade exclusiva e sugestões de tema</div>
+                    <div class="plan-price">
+                        <span class="price-value" data-monthly="515" data-semester="464" data-annual="412">R$ 515</span>
+                        <span class="price-period">/mês</span>
+                    </div>
+                    <ul class="plan-features">
+                        <li class="included">Tudo do Profissional</li>
+                        <li class="included">Assistente IA</li>
+                        <li class="included">Grupo VIP WhatsApp</li>
+                        <li class="included">Sugestões de tema</li>
+                        <li class="not-included">Consultoria online</li>
+                        <li class="not-included">Consultoria in loco</li>
+                    </ul>
+                    <a href="assinatura.html?origem=site&plano=premium" class="plan-cta" style="display:inline-block;text-align:center;text-decoration:none;">Assinar Premium</a>
+                </div>
+                <div class="pricing-card animate-on-scroll delay-5">
+                    <div class="plan-name">Radar Supreme</div>
+                    <div class="plan-desc">Acompanhamento técnico completo do seu município</div>
+                    <div class="plan-price">
+                        <span class="price-value" data-monthly="650" data-semester="585" data-annual="520">R$ 650</span>
+                        <span class="price-period">/mês</span>
+                    </div>
+                    <ul class="plan-features">
+                        <li class="included">Tudo do Premium</li>
+                        <li class="included">Consultoria 4h/mês</li>
+                        <li class="included">Consultoria in loco</li>
+                        <li class="included">Atendimento prioritário</li>
+                        <li class="included">Relatórios customizados</li>
+                    </ul>
+                    <a href="assinatura.html?origem=site&plano=supreme" class="plan-cta" style="display:inline-block;text-align:center;text-decoration:none;">Assinar Supreme</a>
+                </div>
+            </div>
+            <p class="fidelity-note animate-on-scroll">
+                <strong>Cláusula de fidelização:</strong> nos planos de 6 e 12 meses, cancelamento antecipado gera ajuste equivalente ao desconto já usufruído. Não é multa — é devolução do benefício concedido.
+            </p>
         </div>
-        <div class="about__hl anim anim-d3">
-          <div class="about__hl-icon">🔒</div>
-          <div class="about__hl-title">Dados Protegidos</div>
-          <div class="about__hl-text">Plataforma em conformidade com a LGPD.</div>
+    </section>
+
+    <!-- Retention Section -->
+    <section class="section" id="retencao">
+        <div class="section-container">
+            <div class="section-header animate-on-scroll">
+                <div class="section-label">🛡️ Retenção</div>
+                <h2 class="section-title">Construído para durar além do mandato</h2>
+                <p class="section-desc">O ciclo eleitoral é o principal risco de churn. O Radar SIOPE foi projetado com mecanismos estruturais de retenção de longo prazo.</p>
+            </div>
+            <div class="retention-grid">
+                <div class="retention-card animate-on-scroll delay-1">
+                    <div class="retention-icon">📚</div>
+                    <h3>Biblioteca Vitalícia</h3>
+                    <p>Mesmo após o cancelamento, o gestor mantém acesso ao arquivo histórico. Isso cria valor percebido contínuo e reduz drasticamente a objeção de cancelamento.</p>
+                </div>
+                <div class="retention-card animate-on-scroll delay-2">
+                    <div class="retention-icon">🎓</div>
+                    <h3>Trilha de Conhecimento</h3>
+                    <p>Guias práticos estruturados sobre FUNDEB, SIOPE, CACS e Salário-Educação. Formação que transcende o ciclo eleitoral e cria dependência de valor.</p>
+                </div>
+                <div class="retention-card animate-on-scroll delay-3">
+                    <div class="retention-icon">🧠</div>
+                    <h3>Mapas Mentais</h3>
+                    <p>O novo formato de mapa mental permite que gestores visualizem rapidamente a estrutura de temas complexos — ideal para onboarding de novos técnicos e transição de gestão.</p>
+                </div>
+            </div>
         </div>
-        <div class="about__hl anim anim-d4">
-          <div class="about__hl-icon">🏫</div>
-          <div class="about__hl-title">Foco Municipal</div>
-          <div class="about__hl-text">Conteúdo pensado para a realidade dos municípios brasileiros.</div>
+    </section>
+
+    <!-- CTA Section -->
+    <section class="cta-section">
+        <div class="cta-bg">
+            <div class="cta-orb cta-orb-1"></div>
+            <div class="cta-orb cta-orb-2"></div>
         </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- ── CTA ASSINATURA ────────────────────────────── -->
-  <section class="cta-strip" aria-labelledby="cta-title">
-    <div class="container cta-strip__inner">
-      <div>
-        <p class="cta-strip__label">Assine agora</p>
-        <h2 class="cta-strip__title" id="cta-title">Transforme a gestão do Fundeb e do SIOPE</h2>
-        <p class="cta-strip__text">
-          Reúne conteúdo técnico, orientações práticas e alertas sobre prazos e mudanças na legislação. Normas complexas
-          em ações claras — para reduzir riscos e agilizar decisões.
-        </p>
-      </div>
-      <div class="cta-strip__actions">
-        <a href="assinatura.html?origem=site" class="btn btn--cta" target="_blank" rel="noopener">🚀 Quero assinar</a>
-        <a href="newsletters.html" class="btn btn--outline-white" target="_blank" rel="noopener">Ver newsletters</a>
-      </div>
-    </div>
-  </section>
-
-  <!-- ── CONTATO BANNER ────────────────────────────── -->
-  <div class="contact-banner">
-    <div class="container contact-banner__inner">
-      <div>
-        <p class="contact-banner__title">Ficou com alguma dúvida?</p>
-        <p class="contact-banner__text">Nossa equipe está pronta para orientar você antes e depois da assinatura.</p>
-      </div>
-      <a href="capturaLead.html" class="btn btn--blue" target="_blank" rel="noopener">Entre em contato →</a>
-    </div>
-  </div>
-
-  <!-- ── FOOTER ────────────────────────────────────── -->
-  <footer>
-    <div class="container">
-      <div class="footer__top">
-        <div class="footer__brand">
-          <div class="nav__logo" style="color:#fff;">
-            <span class="nav__logo-icon">📡</span>
-            Radar <span style="color:var(--gold)">SIOPE</span>
-          </div>
-          <p>Revista eletrônica e central técnica para gestores e profissionais da educação pública municipal.</p>
+        <div class="cta-content">
+            <h2 class="cta-title animate-on-scroll">
+                Seu município não pode<br>ficar desatualizado
+            </h2>
+            <p class="cta-desc animate-on-scroll delay-1">
+                Junte-se aos gestores que usam o Radar SIOPE para navegar a complexidade da gestão educacional com segurança e precisão.
+            </p>
+            <div class="cta-buttons animate-on-scroll delay-2">
+                <a href="assinatura.html?origem=site" class="btn-primary" style="font-size: 1.125rem; padding: 1.125rem 2.5rem;">
+                    Escolher Meu Plano
+                    <span>→</span>
+                </a>
+                <a href="#funcionalidades" class="btn-secondary" style="font-size: 1.125rem; padding: 1.125rem 2.5rem;">
+                    Explorar Funcionalidades
+                </a>
+            </div>
         </div>
+    </section>
 
-        <div>
-          <p class="footer__col-title">Plataforma</p>
-          <ul class="footer__links">
-            <!-- <li><a href="newsletters.html" target="_blank" rel="noopener">Newsletters</a></li> -->
-            <li><a href="noticias.html" target="_blank" rel="noopener">Notícias</a></li>
-            <li><a href="assinatura.html?origem=site" target="_blank" rel="noopener">Assinar</a></li>
-            <li><a href="login.html">Área do assinante</a></li>
-          </ul>
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="footer-container">
+            <div class="footer-brand">
+                <a href="#" class="logo">
+                    <div class="logo-icon">R</div>
+                    <div class="logo-text">Radar <span>SIOPE</span></div>
+                </a>
+                <p>Plataforma PWA de monitoramento, conformidade e capacitação para gestores municipais de educação no Brasil.</p>
+            </div>
+            <div class="footer-links">
+                <h4>Produto</h4>
+                <ul>
+                    <li><a href="#funcionalidades">Funcionalidades</a></li>
+                    <li><a href="#midias">Mídias</a></li>
+                    <li><a href="#ia">Assistente IA</a></li>
+                    <li><a href="#planos">Planos</a></li>
+                </ul>
+            </div>
+            <div class="footer-links">
+                <h4>Suporte</h4>
+                <ul>
+                    <li><a href="noticias.html">Notícias</a></li>
+                    <li><a href="privacidade.html">LGPD e Privacidade</a></li>
+                    <li><a href="termos.html">Termos de Uso</a></li>
+                    <li><a href="capturaLead.html">Contato</a></li>
+                </ul>
+            </div>
+            <div class="footer-links">
+                <h4>Tecnologia</h4>
+                <ul>
+                    <li><a href="#">Firebase Firestore</a></li>
+                    <li><a href="#">Supabase</a></li>
+                    <li><a href="#">Vercel</a></li>
+                    <li><a href="#">Mercado Pago</a></li>
+                </ul>
+            </div>
         </div>
-
-        <div>
-          <p class="footer__col-title">Temas</p>
-          <ul class="footer__links">
-            <li><a href="#">Fundeb</a></li>
-            <li><a href="#">SIOPE</a></li>
-            <li><a href="#">CACS-Fundeb</a></li>
-            <li><a href="#">Salário-Educação</a></li>
-          </ul>
+        <div class="footer-bottom">
+            <p>© 2024 Radar SIOPE. Todos os direitos reservados.</p>
+            <p>Desenvolvido com 💙 para a gestão educacional municipal</p>
         </div>
+    </footer>
 
-        <div>
-          <p class="footer__col-title">Legal</p>
-          <ul class="footer__links">
-            <li><a href="privacidade.html" target="_blank" rel="noopener">Política de Privacidade</a></li>
-            <li><a href="termos.html" target="_blank" rel="noopener">Termos de Uso</a></li>
-            <li><a href="capturaLead.html" target="_blank" rel="noopener">Contato</a></li>
-          </ul>
-        </div>
-      </div>
+    <script>
+        // Navbar scroll effect
+        const navbar = document.getElementById('navbar');
+        window.addEventListener('scroll', () => {
+            if (window.scrollY > 50) {
+                navbar.classList.add('scrolled');
+            } else {
+                navbar.classList.remove('scrolled');
+            }
+        });
 
-      <div class="footer__bottom">
-        <span>© 2026 Radar SIOPE. Todos os direitos reservados.</span>
-        <span>Brasília/DF — Brasil &nbsp;·&nbsp; <a href="privacidade.html" target="_blank" rel="noopener">Privacidade</a> &nbsp;·&nbsp; <a
-            href="termos.html" target="_blank" rel="noopener">Termos</a></span>
-      </div>
-    </div>
-  </footer>
-
-  <script>
-    // ── Mobile nav toggle
-    const toggle = document.getElementById('nav-toggle');
-    const menu = document.getElementById('nav-menu');
-    toggle.addEventListener('click', () => {
-      const open = menu.classList.toggle('open');
-      toggle.setAttribute('aria-expanded', open);
-      toggle.textContent = open ? '✕' : '☰';
-    });
-
-    // ── Mobile dropdown toggle
-    document.querySelectorAll('.nav__item--drop').forEach(item => {
-      item.querySelector('a').addEventListener('click', e => {
-        if (window.innerWidth < 640) {
-          e.preventDefault();
-          item.classList.toggle('open');
+        // Mobile menu
+        function toggleMobileMenu() {
+            document.getElementById('mobileMenu').classList.toggle('active');
         }
-      });
-    });
 
-    // ── Scroll animations
-    const observer = new IntersectionObserver(entries => {
-      entries.forEach(entry => {
-        if (entry.isIntersecting) {
-          entry.target.classList.add('visible');
-          observer.unobserve(entry.target);
+        // Scroll animations
+        const observerOptions = {
+            root: null,
+            rootMargin: '0px',
+            threshold: 0.1
+        };
+
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.classList.add('visible');
+                }
+            });
+        }, observerOptions);
+
+        document.querySelectorAll('.animate-on-scroll').forEach(el => {
+            observer.observe(el);
+        });
+
+        // Pricing tabs
+        function switchTab(btn, period) {
+            document.querySelectorAll('.pricing-tab').forEach(tab => tab.classList.remove('active'));
+            btn.classList.add('active');
+
+            document.querySelectorAll('.price-value').forEach(price => {
+                const value = price.getAttribute('data-' + period);
+                const original = price.getAttribute('data-monthly');
+
+                // Animate number change
+                price.style.opacity = '0';
+                setTimeout(() => {
+                    price.textContent = 'R$ ' + value;
+                    if (period !== 'monthly') {
+                        price.innerHTML = 'R$ ' + value + '<span class="price-original">R$ ' + original + '</span>';
+                    }
+                    price.style.opacity = '1';
+                }, 200);
+            });
         }
-      });
-    }, { threshold: 0.15 });
 
-    document.querySelectorAll('.anim').forEach(el => observer.observe(el));
-  </script>
+        // Smooth scroll for anchor links
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function(e) {
+                e.preventDefault();
+                const target = document.querySelector(this.getAttribute('href'));
+                if (target) {
+                    target.scrollIntoView({
+                        behavior: 'smooth',
+                        block: 'start'
+                    });
+                }
+            });
+        });
+
+        // Add transition to price values
+        document.querySelectorAll('.price-value').forEach(price => {
+            price.style.transition = 'opacity 0.2s ease';
+        });
+    </script>
 </body>
-
 </html>
