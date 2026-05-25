@@ -186,6 +186,84 @@ async function syncCaucData({ force = false } = {}) {
   }
 }
 
+// ─── Calendário: helpers ──────────────────────────────────────────
+async function _calListar({ sistema, tipo, status, incluirInativos }) {
+  let q = supabase
+    .from('calendario_eventos')
+    .select('*')
+    .order('data', { ascending: true });
+
+  if (!incluirInativos) q = q.eq('ativo', true);
+  if (sistema) q = q.eq('sistema', sistema);
+  if (tipo)    q = q.eq('tipo', tipo);
+  if (status)  q = q.eq('status', status);
+
+  const { data, error } = await q;
+  if (error) throw error;
+  return data;
+}
+
+async function _calGravar(id, dados) {
+  if (id) {
+    const { data, error } = await supabase
+      .from('calendario_eventos')
+      .update(dados).eq('id', id)
+      .select().single();
+    if (error) throw error;
+    return data;
+  }
+  const { data, error } = await supabase
+    .from('calendario_eventos')
+    .insert(dados)
+    .select().single();
+  if (error) throw error;
+  return data;
+}
+
+async function _calExcluir(id) {
+  const { error } = await supabase
+    .from('calendario_eventos')
+    .delete().eq('id', id);
+  if (error) throw error;
+}
+
+// ─── Calendário: helpers de repasses ─────────────────────────────
+async function _calRepListar({ evento_id, cod_municipio }) {
+  let q = supabase
+    .from('calendario_repasses')
+    .select('*')
+    .order('cod_municipio', { ascending: true });
+  if (evento_id)     q = q.eq('evento_id', evento_id);
+  if (cod_municipio) q = q.eq('cod_municipio', cod_municipio);
+  const { data, error } = await q;
+  if (error) throw error;
+  return data;
+}
+
+async function _calRepGravar(id, dados) {
+  if (id) {
+    const { data, error } = await supabase
+      .from('calendario_repasses')
+      .update(dados).eq('id', id)
+      .select().single();
+    if (error) throw error;
+    return data;
+  }
+  const { data, error } = await supabase
+    .from('calendario_repasses')
+    .insert(dados)
+    .select().single();
+  if (error) throw error;
+  return data;
+}
+
+async function _calRepExcluir(id) {
+  const { error } = await supabase
+    .from('calendario_repasses')
+    .delete().eq('id', id);
+  if (error) throw error;
+}
+
 // ─── Helper: lê body com stream (bodyParser:false) ────────────────────────────
 function _lerBody(req) {
   if (req.body && typeof req.body === 'object') return Promise.resolve(req.body);
@@ -537,6 +615,89 @@ export default async function handler(req, res) {
     }
   }
 
+  // ── Calendário admin ─────────────────────────────────────────────────────────
+  if (acao === 'calendario_listar') {
+    const { sistema, tipo, status, incluirInativos } = req.query;
+    try {
+      const dados = await _calListar({
+        sistema, tipo, status,
+        incluirInativos: incluirInativos === 'true',
+      });
+      return res.status(200).json({ ok: true, dados });
+    } catch (e) {
+      return res.status(500).json({ ok: false, error: e.message });
+    }
+  }
+
+  if (acao === 'calendario_criar' || acao === 'calendario_atualizar') {
+    const body = await _lerBody(req);
+    const { id, ...dados } = body;
+    if (acao === 'calendario_atualizar' && !id)
+      return res.status(400).json({ ok: false, error: 'id obrigatório' });
+    try {
+      const evento = await _calGravar(id || null, dados);
+      return res.status(200).json({ ok: true, evento });
+    } catch (e) {
+      return res.status(500).json({ ok: false, error: e.message });
+    }
+  }
+
+  if (acao === 'calendario_desativar') {
+    const body = await _lerBody(req);
+    if (!body.id) return res.status(400).json({ ok: false, error: 'id obrigatório' });
+    try {
+      await _calGravar(body.id, { ativo: false });
+      return res.status(200).json({ ok: true });
+    } catch (e) {
+      return res.status(500).json({ ok: false, error: e.message });
+    }
+  }
+
+  if (acao === 'calendario_excluir') {
+    const body = await _lerBody(req);
+    if (!body.id) return res.status(400).json({ ok: false, error: 'id obrigatório' });
+    try {
+      await _calExcluir(body.id);
+      return res.status(200).json({ ok: true });
+    } catch (e) {
+      return res.status(500).json({ ok: false, error: e.message });
+    }
+  }
+
+  if (acao === 'calendario_repasse_listar') {
+    const { evento_id, cod_municipio } = req.query;
+    try {
+      const dados = await _calRepListar({ evento_id, cod_municipio });
+      return res.status(200).json({ ok: true, dados });
+    } catch (e) {
+      return res.status(500).json({ ok: false, error: e.message });
+    }
+  }
+
+  if (acao === 'calendario_repasse_criar' || acao === 'calendario_repasse_atualizar') {
+    const body = await _lerBody(req);
+    const { id, ...dados } = body;
+    if (acao === 'calendario_repasse_atualizar' && !id)
+      return res.status(400).json({ ok: false, error: 'id obrigatório' });
+    try {
+      const repasse = await _calRepGravar(id || null, dados);
+      return res.status(200).json({ ok: true, repasse });
+    } catch (e) {
+      return res.status(500).json({ ok: false, error: e.message });
+    }
+  }
+
+  if (acao === 'calendario_repasse_excluir') {
+    const body = await _lerBody(req);
+    if (!body.id) return res.status(400).json({ ok: false, error: 'id obrigatório' });
+    try {
+      await _calRepExcluir(body.id);
+      return res.status(200).json({ ok: true });
+    } catch (e) {
+      return res.status(500).json({ ok: false, error: e.message });
+    }
+  }
+  
   // ── SES: envio de e-mail ───────────────────────────────────────────────────
   res.setHeader('Access-Control-Allow-Origin', 'https://radarsiope-vercel.vercel.app');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
