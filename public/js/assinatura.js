@@ -543,18 +543,20 @@ function _criarCardPlano(plano, ciclo, allFeatures) {
   `;
 
   card.addEventListener('click', (e) => {
-    // ✅ 1. Se clicou em link de ação do card bloqueado, permite a navegação
+    //  Ignora clique no botão de expandir features
+    if (e.target.closest('.btn-ver-mais-features')) return;
+    // Se clicou em link de ação do card bloqueado, permite a navegação
     if (e.target.closest('a[href="capturaLead.html"]')) return;
     if (e.target.closest('a[href="faleConosco.html"]')) return;
 
-    // 🚫 2. Mantém o bloqueio de seleção para planos indisponíveis
+    // Mantém o bloqueio de seleção para planos indisponíveis
     if (plano.em_breve || plano.sob_consulta) return;
 
     e.stopPropagation();
     _onPlanoSelecionado(plano.id, ciclo);
   });
 
-  // ✅ 3. Garantia extra: sobrescreve pointer-events do CSS apenas no link
+  // Garantia extra: sobrescreve pointer-events do CSS apenas no link
   const linkCadastro = card.querySelector('.plano-em-breve-aviso a');
   if (linkCadastro) {
     linkCadastro.style.pointerEvents = 'auto';
