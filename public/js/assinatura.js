@@ -501,10 +501,10 @@ function _criarCardPlano(plano, ciclo, allFeatures) {
     ].join('');
 
     featuresHtml += `
-    <button type="button" class="btn-ver-mais-features" style="display:block;background:none;border:none;color:#0A3D62;font-size:12px;font-weight:500;cursor:pointer;padding:4px 0;margin-top:4px;text-align:left;width:100%;">
-      📋 Ver todos os recursos (+${extrasCount})
-    </button>
-    <div class="features-expanded" style="display:none; margin-top:6px; border-top:1px solid #f1f5f9; padding-top:6px;">
+      <button type="button" class="btn-ver-mais-features" data-count="${extrasCount}" style="...">
+        📋 Ver todos os recursos (+${extrasCount})
+      </button>
+      <div class="features-expanded" style="display:none; margin-top:6px; border-top:1px solid #f1f5f9; padding-top:6px;">
       <ul class="plano-features">${hiddenList}</ul>
     </div>`;
   }
@@ -1210,20 +1210,34 @@ async function initAssinatura() {
   document.getElementById('parcelas')?.addEventListener('change', atualizarPreview);
   document.getElementById('form-assinatura')?.addEventListener('submit', processarEnvioAssinatura);
 
-  // Delegação para o toggle de features
-  document.addEventListener('click', (e) => {
-    const btn = e.target.closest('.btn-ver-mais-features');
-    if (!btn) return;
-    e.stopPropagation(); // ⚠️ Impede que o card seja selecionado ao clicar no botão
-    const card = btn.closest('.plano-card');
-    const wrapper = card.querySelector('.features-expanded');
-    const isHidden = wrapper.style.display === 'none';
+  // ── Toggle de features (delegação segura, executada apenas uma vez) ──
+  if (!window._assinaturaFeaturesListenerAttached) {
+    window._assinaturaFeaturesListenerAttached = true;
 
-    wrapper.style.display = isHidden ? 'block' : 'none';
-    btn.textContent = isHidden
-      ? '🔼 Ocultar recursos'
-      : '📋 Ver todos os recursos (+' + (btn.textContent.match(/\+(\d+)/)?.[1] || '') + ')';
-  });
+    document.addEventListener('click', (e) => {
+      const btn = e.target.closest('.btn-ver-mais-features');
+      if (!btn) return;
+
+      e.stopPropagation(); // ⚠️ Impede seleção do card
+
+      const card = btn.closest('.plano-card');
+      const wrapper = card?.querySelector('.features-expanded');
+
+      // ✅ Validações de segurança
+      if (!card || !wrapper) return;
+
+      const isHidden = wrapper.style.display === 'none' || wrapper.offsetParent === null;
+      wrapper.style.display = isHidden ? 'block' : 'none';
+
+      // Atualiza texto do botão mantendo o contador original
+      const originalCount = btn.dataset.count || btn.textContent.match(/\+(\d+)/)?.[1] || '';
+      if (originalCount) btn.dataset.count = originalCount; // guarda para reuso
+
+      btn.textContent = isHidden
+        ? '🔼 Ocultar recursos'
+        : `📋 Ver todos os recursos (+${originalCount})`;
+    }, { passive: true }); // ✅ performance
+  }
 }
 
 // ── Auto-init ──────────────────────────────────────────────────────────────────
