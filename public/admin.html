@@ -566,6 +566,7 @@
       title="Recalcula os contadores de solicitações, feedbacks e parcelas vencidas">🔄 Recalcular contadores</button>
     <button onclick="abrirTab('votacoes-temas')">🏆 Votações de Temas</button>
     <button onclick="abrirPainelGestao()">🗞️ Painel</button>
+    <button onclick="abrirTab('calendario')">📅 Calendário</button>
 
     <div style="margin-top:12px">
       <h2 style="font-size:14px;margin-bottom:6px">Relatório de Preferências</h2>
@@ -1430,7 +1431,9 @@
           <h3 style="margin:0">📑 Planos</h3>
         </div>
         <div style="display:flex;gap:8px">
-          <button onclick="if(window.FeaturesManager) window.FeaturesManager.abrirModalFeatures(); else alert('FeaturesManager não carregado')">⚙️ Gerenciar Features</button>
+          <button
+            onclick="if(window.FeaturesManager) window.FeaturesManager.abrirModalFeatures(); else alert('FeaturesManager não carregado')">⚙️
+            Gerenciar Features</button>
           <button onclick="abrirModalPlano()">➕ Novo Plano</button>
         </div>
       </div>
@@ -2196,7 +2199,9 @@
     <section id="feedbacks" class="card" style="display:none">
       <!-- preenchido inteiramente por carregarSecaoFeedbacks() em feedbacks.js -->
     </section>
-
+    <section id="calendario">
+      <div id="cal-admin-root"></div>
+    </section>
   </main>
 
 
@@ -2409,6 +2414,7 @@
   <script src="js/site.js"></script>
   <script src="js/functions.js"></script>
   <script src="js/mailer.js"></script>
+  <script src="js/calendarioAdmin.js"></script>
 
 
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
@@ -2521,6 +2527,7 @@
       else if (tabId === 'votacoes-temas') {
         carregarPainelVotacoesTemas();
       }
+      else if (tabId === 'calendario') renderCalendarioAdmin(document.getElementById('cal-admin-root'));
     }
 
     // inicializa com usuários visível
@@ -2768,7 +2775,362 @@
       </div>
     </div>
   </div>
+  <script>
+    // ── Calendário Admin ─────────────────────────────────────────────
+    const _CAL_API = '/api/sendViaSES';
+    let _calEventos = [];
+    let _calEditando = null;
 
+    async function renderCalendarioAdmin(container) {
+      container.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <h2 style="margin:0;color:#0a3d62;font-size:22px">📅 Calendário de Datas Importantes</h2>
+      <button onclick="_calAbrirForm(null)"
+        style="background:#007acc;color:#fff;border:none;padding:8px 16px;border-radius:6px;cursor:pointer;font-weight:bold">
+        + Novo evento
+      </button>
+    </div>
+
+    <div class="card" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:16px">
+      <select id="cal-f-sistema" onchange="_calCarregar()">
+        <option value="">Todos os sistemas</option>
+        <option value="fundeb">FUNDEB</option>
+        <option value="siope">SIOPE</option>
+        <option value="salario_educacao">Salário-Educação</option>
+        <option value="siscacs">SISCACS</option>
+      </select>
+      <select id="cal-f-tipo" onchange="_calCarregar()">
+        <option value="">Todos os tipos</option>
+        <option value="repasse">Repasse</option>
+        <option value="prazo">Prazo</option>
+        <option value="reuniao">Reunião</option>
+        <option value="mandato">Mandato</option>
+        <option value="outro">Outro</option>
+      </select>
+      <select id="cal-f-status" onchange="_calCarregar()">
+        <option value="">Todos os status</option>
+        <option value="previsto">Previsto</option>
+        <option value="confirmado">Confirmado</option>
+        <option value="realizado">Realizado</option>
+      </select>
+      <label style="font-size:13px;cursor:pointer">
+        <input type="checkbox" id="cal-f-inativos" onchange="_calCarregar()"> Ver inativos
+      </label>
+    </div>
+
+    <div id="cal-tabela-wrap" class="card">Carregando...</div>
+
+    <!-- Painel lateral — reutiliza .modal-overlay do admin -->
+    <div id="cal-painel" class="modal-overlay" aria-hidden="true" style="width:520px">
+      <div class="modal" id="cal-painel-conteudo" style="padding:24px"></div>
+    </div>`;
+
+      _calCarregar();
+    }
+
+    // ── Carregar lista ───────────────────────────────────────────────
+    async function _calCarregar() {
+      const wrap = document.getElementById('cal-tabela-wrap');
+      if (!wrap) return;
+      wrap.innerHTML = '<p style="color:#666;padding:8px">Carregando...</p>';
+
+      const params = new URLSearchParams({ acao: 'calendario_listar' });
+      const sis = document.getElementById('cal-f-sistema')?.value;
+      const tipo = document.getElementById('cal-f-tipo')?.value;
+      const st = document.getElementById('cal-f-status')?.value;
+      const inat = document.getElementById('cal-f-inativos')?.checked;
+      if (sis) params.append('sistema', sis);
+      if (tipo) params.append('tipo', tipo);
+      if (st) params.append('status', st);
+      if (inat) params.append('incluirInativos', 'true');
+
+      try {
+        const res = await fetch(`${_CAL_API}?${params}`);
+        const json = await res.json();
+        if (!json.ok) throw new Error(json.error);
+        _calEventos = json.dados;
+        _calRenderTabela();
+      } catch (e) {
+        wrap.innerHTML = `<p style="color:red">Erro: ${e.message}</p>`;
+      }
+    }
+
+    // ── Tabela ───────────────────────────────────────────────────────
+    function _calRenderTabela() {
+      const wrap = document.getElementById('cal-tabela-wrap');
+      const SIS = { fundeb: 'FUNDEB', siope: 'SIOPE', salario_educacao: 'Salário-Ed.', siscacs: 'SISCACS' };
+      const TIP = { repasse: 'Repasse', prazo: 'Prazo', reuniao: 'Reunião', mandato: 'Mandato', outro: 'Outro' };
+      const STA = { previsto: 'Previsto', confirmado: 'Confirmado', realizado: 'Realizado' };
+      const fmtR = v => v ? new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(v / 100) : null;
+      const fmtD = d => { if (!d) return '—'; const [y, m, dd] = d.split('-'); return `${dd}/${m}/${y}`; };
+      const stBg = s => s === 'realizado' ? '#e8f5e9' : s === 'confirmado' ? '#e3f2fd' : '#f5f5f5';
+
+      if (!_calEventos.length) {
+        wrap.innerHTML = '<p style="color:#666;padding:8px">Nenhum evento encontrado.</p>';
+        return;
+      }
+
+      wrap.innerHTML = `
+  <table>
+    <thead>
+      <tr>
+        <th>Sistema</th><th>Tipo</th><th>Título</th><th>Data</th>
+        <th>Valores</th><th>Status</th><th>Free</th><th>Ativo</th><th>Ações</th>
+      </tr>
+    </thead>
+    <tbody>
+    ${_calEventos.map(ev => {
+        const vals = [
+          ev.vl_vaaf && `VAAF: ${fmtR(ev.vl_vaaf)}`,
+          ev.vl_vaat && `VAAT: ${fmtR(ev.vl_vaat)}`,
+          ev.vl_vaar && `VAAR: ${fmtR(ev.vl_vaar)}`,
+          ev.vl_sal_educ && `Sal-Ed: ${fmtR(ev.vl_sal_educ)}`,
+        ].filter(Boolean);
+        return `
+      <tr style="${!ev.ativo ? 'opacity:.45;background:#fafafa' : ''}">
+        <td><strong>${SIS[ev.sistema] || ev.sistema}</strong></td>
+        <td>${TIP[ev.tipo] || ev.tipo}</td>
+        <td>${ev.titulo}</td>
+        <td style="white-space:nowrap">${fmtD(ev.data)}</td>
+        <td style="font-size:12px;line-height:1.6">${vals.join('<br>') || '—'}</td>
+        <td><span style="background:${stBg(ev.status)};padding:2px 8px;border-radius:4px;font-size:12px">
+          ${STA[ev.status] || ev.status}</span></td>
+        <td style="text-align:center">${ev.visivel_free ? '✅' : '—'}</td>
+        <td style="text-align:center">${ev.ativo ? '✅' : '❌'}</td>
+        <td style="white-space:nowrap">
+          <span class="icon-btn" onclick="_calAbrirForm('${ev.id}')" title="Editar">✏️</span>
+          ${ev.ativo
+            ? `<span class="icon-btn" onclick="_calDesativar('${ev.id}')" title="Desativar">🔕</span>`
+            : `<span class="icon-btn" onclick="_calExcluirDef('${ev.id}')" title="Excluir permanentemente">🗑️</span>`
+          }
+        </td>
+      </tr>`;
+      }).join('')}
+    </tbody>
+  </table>`;
+    }
+
+    // ── Formulário ───────────────────────────────────────────────────
+    function _calAbrirForm(id) {
+      _calEditando = id ? (_calEventos.find(e => e.id === id) || null) : null;
+      const painel = document.getElementById('cal-painel');
+      document.getElementById('cal-painel-conteudo').innerHTML = _calHtmlForm(_calEditando);
+      painel.classList.add('aberto');
+      painel.setAttribute('aria-hidden', 'false');
+      _calToggleCampos();
+    }
+
+    function _calFecharForm() {
+      const painel = document.getElementById('cal-painel');
+      painel.classList.remove('aberto');
+      painel.setAttribute('aria-hidden', 'true');
+      _calEditando = null;
+    }
+
+    function _calHtmlForm(ev) {
+      const v = ev || {};
+      const av = v.avisos_antecipados || [];
+      const fmtV = c => c ? (c / 100).toFixed(2) : '';
+      const sel = (val, opt) => val === opt ? 'selected' : '';
+
+      return `
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
+    <h3 style="margin:0;color:#0a3d62">${ev ? 'Editar evento' : 'Novo evento'}</h3>
+    <button onclick="_calFecharForm()" style="background:none;border:none;font-size:20px;cursor:pointer;color:#666">✕</button>
+  </div>
+
+  <div class="field">
+    <label>Sistema</label>
+    <select id="cf-sistema" onchange="_calToggleCampos()">
+      <option value="fundeb"           ${sel(v.sistema, 'fundeb')}>FUNDEB</option>
+      <option value="siope"            ${sel(v.sistema, 'siope')}>SIOPE</option>
+      <option value="salario_educacao" ${sel(v.sistema, 'salario_educacao')}>Salário-Educação</option>
+      <option value="siscacs"          ${sel(v.sistema, 'siscacs')}>SISCACS</option>
+    </select>
+  </div>
+
+  <div class="field">
+    <label>Tipo</label>
+    <select id="cf-tipo" onchange="_calToggleCampos()">
+      <option value="repasse" ${sel(v.tipo, 'repasse')}>Repasse</option>
+      <option value="prazo"   ${sel(v.tipo, 'prazo')}>Prazo</option>
+      <option value="reuniao" ${sel(v.tipo, 'reuniao')}>Reunião</option>
+      <option value="mandato" ${sel(v.tipo, 'mandato')}>Mandato</option>
+      <option value="outro"   ${sel(v.tipo, 'outro')}>Outro</option>
+    </select>
+  </div>
+
+  <div class="field">
+    <label>Título</label>
+    <input type="text" id="cf-titulo" value="${v.titulo || ''}" placeholder="Ex: Repasse FUNDEB – mai/2026">
+  </div>
+
+  <div class="field">
+    <label>Descrição <span style="font-weight:400;color:#999">(opcional)</span></label>
+    <textarea id="cf-descricao" rows="2" placeholder="Informações adicionais...">${v.descricao || ''}</textarea>
+  </div>
+
+  <div class="field">
+    <label id="cf-data-label">Data</label>
+    <input type="date" id="cf-data" value="${v.data || ''}">
+    <small id="cf-data-hint" style="color:#999;display:none">
+      Informe o último dia do mês de referência — VAAF, VAAT e VAAR são creditados juntos
+    </small>
+  </div>
+
+  <div class="field">
+    <label>Status</label>
+    <select id="cf-status">
+      <option value="previsto"   ${sel(v.status || 'previsto', 'previsto')}>Previsto</option>
+      <option value="confirmado" ${sel(v.status, 'confirmado')}>Confirmado</option>
+      <option value="realizado"  ${sel(v.status, 'realizado')}>Realizado</option>
+    </select>
+  </div>
+
+  <!-- Valores FUNDEB -->
+  <div id="cf-bloco-fundeb" style="display:none;background:#f0f7ff;border-radius:6px;padding:12px;margin-bottom:8px">
+    <p style="margin:0 0 10px;font-size:12px;font-weight:600;color:#444">Valores do repasse (R$)</p>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
+      <div class="field" style="margin:0">
+        <label style="font-size:12px">VAAF</label>
+        <input type="number" id="cf-vl-vaaf" step="0.01" min="0" value="${fmtV(v.vl_vaaf)}" placeholder="0,00">
+      </div>
+      <div class="field" style="margin:0">
+        <label style="font-size:12px">VAAT</label>
+        <input type="number" id="cf-vl-vaat" step="0.01" min="0" value="${fmtV(v.vl_vaat)}" placeholder="0,00">
+      </div>
+      <div class="field" style="margin:0">
+        <label style="font-size:12px">VAAR</label>
+        <input type="number" id="cf-vl-vaar" step="0.01" min="0" value="${fmtV(v.vl_vaar)}" placeholder="0,00">
+      </div>
+    </div>
+  </div>
+
+  <!-- Valor Salário-Educação -->
+  <div id="cf-bloco-saleduc" style="display:none;background:#fff8f0;border-radius:6px;padding:12px;margin-bottom:8px">
+    <div class="field" style="margin:0">
+      <label>Valor do repasse Salário-Educação (R$)</label>
+      <input type="number" id="cf-vl-sal-educ" step="0.01" min="0" value="${fmtV(v.vl_sal_educ)}" placeholder="0,00">
+    </div>
+  </div>
+
+  <div class="field">
+    <label>Avisos antecipados</label>
+    <div style="display:flex;gap:16px;margin-top:4px">
+      ${[3, 7, 15, 30].map(d => `
+      <label style="font-size:13px;cursor:pointer">
+        <input type="checkbox" class="cf-aviso" value="${d}" ${av.includes(d) ? 'checked' : ''}> ${d}d
+      </label>`).join('')}
+    </div>
+  </div>
+
+  <div class="field" style="display:flex;gap:24px">
+    <label style="font-size:13px;cursor:pointer">
+      <input type="checkbox" id="cf-free" ${v.visivel_free ? 'checked' : ''}> Visível no plano free
+    </label>
+    ${ev ? `
+    <label style="font-size:13px;cursor:pointer">
+      <input type="checkbox" id="cf-ativo" ${v.ativo ? 'checked' : ''}> Ativo
+    </label>` : ''}
+  </div>
+
+  <div style="text-align:right;margin-top:16px;padding-top:12px;border-top:1px solid #eee">
+    <button onclick="_calFecharForm()">Cancelar</button>
+    <button id="cf-btn-salvar" onclick="_calSalvar()"
+      style="background:#007acc;color:#fff;border:none;padding:.5em 1.2em;border-radius:4px;cursor:pointer;font-weight:bold;margin-left:8px">
+      ${ev ? '💾 Salvar' : '➕ Criar'}
+    </button>
+  </div>`;
+    }
+
+    function _calToggleCampos() {
+      const sis = document.getElementById('cf-sistema')?.value;
+      const tipo = document.getElementById('cf-tipo')?.value;
+      const isRep = tipo === 'repasse';
+      const show = (id, vis) => { const el = document.getElementById(id); if (el) el.style.display = vis ? 'block' : 'none'; };
+      show('cf-bloco-fundeb', isRep && sis === 'fundeb');
+      show('cf-bloco-saleduc', isRep && sis === 'salario_educacao');
+      show('cf-data-hint', isRep && sis === 'fundeb');
+    }
+
+    // ── Salvar ───────────────────────────────────────────────────────
+    function _calCentavos(id) {
+      const v = parseFloat(document.getElementById(id)?.value) || 0;
+      return v > 0 ? Math.round(v * 100) : null;
+    }
+
+    async function _calSalvar() {
+      const titulo = document.getElementById('cf-titulo').value.trim();
+      const data = document.getElementById('cf-data').value;
+      if (!titulo) return alert('Informe o título do evento.');
+      if (!data) return alert('Informe a data do evento.');
+
+      const dados = {
+        sistema: document.getElementById('cf-sistema').value,
+        tipo: document.getElementById('cf-tipo').value,
+        titulo,
+        descricao: document.getElementById('cf-descricao').value.trim() || null,
+        data,
+        status: document.getElementById('cf-status').value,
+        vl_vaaf: _calCentavos('cf-vl-vaaf'),
+        vl_vaat: _calCentavos('cf-vl-vaat'),
+        vl_vaar: _calCentavos('cf-vl-vaar'),
+        vl_sal_educ: _calCentavos('cf-vl-sal-educ'),
+        avisos_antecipados: [...document.querySelectorAll('.cf-aviso:checked')].map(el => +el.value),
+        visivel_free: document.getElementById('cf-free').checked,
+        ativo: _calEditando ? document.getElementById('cf-ativo').checked : true,
+      };
+      if (_calEditando) dados.id = _calEditando.id;
+
+      const btn = document.getElementById('cf-btn-salvar');
+      const acao = dados.id ? 'calendario_atualizar' : 'calendario_criar';
+      btn.disabled = true;
+      btn.textContent = 'Salvando...';
+
+      try {
+        const res = await fetch(`${_CAL_API}?acao=${acao}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(dados),
+        });
+        const json = await res.json();
+        if (!json.ok) throw new Error(json.error);
+        _calFecharForm();
+        _calCarregar();
+      } catch (e) {
+        alert('Erro ao salvar: ' + e.message);
+        btn.disabled = false;
+        btn.textContent = _calEditando ? '💾 Salvar' : '➕ Criar';
+      }
+    }
+
+    // ── Ações da tabela ──────────────────────────────────────────────
+    async function _calDesativar(id) {
+      if (!confirm('Desativar este evento?')) return;
+      try {
+        const res = await fetch(`${_CAL_API}?acao=calendario_desativar`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id }),
+        });
+        const json = await res.json();
+        if (!json.ok) throw new Error(json.error);
+        _calCarregar();
+      } catch (e) { alert('Erro: ' + e.message); }
+    }
+
+    async function _calExcluirDef(id) {
+      if (!confirm('Excluir permanentemente este evento? Não há como desfazer.')) return;
+      try {
+        const res = await fetch(`${_CAL_API}?acao=calendario_excluir`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id }),
+        });
+        const json = await res.json();
+        if (!json.ok) throw new Error(json.error);
+        _calCarregar();
+      } catch (e) { alert('Erro: ' + e.message); }
+    }
+  </script>
 </body>
 
 </html>
