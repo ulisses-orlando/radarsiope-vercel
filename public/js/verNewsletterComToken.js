@@ -2704,8 +2704,9 @@ function _getCtx() {
 }
 
 // ─── Calendário: painel de tela cheia ─────────────────────────────────────────
+// ─── Substituir a função _abrirCalendario em verNewsletterComToken.js ─────────
+
 function _abrirCalendario() {
-  // Cria o painel apenas uma vez
   const PAINEL_ID = 'rs-cal-fullscreen';
   let painel = document.getElementById(PAINEL_ID);
 
@@ -2720,7 +2721,6 @@ function _abrirCalendario() {
       'display:flex', 'flex-direction:column',
     ].join(';');
 
-    // Botão fechar
     const btnFechar = document.createElement('button');
     btnFechar.innerHTML = '← Voltar';
     btnFechar.style.cssText = [
@@ -2741,7 +2741,6 @@ function _abrirCalendario() {
       }, 200);
     });
 
-    // Container do calendário
     const container = document.createElement('div');
     container.id = 'rs-cal-container';
     container.style.flex = '1';
@@ -2753,13 +2752,36 @@ function _abrirCalendario() {
     painel.style.display = 'flex';
   }
 
-  // Renderiza / re-renderiza o calendário
   const container = document.getElementById('rs-cal-container');
-  if (container && typeof window.renderizarCalendario === 'function') {
-    const acesso = window._radarUser || {};
-    const edicao = window._edicaoAtual || {};  // edição corrente se disponível
-    window.renderizarCalendario(container, { acesso, edicao });
+  if (!container) return;
+
+  // ── Diagnóstico ──────────────────────────────────────────────────────────────
+  if (typeof window.renderizarCalendario !== 'function') {
+    console.error('[Calendário] window.renderizarCalendario não está disponível.',
+      'Verifique se calendario.js está carregado na página.');
+    container.innerHTML = `
+      <div style="padding:40px 20px;text-align:center;color:#94a3b8">
+        <div style="font-size:32px;margin-bottom:12px">⚠️</div>
+        <div style="font-size:14px;font-weight:600;color:#f1f5f9;margin-bottom:6px">
+          Módulo do calendário não carregado
+        </div>
+        <div style="font-size:12px;color:#64748b">
+          Verifique se calendario.js está incluído na página.<br>
+          Consulte o console para detalhes.
+        </div>
+      </div>`;
+    return;
   }
+
+  // ── Monta acesso e edicao ────────────────────────────────────────────────────
+  // window._radarUser.features vem do Firestore — precisa ter { calendario: true }
+  // para o usuário ter acesso. Sem isso, renderizarCalendario exibe o upgrade prompt.
+  const acesso = window._radarUser || {};
+  const edicao = {};
+
+  console.log('[Calendário] Abrindo. acesso.features:', acesso.features);
+
+  window.renderizarCalendario(container, { acesso, edicao });
 }
 
 // ─── Inicializar drawer ──────────────────────────────────────────────────────
