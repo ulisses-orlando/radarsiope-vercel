@@ -285,6 +285,7 @@ async function _calCarregar() {
     );
   }
   console.log('[Calendário] Carregando eventos e repasses para município:', _cal.codMunicipio);
+  console.log('[Calendário] startVal:', startVal, 'endVal:',  endVal);
 
   const [evRes, repRes] = await Promise.all(queries);
 
