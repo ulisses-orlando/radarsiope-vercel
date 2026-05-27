@@ -352,8 +352,8 @@ function _calRenderizar() {
   const hint = document.getElementById('rs-cal-hint');
   if (hint) {
     const hints = {
-      geral: 'Visão geral · toque num mês para expandir',
-      repasses: 'Fluxo de repasses · toque num mês para ver detalhes',
+      geral: 'Visão geral · toque em um mês para expandir',
+      repasses: 'Fluxo de repasses · toque em um mês para ver detalhes',
     };
     hint.style.display = hints[_cal.view] ? 'block' : 'none';
     hint.textContent = hints[_cal.view] || '';
