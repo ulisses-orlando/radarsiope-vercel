@@ -273,11 +273,15 @@ async function _calCarregar() {
   ];
 
   if (_cal.codMunicipio) {
+    const startVal = _cal.codMunicipio * 10;
+    const endVal = startVal + 10;        
     queries.push(
       window.supabase
         .from('calendario_repasses')
         .select('*')
-        .eq('cod_municipio', _cal.codMunicipio)
+        // .eq('cod_municipio', _cal.codMunicipio)
+        .gte('cod_municipio', startVal)
+        .lte('cod_municipio', endVal)
     );
   }
   console.log('[Calendário] Carregando eventos e repasses para município:', _cal.codMunicipio);
