@@ -217,8 +217,6 @@ async function renderizarCalendario(container, { acesso = {}, edicao = {} } = {}
     || window._radarUser?.municipio_cod
     || null;
 
-    console.log('[Calendário] renderizarCalendario chamado. acesso.features:', acesso.features, 'codMunicipio inicial:', _cal.codMunicipio);
-
   // Verificação de acesso — mesmo padrão de outras features
   const temAcesso = edicao?.features?.calendario || acesso?.features?.calendario;
   if (!temAcesso) {
@@ -285,8 +283,6 @@ async function _calCarregar() {
     );
     console.log('[Calendário] startVal:', startVal, 'endVal:',  endVal);
   }
-  console.log('[Calendário] Carregando eventos e repasses para município:', _cal.codMunicipio);
-  
 
   const [evRes, repRes] = await Promise.all(queries);
 
