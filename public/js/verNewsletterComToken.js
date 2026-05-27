@@ -770,7 +770,6 @@ function _renderSeletorMunicipio(tituloEl, municipiosPlano, destinatario, acesso
         btnRel.dataset.cod = String(novo.cod_municipio || '');
         btnRel.dataset.nome = String(novo.nome || '');
         btnRel.dataset.uf = String(novo.uf || '');
-        console.log('[Seletor] Dataset atualizado:', btnRel.dataset);
       }
     } catch (err) {
       console.warn('[verNL] Erro ao trocar município:', err);
@@ -1401,7 +1400,7 @@ async function _marcarLinksVisualizados() {
 
 function _registrarAcessoGrupo(grupo) {
   // Registro local para analytics (opcional)
-  console.log(`[WA] Usuário acessou grupo: ${grupo}`);
+  //console.log(`[WA] Usuário acessou grupo: ${grupo}`);
 }
 
 // Expor funções globalmente
@@ -2704,7 +2703,6 @@ function _getCtx() {
 }
 
 // ─── Calendário: painel de tela cheia ─────────────────────────────────────────
-// ─── Substituir a função _abrirCalendario em verNewsletterComToken.js ─────────
 
 function _abrirCalendario() {
   const PAINEL_ID = 'rs-cal-fullscreen';
@@ -2778,8 +2776,6 @@ function _abrirCalendario() {
   // para o usuário ter acesso. Sem isso, renderizarCalendario exibe o upgrade prompt.
   const acesso = window._radarUser || {};
   const edicao = {};
-
-  console.log('[Calendário] Abrindo. acesso.features:', acesso.features);
 
   window.renderizarCalendario(container, { acesso, edicao });
 }
