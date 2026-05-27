@@ -114,55 +114,6 @@ async function gerarRelatorioConformidade(cod, nome, uf) {
   }
 }
 
-// ─── Injeta o botão no DOM após a seção municipal ─────────────────────────────
-/* function _injetarBotaoRelatorio(cod, nome, uf) {
-  document.getElementById('btn-relatorio-conformidade')?.remove();
-  const btn = document.createElement('button');
-  btn.id = 'btn-relatorio-conformidade';
-  btn.innerHTML = '📋 Relatório de Conformidade';
-  btn.title = 'Gerar relatório de conformidade municipal (PDF)';
-
-  // ✅ EVOLUÇÃO 1: Armazena dados no dataset para leitura dinâmica
-  btn.dataset.cod = String(cod || '');
-  btn.dataset.nome = String(nome || '');
-  btn.dataset.uf = String(uf || '');
-
-  btn.style.cssText = [
-    'display:flex', 'align-items:center', 'gap:6px',
-    'margin:8px 0 0 0', 'padding:9px 16px',
-    'background:transparent',
-    'border:1.5px solid rgba(255,255,255,0.18)',
-    'border-radius:8px',
-    'color:var(--rs-muted,#94a3b8)',
-    'font-size:13px', 'font-weight:500',
-    'cursor:pointer', 'width:100%',
-    'justify-content:center',
-    'transition:background .2s, border-color .2s, color .2s',
-  ].join(';');
-
-  btn.addEventListener('mouseover', () => {
-    btn.style.background = 'rgba(10,61,98,0.35)';
-    btn.style.borderColor = 'rgba(10,61,98,0.7)';
-    btn.style.color = '#f1f5f9';
-  });
-  btn.addEventListener('mouseout', () => {
-    btn.style.background = 'transparent';
-    btn.style.borderColor = 'rgba(255,255,255,0.18)';
-    btn.style.color = 'var(--rs-muted,#94a3b8)';
-  });
-
-  // ✅ EVOLUÇÃO 1: Lê do dataset no momento do clique
-  btn.addEventListener('click', () => gerarRelatorioConformidade(btn.dataset.cod, btn.dataset.nome, btn.dataset.uf));
-
-  const ref = document.getElementById('btn-toggle-historico');
-  if (ref?.parentNode) {
-    ref.parentNode.insertBefore(btn, ref.nextSibling);
-  } else {
-    const container = document.getElementById('municipio-conteudo');
-    if (container) container.appendChild(btn);
-  }
-} */
-
 // ─── Monta o documento HTML completo do relatório ────────────────────────────
 function _montarHTMLRelatorio(d) {
   const { assinante, siope, alertas, quiz, cauc, gerado_em } = d;
