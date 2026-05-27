@@ -1983,110 +1983,43 @@
         <div class="section-container">
             <div class="section-header animate-on-scroll">
                 <div class="section-label">💰 Planos</div>
-                <h2 class="section-title">Escolha o radar ideal para seu município</h2>
-                <p class="section-desc">Cinco planos com features progressivas. Fidelize e economize com ciclos de 6 ou 12 meses.</p>
+                <h2 class="section-title">Escolha seu plano</h2>
+                <p class="section-desc">Planos flexíveis para cada necessidade. Assine em minutos e comece a monitorar sua gestão educacional.</p>
             </div>
-            <div class="pricing-tabs animate-on-scroll">
-                <button class="pricing-tab active" onclick="switchTab(this, 'monthly')">Mensal</button>
-                <button class="pricing-tab" onclick="switchTab(this, 'semester')">6 meses <span style="color:var(--success)">-10%</span></button>
-                <button class="pricing-tab" onclick="switchTab(this, 'annual')">12 meses <span style="color:var(--success)">-20%</span></button>
-            </div>
-            <div class="pricing-grid" id="pricingGrid">
-                <div class="pricing-card animate-on-scroll delay-1">
-                    <div class="plan-name">Radar Básico</div>
-                    <div class="plan-desc">Entrada inteligente no monitoramento educacional</div>
-                    <div class="plan-price">
-                        <span class="price-value" data-monthly="189" data-semester="170" data-annual="151">R$ 189</span>
-                        <span class="price-period">/mês</span>
+            <div class="pricing-grid" id="pricingGrid" style="display:flex;justify-content:center;">
+                <div class="pricing-card animate-on-scroll" style="max-width:480px;width:100%;text-align:center;padding:3rem 2rem;border-color:var(--accent);box-shadow:0 0 40px var(--accent-glow);">
+                    <div style="font-size:4rem;margin-bottom:1.5rem;">🎯</div>
+                    <div class="plan-name" style="font-size:1.5rem;margin-bottom:0.75rem;">Conheça nossos planos</div>
+                    <div class="plan-desc" style="font-size:1rem;line-height:1.6;margin-bottom:2rem;">
+                        Escolha o plano ideal para o seu município.<br>
+                        Do monitoramento básico ao acompanhamento técnico completo com consultoria.
                     </div>
-                    <ul class="plan-features">
-                        <li class="included">Newsletter texto</li>
-                        <li class="included">Biblioteca vitalícia</li>
-                        <li class="included">Acesso PWA</li>
-                        <li class="not-included">Áudio (podcast)</li>
-                        <li class="not-included">Vídeo e infográfico</li>
-                        <li class="not-included">Alertas prioritários</li>
-                        <li class="not-included">Gráficos municipalizados</li>
-                        <li class="not-included">Assistente IA</li>
-                        <li class="not-included">Grupo VIP WhatsApp</li>
-                        <li class="not-included">Consultoria</li>
-                    </ul>
-                    <a href="assinatura.html?origem=site&plano=basico" class="plan-cta" style="display:inline-block;text-align:center;text-decoration:none;">Assinar Básico</a>
-                </div>
-                <div class="pricing-card animate-on-scroll delay-2">
-                    <div class="plan-name">Radar Essence</div>
-                    <div class="plan-desc">Conteúdo multimídia para gestores em movimento</div>
-                    <div class="plan-price">
-                        <span class="price-value" data-monthly="295" data-semester="266" data-annual="236">R$ 295</span>
-                        <span class="price-period">/mês</span>
+                    <div style="display:flex;flex-direction:column;gap:0.75rem;margin-bottom:2rem;text-align:left;padding:0 1rem;">
+                        <div style="display:flex;align-items:center;gap:0.75rem;font-size:0.9375rem;color:var(--text-muted);">
+                            <span style="color:var(--success);font-weight:700;">✓</span> 5 formatos de conteúdo
+                        </div>
+                        <div style="display:flex;align-items:center;gap:0.75rem;font-size:0.9375rem;color:var(--text-muted);">
+                            <span style="color:var(--success);font-weight:700;">✓</span> Alertas em tempo real
+                        </div>
+                        <div style="display:flex;align-items:center;gap:0.75rem;font-size:0.9375rem;color:var(--text-muted);">
+                            <span style="color:var(--success);font-weight:700;">✓</span> Assistente IA especializado
+                        </div>
+                        <div style="display:flex;align-items:center;gap:0.75rem;font-size:0.9375rem;color:var(--text-muted);">
+                            <span style="color:var(--success);font-weight:700;">✓</span> Ciclos de 3, 6 ou 12 meses
+                        </div>
+                        <div style="display:flex;align-items:center;gap:0.75rem;font-size:0.9375rem;color:var(--text-muted);">
+                            <span style="color:var(--success);font-weight:700;">✓</span> Biblioteca vitalícia
+                        </div>
                     </div>
-                    <ul class="plan-features">
-                        <li class="included">Tudo do Básico</li>
-                        <li class="included">Áudio (podcast)</li>
-                        <li class="not-included">Vídeo e infográfico</li>
-                        <li class="not-included">Alertas prioritários</li>
-                        <li class="not-included">Gráficos municipalizados</li>
-                        <li class="not-included">Assistente IA</li>
-                        <li class="not-included">Grupo VIP WhatsApp</li>
-                        <li class="not-included">Consultoria</li>
-                    </ul>
-                    <a href="assinatura.html?origem=site&plano=essence" class="plan-cta" style="display:inline-block;text-align:center;text-decoration:none;">Assinar Essence</a>
-                </div>
-                <div class="pricing-card popular animate-on-scroll delay-3">
-                    <div class="popular-badge">Mais Popular</div>
-                    <div class="plan-name">Radar Profissional</div>
-                    <div class="plan-desc">Monitoramento completo com alertas e dados</div>
-                    <div class="plan-price">
-                        <span class="price-value" data-monthly="395" data-semester="356" data-annual="316">R$ 395</span>
-                        <span class="price-period">/mês</span>
-                    </div>
-                    <ul class="plan-features">
-                        <li class="included">Tudo do Essence</li>
-                        <li class="included">Vídeo e infográfico</li>
-                        <li class="included">Alertas prioritários</li>
-                        <li class="included">Gráficos municipalizados</li>
-                        <li class="included">Mapa mental</li>
-                        <li class="not-included">Assistente IA</li>
-                        <li class="not-included">Grupo VIP WhatsApp</li>
-                        <li class="not-included">Consultoria</li>
-                    </ul>
-                    <a href="assinatura.html?origem=site&plano=profissional" class="plan-cta" style="display:inline-block;text-align:center;text-decoration:none;">Assinar Profissional</a>
-                </div>
-                <div class="pricing-card animate-on-scroll delay-4">
-                    <div class="plan-name">Radar Premium</div>
-                    <div class="plan-desc">Comunidade exclusiva e sugestões de tema</div>
-                    <div class="plan-price">
-                        <span class="price-value" data-monthly="515" data-semester="464" data-annual="412">R$ 515</span>
-                        <span class="price-period">/mês</span>
-                    </div>
-                    <ul class="plan-features">
-                        <li class="included">Tudo do Profissional</li>
-                        <li class="included">Assistente IA</li>
-                        <li class="included">Grupo VIP WhatsApp</li>
-                        <li class="included">Sugestões de tema</li>
-                        <li class="not-included">Consultoria online</li>
-                        <li class="not-included">Consultoria in loco</li>
-                    </ul>
-                    <a href="assinatura.html?origem=site&plano=premium" class="plan-cta" style="display:inline-block;text-align:center;text-decoration:none;">Assinar Premium</a>
-                </div>
-                <div class="pricing-card animate-on-scroll delay-5">
-                    <div class="plan-name">Radar Supreme</div>
-                    <div class="plan-desc">Acompanhamento técnico completo do seu município</div>
-                    <div class="plan-price">
-                        <span class="price-value" data-monthly="650" data-semester="585" data-annual="520">R$ 650</span>
-                        <span class="price-period">/mês</span>
-                    </div>
-                    <ul class="plan-features">
-                        <li class="included">Tudo do Premium</li>
-                        <li class="included">Consultoria 4h/mês</li>
-                        <li class="included">Consultoria in loco</li>
-                        <li class="included">Atendimento prioritário</li>
-                        <li class="included">Relatórios customizados</li>
-                    </ul>
-                    <a href="assinatura.html?origem=site&plano=supreme" class="plan-cta" style="display:inline-block;text-align:center;text-decoration:none;">Assinar Supreme</a>
+                    <a href="assinatura.html?origem=site" class="plan-cta" style="display:inline-block;width:100%;text-align:center;text-decoration:none;background:var(--gradient-accent);border:none;color:white;box-shadow:0 0 20px var(--accent-glow);padding:1rem;font-size:1.125rem;border-radius:10px;font-weight:600;transition:all 0.3s ease;">
+                        Ver Planos e Assinar →
+                    </a>
+                    <p style="margin-top:1.25rem;font-size:0.875rem;color:var(--text-dim);">
+                        Ainda tem dúvidas? <a href="capturaLead.html" style="color:var(--accent);text-decoration:none;font-weight:500;">Fale conosco</a>
+                    </p>
                 </div>
             </div>
-            <p class="fidelity-note animate-on-scroll">
+            <p class="fidelity-note animate-on-scroll" style="margin-top:2rem;">
                 <strong>Cláusula de fidelização:</strong> nos planos de 6 e 12 meses, cancelamento antecipado gera ajuste equivalente ao desconto já usufruído. Não é multa — é devolução do benefício concedido.
             </p>
         </div>
@@ -2264,5 +2197,8 @@
             price.style.transition = 'opacity 0.2s ease';
         });
     </script>
+
+
+    
 </body>
 </html>
