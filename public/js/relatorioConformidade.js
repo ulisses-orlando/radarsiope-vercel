@@ -115,7 +115,7 @@ async function gerarRelatorioConformidade(cod, nome, uf) {
 }
 
 // ─── Injeta o botão no DOM após a seção municipal ─────────────────────────────
-function _injetarBotaoRelatorio(cod, nome, uf) {
+/* function _injetarBotaoRelatorio(cod, nome, uf) {
   document.getElementById('btn-relatorio-conformidade')?.remove();
   const btn = document.createElement('button');
   btn.id = 'btn-relatorio-conformidade';
@@ -161,7 +161,7 @@ function _injetarBotaoRelatorio(cod, nome, uf) {
     const container = document.getElementById('municipio-conteudo');
     if (container) container.appendChild(btn);
   }
-}
+} */
 
 // ─── Monta o documento HTML completo do relatório ────────────────────────────
 function _montarHTMLRelatorio(d) {
