@@ -179,52 +179,59 @@ function _cadHtmlForm(ev) {
   const avs = v.avisos_antecipados || [];
   const sel = (val, opt) => val === opt ? 'selected' : '';
   
+  // Estilos base para garantir layout limpo
+  const labelStyle = "display:block;font-size:11px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px;";
+  const inputStyle = "width:100%;background:#0f172a;border:1px solid #334155;border-radius:10px;padding:9px 12px;color:#f1f5f9;font-size:13px;font-family:inherit;outline:none;box-sizing:border-box;";
+  const rowStyle = "margin-bottom:16px;";
+  const gridRowStyle = "display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;";
+
   return `
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px">
       <div style="font-size:17px;font-weight:700;color:#f1f5f9">${ev ? 'Editar evento' : 'Novo evento'}</div>
       <button onclick="window._cadFecharPainel()" style="background:none;border:none;color:#475569;font-size:20px;cursor:pointer">✕</button>
     </div>
     
-    <div style="display:flex;flex-direction:column;gap:16px">
-      <div>
-        <label style="${_cadLabelStyle()}">Sistema</label>
-        <select id="cf-sistema" style="${_cadInputStyle()}">
+    <div style="display:flex;flex-direction:column;gap:0">
+      
+      <div style="${rowStyle}">
+        <label style="${labelStyle}">Sistema</label>
+        <select id="cf-sistema" style="${inputStyle}">
           ${Object.entries(_CAL_ADM_SIS).map(([val,lbl]) => `<option value="${val}" ${sel(v.sistema,val)}>${lbl}</option>`).join('')}
         </select>
       </div>
 
-      <div>
-        <label style="${_cadLabelStyle()}">Tipo</label>
-        <select id="cf-tipo" style="${_cadInputStyle()}">
+      <div style="${rowStyle}">
+        <label style="${labelStyle}">Tipo</label>
+        <select id="cf-tipo" style="${inputStyle}">
           ${Object.entries(_CAL_ADM_TIP).map(([val,lbl]) => `<option value="${val}" ${sel(v.tipo,val)}>${lbl}</option>`).join('')}
         </select>
       </div>
 
-      <div>
-        <label style="${_cadLabelStyle()}">Título</label>
-        <input id="cf-titulo" type="text" value="${v.titulo||''}" style="${_cadInputStyle()}" placeholder="Ex: Repasse FUNDEB – Jun/2026">
+      <div style="${rowStyle}">
+        <label style="${labelStyle}">Título</label>
+        <input id="cf-titulo" type="text" value="${v.titulo||''}" style="${inputStyle}" placeholder="Ex: Repasse FUNDEB – Jun/2026">
       </div>
 
-      <div>
-        <label style="${_cadLabelStyle()}">Descrição <span style="color:#475569;font-weight:400">(opcional)</span></label>
-        <textarea id="cf-descricao" rows="3" style="${_cadInputStyle()};resize:vertical">${v.descricao||''}</textarea>
+      <div style="${rowStyle}">
+        <label style="${labelStyle}">Descrição <span style="color:#475569;font-weight:400">(opcional)</span></label>
+        <textarea id="cf-descricao" rows="3" style="${inputStyle};resize:vertical">${v.descricao||''}</textarea>
       </div>
 
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      <div style="${gridRowStyle}">
         <div>
-          <label style="${_cadLabelStyle()}">Data</label>
-          <input id="cf-data" type="date" value="${v.data||''}" style="${_cadInputStyle()}">
+          <label style="${labelStyle}">Data</label>
+          <input id="cf-data" type="date" value="${v.data||''}" style="${inputStyle}">
         </div>
         <div>
-          <label style="${_cadLabelStyle()}">Status</label>
-          <select id="cf-status" style="${_cadInputStyle()}">
+          <label style="${labelStyle}">Status</label>
+          <select id="cf-status" style="${inputStyle}">
             ${Object.entries(_CAL_ADM_STA).map(([val,lbl]) => `<option value="${val}" ${sel(v.status||'previsto',val)}>${lbl}</option>`).join('')}
           </select>
         </div>
       </div>
 
-      <div>
-        <label style="${_cadLabelStyle()}">Avisos antecipados (dias antes)</label>
+      <div style="${rowStyle}">
+        <label style="${labelStyle}">Avisos antecipados (dias antes)</label>
         <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:6px">
           ${_CAL_ADM_AVISOS.map(d => `
             <label style="display:flex;align-items:center;gap:5px;font-size:13px;color:#94a3b8;cursor:pointer">
@@ -233,7 +240,7 @@ function _cadHtmlForm(ev) {
         </div>
       </div>
 
-      <div style="display:flex;gap:20px">
+      <div style="display:flex;gap:20px;margin-bottom:24px;align-items:center">
         <label style="display:flex;align-items:center;gap:7px;font-size:13px;color:#94a3b8;cursor:pointer">
           <input type="checkbox" id="cf-free" ${v.visivel_free?'checked':''} style="accent-color:#fbbf24"> Visível no plano free
         </label>
@@ -243,7 +250,7 @@ function _cadHtmlForm(ev) {
         </label>` : ''}
       </div>
 
-      <button id="cf-salvar" style="${_cadBtnStyle('#38bdf8')};width:100%;justify-content:center;margin-top:6px">
+      <button id="cf-salvar" style="width:100%;background:#38bdf8;color:#0f172a;border:none;border-radius:10px;padding:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">
         ${ev ? 'Salvar alterações' : 'Criar evento'}
       </button>
     </div>
