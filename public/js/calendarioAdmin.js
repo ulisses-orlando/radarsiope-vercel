@@ -62,43 +62,44 @@ async function renderCalendarioAdmin(container) {
 // ─── Shell ────────────────────────────────────────────────────────────────────
 function _cadShellHTML() {
   return `
-  <div id="cad-root" style="font-family:'DM Sans',sans-serif;color:#f1f5f9;padding:0 0 80px">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
+  <div id="cad-root" style="font-family:'DM Sans',sans-serif;color:#f1f5f9;padding:20px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
       <div>
-        <div style="font-size:11px;color:#475569;font-weight:700;text-transform:uppercase;letter-spacing:.1em;margin-bottom:3px">Central · Admin</div>
-        <div style="font-size:22px;font-weight:700;letter-spacing:-.02em">Calendário</div>
+        <div style="font-size:11px;color:#475569;font-weight:700;text-transform:uppercase;letter-spacing:.1em;margin-bottom:3px;">Central · Admin</div>
+        <div style="font-size:22px;font-weight:700;letter-spacing:-.02em;color:#0f172a;">Calendário</div>
       </div>
-      <button id="cad-btn-novo" style="${_cadBtnStyle('#38bdf8')}">+ Novo evento</button>
+      <button id="cad-btn-novo" style="${_cadBtnStyle('#0A3D62')}">+ Novo evento</button>
     </div>
-
-    <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:20px">
-      <select id="cad-f-sistema" style="${_cadSelectStyle()}">
-        <option value="">Todos os sistemas</option>
-        ${Object.entries(_CAL_ADM_SIS).map(([v,l])=>`<option value="${v}">${l}</option>`).join('')}
-      </select>
-      <select id="cad-f-tipo" style="${_cadSelectStyle()}">
-        <option value="">Todos os tipos</option>
-        ${Object.entries(_CAL_ADM_TIP).map(([v,l])=>`<option value="${v}">${l}</option>`).join('')}
-      </select>
-      <select id="cad-f-status" style="${_cadSelectStyle()}">
-        <option value="">Todos os status</option>
-        ${Object.entries(_CAL_ADM_STA).map(([v,l])=>`<option value="${v}">${l}</option>`).join('')}
-      </select>
-      <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#94a3b8;cursor:pointer">
-        <input type="checkbox" id="cad-f-inativos" style="accent-color:#38bdf8"> Ver inativos
-      </label>
-    </div>
+    
+    <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:20px;background:#fff;padding:12px;border-radius:8px;border:1px solid #e2e8f0;">
+       <select id="cad-f-sistema" style="${_cadSelectStyle()}">
+         <option value="">Todos os sistemas</option>
+         ${Object.entries(_CAL_ADM_SIS).map(([v,l]) => `<option value="${v}">${l}</option>`).join('')}
+       </select>
+       <select id="cad-f-tipo" style="${_cadSelectStyle()}">
+         <option value="">Todos os tipos</option>
+         ${Object.entries(_CAL_ADM_TIP).map(([v,l]) => `<option value="${v}">${l}</option>`).join('')}
+       </select>
+       <select id="cad-f-status" style="${_cadSelectStyle()}">
+         <option value="">Todos os status</option>
+         ${Object.entries(_CAL_ADM_STA).map(([v,l]) => `<option value="${v}">${l}</option>`).join('')}
+       </select>
+       <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#475569;cursor:pointer;padding:5px 10px;background:#f8fafc;border-radius:6px;">
+         <input type="checkbox" id="cad-f-inativos" style="accent-color:#0A3D62"> Ver inativos
+       </label>
+     </div>
 
     <div id="cad-loading" style="display:none;text-align:center;padding:40px;color:#475569;font-size:13px">Carregando...</div>
     <div id="cad-lista"></div>
 
     <!-- Painel lateral (evento + repasses) -->
-    <div id="cad-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:200;backdrop-filter:blur(4px)"></div>
-    <div id="cad-painel" style="display:none;position:fixed;top:0;right:0;width:min(500px,100vw);height:100vh;background:#1e293b;z-index:201;overflow-y:auto;box-shadow:-4px 0 24px rgba(0,0,0,.4);padding:28px 24px 60px">
-      <div id="cad-painel-conteudo"></div>
+    <div id="cad-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9998;backdrop-filter:blur(2px);"></div>
+    
+    <div id="cad-painel" style="display:none;position:fixed;top:0;right:0;width:450px;height:100vh;background:#fff;z-index:9999;overflow-y:auto;box-shadow:-4px 0 24px rgba(0,0,0,0.15);padding:0;">
+      <div id="cad-painel-conteudo" style="padding:24px;"></div>
     </div>
 
-    <div id="cad-toast" style="display:none;position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#1e293b;border:1px solid #334155;color:#f1f5f9;padding:10px 20px;border-radius:12px;font-size:13px;font-weight:600;z-index:300;white-space:nowrap"></div>
+    <div id="cad-toast" style="display:none;position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#1e293b;border:1px solid #334155;color:#f1f5f9;padding:10px 20px;border-radius:12px;font-size:13px;font-weight:600;z-index:300;white-space:nowrap;"></div>
   </div>`;
 }
 
@@ -175,23 +176,22 @@ function _cadAbrirForm(ev = null) {
 }
 
 function _cadHtmlForm(ev) {
-  const v    = ev || {};
-  const avs  = v.avisos_antecipados || [];
-  const sel  = (val, opt) => val === opt ? 'selected' : '';
+  const v = ev || {};
+  const avs = v.avisos_antecipados || [];
+  const sel = (val, opt) => val === opt ? 'selected' : '';
   
-  // Estilos com !important para garantir prioridade sobre o admin.html
-  const rowStyle    = "display:flex !important; flex-direction:column !important; gap:8px !important; margin-bottom:20px !important; width:100% !important;";
-  const labelStyle  = "display:block !important; font-size:11px !important; font-weight:700 !important; color:#475569 !important; text-transform:uppercase !important; letter-spacing:.08em !important; margin:0 !important;";
-  const inputStyle  = "display:block !important; width:100% !important; background:#0f172a !important; border:1px solid #334155 !important; border-radius:10px !important; padding:10px 12px !important; color:#f1f5f9 !important; font-size:13px !important; font-family:inherit !important; outline:none !important; box-sizing:border-box !important; appearance:none !important;";
-  const gridRow     = "display:grid !important; grid-template-columns:1fr 1fr !important; gap:16px !important; margin-bottom:20px !important;";
+  // Estilos de bloco
+  const rowStyle = "display:block;margin-bottom:16px;width:100%;";
+  const labelStyle = "display:block;font-size:11px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px;";
+  const inputStyle = "width:100%;background:#f8fafc;border:1px solid #cbd5e1;border-radius:6px;padding:10px 12px;color:#0f172a;font-size:13px;font-family:inherit;outline:none;box-sizing:border-box;display:block;";
 
   return `
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px">
-      <div style="font-size:17px;font-weight:700;color:#f1f5f9">${ev ? 'Editar evento' : 'Novo evento'}</div>
-      <button onclick="window._cadFecharPainel()" style="background:none;border:none;color:#475569;font-size:20px;cursor:pointer">✕</button>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;border-bottom:1px solid #e2e8f0;padding-bottom:16px;">
+      <div style="font-size:18px;font-weight:700;color:#0f172a;">${ev ? 'Editar evento' : 'Novo evento'}</div>
+      <button onclick="window._cadFecharPainel()" style="background:none;border:none;color:#64748b;font-size:20px;cursor:pointer;padding:4px;">✕</button>
     </div>
-
-    <div style="display:flex;flex-direction:column;gap:0;width:100%">
+    
+    <div style="display:flex;flex-direction:column;gap:16px;">
       
       <div style="${rowStyle}">
         <label style="${labelStyle}">Sistema</label>
@@ -213,11 +213,11 @@ function _cadHtmlForm(ev) {
       </div>
 
       <div style="${rowStyle}">
-        <label style="${labelStyle}">Descrição <span style="color:#475569;font-weight:400">(opcional)</span></label>
+        <label style="${labelStyle}">Descrição <span style="color:#64748b;font-weight:400;font-size:10px">(opcional)</span></label>
         <textarea id="cf-descricao" rows="3" style="${inputStyle};resize:vertical">${v.descricao||''}</textarea>
       </div>
 
-      <div style="${gridRow}">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;">
         <div>
           <label style="${labelStyle}">Data</label>
           <input id="cf-data" type="date" value="${v.data||''}" style="${inputStyle}">
@@ -232,26 +232,29 @@ function _cadHtmlForm(ev) {
 
       <div style="${rowStyle}">
         <label style="${labelStyle}">Avisos antecipados (dias antes)</label>
-        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:6px">
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;">
           ${_CAL_ADM_AVISOS.map(d => `
-            <label style="display:flex;align-items:center;gap:5px;font-size:13px;color:#94a3b8;cursor:pointer">
-              <input type="checkbox" class="cf-aviso" value="${d}" ${avs.includes(d)?'checked':''} style="accent-color:#a78bfa"> ${d}d
+            <label style="display:flex;align-items:center;gap:4px;font-size:12px;color:#475569;cursor:pointer;background:#f1f5f9;padding:6px 10px;border-radius:6px;border:1px solid #e2e8f0;">
+              <input type="checkbox" class="cf-aviso" value="${d}" ${avs.includes(d)?'checked':''} style="accent-color:#0A3D62;margin:0;">
+              ${d} dias
             </label>`).join('')}
         </div>
       </div>
 
-      <div style="display:flex;gap:20px;margin-bottom:24px;align-items:center">
-        <label style="display:flex;align-items:center;gap:7px;font-size:13px;color:#94a3b8;cursor:pointer">
-          <input type="checkbox" id="cf-free" ${v.visivel_free?'checked':''} style="accent-color:#fbbf24"> Visível no plano free
+      <div style="display:flex;gap:16px;margin-bottom:24px;align-items:center;">
+        <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:#475569;cursor:pointer;">
+          <input type="checkbox" id="cf-free" ${v.visivel_free?'checked':''} style="accent-color:#f59e0b;width:16px;height:16px;margin:0;"> 
+          Visível no plano free
         </label>
         ${ev ? `
-        <label style="display:flex;align-items:center;gap:7px;font-size:13px;color:#94a3b8;cursor:pointer">
-          <input type="checkbox" id="cf-ativo" ${v.ativo?'checked':''} style="accent-color:#34d399"> Ativo
+        <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:#475569;cursor:pointer;">
+          <input type="checkbox" id="cf-ativo" ${v.ativo?'checked':''} style="accent-color:#10b981;width:16px;height:16px;margin:0;"> 
+          Ativo
         </label>` : ''}
       </div>
 
-      <button id="cf-salvar" style="width:100%;background:#38bdf8;color:#0f172a;border:none;border-radius:10px;padding:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;margin-top:6px">
-        ${ev ? 'Salvar alterações' : 'Criar evento'}
+      <button id="cf-salvar" style="width:100%;background:#0A3D62;color:#fff;border:none;border-radius:8px;padding:12px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;margin-top:8px;box-shadow:0 2px 4px rgba(10,61,98,0.2);">
+        ${ev ? '💾 Salvar alterações' : '➕ Criar evento'}
       </button>
 
     </div>
