@@ -175,65 +175,63 @@ function _cadAbrirForm(ev = null) {
 }
 
 function _cadHtmlForm(ev) {
-  const v = ev || {};
-  const avs = v.avisos_antecipados || [];
-  const sel = (val, opt) => val === opt ? 'selected' : '';
+  const v    = ev || {};
+  const avs  = v.avisos_antecipados || [];
+  const sel  = (val, opt) => val === opt ? 'selected' : '';
   
-  // Variáveis de estilo para evitar erros de espaço ao copiar
-  const C = 'display:flex;flex-direction:column;gap:16px';
-  const R = 'margin-bottom:16px';
-  const L = 'display:block;font-size:11px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px';
-  const I = 'width:100%;background:#0f172a;border:1px solid #334155;border-radius:10px;padding:9px 12px;color:#f1f5f9;font-size:13px;font-family:inherit;outline:none;box-sizing:border-box';
-  const G = 'display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px';
-  const B = 'width:100%;background:#38bdf8;color:#0f172a;border:none;border-radius:10px;padding:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;margin-top:8px';
+  // Estilos com !important para garantir prioridade sobre o admin.html
+  const rowStyle    = "display:flex !important; flex-direction:column !important; gap:8px !important; margin-bottom:20px !important; width:100% !important;";
+  const labelStyle  = "display:block !important; font-size:11px !important; font-weight:700 !important; color:#475569 !important; text-transform:uppercase !important; letter-spacing:.08em !important; margin:0 !important;";
+  const inputStyle  = "display:block !important; width:100% !important; background:#0f172a !important; border:1px solid #334155 !important; border-radius:10px !important; padding:10px 12px !important; color:#f1f5f9 !important; font-size:13px !important; font-family:inherit !important; outline:none !important; box-sizing:border-box !important; appearance:none !important;";
+  const gridRow     = "display:grid !important; grid-template-columns:1fr 1fr !important; gap:16px !important; margin-bottom:20px !important;";
 
   return `
-    <div style="${C}">
-      
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px">
-        <div style="font-size:17px;font-weight:700;color:#f1f5f9">${ev ? 'Editar evento' : 'Novo evento'}</div>
-        <button onclick="window._cadFecharPainel()" style="background:none;border:none;color:#475569;font-size:20px;cursor:pointer">✕</button>
-      </div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px">
+      <div style="font-size:17px;font-weight:700;color:#f1f5f9">${ev ? 'Editar evento' : 'Novo evento'}</div>
+      <button onclick="window._cadFecharPainel()" style="background:none;border:none;color:#475569;font-size:20px;cursor:pointer">✕</button>
+    </div>
 
-      <div style="${R}">
-        <label style="${L}">Sistema</label>
-        <select id="cf-sistema" style="${I}">
+    <div style="display:flex;flex-direction:column;gap:0;width:100%">
+      
+      <div style="${rowStyle}">
+        <label style="${labelStyle}">Sistema</label>
+        <select id="cf-sistema" style="${inputStyle}">
           ${Object.entries(_CAL_ADM_SIS).map(([val,lbl]) => `<option value="${val}" ${sel(v.sistema,val)}>${lbl}</option>`).join('')}
         </select>
       </div>
 
-      <div style="${R}">
-        <label style="${L}">Tipo</label>
-        <select id="cf-tipo" style="${I}">
+      <div style="${rowStyle}">
+        <label style="${labelStyle}">Tipo</label>
+        <select id="cf-tipo" style="${inputStyle}">
           ${Object.entries(_CAL_ADM_TIP).map(([val,lbl]) => `<option value="${val}" ${sel(v.tipo,val)}>${lbl}</option>`).join('')}
         </select>
       </div>
 
-      <div style="${R}">
-        <label style="${L}">Título</label>
-        <input id="cf-titulo" type="text" value="${v.titulo||''}" style="${I}" placeholder="Ex: Repasse FUNDEB – Jun/2026">
+      <div style="${rowStyle}">
+        <label style="${labelStyle}">Título</label>
+        <input id="cf-titulo" type="text" value="${v.titulo||''}" style="${inputStyle}" placeholder="Ex: Repasse FUNDEB – Jun/2026">
       </div>
 
-      <div style="${R}">
-        <label style="${L}">Descrição <span style="color:#475569;font-weight:400">(opcional)</span></label>
-        <textarea id="cf-descricao" rows="3" style="${I};resize:vertical">${v.descricao||''}</textarea>
+      <div style="${rowStyle}">
+        <label style="${labelStyle}">Descrição <span style="color:#475569;font-weight:400">(opcional)</span></label>
+        <textarea id="cf-descricao" rows="3" style="${inputStyle};resize:vertical">${v.descricao||''}</textarea>
       </div>
 
-      <div style="${G}">
+      <div style="${gridRow}">
         <div>
-          <label style="${L}">Data</label>
-          <input id="cf-data" type="date" value="${v.data||''}" style="${I}">
+          <label style="${labelStyle}">Data</label>
+          <input id="cf-data" type="date" value="${v.data||''}" style="${inputStyle}">
         </div>
         <div>
-          <label style="${L}">Status</label>
-          <select id="cf-status" style="${I}">
+          <label style="${labelStyle}">Status</label>
+          <select id="cf-status" style="${inputStyle}">
             ${Object.entries(_CAL_ADM_STA).map(([val,lbl]) => `<option value="${val}" ${sel(v.status||'previsto',val)}>${lbl}</option>`).join('')}
           </select>
         </div>
       </div>
 
-      <div style="${R}">
-        <label style="${L}">Avisos antecipados (dias antes)</label>
+      <div style="${rowStyle}">
+        <label style="${labelStyle}">Avisos antecipados (dias antes)</label>
         <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:6px">
           ${_CAL_ADM_AVISOS.map(d => `
             <label style="display:flex;align-items:center;gap:5px;font-size:13px;color:#94a3b8;cursor:pointer">
@@ -252,9 +250,10 @@ function _cadHtmlForm(ev) {
         </label>` : ''}
       </div>
 
-      <button id="cf-salvar" style="${B}">
+      <button id="cf-salvar" style="width:100%;background:#38bdf8;color:#0f172a;border:none;border-radius:10px;padding:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;margin-top:6px">
         ${ev ? 'Salvar alterações' : 'Criar evento'}
       </button>
+
     </div>
   `;
 }
