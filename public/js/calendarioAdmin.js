@@ -179,59 +179,53 @@ function _cadHtmlForm(ev) {
   const avs = v.avisos_antecipados || [];
   const sel = (val, opt) => val === opt ? 'selected' : '';
   
-  // Estilos base para garantir layout limpo
-  const labelStyle = "display:block;font-size:11px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px;";
-  const inputStyle = "width:100%;background:#0f172a;border:1px solid #334155;border-radius:10px;padding:9px 12px;color:#f1f5f9;font-size:13px;font-family:inherit;outline:none;box-sizing:border-box;";
-  const rowStyle = "margin-bottom:16px;";
-  const gridRowStyle = "display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;";
-
   return `
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px">
       <div style="font-size:17px;font-weight:700;color:#f1f5f9">${ev ? 'Editar evento' : 'Novo evento'}</div>
       <button onclick="window._cadFecharPainel()" style="background:none;border:none;color:#475569;font-size:20px;cursor:pointer">✕</button>
     </div>
     
-    <div style="display:flex;flex-direction:column;gap:0">
+    <div style="display:flex;flex-direction:column;gap:16px">
       
-      <div style="${rowStyle}">
-        <label style="${labelStyle}">Sistema</label>
-        <select id="cf-sistema" style="${inputStyle}">
+      <div style="margin-bottom:16px">
+        <label style="display:block;font-size:11px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px">Sistema</label>
+        <select id="cf-sistema" style="width:100%;background:#0f172a;border:1px solid #334155;border-radius:10px;padding:9px 12px;color:#f1f5f9;font-size:13px;font-family:inherit;outline:none;box-sizing:border-box">
           ${Object.entries(_CAL_ADM_SIS).map(([val,lbl]) => `<option value="${val}" ${sel(v.sistema,val)}>${lbl}</option>`).join('')}
         </select>
       </div>
 
-      <div style="${rowStyle}">
-        <label style="${labelStyle}">Tipo</label>
-        <select id="cf-tipo" style="${inputStyle}">
+      <div style="margin-bottom:16px">
+        <label style="display:block;font-size:11px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px">Tipo</label>
+        <select id="cf-tipo" style="width:100%;background:#0f172a;border:1px solid #334155;border-radius:10px;padding:9px 12px;color:#f1f5f9;font-size:13px;font-family:inherit;outline:none;box-sizing:border-box">
           ${Object.entries(_CAL_ADM_TIP).map(([val,lbl]) => `<option value="${val}" ${sel(v.tipo,val)}>${lbl}</option>`).join('')}
         </select>
       </div>
 
-      <div style="${rowStyle}">
-        <label style="${labelStyle}">Título</label>
-        <input id="cf-titulo" type="text" value="${v.titulo||''}" style="${inputStyle}" placeholder="Ex: Repasse FUNDEB – Jun/2026">
+      <div style="margin-bottom:16px">
+        <label style="display:block;font-size:11px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px">Título</label>
+        <input id="cf-titulo" type="text" value="${v.titulo||''}" style="width:100%;background:#0f172a;border:1px solid #334155;border-radius:10px;padding:9px 12px;color:#f1f5f9;font-size:13px;font-family:inherit;outline:none;box-sizing:border-box" placeholder="Ex: Repasse FUNDEB – Jun/2026">
       </div>
 
-      <div style="${rowStyle}">
-        <label style="${labelStyle}">Descrição <span style="color:#475569;font-weight:400">(opcional)</span></label>
-        <textarea id="cf-descricao" rows="3" style="${inputStyle};resize:vertical">${v.descricao||''}</textarea>
+      <div style="margin-bottom:16px">
+        <label style="display:block;font-size:11px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px">Descrição <span style="color:#475569;font-weight:400">(opcional)</span></label>
+        <textarea id="cf-descricao" rows="3" style="width:100%;background:#0f172a;border:1px solid #334155;border-radius:10px;padding:9px 12px;color:#f1f5f9;font-size:13px;font-family:inherit;outline:none;box-sizing:border-box;resize:vertical">${v.descricao||''}</textarea>
       </div>
 
-      <div style="${gridRowStyle}">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">
         <div>
-          <label style="${labelStyle}">Data</label>
-          <input id="cf-data" type="date" value="${v.data||''}" style="${inputStyle}">
+          <label style="display:block;font-size:11px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px">Data</label>
+          <input id="cf-data" type="date" value="${v.data||''}" style="width:100%;background:#0f172a;border:1px solid #334155;border-radius:10px;padding:9px 12px;color:#f1f5f9;font-size:13px;font-family:inherit;outline:none;box-sizing:border-box">
         </div>
         <div>
-          <label style="${labelStyle}">Status</label>
-          <select id="cf-status" style="${inputStyle}">
+          <label style="display:block;font-size:11px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px">Status</label>
+          <select id="cf-status" style="width:100%;background:#0f172a;border:1px solid #334155;border-radius:10px;padding:9px 12px;color:#f1f5f9;font-size:13px;font-family:inherit;outline:none;box-sizing:border-box">
             ${Object.entries(_CAL_ADM_STA).map(([val,lbl]) => `<option value="${val}" ${sel(v.status||'previsto',val)}>${lbl}</option>`).join('')}
           </select>
         </div>
       </div>
 
-      <div style="${rowStyle}">
-        <label style="${labelStyle}">Avisos antecipados (dias antes)</label>
+      <div style="margin-bottom:16px">
+        <label style="display:block;font-size:11px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px">Avisos antecipados (dias antes)</label>
         <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:6px">
           ${_CAL_ADM_AVISOS.map(d => `
             <label style="display:flex;align-items:center;gap:5px;font-size:13px;color:#94a3b8;cursor:pointer">
