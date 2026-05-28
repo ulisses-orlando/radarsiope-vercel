@@ -222,6 +222,9 @@ async function renderizarCalendario(container, { acesso = {}, edicao = {} } = {}
   const temAcesso = acesso?.isAssinante
     ? !!acesso?.features?.calendario
     : (acesso?.acessoProTemp || false);
+
+    console.log('[Calendário] Acesso:', temAcesso, 'Detalhes do acesso:', acesso);
+    
   if (!temAcesso) {
     _solicitarUpgrade('calendario', acesso?.isAssinante);
     container.innerHTML = `
