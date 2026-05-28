@@ -2776,7 +2776,7 @@ function _abrirCalendario() {
   // para o usuário ter acesso. Sem isso, renderizarCalendario exibe o upgrade prompt.
   const acesso = window._radarUser || {};
   const edicao = {};
-
+console.log('[Calendário] Renderizando calendário com acesso:', acesso);
   window.renderizarCalendario(container, { acesso, edicao });
 }
 
