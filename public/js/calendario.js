@@ -219,7 +219,10 @@ async function renderizarCalendario(container, { acesso = {}, edicao = {} } = {}
     || null;
 
   // Verificação de acesso — mesmo padrão de outras features
-  const temAcesso = edicao?.features?.calendario || acesso?.features?.calendario;
+  // isAssinante → verifica flag específica; lead com acessoProTemp → libera
+  const temAcesso = acesso?.isAssinante
+    ? !!acesso?.features?.calendario
+    : (acesso?.acessoProTemp || false);
   if (!temAcesso) {
     _solicitarUpgrade('calendario', acesso?.isAssinante);
     container.innerHTML = `
