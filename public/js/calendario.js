@@ -87,7 +87,7 @@
 
     .rs-cal-sheet {
       position: fixed; bottom: 0; left: 0; right: 0; z-index: 9000;
-      background: var(--rs-card, #1e293b);
+      background: #1e293b;                /* explícito — não depende de CSS var */
       border-radius: 24px 24px 0 0;
       padding: 20px 16px 48px;
       max-height: 85vh; overflow-y: auto;
@@ -99,8 +99,8 @@
     }
 
     .rs-cal-valor-box {
-      background: rgba(52,211,153,.08);
-      border: 1px solid rgba(52,211,153,.2);
+      background: rgba(52,211,153,.12);
+      border: 1px solid rgba(52,211,153,.3);
       border-radius: 14px; padding: 14px 16px;
       text-align: center; margin-bottom: 14px;
     }
@@ -108,7 +108,8 @@
       background: #0f172a; border-radius: 12px; padding: 12px 14px;
     }
     .rs-cal-info-label {
-      font-size: 10px; color: #475569; text-transform: uppercase;
+      font-size: 10px; color: #94a3b8;    /* era #475569 — invisível em fundo escuro */
+      text-transform: uppercase;
       letter-spacing: .08em; margin-bottom: 4px;
     }
 
@@ -308,11 +309,29 @@ function _calShellHTML() {
           <div style="font-size:10px;color:#475569;font-weight:700;text-transform:uppercase;letter-spacing:.1em;margin-bottom:3px">Central</div>
           <div style="font-size:21px;font-weight:700;letter-spacing:-.02em;color:var(--rs-text,#f1f5f9)">Calendário</div>
         </div>
-        <div style="background:#1e293b;border-radius:10px;padding:3px;display:flex;gap:2px">
-          ${[['agenda', '≡'], ['sistema', '⊞'], ['geral', '◎'], ['repasses', '₿']].map(([v, ic]) => `
-          <button class="rs-cal-view-btn${_cal.view === v ? ' ativo' : ''}"
-            id="rs-cal-vbtn-${v}" onclick="_calSetView('${v}')">${ic}</button>`).join('')}
         </div>
+
+      <!-- Abas de visão — linha própria, scrollável, com ícone + texto -->
+      <div style="display:flex;gap:6px;overflow-x:auto;padding-bottom:10px;margin-bottom:2px;scrollbar-width:none;-webkit-overflow-scrolling:touch">
+        ${[
+          ['agenda',   '📋', 'Agenda'  ],
+          ['sistema',  '🏷️', 'Sistema' ],
+          ['geral',    '📅', 'Geral'   ],
+          ['repasses', '💰', 'Repasses'],
+        ].map(([v, ic, label]) => {
+          const ativo = _cal.view === v;
+          const cores = { agenda:'#38bdf8', sistema:'#34d399', geral:'#a78bfa', repasses:'#34d399' };
+          const cor   = cores[v];
+          return `<button class="rs-cal-view-btn${ativo ? ' ativo' : ''}"
+            id="rs-cal-vbtn-${v}" onclick="_calSetView('${v}')"
+            style="display:flex;align-items:center;gap:5px;white-space:nowrap;padding:7px 14px;border-radius:99px;font-size:12px;
+                   ${ativo
+                     ? `background:${cor}20;color:${cor};border:1px solid ${cor}40;`
+                     : 'background:rgba(255,255,255,.05);color:#64748b;border:1px solid transparent;'
+                   }">
+            <span style="font-size:13px">${ic}</span>${label}
+          </button>`;
+        }).join('')}
       </div>
 
       <div id="rs-cal-prox"></div>
@@ -767,8 +786,24 @@ window._calFecharSheet = function () {
 window._calSetView = function (v) {
   _cal.view = v;
   _cal.mesExp = null;
-  document.querySelectorAll('.rs-cal-view-btn').forEach(b => b.classList.remove('ativo'));
-  document.getElementById(`rs-cal-vbtn-${v}`)?.classList.add('ativo');
+  // Reaplica estilos das abas
+  const cores = { agenda:'#38bdf8', sistema:'#34d399', geral:'#a78bfa', repasses:'#34d399' };
+  ['agenda','sistema','geral','repasses'].forEach(key => {
+    const btn = document.getElementById(`rs-cal-vbtn-${key}`);
+    if (!btn) return;
+    const cor = cores[key];
+    if (key === v) {
+      btn.classList.add('ativo');
+      btn.style.background    = `${cor}20`;
+      btn.style.color         = cor;
+      btn.style.borderColor   = `${cor}40`;
+    } else {
+      btn.classList.remove('ativo');
+      btn.style.background    = 'rgba(255,255,255,.05)';
+      btn.style.color         = '#64748b';
+      btn.style.borderColor   = 'transparent';
+    }
+  });
   _calRenderizar();
 };
 window._calSetFiltro = f => { _cal.filtro = f; _calRenderizar(); };

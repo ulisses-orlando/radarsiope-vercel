@@ -626,7 +626,7 @@ function _injetarBotaoRelatorio(cod, nome, uf, temRelatorio) {
   const grupo = document.createElement('div');
   grupo.id = 'rs-acoes-municipio';
   grupo.style.cssText = [
-    'display:flex', 'gap:8px', 'margin-top:8px', 'width:100%',
+    'display:flex', 'flex-wrap:wrap', 'gap:8px', 'margin-top:8px', 'width:100%',
   ].join(';');
   btnHistorico.style.flex = '1';
   btnHistorico.parentNode.insertBefore(grupo, btnHistorico);
@@ -645,7 +645,7 @@ function _injetarBotaoRelatorio(cod, nome, uf, temRelatorio) {
     btnRel.innerHTML = '📋 Conformidade';
     btnRel.title = 'Gerar Relatório de Conformidade Municipal (PDF)';
     btnRel.style.cssText = [
-      'flex:1', 'padding:9px 10px', 'background:var(--azul,#0A3D62)',
+      'flex:1 1 120px', 'padding:9px 10px', 'background:var(--azul,#0A3D62)',
       'color:#fff', 'border:none', 'border-radius:8px', 'font-size:13px',
       'font-weight:600', 'cursor:pointer', 'white-space:nowrap', 'transition:opacity .2s',
     ].join(';');
@@ -657,7 +657,7 @@ function _injetarBotaoRelatorio(cod, nome, uf, temRelatorio) {
     btnRel.innerHTML = '🔒 Conformidade';
     btnRel.title = 'Disponível no plano Profissional';
     btnRel.style.cssText = [
-      'flex:1', 'padding:9px 10px', 'background:transparent',
+      'flex:1 1 120px', 'padding:9px 10px', 'background:transparent',
       'color:var(--rs-muted,#94a3b8)', 'border:1.5px dashed var(--rs-borda,#334155)',
       'border-radius:8px', 'font-size:13px', 'font-weight:600',
       'cursor:pointer', 'white-space:nowrap', 'transition:border-color .2s, color .2s',
