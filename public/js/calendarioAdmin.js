@@ -53,7 +53,7 @@ async function _cadPost(acao, body) {
 }
 
 // ─── Ponto de entrada ─────────────────────────────────────────────────────────
-export async function renderCalendarioAdmin(container) {
+async function renderCalendarioAdmin(container) {
   container.innerHTML = _cadShellHTML();
   _cadBindFiltros();
   await _cadCarregar();
@@ -524,3 +524,5 @@ function _cadSelectStyle() {
 function _cadLabelStyle() {
   return `display:block;font-size:11px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px`;
 }
+
+window.renderCalendarioAdmin = renderCalendarioAdmin;
