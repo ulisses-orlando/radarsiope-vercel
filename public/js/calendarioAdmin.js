@@ -175,77 +175,76 @@ function _cadAbrirForm(ev = null) {
 }
 
 function _cadHtmlForm(ev) {
-  const v    = ev || {};
-  const avs  = v.avisos_antecipados || [];
-  const sel  = (val, opt) => val === opt ? 'selected' : '';
-  return `
-  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px">
-    <div style="font-size:17px;font-weight:700;color:#f1f5f9">${ev ? 'Editar evento' : 'Novo evento'}</div>
-    <button onclick="window._cadFecharPainel()" style="background:none;border:none;color:#475569;font-size:20px;cursor:pointer">✕</button>
-  </div>
-  <div style="display:flex;flex-direction:column;gap:14px">
+const v    = ev || {};
+const avs  = v.avisos_antecipados || [];
+const sel  = (val, opt) => val === opt ? 'selected' : '';
+return `
+<div style= "display:flex;justify-content:space-between;align-items:center;margin-bottom:24px " >
+ <div style= "font-size:17px;font-weight:700;color:#f1f5f9 " >${ev ? 'Editar evento' : 'Novo evento'} </div >
+ <button onclick= "window._cadFecharPainel() " style= "background:none;border:none;color:#475569;font-size:20px;cursor:pointer " >✕ </button >
+ </div >
+ <div style= "display:flex;flex-direction:column;gap:16px " </div>
+<div >
+   <label style= "${_cadLabelStyle()} " >Sistema </label>
+   <select id= "cf-sistema " style= "${_cadInputStyle()} " >
+    ${Object.entries(_CAL_ADM_SIS).map(([val,lbl])= ` <option value= "${val} " ${sel(v.sistema,val)} >${lbl} </option >`).join('')}
+   </select>
+ </div >
 
-    <div>
-      <label style="${_cadLabelStyle()}">Sistema</label>
-      <select id="cf-sistema" style="${_cadInputStyle()}">
-        ${Object.entries(_CAL_ADM_SIS).map(([val,lbl])=>`<option value="${val}" ${sel(v.sistema,val)}>${lbl}</option>`).join('')}
-      </select>
-    </div>
+ <div >
+   <label style= "${_cadLabelStyle()} " >Tipo </label >
+   <select id= "cf-tipo " style= "${_cadInputStyle()} " >
+    ${Object.entries(_CAL_ADM_TIP).map(([val,lbl])= ` <option value= "${val} " ${sel(v.tipo,val)} >${lbl} </option >`).join('')}
+   </select >
+ </div >
 
-    <div>
-      <label style="${_cadLabelStyle()}">Tipo</label>
-      <select id="cf-tipo" style="${_cadInputStyle()}">
-        ${Object.entries(_CAL_ADM_TIP).map(([val,lbl])=>`<option value="${val}" ${sel(v.tipo,val)}>${lbl}</option>`).join('')}
-      </select>
-    </div>
+ <div >
+   <label style= "${_cadLabelStyle()} " >Título </label >
+   <input id= "cf-titulo " type= "text " value= "${v.titulo||''} " style= "${_cadInputStyle()} " placeholder= "Ex: Repasse FUNDEB – Jun/2026 " >
+ </div >
 
-    <div>
-      <label style="${_cadLabelStyle()}">Título</label>
-      <input id="cf-titulo" type="text" value="${v.titulo||''}" style="${_cadInputStyle()}" placeholder="Ex: Repasse FUNDEB – Jun/2026">
-    </div>
+ <div >
+   <label style= "${_cadLabelStyle()} " >Descrição  <span style= "color:#475569;font-weight:400 " >(opcional) </span > </label >
+   <textarea id= "cf-descricao " rows= "3 " style= "${_cadInputStyle()};resize:vertical " >${v.descricao||''} </textarea >
+ </div >
 
-    <div>
-      <label style="${_cadLabelStyle()}">Descrição <span style="color:#475569;font-weight:400">(opcional)</span></label>
-      <textarea id="cf-descricao" rows="3" style="${_cadInputStyle()};resize:vertical">${v.descricao||''}</textarea>
-    </div>
+ <div style= "display:grid;grid-template-columns:1fr 1fr;gap:12px " >
+   <div >
+     <label style= "${_cadLabelStyle()} " >Data </label >
+     <input id= "cf-data " type= "date " value= "${v.data||''} " style= "${_cadInputStyle()} " >
+   </div >
+   <div >
+     <label style= "${_cadLabelStyle()} " >Status </label >
+     <select id= "cf-status " style= "${_cadInputStyle()} " >
+      ${Object.entries(_CAL_ADM_STA).map(([val,lbl])= ` <option value= "${val} " ${sel(v.status||'previsto',val)} >${lbl} </option >`).join('')}
+     </select >
+   </div >
+ </div >
 
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-      <div>
-        <label style="${_cadLabelStyle()}">Data</label>
-        <input id="cf-data" type="date" value="${v.data||''}" style="${_cadInputStyle()}">
-      </div>
-      <div>
-        <label style="${_cadLabelStyle()}">Status</label>
-        <select id="cf-status" style="${_cadInputStyle()}">
-          ${Object.entries(_CAL_ADM_STA).map(([val,lbl])=>`<option value="${val}" ${sel(v.status||'previsto',val)}>${lbl}</option>`).join('')}
-        </select>
-      </div>
-    </div>
+ <div >
+   <label style= "${_cadLabelStyle()} " >Avisos antecipados (dias antes) </label >
+   <div style= "display:flex;gap:10px;flex-wrap:wrap;margin-top:6px " >
+    ${_CAL_ADM_AVISOS.map(d= `
+     <label style= "display:flex;align-items:center;gap:5px;font-size:13px;color:#94a3b8;cursor:pointer " >
+       <input type= "checkbox " class= "cf-aviso " value= "${d} " ${avs.includes(d)?'checked':''} style= "accent-color:#a78bfa " > ${d}d
+     </label >`).join('')}
+   </div >
+ </div >
 
-    <div>
-      <label style="${_cadLabelStyle()}">Avisos antecipados (dias antes)</label>
-      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:6px">
-        ${_CAL_ADM_AVISOS.map(d=>`
-        <label style="display:flex;align-items:center;gap:5px;font-size:13px;color:#94a3b8;cursor:pointer">
-          <input type="checkbox" class="cf-aviso" value="${d}" ${avs.includes(d)?'checked':''} style="accent-color:#a78bfa"> ${d}d
-        </label>`).join('')}
-      </div>
-    </div>
+ <div style= "display:flex;gap:20px " >
+   <label style= "display:flex;align-items:center;gap:7px;font-size:13px;color:#94a3b8;cursor:pointer " >
+     <input type= "checkbox " id= "cf-free " ${v.visivel_free?'checked':''} style= "accent-color:#fbbf24 " > Visível no plano free
+   </label >
+  ${ev ? `
+   <label style= "display:flex;align-items:center;gap:7px;font-size:13px;color:#94a3b8;cursor:pointer " >
+     <input type= "checkbox " id= "cf-ativo " ${v.ativo?'checked':''} style= "accent-color:#34d399 " > Ativo
+   </label >` : ''}
+ </div >
 
-    <div style="display:flex;gap:20px">
-      <label style="display:flex;align-items:center;gap:7px;font-size:13px;color:#94a3b8;cursor:pointer">
-        <input type="checkbox" id="cf-free" ${v.visivel_free?'checked':''} style="accent-color:#fbbf24"> Visível no plano free
-      </label>
-      ${ev ? `
-      <label style="display:flex;align-items:center;gap:7px;font-size:13px;color:#94a3b8;cursor:pointer">
-        <input type="checkbox" id="cf-ativo" ${v.ativo?'checked':''} style="accent-color:#34d399"> Ativo
-      </label>` : ''}
-    </div>
-
-    <button id="cf-salvar" style="${_cadBtnStyle('#38bdf8')};width:100%;justify-content:center;margin-top:6px">
-      ${ev ? 'Salvar alterações' : 'Criar evento'}
-    </button>
-  </div>`;
+ <button id= "cf-salvar " style= "${_cadBtnStyle('#38bdf8')};width:100%;justify-content:center;margin-top:6px " >
+  ${ev ? 'Salvar alterações' : 'Criar evento'}
+ </button >
+</div>`;
 }
 
 async function _cadSubmitForm() {
