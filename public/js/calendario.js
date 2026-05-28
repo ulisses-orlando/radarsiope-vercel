@@ -282,7 +282,6 @@ async function _calCarregar() {
         .gte('cod_municipio', startVal)
         .lte('cod_municipio', endVal)
     );
-    console.log('[Calendário] startVal:', startVal, 'endVal:',  endVal);
   }
 
   const [evRes, repRes] = await Promise.all(queries);
