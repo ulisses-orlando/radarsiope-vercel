@@ -2712,7 +2712,8 @@ function _abrirCalendario() {
   const temAcesso = isAssinante
     ? !!features.calendario
     : (window._leadAcessoProTemp === true);
-
+console.log('[drawer] Acesso ao calendário:', { isAssinante, temAcesso, features, leadProTemp: window._leadAcessoProTemp });
+console.log('temCalendario:', temCalendario);
   if (!temAcesso) {
     _solicitarUpgrade('calendario', isAssinante);
     return;
@@ -2841,7 +2842,7 @@ async function iniciarDrawer(newsletter) {
   window.addEventListener('rs:abrirEdicoes', abrirDrawer);
 
   window.addEventListener('rs:abrirCalendario', _abrirCalendario);
-  
+
   // 🔒 Guard de sessão no botão Sentinela (intercepta antes dos handlers do menu)
   document.getElementById('rs-alertas-btn')?.addEventListener('click', async function (e) {
     if (this.dataset.sessaoOk === '1') { this.dataset.sessaoOk = '0'; return; }
