@@ -176,84 +176,124 @@ function _cadAbrirForm(ev = null) {
 }
 
 function _cadHtmlForm(ev) {
-  const v = ev || {};
+  const v   = ev || {};
   const avs = v.avisos_antecipados || [];
   const sel = (val, opt) => val === opt ? 'selected' : '';
-  
-  // Estilos de bloco
-  const rowStyle = "display:block;margin-bottom:16px;width:100%;";
-  const labelStyle = "display:block;font-size:11px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px;";
-  const inputStyle = "width:100%;background:#f8fafc;border:1px solid #cbd5e1;border-radius:6px;padding:10px 12px;color:#0f172a;font-size:13px;font-family:inherit;outline:none;box-sizing:border-box;display:block;";
+
+  // Injeta CSS isolado apenas uma vez
+  if (!document.getElementById('cad-form-css')) {
+    const s = document.createElement('style');
+    s.id = 'cad-form-css';
+    s.textContent = `
+      #cad-form-scope { display: block !important; }
+      #cad-form-scope .cad-field { display: block !important; margin-bottom: 16px; width: 100%; }
+      #cad-form-scope .cad-field label.cad-lbl {
+        display: block !important; float: none !important;
+        font-size: 11px; font-weight: 700; color: #475569;
+        text-transform: uppercase; letter-spacing: .08em; margin-bottom: 6px;
+      }
+      #cad-form-scope .cad-field input,
+      #cad-form-scope .cad-field select,
+      #cad-form-scope .cad-field textarea {
+        display: block !important; width: 100%; box-sizing: border-box;
+        background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 6px;
+        padding: 10px 12px; color: #0f172a; font-size: 13px;
+        font-family: inherit; outline: none;
+      }
+      #cad-form-scope .cad-grid-2 { display: grid !important; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px; }
+      #cad-form-scope .cad-grid-2 .cad-field { margin-bottom: 0; }
+      #cad-form-scope .cad-avisos { display: flex !important; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+      #cad-form-scope .cad-avisos label {
+        display: flex !important; align-items: center; gap: 4px;
+        font-size: 12px; color: #475569; cursor: pointer;
+        background: #f1f5f9; padding: 6px 10px; border-radius: 6px; border: 1px solid #e2e8f0;
+        font-weight: normal; text-transform: none; letter-spacing: 0;
+      }
+      #cad-form-scope .cad-checks { display: flex !important; gap: 16px; margin-bottom: 24px; align-items: center; flex-wrap: wrap; }
+      #cad-form-scope .cad-checks label {
+        display: flex !important; align-items: center; gap: 6px;
+        font-size: 13px; color: #475569; cursor: pointer; font-weight: normal;
+        text-transform: none; letter-spacing: 0;
+      }
+      #cad-btn-salvar-ev {
+        display: block !important; width: 100%;
+        background: #0A3D62; color: #fff; border: none; border-radius: 8px;
+        padding: 12px; font-size: 14px; font-weight: 700;
+        cursor: pointer; font-family: inherit; margin-top: 8px;
+      }
+    `;
+    document.head.appendChild(s);
+  }
 
   return `
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;border-bottom:1px solid #e2e8f0;padding-bottom:16px;">
       <div style="font-size:18px;font-weight:700;color:#0f172a;">${ev ? 'Editar evento' : 'Novo evento'}</div>
       <button onclick="window._cadFecharPainel()" style="background:none;border:none;color:#64748b;font-size:20px;cursor:pointer;padding:4px;">✕</button>
     </div>
-    
-    <div style="display:flex;flex-direction:column;gap:16px;">
-      
-      <div style="${rowStyle}">
-        <label style="${labelStyle}">Sistema</label>
-        <select id="cf-sistema" style="${inputStyle}">
+
+    <div id="cad-form-scope">
+
+      <div class="cad-field">
+        <label class="cad-lbl">Sistema</label>
+        <select id="cf-sistema">
           ${Object.entries(_CAL_ADM_SIS).map(([val,lbl]) => `<option value="${val}" ${sel(v.sistema,val)}>${lbl}</option>`).join('')}
         </select>
       </div>
 
-      <div style="${rowStyle}">
-        <label style="${labelStyle}">Tipo</label>
-        <select id="cf-tipo" style="${inputStyle}">
+      <div class="cad-field">
+        <label class="cad-lbl">Tipo</label>
+        <select id="cf-tipo">
           ${Object.entries(_CAL_ADM_TIP).map(([val,lbl]) => `<option value="${val}" ${sel(v.tipo,val)}>${lbl}</option>`).join('')}
         </select>
       </div>
 
-      <div style="${rowStyle}">
-        <label style="${labelStyle}">Título</label>
-        <input id="cf-titulo" type="text" value="${v.titulo||''}" style="${inputStyle}" placeholder="Ex: Repasse FUNDEB – Jun/2026">
+      <div class="cad-field">
+        <label class="cad-lbl">Título</label>
+        <input id="cf-titulo" type="text" value="${v.titulo||''}" placeholder="Ex: Repasse FUNDEB – Jun/2026">
       </div>
 
-      <div style="${rowStyle}">
-        <label style="${labelStyle}">Descrição <span style="color:#64748b;font-weight:400;font-size:10px">(opcional)</span></label>
-        <textarea id="cf-descricao" rows="3" style="${inputStyle};resize:vertical">${v.descricao||''}</textarea>
+      <div class="cad-field">
+        <label class="cad-lbl">Descrição <span style="font-weight:400;font-size:10px;color:#64748b">(opcional)</span></label>
+        <textarea id="cf-descricao" rows="3" style="resize:vertical">${v.descricao||''}</textarea>
       </div>
 
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;">
-        <div>
-          <label style="${labelStyle}">Data</label>
-          <input id="cf-data" type="date" value="${v.data||''}" style="${inputStyle}">
+      <div class="cad-grid-2">
+        <div class="cad-field">
+          <label class="cad-lbl">Data</label>
+          <input id="cf-data" type="date" value="${v.data||''}">
         </div>
-        <div>
-          <label style="${labelStyle}">Status</label>
-          <select id="cf-status" style="${inputStyle}">
+        <div class="cad-field">
+          <label class="cad-lbl">Status</label>
+          <select id="cf-status">
             ${Object.entries(_CAL_ADM_STA).map(([val,lbl]) => `<option value="${val}" ${sel(v.status||'previsto',val)}>${lbl}</option>`).join('')}
           </select>
         </div>
       </div>
 
-      <div style="${rowStyle}">
-        <label style="${labelStyle}">Avisos antecipados (dias antes)</label>
-        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;">
+      <div class="cad-field">
+        <label class="cad-lbl">Avisos antecipados (dias antes)</label>
+        <div class="cad-avisos">
           ${_CAL_ADM_AVISOS.map(d => `
-            <label style="display:flex;align-items:center;gap:4px;font-size:12px;color:#475569;cursor:pointer;background:#f1f5f9;padding:6px 10px;border-radius:6px;border:1px solid #e2e8f0;">
-              <input type="checkbox" class="cf-aviso" value="${d}" ${avs.includes(d)?'checked':''} style="accent-color:#0A3D62;margin:0;">
-              ${d} dias
-            </label>`).join('')}
+          <label>
+            <input type="checkbox" class="cf-aviso" value="${d}" ${avs.includes(d)?'checked':''} style="accent-color:#0A3D62;margin:0;">
+            ${d} dias
+          </label>`).join('')}
         </div>
       </div>
 
-      <div style="display:flex;gap:16px;margin-bottom:24px;align-items:center;">
-        <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:#475569;cursor:pointer;">
-          <input type="checkbox" id="cf-free" ${v.visivel_free?'checked':''} style="accent-color:#f59e0b;width:16px;height:16px;margin:0;"> 
+      <div class="cad-checks">
+        <label>
+          <input type="checkbox" id="cf-free" ${v.visivel_free?'checked':''} style="accent-color:#f59e0b;width:16px;height:16px;margin:0;">
           Visível no plano free
         </label>
         ${ev ? `
-        <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:#475569;cursor:pointer;">
-          <input type="checkbox" id="cf-ativo" ${v.ativo?'checked':''} style="accent-color:#10b981;width:16px;height:16px;margin:0;"> 
+        <label>
+          <input type="checkbox" id="cf-ativo" ${v.ativo?'checked':''} style="accent-color:#10b981;width:16px;height:16px;margin:0;">
           Ativo
         </label>` : ''}
       </div>
 
-      <button id="cf-salvar" style="width:100%;background:#0A3D62;color:#fff;border:none;border-radius:8px;padding:12px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;margin-top:8px;box-shadow:0 2px 4px rgba(10,61,98,0.2);">
+      <button id="cf-salvar">
         ${ev ? '💾 Salvar alterações' : '➕ Criar evento'}
       </button>
 
