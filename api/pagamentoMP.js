@@ -156,7 +156,7 @@ async function validarECustomizarCupomAtomico(codigo, userId, email, cpf, assina
     const q = db.collection('cupons').where('codigo', '==', codigo).limit(1);
     const snap = await tx.get(q);
     if (snap.empty) throw new Error('Cupom não encontrado.');
-    
+
     const cupomRef = snap.docs[0].ref;
     const data = snap.docs[0].data();
 
@@ -400,26 +400,26 @@ async function dispararMensagemAutomatica(momento, dados) {
 // ─── Ativação de sessão pós-pagamento ──────────────────────────────────────
 async function _handleAtivarSessao(req, res) {
   if (req.method !== 'POST') return json(res, 405, { ok: false, message: 'Método não permitido.' });
- 
+
   const { uid, session_token } = req.body || {};
   if (!uid || !session_token) {
     return json(res, 400, { ok: false, message: 'uid e session_token obrigatórios.' });
   }
- 
-  const ua      = req.headers['user-agent'] || '';
-  const uaHash  = crypto.createHash('md5').update(ua.slice(0, 80)).digest('hex').slice(0, 8);
- 
+
+  const ua = req.headers['user-agent'] || '';
+  const uaHash = crypto.createHash('md5').update(ua.slice(0, 80)).digest('hex').slice(0, 8);
+
   try {
-    const usuarioRef  = db.collection('usuarios').doc(uid);
+    const usuarioRef = db.collection('usuarios').doc(uid);
     const usuarioSnap = await usuarioRef.get();
- 
+
     if (!usuarioSnap.exists) {
       return json(res, 404, { ok: false, message: 'Usuário não encontrado.' });
     }
- 
+
     const usuarioData = usuarioSnap.data();
-    const pst         = usuarioData.pending_session_token;
- 
+    const pst = usuarioData.pending_session_token;
+
     // Validações do token de ativação
     if (!pst) {
       return json(res, 400, { ok: false, message: 'Token de ativação não encontrado.' });
@@ -428,9 +428,17 @@ async function _handleAtivarSessao(req, res) {
     if (pst.token !== session_token) {
       return json(res, 400, { ok: false, message: 'Token inválido.' });
     }
- 
+
+    if (Date.now() > (pst.exp || 0)) {
+      return json(res, 400, { ok: false, message: 'Link de ativação expirado. Solicite um novo acesso.' });
+    }
+
+    if (pst.usado) {
+      return json(res, 400, { ok: false, message: 'Link já utilizado. Acesse o app diretamente.' });
+    }
+
     const { assinaturaId } = pst;
- 
+
     // Busca dados atuais da assinatura
     const assinaturaSnap = await db.collection('usuarios').doc(uid)
       .collection('assinaturas').doc(assinaturaId).get();
@@ -438,161 +446,174 @@ async function _handleAtivarSessao(req, res) {
       return json(res, 404, { ok: false, message: 'Assinatura não encontrada.' });
     }
     const assinaturaData = assinaturaSnap.data();
- 
-    // Controle de sessões ativas: máximo 3 por assinante
-    // Se já existem 3, desativa a que ficou mais tempo sem acesso
-    const sessoesSnap = await usuarioRef.collection('sessoes')
-      .where('ativo', '==', true).get();
- 
-    if (sessoesSnap.size >= 3) {
-      const ordenadas = sessoesSnap.docs.sort((a, b) => {
-        const ta = a.data().ultimo_acesso?.toMillis?.() || 0;
-        const tb = b.data().ultimo_acesso?.toMillis?.() || 0;
-        return ta - tb; // mais antiga primeiro
-      });
-      await ordenadas[0].ref.update({
-        ativo: false,
-        desativado_motivo: 'limite_dispositivos',
-        desativado_em: admin.firestore.FieldValue.serverTimestamp(),
-      });
-    }
- 
-    // Cria nova sessão
+
+    // Lê max_usuarios do snapshot da assinatura (contrato no momento da compra),
+    // com fallback no map features do usuário e depois em 3.
+    const limiteUsuarios =
+      assinaturaData.features_snapshot?.max_usuarios ||
+      usuarioData.features?.max_usuarios ||
+      3;
+
+    // Controle de sessões ativas em transação (evita race condition em double-tap/retry)
     const sessionId = crypto.randomUUID();
-    await usuarioRef.collection('sessoes').doc(sessionId).set({
-      criado_em:    admin.firestore.FieldValue.serverTimestamp(),
-      ultimo_acesso: admin.firestore.FieldValue.serverTimestamp(),
-      ua_hash:      uaHash,
-      ativo:        true,
-      assinaturaId,
-      acessos_ua_distintos: 0,
-      compartilhamento_suspeito: false,
+    let _avisoSessoes = false;
+
+    await db.runTransaction(async (tx) => {
+      const sessoesSnap = await tx.get(
+        usuarioRef.collection('sessoes').where('ativo', '==', true)
+      );
+
+      _avisoSessoes = sessoesSnap.size >= limiteUsuarios;
+
+      if (_avisoSessoes) {
+        const ordenadas = sessoesSnap.docs.sort((a, b) => {
+          const ta = a.data().ultimo_acesso?.toMillis?.() || 0;
+          const tb = b.data().ultimo_acesso?.toMillis?.() || 0;
+          return ta - tb;
+        });
+        tx.update(ordenadas[0].ref, {
+          ativo: false,
+          desativado_motivo: 'limite_dispositivos',
+          desativado_em: admin.firestore.FieldValue.serverTimestamp(),
+        });
+      }
+
+      tx.set(usuarioRef.collection('sessoes').doc(sessionId), {
+        criado_em: admin.firestore.FieldValue.serverTimestamp(),
+        ultimo_acesso: admin.firestore.FieldValue.serverTimestamp(),
+        ua_hash: uaHash,
+        ativo: true,
+        assinaturaId,
+        acessos_ua_distintos: 0,
+        compartilhamento_suspeito: false,
+      });
     });
- 
-    const _avisoSessoes = sessoesSnap.size >= 3; // true se desativou a mais antiga
- 
+
+    // Marca token como usado (uso único) — fora da transaction pois não é crítico para atomicidade
+    await usuarioRef.update({ 'pending_session_token.usado': true });
+
     return json(res, 200, {
-      ok:             true,
-      session_id:     sessionId,
+      ok: true,
+      session_id: sessionId,
       aviso_limite_sessoes: _avisoSessoes,
       uid,
       assinaturaId,
-      segmento:       'assinante',
-      plano_slug:     assinaturaData.plano_slug   || null,
+      segmento: 'assinante',
+      plano_slug: assinaturaData.plano_slug || null,
       features: usuarioData.features || assinaturaData.features_snapshot || {},
-      nome:           usuarioData.nome            || '',
-      email:          usuarioData.email           || '',
-      cod_uf:         usuarioData.cod_uf          || '',
-      cod_municipio:  usuarioData.cod_municipio   || '',
-      nome_municipio: usuarioData.nome_municipio  || '',
-      perfil:         usuarioData.tipo_perfil     || '',
+      nome: usuarioData.nome || '',
+      email: usuarioData.email || '',
+      cod_uf: usuarioData.cod_uf || '',
+      cod_municipio: usuarioData.cod_municipio || '',
+      nome_municipio: usuarioData.nome_municipio || '',
+      perfil: usuarioData.tipo_perfil || '',
       municipios_plano: assinaturaData.municipios_plano || [],
     });
- 
+
   } catch (err) {
     console.error('[ativar-sessao] Erro:', err.message);
     return json(res, 500, { ok: false, message: 'Erro interno ao ativar sessão.' });
   }
 }
- 
+
 // ─── Validação periódica de sessão (chamado a cada 24h pelo app) ───────────
 async function _handleValidarSessao(req, res) {
   if (req.method !== 'POST') return json(res, 405, { ok: false, message: 'Método não permitido.' });
 
   let municipiosPlano = [];
- 
+
   const { uid, session_id } = req.body || {};
   if (!uid || !session_id) {
-    return json(res, 400, { ok: false, message: 'uid e session_id obrigatórios.' });  
+    return json(res, 400, { ok: false, message: 'uid e session_id obrigatórios.' });
   }
- 
-  const ua     = req.headers['user-agent'] || '';
+
+  const ua = req.headers['user-agent'] || '';
   const uaHash = crypto.createHash('md5').update(ua.slice(0, 80)).digest('hex').slice(0, 8);
- 
+
   try {
 
-    
-    const sessaoRef  = db.collection('usuarios').doc(uid).collection('sessoes').doc(session_id);
+
+    const sessaoRef = db.collection('usuarios').doc(uid).collection('sessoes').doc(session_id);
     const sessaoSnap = await sessaoRef.get();
-    
+
     if (!sessaoSnap.exists) {
       console.warn(`[validar-sessao] Sessão NÃO encontrada para uid=${uid}, session_id=${session_id}`);
-      return json(res, 200, { 
-        valido: false, 
+      return json(res, 200, {
+        valido: false,
         motivo: 'sessao_nao_encontrada',
       });
     }
-    
+
     const sessaoData = sessaoSnap.data();
-    
+
     if (!sessaoData.ativo) {
-      return json(res, 200, { 
-        valido: false, 
+      return json(res, 200, {
+        valido: false,
         motivo: 'sessao_invalida',
       });
     }
- 
-    const agora      = Date.now();
-    const updates    = { ultimo_acesso: admin.firestore.FieldValue.serverTimestamp() };
- 
+
+    const agora = Date.now();
+    const updates = { ultimo_acesso: admin.firestore.FieldValue.serverTimestamp() };
+
     // Detecção de compartilhamento: UA diferente em menos de 1h
     if (sessaoData.ua_hash && sessaoData.ua_hash !== uaHash) {
       const ultimoAcessoMs = sessaoData.ultimo_acesso?.toMillis?.() || 0;
       if (agora - ultimoAcessoMs < 60 * 60 * 1000) {
         const distintos = (sessaoData.acessos_ua_distintos || 0) + 1;
-        updates.acessos_ua_distintos       = distintos;
-        updates.ua_hash                    = uaHash;
+        updates.acessos_ua_distintos = distintos;
+        updates.ua_hash = uaHash;
         if (distintos >= 3) updates.compartilhamento_suspeito = true;
       } else {
         updates.ua_hash = uaHash;
       }
     }
- 
+
     await sessaoRef.update(updates);
- 
+
     // Verifica status atual da assinatura
     const assinaturaId = sessaoData.assinaturaId;
-    let plano_slug     = null;
-    let features       = {};
-    let statusAss      = null;
- 
+    let plano_slug = null;
+    let features = {};
+    let statusAss = null;
+
     if (assinaturaId) {
       try {
         const [usuarioSnap, assnSnap] = await Promise.all([
-        db.collection('usuarios').doc(uid).get(),
-        db.collection('usuarios').doc(uid).collection('assinaturas').doc(assinaturaId).get()
-      ]);
-      const userData = usuarioSnap.exists ? usuarioSnap.data() : {};
+          db.collection('usuarios').doc(uid).get(),
+          db.collection('usuarios').doc(uid).collection('assinaturas').doc(assinaturaId).get()
+        ]);
+        const userData = usuarioSnap.exists ? usuarioSnap.data() : {};
 
-      if (assnSnap.exists) {
-        const d = assnSnap.data();
-        plano_slug = d.plano_slug || null;
-        features   = userData.features || d.features_snapshot || {}; // ← USUÁRIO PRIMEIRO
-        statusAss  = d.status || null;
-        municipiosPlano = d.municipios_plano || [];
-      }
+        if (assnSnap.exists) {
+          const d = assnSnap.data();
+          plano_slug = d.plano_slug || null;
+          features = userData.features || d.features_snapshot || {}; // ← USUÁRIO PRIMEIRO
+          statusAss = d.status || null;
+          municipiosPlano = d.municipios_plano || [];
+        }
       } catch (e) { /* não fatal */ }
     }
- 
+
     // Assinatura inativa → invalida sessão
     const statusAtivos = ['ativa', 'aprovada', 'pago'];
     if (statusAss && !statusAtivos.includes(statusAss)) {
       await sessaoRef.update({ ativo: false, desativado_motivo: 'assinatura_inativa' });
-      return json(res, 200, { 
-        valido: false, 
+      return json(res, 200, {
+        valido: false,
         motivo: 'assinatura_inativa',
       });
     }
- 
+
     // ✅ Sucesso: retorna session_id para conferência no frontend
-    return json(res, 200, { 
-      valido: true, 
-      plano_slug, 
-      features, 
-      assinaturaId,  
+    return json(res, 200, {
+      valido: true,
+      plano_slug,
+      features,
+      assinaturaId,
       municipios_plano: municipiosPlano,
     });
- 
+
   } catch (err) {
     console.error('[validar-sessao] Erro:', err.message);
     return json(res, 500, { ok: false, message: 'Erro interno ao validar sessão.' });
@@ -610,11 +631,11 @@ async function _handleCriarSessao(req, res) {
     return json(res, 400, { ok: false, message: 'uid e assinaturaId obrigatórios.' });
   }
 
-  const ua     = req.headers['user-agent'] || '';
+  const ua = req.headers['user-agent'] || '';
   const uaHash = crypto.createHash('md5').update(ua.slice(0, 80)).digest('hex').slice(0, 8);
 
   try {
-    const usuarioRef    = db.collection('usuarios').doc(uid);
+    const usuarioRef = db.collection('usuarios').doc(uid);
     const assinaturaRef = usuarioRef.collection('assinaturas').doc(assinaturaId);
 
     const [usuarioSnap, assinaturaSnap] = await Promise.all([
@@ -622,72 +643,83 @@ async function _handleCriarSessao(req, res) {
       assinaturaRef.get(),
     ]);
 
-    if (!usuarioSnap.exists)    return json(res, 404, { ok: false, message: 'Usuário não encontrado.' });
+    if (!usuarioSnap.exists) return json(res, 404, { ok: false, message: 'Usuário não encontrado.' });
     if (!assinaturaSnap.exists) return json(res, 404, { ok: false, message: 'Assinatura não encontrada.' });
 
     const assinaturaData = assinaturaSnap.data();
-    const usuarioData    = usuarioSnap.data();
+    const usuarioData = usuarioSnap.data();
 
     if (assinaturaData.status !== 'ativa') {
       const _msgPorStatus = {
         pendente_pagamento: 'Seu pagamento está sendo processado. Assim que confirmado, você terá acesso completo.',
-        cancelado:          'Sua assinatura foi cancelada. Entre em contato para reativá-la.',
-        suspenso:           'Sua assinatura está suspensa. Entre em contato com o suporte.',
-        inativo:            'Sua assinatura está inativa. Entre em contato para reativá-la.',
+        cancelado: 'Sua assinatura foi cancelada. Entre em contato para reativá-la.',
+        suspenso: 'Sua assinatura está suspensa. Entre em contato com o suporte.',
+        inativo: 'Sua assinatura está inativa. Entre em contato para reativá-la.',
       };
       const _msg = _msgPorStatus[assinaturaData.status] || 'Assinatura inativa.';
       return json(res, 403, { ok: false, status: assinaturaData.status, message: _msg });
     }
 
-    // Controle de sessões ativas: máximo 3 por assinante
-    const sessoesSnap = await usuarioRef.collection('sessoes')
-      .where('ativo', '==', true).get();
+    // Lê max_usuarios do snapshot da assinatura (contrato no momento da compra),
+    // com fallback no map features do usuário e depois em 3.
+    const limiteUsuarios =
+      assinaturaData.features_snapshot?.max_usuarios ||
+      usuarioData.features?.max_usuarios ||
+      3;
 
-    if (sessoesSnap.size >= 3) {
-      const ordenadas = sessoesSnap.docs.sort((a, b) => {
-        const ta = a.data().ultimo_acesso?.toMillis?.() || a.data().criado_em?.toMillis?.() || 0;
-        const tb = b.data().ultimo_acesso?.toMillis?.() || b.data().criado_em?.toMillis?.() || 0;
-        return ta - tb; // mais antiga primeiro
-      });
-
-      await ordenadas[0].ref.update({
-        ativo:             false,
-        desativado_motivo: 'limite_dispositivos',
-        desativado_em:     admin.firestore.FieldValue.serverTimestamp(),
-      });
-    }
-
+    // Controle de sessões ativas em transação (evita race condition em double-tap/retry)
     const sessionId = crypto.randomUUID();
-    await usuarioRef.collection('sessoes').doc(sessionId).set({
-      criado_em:                 admin.firestore.FieldValue.serverTimestamp(),
-      ultimo_acesso:             admin.firestore.FieldValue.serverTimestamp(),
-      ua_hash:                   uaHash,
-      ativo:                     true,
-      assinaturaId,
-      acessos_ua_distintos:      0,
-      compartilhamento_suspeito: false,
-      origem:                    'link_edicao',
+    let _avisoSessoes = false;
+
+    await db.runTransaction(async (tx) => {
+      const sessoesSnap = await tx.get(
+        usuarioRef.collection('sessoes').where('ativo', '==', true)
+      );
+
+      _avisoSessoes = sessoesSnap.size >= limiteUsuarios;
+
+      if (_avisoSessoes) {
+        const ordenadas = sessoesSnap.docs.sort((a, b) => {
+          const ta = a.data().ultimo_acesso?.toMillis?.() || a.data().criado_em?.toMillis?.() || 0;
+          const tb = b.data().ultimo_acesso?.toMillis?.() || b.data().criado_em?.toMillis?.() || 0;
+          return ta - tb; // mais antiga primeiro
+        });
+        tx.update(ordenadas[0].ref, {
+          ativo: false,
+          desativado_motivo: 'limite_dispositivos',
+          desativado_em: admin.firestore.FieldValue.serverTimestamp(),
+        });
+      }
+
+      tx.set(usuarioRef.collection('sessoes').doc(sessionId), {
+        criado_em: admin.firestore.FieldValue.serverTimestamp(),
+        ultimo_acesso: admin.firestore.FieldValue.serverTimestamp(),
+        ua_hash: uaHash,
+        ativo: true,
+        assinaturaId,
+        acessos_ua_distintos: 0,
+        compartilhamento_suspeito: false,
+        origem: 'link_edicao',
+      });
     });
 
-    const _avisoSessoes = sessoesSnap.size >= 3; // true se desativou a mais antiga
-
     return json(res, 200, {
-      ok:             true,
-      session_id:     sessionId,
+      ok: true,
+      session_id: sessionId,
       aviso_limite_sessoes: _avisoSessoes,
       uid,
       assinaturaId,
-      segmento:       'assinante',
-      plano_slug:     assinaturaData.plano_slug   || null,
-      features:       usuarioData.features        || assinaturaData.features_snapshot || {},
+      segmento: 'assinante',
+      plano_slug: assinaturaData.plano_slug || null,
+      features: usuarioData.features || assinaturaData.features_snapshot || {},
       municipios_plano: assinaturaData.municipios_plano || [],
-      nome:           usuarioData.nome            || '',
-      email:          usuarioData.email           || '',
-      cod_uf:         usuarioData.cod_uf          || '',
-      cod_municipio:  usuarioData.cod_municipio   || '',
-      nome_municipio: usuarioData.nome_municipio  || '',
-      perfil:         usuarioData.tipo_perfil     || '',
-      validado_em:    Date.now(),
+      nome: usuarioData.nome || '',
+      email: usuarioData.email || '',
+      cod_uf: usuarioData.cod_uf || '',
+      cod_municipio: usuarioData.cod_municipio || '',
+      nome_municipio: usuarioData.nome_municipio || '',
+      perfil: usuarioData.tipo_perfil || '',
+      validado_em: Date.now(),
     });
 
   } catch (err) {
@@ -715,9 +747,9 @@ async function _handleEncerrarSessao(req, res) {
     }
 
     await sessaoRef.update({
-      ativo:             false,
+      ativo: false,
       desativado_motivo: 'logout_usuario',
-      desativado_em:     admin.firestore.FieldValue.serverTimestamp(),
+      desativado_em: admin.firestore.FieldValue.serverTimestamp(),
     });
 
     return json(res, 200, { ok: true });
@@ -741,7 +773,7 @@ async function _handleCancelarAssinatura(req, res) {
   }
 
   try {
-    const assinRef  = db.collection('usuarios').doc(uid).collection('assinaturas').doc(assinaturaId);
+    const assinRef = db.collection('usuarios').doc(uid).collection('assinaturas').doc(assinaturaId);
     const assinSnap = await assinRef.get();
 
     if (!assinSnap.exists) return json(res, 404, { ok: false, message: 'Assinatura não encontrada.' });
@@ -752,31 +784,31 @@ async function _handleCancelarAssinatura(req, res) {
       return json(res, 409, { ok: false, message: `Assinatura não está ativa (status: ${d.status}).` });
     }
 
-    const agora        = new Date();
-    const dataInicio   = d.data_inicio?.toDate?.() || new Date(d.data_inicio);
-    const dataFimFid   = d.data_fim_fidelizacao?.toDate?.() || null;
-    const temFid       = !!d.tem_fidelizacao && !!dataFimFid;
-    const dentroFid    = temFid && agora < dataFimFid;
+    const agora = new Date();
+    const dataInicio = d.data_inicio?.toDate?.() || new Date(d.data_inicio);
+    const dataFimFid = d.data_fim_fidelizacao?.toDate?.() || null;
+    const temFid = !!d.tem_fidelizacao && !!dataFimFid;
+    const dentroFid = temFid && agora < dataFimFid;
 
     // Meses usados (arredonda para cima — mês iniciado conta)
-    const msUsados     = agora - dataInicio;
-    const mesesUsados  = Math.max(1, Math.ceil(msUsados / (30 * 24 * 60 * 60 * 1000)));
+    const msUsados = agora - dataInicio;
+    const mesesUsados = Math.max(1, Math.ceil(msUsados / (30 * 24 * 60 * 60 * 1000)));
 
     // Ajuste = desconto concedido × meses usados (só dentro do período de fidelização)
     const descontoMensal = Number(d.desconto_mensal) || 0;
     const ajusteCentavos = dentroFid ? Math.round(descontoMensal * mesesUsados * 100) : 0;
-    const ajusteReais    = ajusteCentavos / 100;
+    const ajusteReais = ajusteCentavos / 100;
 
     const novoStatus = ajusteCentavos > 0 ? 'cancelamento_pendente_ajuste' : 'cancelada';
 
     await assinRef.set({
-      status:               novoStatus,
-      cancelado_em:         admin.firestore.FieldValue.serverTimestamp(),
-      cancelamento_motivo:  motivo || null,
-      ajuste_fidelizacao:   ajusteReais,
-      ajuste_meses_usados:  mesesUsados,
-      ajuste_status:        ajusteCentavos > 0 ? 'pendente' : 'nao_aplicavel',
-      atualizadoEm:         admin.firestore.FieldValue.serverTimestamp(),
+      status: novoStatus,
+      cancelado_em: admin.firestore.FieldValue.serverTimestamp(),
+      cancelamento_motivo: motivo || null,
+      ajuste_fidelizacao: ajusteReais,
+      ajuste_meses_usados: mesesUsados,
+      ajuste_status: ajusteCentavos > 0 ? 'pendente' : 'nao_aplicavel',
+      atualizadoEm: admin.firestore.FieldValue.serverTimestamp(),
     }, { merge: true });
 
     // Desativa sessões ativas do usuário
@@ -795,16 +827,16 @@ async function _handleCancelarAssinatura(req, res) {
     } catch (e) { console.warn('[cancelar-assinatura] Falha ao desativar sessões:', e.message); }
 
     return json(res, 200, {
-      ok:             true,
-      status:         novoStatus,
-      tem_ajuste:     ajusteCentavos > 0,
-      ajuste_reais:   ajusteReais,
+      ok: true,
+      status: novoStatus,
+      tem_ajuste: ajusteCentavos > 0,
+      ajuste_reais: ajusteReais,
       ajuste_centavos: ajusteCentavos,
-      meses_usados:   mesesUsados,
+      meses_usados: mesesUsados,
       desconto_mensal: descontoMensal,
       data_fim_fidelizacao: dataFimFid ? dataFimFid.toISOString() : null,
       message: ajusteCentavos > 0
-        ? `Cancelamento registrado. Ajuste de ${ajusteReais.toLocaleString('pt-BR',{style:'currency',currency:'BRL'})} pendente (${mesesUsados} meses × ${descontoMensal.toLocaleString('pt-BR',{style:'currency',currency:'BRL'})}).`
+        ? `Cancelamento registrado. Ajuste de ${ajusteReais.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} pendente (${mesesUsados} meses × ${descontoMensal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}).`
         : 'Assinatura cancelada sem ajuste.',
     });
 
@@ -969,7 +1001,7 @@ async function _handleSalvarResultadoQuiz(req, res) {
     const tentativas = atualizados.docs
       .map(d => ({
         pontuacao: d.data().pontuacao,
-        aprovado:  d.data().aprovado,
+        aprovado: d.data().aprovado,
         criado_em: d.data().criado_em?.toDate?.()?.toISOString() ?? null
       }))
       .sort((a, b) => (b.criado_em || '').localeCompare(a.criado_em || '')); // Mais recente primeiro
@@ -1004,7 +1036,7 @@ async function _handleQuizHistorico(req, res) {
     const tentativas = snap.docs
       .map(d => ({
         pontuacao: d.data().pontuacao,
-        aprovado:  d.data().aprovado,
+        aprovado: d.data().aprovado,
         criado_em: d.data().criado_em?.toDate?.()?.toISOString() ?? null
       }))
       .sort((a, b) => (b.criado_em || '').localeCompare(a.criado_em || ''));
@@ -1077,9 +1109,9 @@ export default async function handler(req, res) {
     }
 
     if (req.method === 'GET' && acao === 'quiz-historico') {
-       return _handleQuizHistorico(req, res);
+      return _handleQuizHistorico(req, res);
     }
-    
+
     // ── POST ?acao=salvar-quiz ────────────────────────────────────────────
     if (req.method === 'POST' && acao === 'salvar-quiz') {
       return _handleSalvarResultadoQuiz(req, res);
@@ -1089,7 +1121,7 @@ export default async function handler(req, res) {
     if (req.method === 'POST' && acao === 'ativar-sessao') {
       return _handleAtivarSessao(req, res);
     }
- 
+
     // ── POST ?acao=validar-sessao ─────────────────────────────────────────
     if (req.method === 'POST' && acao === 'validar-sessao') {
       return _handleValidarSessao(req, res);
@@ -1135,7 +1167,7 @@ export default async function handler(req, res) {
       if (isNaN(amountCentavos) || amountCentavos < 0) {
         return json(res, 400, { ok: false, message: 'amountCentavos inválido.' });
       }
-      
+
       // fix #9: validar back_urls antes de chamar o MP
       const backUrlSuccess = process.env.MP_BACK_URL_SUCCESS;
       const backUrlFailure = process.env.MP_BACK_URL_FAILURE;
@@ -1178,7 +1210,7 @@ export default async function handler(req, res) {
       const external_reference = montarExternalReference(userId, assinaturaId, novoPedidoRef.id);
       const cpfNormalizado = (cpf || '').replace(/\D/g, '');
 
-        // 🔐 VALIDAÇÃO ATÔMICA DO CUPOM (ANTES DE QUALQUER FLUXO)
+      // 🔐 VALIDAÇÃO ATÔMICA DO CUPOM (ANTES DE QUALQUER FLUXO)
       if (body.cupomCodigo) {
         try {
           await validarECustomizarCupomAtomico(body.cupomCodigo, userId, email, cpf, assinaturaId);
@@ -1192,16 +1224,16 @@ export default async function handler(req, res) {
         await registrarPagamentoPendente(userId, assinaturaId, 0, 1, 'cupom_gratuito', novoPedidoRef.id);
         await novoPedidoRef.set({ status: 'pago', mpStatus: 'approved', mpPaymentMethod: 'cupom_gratuito', atualizadoEm: admin.firestore.FieldValue.serverTimestamp() }, { merge: true });
         const assinRef = db.collection('usuarios').doc(userId).collection('assinaturas').doc(assinaturaId);
-        await assinRef.set({ status: 'ativa', paymentProvider: 'cupom_gratuito', orderId: `GRAT-${novoPedidoRef.id.slice(0,8)}`, pedidoId: novoPedidoRef.id, ativadoEm: admin.firestore.FieldValue.serverTimestamp(), atualizadoEm: admin.firestore.FieldValue.serverTimestamp() }, { merge: true });
+        await assinRef.set({ status: 'ativa', paymentProvider: 'cupom_gratuito', orderId: `GRAT-${novoPedidoRef.id.slice(0, 8)}`, pedidoId: novoPedidoRef.id, ativadoEm: admin.firestore.FieldValue.serverTimestamp(), atualizadoEm: admin.firestore.FieldValue.serverTimestamp() }, { merge: true });
         await db.collection('usuarios').doc(userId).update({ ativo: true });
 
         const _sessionToken = crypto.randomBytes(32).toString('hex');
-        await db.collection('usuarios').doc(userId).set({ pending_session_token: { token: _sessionToken, exp: Date.now() + 72*60*60*1000, assinaturaId, usado: false, criado_em: admin.firestore.FieldValue.serverTimestamp() } }, { merge: true });
+        await db.collection('usuarios').doc(userId).set({ pending_session_token: { token: _sessionToken, exp: Date.now() + 72 * 60 * 60 * 1000, assinaturaId, usado: false, criado_em: admin.firestore.FieldValue.serverTimestamp() } }, { merge: true });
 
         const usuarioData = (await db.collection('usuarios').doc(userId).get()).data() || {};
         const assinaturaData = (await assinRef.get()).data() || {};
         let nomePlano = '(plano não informado)';
-        if (assinaturaData.planId) { try { const pd = await db.collection('planos').doc(assinaturaData.planId).get(); if(pd.exists) nomePlano = pd.data().nome || nomePlano; } catch(e){} }
+        if (assinaturaData.planId) { try { const pd = await db.collection('planos').doc(assinaturaData.planId).get(); if (pd.exists) nomePlano = pd.data().nome || nomePlano; } catch (e) { } }
         const linkAtivacao = `${process.env.NEXT_PUBLIC_BASE_URL}/verNewsletterComToken.html?ativar=${_sessionToken}&uid=${userId}`;
         await dispararMensagemAutomatica('pos_cadastro_assinante', { userId, assinaturaId, nome: usuarioData.nome || nome, email: usuarioData.email || email, plano: nomePlano, data_assinatura: new Date(), link_ativacao: linkAtivacao });
 
@@ -1364,64 +1396,64 @@ export default async function handler(req, res) {
         return json(res, 200, { ok: true, message: 'sem external_reference' });
       }
 
-        const parsed = parseExternalReference(externalRef);
-        if (!parsed) {
-          await globalNotifRef.set({ resolved: false, motivo: 'external_reference inválido' }, { merge: true });
-          return json(res, 200, { ok: true, message: 'external_reference inválido' });
+      const parsed = parseExternalReference(externalRef);
+      if (!parsed) {
+        await globalNotifRef.set({ resolved: false, motivo: 'external_reference inválido' }, { merge: true });
+        return json(res, 200, { ok: true, message: 'external_reference inválido' });
+      }
+
+      // 🔹 IMPORTANTE: mpStatus deve ser definido ANTES do bloco de cancelamento
+      const mpStatus = mpData.status || mpData.payment_status || null;
+
+      // 🔹 TRATAMENTO DE MULTA DE CANCELAMENTO
+      if (externalRef && externalRef.startsWith('cancelamento_')) {
+        const parts = externalRef.replace('cancelamento_', '').split('_');
+        const [cUid, cAssinId, cSolId] = parts;
+
+        if (mpStatus === 'approved' || mpStatus === 'paid') {
+          await Promise.all([
+            db.collection('usuarios').doc(cUid).collection('assinaturas').doc(cAssinId).set({
+              ajuste_status: 'pago',
+              multa_pago_em: admin.firestore.FieldValue.serverTimestamp(),
+              atualizadoEm: admin.firestore.FieldValue.serverTimestamp()
+            }, { merge: true }),
+            db.collection('usuarios').doc(cUid).collection('solicitacoes').doc(cSolId).set({
+              status: 'multa_pago',
+              atualizadoEm: admin.firestore.FieldValue.serverTimestamp()
+            }, { merge: true })
+          ]);
         }
+        return json(res, 200, { ok: true, message: 'multa processada' });
+      }
 
-        // 🔹 IMPORTANTE: mpStatus deve ser definido ANTES do bloco de cancelamento
-        const mpStatus = mpData.status || mpData.payment_status || null;
+      // ── Fluxo normal (assinatura) ──
+      const { userId, assinaturaId, pedidoId } = parsed;
 
-        // 🔹 TRATAMENTO DE MULTA DE CANCELAMENTO
-        if (externalRef && externalRef.startsWith('cancelamento_')) {
-          const parts = externalRef.replace('cancelamento_', '').split('_');
-          const [cUid, cAssinId, cSolId] = parts;
-          
-          if (mpStatus === 'approved' || mpStatus === 'paid') {
-            await Promise.all([
-              db.collection('usuarios').doc(cUid).collection('assinaturas').doc(cAssinId).set({ 
-                ajuste_status: 'pago', 
-                multa_pago_em: admin.firestore.FieldValue.serverTimestamp(), 
-                atualizadoEm: admin.firestore.FieldValue.serverTimestamp() 
-              }, { merge: true }),
-              db.collection('usuarios').doc(cUid).collection('solicitacoes').doc(cSolId).set({ 
-                status: 'multa_pago', 
-                atualizadoEm: admin.firestore.FieldValue.serverTimestamp() 
-              }, { merge: true })
-            ]);
-          }
-          return json(res, 200, { ok: true, message: 'multa processada' });
-        }
-        
-        // ── Fluxo normal (assinatura) ──
-        const { userId, assinaturaId, pedidoId } = parsed;
+      // fix #8: salvar notificação SEMPRE em notificacoes_mp
+      const notifRef = db.collection('usuarios').doc(userId)
+        .collection('assinaturas').doc(assinaturaId)
+        .collection('notificacoes_mp').doc(notifId);
 
-        // fix #8: salvar notificação SEMPRE em notificacoes_mp
-        const notifRef = db.collection('usuarios').doc(userId)
-          .collection('assinaturas').doc(assinaturaId)
-          .collection('notificacoes_mp').doc(notifId);
+      const notifSnap = await notifRef.get();
+      if (notifSnap.exists) {
+        return json(res, 200, { ok: true, message: 'já processado' });
+      }
 
-        const notifSnap = await notifRef.get();
-        if (notifSnap.exists) {
-          return json(res, 200, { ok: true, message: 'já processado' });
-        }
+      await notifRef.set(logCompleto()
+        ? { topic, id, mpData, recebidoEm: admin.firestore.FieldValue.serverTimestamp(), resolvedTipo: resolved.tipo }
+        : { topic, id, mpStatus, recebidoEm: admin.firestore.FieldValue.serverTimestamp() }
+      );
 
-        await notifRef.set(logCompleto()
-          ? { topic, id, mpData, recebidoEm: admin.firestore.FieldValue.serverTimestamp(), resolvedTipo: resolved.tipo }
-          : { topic, id, mpStatus, recebidoEm: admin.firestore.FieldValue.serverTimestamp() }
-        );
+      // Atualizar pedido
+      const pedidoRef = db.collection('usuarios').doc(userId)
+        .collection('assinaturas').doc(assinaturaId)
+        .collection('pedidos_mp').doc(pedidoId);
 
-        // Atualizar pedido
-        const pedidoRef = db.collection('usuarios').doc(userId)
-          .collection('assinaturas').doc(assinaturaId)
-          .collection('pedidos_mp').doc(pedidoId);
-
-        const pedidoSnap = await pedidoRef.get();
-        if (!pedidoSnap.exists) {
-          await globalNotifRef.set({ processado: true, motivo: 'pedido não encontrado' }, { merge: true });
-          return json(res, 200, { ok: true, message: 'processado' });
-        }
+      const pedidoSnap = await pedidoRef.get();
+      if (!pedidoSnap.exists) {
+        await globalNotifRef.set({ processado: true, motivo: 'pedido não encontrado' }, { merge: true });
+        return json(res, 200, { ok: true, message: 'processado' });
+      }
 
       let novoStatusPedido = 'pendente';
 
@@ -1483,11 +1515,11 @@ export default async function handler(req, res) {
         const _sessionToken = crypto.randomBytes(32).toString('hex');
         await db.collection('usuarios').doc(userId).set({
           pending_session_token: {
-            token:        _sessionToken,
-            exp:          Date.now() + 72 * 60 * 60 * 1000, // 72h em ms
+            token: _sessionToken,
+            exp: Date.now() + 72 * 60 * 60 * 1000, // 72h em ms
             assinaturaId,
-            usado:        false,
-            criado_em:    admin.firestore.FieldValue.serverTimestamp(),
+            usado: false,
+            criado_em: admin.firestore.FieldValue.serverTimestamp(),
           }
         }, { merge: true });
 
@@ -1533,33 +1565,33 @@ export default async function handler(req, res) {
           const nomeAssinante = usuarioData?.nome || mpData.payer?.first_name || assinaturaData?.nome || '';
           const emailAssinante = usuarioData?.email || mpData.payer?.email || '(email não informado)';
           const whatsappAssinante = usuarioData?.whatsapp || null;
- 
+
           // ── E-mail (comportamento existente, mantido) ──────────────────────
           const emailPromise = dispararMensagemAutomatica('pos_cadastro_assinante', {
             userId,
             assinaturaId,
-            nome:            nomeAssinante,
-            email:           emailAssinante,
-            plano:           nomePlano,
+            nome: nomeAssinante,
+            email: emailAssinante,
+            plano: nomePlano,
             data_assinatura: new Date(),
-            link_ativacao:   linkAtivacao,
+            link_ativacao: linkAtivacao,
           }).catch(err => {
             console.error('[pagamentoMP] Erro no e-mail de boas-vindas:', err?.message || err);
           });
- 
+
           await emailPromise;
- 
+
           const successPayload = {};
           successPayload[logKey] = {
-            momento:    'pos_cadastro_assinante',
-            email:      emailAssinante,
-            whatsapp:   whatsappAssinante ? 'enviado' : 'sem_numero',
-            status:     'enviado',
+            momento: 'pos_cadastro_assinante',
+            email: emailAssinante,
+            whatsapp: whatsappAssinante ? 'enviado' : 'sem_numero',
+            status: 'enviado',
             links_grupos_ativos: false,
-            enviadoEm:  admin.firestore.FieldValue.serverTimestamp(),
+            enviadoEm: admin.firestore.FieldValue.serverTimestamp(),
           };
           await assinRef.set(successPayload, { merge: true });
- 
+
         } else {
           if (logCompleto()) console.info('Envio já registrado para pedidoId:', pedidoId);
         }
