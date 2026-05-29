@@ -916,7 +916,187 @@
     .delay-1 { animation-delay: 0.1s; }
     .delay-2 { animation-delay: 0.2s; }
     .delay-3 { animation-delay: 0.3s; }
-  </style>
+  
+    /* ═══════════════════════════════════════════════════════════════
+       OVERRIDE: Correções de tema dark para elementos renderizados
+       dinamicamente pelo assinatura.js (não modificar o JS)
+       ═══════════════════════════════════════════════════════════════ */
+
+    /* ── Cards de plano (renderizados pelo _criarCardPlano) ── */
+    .plano-card .plano-features li {
+      color: var(--text-muted) !important;
+    }
+
+    .plano-card .plano-features li.inativo {
+      color: var(--text-dim) !important;
+      opacity: 0.5;
+      text-decoration: line-through;
+    }
+
+    .plano-card .plano-features li::before {
+      color: var(--success) !important;
+    }
+
+    .plano-card .plano-features li.inativo::before {
+      color: var(--text-dim) !important;
+    }
+
+    .plano-card .plano-preco-total {
+      color: var(--text-dim) !important;
+    }
+
+    .plano-card .plano-descricao {
+      color: var(--text-muted) !important;
+    }
+
+    .plano-card .btn-ver-mais-features {
+      color: var(--accent) !important;
+    }
+
+    .plano-card .btn-ver-mais-features:hover {
+      color: var(--accent-secondary) !important;
+    }
+
+    .plano-card .features-expanded {
+      border-top-color: var(--border) !important;
+    }
+
+    .plano-card .features-expanded .plano-features li {
+      color: var(--text-muted) !important;
+    }
+
+    /* ── Tabs de ciclo (renderizadas pelo carregarListaPlanos) ── */
+    #ciclo-tabs button {
+      background: var(--surface-elevated) !important;
+      border-color: var(--border) !important;
+      color: var(--text-muted) !important;
+    }
+
+    #ciclo-tabs button.active {
+      background: var(--gradient-accent) !important;
+      border-color: var(--accent) !important;
+      color: white !important;
+      box-shadow: 0 0 15px var(--accent-glow) !important;
+    }
+
+    #ciclo-tabs button:hover:not(.active) {
+      border-color: var(--accent) !important;
+      color: var(--text) !important;
+    }
+
+    /* ── Dropdown de municípios (configurarUIMunicipiosExtra) ── */
+    #container-municipios-extra label {
+      color: var(--text-muted) !important;
+    }
+
+    #municipios-aviso {
+      color: var(--text-dim) !important;
+    }
+
+    #municipios-trigger {
+      background: var(--surface-elevated) !important;
+      border-color: var(--border) !important;
+      color: var(--text) !important;
+    }
+
+    #municipios-trigger:hover {
+      border-color: var(--accent) !important;
+    }
+
+    /* Painel flutuante do dropdown */
+    #municipios-panel {
+      background: var(--surface-elevated) !important;
+      border-color: var(--border) !important;
+      box-shadow: var(--shadow-lg) !important;
+      /* Garantir que não seja cortado */
+      position: fixed !important;
+      z-index: 10000 !important;
+      max-height: 320px !important;
+      width: auto !important;
+      min-width: 280px !important;
+    }
+
+    #municipios-busca {
+      background: var(--surface-card) !important;
+      border-bottom-color: var(--border) !important;
+      color: var(--text) !important;
+    }
+
+    #municipios-busca::placeholder {
+      color: var(--text-dim) !important;
+    }
+
+    #municipios-lista {
+      max-height: 240px !important;
+    }
+
+    #municipios-lista > div {
+      background: transparent !important;
+      border-bottom-color: var(--border) !important;
+      color: var(--text) !important;
+    }
+
+    #municipios-lista > div:hover {
+      background: rgba(59, 130, 246, 0.1) !important;
+    }
+
+    #municipios-lista input[type="checkbox"] {
+      accent-color: var(--accent) !important;
+    }
+
+    #municipios-limit-info {
+      color: var(--text-dim) !important;
+    }
+
+    /* ── Campo de parcelas (se existir) ── */
+    #parcelas {
+      background: var(--surface-elevated);
+      border-color: var(--border);
+      color: var(--text);
+    }
+
+    /* ── Loading de planos ── */
+    #planos-cards > .rs-loading,
+    #planos-cards > div:first-child {
+      color: var(--text-muted) !important;
+    }
+
+    /* ── Newsletter checkboxes (carregarTiposNewsletter) ── */
+    #grupo-newsletters label {
+      color: var(--text-muted) !important;
+    }
+
+    #grupo-newsletters label span {
+      color: var(--text) !important;
+    }
+
+    #btn-sel-todos {
+      background: var(--surface-elevated) !important;
+      border-color: var(--border) !important;
+      color: var(--text-muted) !important;
+    }
+
+    #btn-sel-todos:hover {
+      border-color: var(--accent) !important;
+      color: var(--text) !important;
+    }
+
+    /* ── Mensagens de erro/feedback do JS ── */
+    #cupom-feedback {
+      color: var(--success) !important;
+    }
+
+    /* ── Avisos de plano em breve/sob consulta ── */
+    .plano-em-breve-aviso {
+      background: rgba(245, 158, 11, 0.1) !important;
+      border-color: rgba(245, 158, 11, 0.2) !important;
+      color: var(--warning) !important;
+    }
+
+    .plano-sob-consulta-aviso {
+      color: #a78bfa !important;
+    }
+</style>
 <base target="_blank">
 </head>
 
@@ -935,7 +1115,7 @@
     <!-- Cabeçalho -->
     <div class="rs-header rs-animate-in">
       <h1>📡 Assine o <span class="gradient-text">Radar SIOPE</span></h1>
-      <p>O guia da educação digital para o seu município. Fundeb, SIOPE e CACS-Fundeb.</p>
+      <p>O guia da educação digital para o seu município. Fundeb, Salário-Educação, SIOPE e CACS-Fundeb.</p>
     </div>
 
     <!-- Progresso -->
