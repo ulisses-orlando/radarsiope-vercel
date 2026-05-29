@@ -177,52 +177,84 @@ function _cadAbrirForm(ev = null) {
 }
 
 function _cadHtmlForm(ev) {
-  // 1. Pega o template que está no admin.html
-  const template = document.getElementById('cad-form-template');
-  if (!template) return '<p style="color:red">Erro: Template não encontrado no admin.html</p>';
-
-  // 2. Clona o template para poder manipular sem afetar o original oculto
-  const clone = template.cloneNode(true);
-  clone.style.display = 'block'; // Mostra o clone
-
-  // 3. Preenche os dados se estiver editando (ev != null)
-  if (ev) {
-    clone.querySelector('#cad-form-title').textContent = 'Editar evento';
-    clone.querySelector('#cf-salvar').textContent = '💾 Salvar alterações';
+  const v = ev || {};
+  const avs = v.avisos_antecipados || [];
+  const sel = (val, opt) => val === opt ? 'selected' : '';
+  
+  return `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;border-bottom:1px solid #e2e8f0;padding-bottom:16px;">
+      <div style="font-size:18px;font-weight:700;color:#0f172a;">${ev ? 'Editar evento' : 'Novo evento'}</div>
+      <button onclick="window._cadFecharPainel()" style="background:none;border:none;color:#64748b;font-size:20px;cursor:pointer;padding:4px;">✕</button>
+    </div>
     
-    // Preenche campos
-    clone.querySelector('#cf-sistema').value = ev.sistema || '';
-    clone.querySelector('#cf-tipo').value = ev.tipo || '';
-    clone.querySelector('#cf-titulo').value = ev.titulo || '';
-    clone.querySelector('#cf-descricao').value = ev.descricao || '';
-    clone.querySelector('#cf-data').value = ev.data || '';
-    clone.querySelector('#cf-status').value = ev.status || 'previsto';
-    clone.querySelector('#cf-free').checked = !!ev.visivel_free;
-    clone.querySelector('#cf-ativo').checked = !!ev.ativo;
+    <div style="display:flex;flex-direction:column;gap:16px;">
+      
+      <div style="display:flex;flex-direction:column;gap:6px;">
+        <label style="display:block;font-size:11px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:.08em;">Sistema</label>
+        <select id="cf-sistema" style="width:100%;background:#f8fafc;border:1px solid #cbd5e1;border-radius:6px;padding:10px 12px;color:#0f172a;font-size:13px;font-family:inherit;outline:none;box-sizing:border-box;">
+          ${Object.entries(_CAL_ADM_SIS).map(([val,lbl]) => `<option value="${val}" ${sel(v.sistema,val)}>${lbl}</option>`).join('')}
+        </select>
+      </div>
 
-    // Mostra o checkbox "Ativo" apenas na edição
-    const wrapAtivo = clone.querySelector('#wrap-cf-ativo');
-    if (wrapAtivo) wrapAtivo.style.display = 'flex';
+      <div style="display:flex;flex-direction:column;gap:6px;">
+        <label style="display:block;font-size:11px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:.08em;">Tipo</label>
+        <select id="cf-tipo" style="width:100%;background:#f8fafc;border:1px solid #cbd5e1;border-radius:6px;padding:10px 12px;color:#0f172a;font-size:13px;font-family:inherit;outline:none;box-sizing:border-box;">
+          ${Object.entries(_CAL_ADM_TIP).map(([val,lbl]) => `<option value="${val}" ${sel(v.tipo,val)}>${lbl}</option>`).join('')}
+        </select>
+      </div>
 
-    // Marca os checkboxes de avisos
-    const avisos = ev.avisos_antecipados || [];
-    clone.querySelectorAll('.cf-aviso').forEach(cb => {
-      cb.checked = avisos.includes(Number(cb.value));
-    });
+      <div style="display:flex;flex-direction:column;gap:6px;">
+        <label style="display:block;font-size:11px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:.08em;">Título</label>
+        <input id="cf-titulo" type="text" value="${v.titulo||''}" style="width:100%;background:#f8fafc;border:1px solid #cbd5e1;border-radius:6px;padding:10px 12px;color:#0f172a;font-size:13px;font-family:inherit;outline:none;box-sizing:border-box;" placeholder="Ex: Repasse FUNDEB – Jun/2026">
+      </div>
 
-  } else {
-    // Modo "Novo": Reseta o formulário
-    clone.querySelector('#cad-form-title').textContent = 'Novo evento';
-    clone.querySelector('#cf-salvar').textContent = '➕ Criar evento';
-    clone.querySelector('#cf-event-form').reset();
-    
-    // Esconde o checkbox "Ativo"
-    const wrapAtivo = clone.querySelector('#wrap-cf-ativo');
-    if (wrapAtivo) wrapAtivo.style.display = 'none';
-  }
+      <div style="display:flex;flex-direction:column;gap:6px;">
+        <label style="display:block;font-size:11px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:.08em;">Descrição <span style="font-weight:400;font-size:10px;color:#64748b;">(opcional)</span></label>
+        <textarea id="cf-descricao" rows="3" style="width:100%;background:#f8fafc;border:1px solid #cbd5e1;border-radius:6px;padding:10px 12px;color:#0f172a;font-size:13px;font-family:inherit;outline:none;box-sizing:border-box;resize:vertical;">${v.descricao||''}</textarea>
+      </div>
 
-  // Retorna o HTML do clone preenchido
-  return clone.innerHTML;
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+        <div style="display:flex;flex-direction:column;gap:6px;">
+          <label style="display:block;font-size:11px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:.08em;">Data</label>
+          <input id="cf-data" type="date" value="${v.data||''}" style="width:100%;background:#f8fafc;border:1px solid #cbd5e1;border-radius:6px;padding:10px 12px;color:#0f172a;font-size:13px;font-family:inherit;outline:none;box-sizing:border-box;">
+        </div>
+        <div style="display:flex;flex-direction:column;gap:6px;">
+          <label style="display:block;font-size:11px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:.08em;">Status</label>
+          <select id="cf-status" style="width:100%;background:#f8fafc;border:1px solid #cbd5e1;border-radius:6px;padding:10px 12px;color:#0f172a;font-size:13px;font-family:inherit;outline:none;box-sizing:border-box;">
+            ${Object.entries(_CAL_ADM_STA).map(([val,lbl]) => `<option value="${val}" ${sel(v.status||'previsto',val)}>${lbl}</option>`).join('')}
+          </select>
+        </div>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:6px;">
+        <label style="display:block;font-size:11px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:.08em;">Avisos antecipados (dias antes)</label>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;">
+          ${_CAL_ADM_AVISOS.map(d => `
+            <label style="display:flex;align-items:center;gap:4px;font-size:12px;color:#475569;cursor:pointer;background:#f1f5f9;padding:6px 10px;border-radius:6px;border:1px solid #e2e8f0;">
+              <input type="checkbox" class="cf-aviso" value="${d}" ${avs.includes(d)?'checked':''} style="accent-color:#0A3D62;margin:0;width:15px;height:15px;">
+              ${d} dias
+            </label>`).join('')}
+        </div>
+      </div>
+
+      <div style="display:flex;gap:16px;margin-bottom:24px;align-items:center;flex-wrap:wrap;">
+        <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:#475569;cursor:pointer;">
+          <input type="checkbox" id="cf-free" ${v.visivel_free?'checked':''} style="accent-color:#f59e0b;width:16px;height:16px;margin:0;">
+          Visível no plano free
+        </label>
+        ${ev ? `
+        <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:#475569;cursor:pointer;">
+          <input type="checkbox" id="cf-ativo" ${v.ativo?'checked':''} style="accent-color:#10b981;width:16px;height:16px;margin:0;">
+          Ativo
+        </label>` : ''}
+      </div>
+
+      <button id="cf-salvar" style="width:100%;background:#0A3D62;color:#fff;border:none;border-radius:8px;padding:12px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;margin-top:8px;">
+        ${ev ? '💾 Salvar alterações' : '➕ Criar evento'}
+      </button>
+
+    </div>
+  `;
 }
 
 async function _cadSubmitForm() {
