@@ -87,7 +87,7 @@
 
     .rs-cal-sheet {
       position: fixed; bottom: 0; left: 0; right: 0; z-index: 9000;
-      background: #1e293b;                /* explícito — não depende de CSS var */
+      background: var(--rs-card, #1e293b);
       border-radius: 24px 24px 0 0;
       padding: 20px 16px 48px;
       max-height: 85vh; overflow-y: auto;
@@ -99,8 +99,8 @@
     }
 
     .rs-cal-valor-box {
-      background: rgba(52,211,153,.12);
-      border: 1px solid rgba(52,211,153,.3);
+      background: rgba(52,211,153,.08);
+      border: 1px solid rgba(52,211,153,.2);
       border-radius: 14px; padding: 14px 16px;
       text-align: center; margin-bottom: 14px;
     }
@@ -108,8 +108,7 @@
       background: #0f172a; border-radius: 12px; padding: 12px 14px;
     }
     .rs-cal-info-label {
-      font-size: 10px; color: #94a3b8;    /* era #475569 — invisível em fundo escuro */
-      text-transform: uppercase;
+      font-size: 10px; color: #475569; text-transform: uppercase;
       letter-spacing: .08em; margin-bottom: 4px;
     }
 
@@ -206,40 +205,23 @@ function _calStatusHTML(status) {
 }
 
 // ─── Ponto de entrada público ─────────────────────────────────────────────────
-async function renderizarCalendario(container, { acesso = {}, edicao = {} } = {}) {
-  _cal.acesso = acesso;
-  _cal.view = 'agenda';
-  _cal.filtro = 'todos';
+// Controle de acesso feito ANTES desta chamada, em verNewsletterComToken.js
+// (_abrirCalendario verifica temCalendario e chama _solicitarUpgrade se necessário)
+async function renderizarCalendario(container) {
+  _cal.view      = 'agenda';
+  _cal.filtro    = 'todos';
   _cal.horizonte = 6;
-  _cal.mesExp = null;
-  _cal.repasses = [];
+  _cal.mesExp    = null;
+  _cal.repasses  = [];
+
   // Município: prioridade ao seletor ativo, fallback ao usuário logado
   _cal.codMunicipio = window._municipioAtivo?.cod_municipio
     || window._radarUser?.municipio_cod
     || null;
 
-  // Verificação de acesso — mesmo padrão de outras features
-  const temAcesso = edicao?.features?.calendario || acesso?.features?.calendario;
-  if (!temAcesso) {
-    _solicitarUpgrade('calendario', acesso?.isAssinante);
-    container.innerHTML = `
-      <div style="text-align:center;padding:60px 20px;color:#475569">
-        <div style="font-size:40px;margin-bottom:12px">📅</div>
-        <div style="font-size:15px;font-weight:600;color:#64748b;margin-bottom:8px">Calendário de Datas Importantes e Repasses de Recursos do Fundeb e Salário-Educação</div>
-        <div style="font-size:13px;color:#475569">Disponível nos planos Essence e superiores</div>
-      </div>`;
-    // Expõe atualização para o seletor de município
-    window._calAtualizarMunicipio = async (codMunicipio) => {
-      _cal.codMunicipio = codMunicipio;
-      _cal.mesExp = null;
-      await _calCarregar();
-    };
-    return;
-  }
-
   container.innerHTML = _calShellHTML();
 
-  // Expõe para o seletor de município — mesmo para quem tem acesso
+  // Expõe para o seletor de município
   window._calAtualizarMunicipio = async (codMunicipio) => {
     _cal.codMunicipio = codMunicipio;
     _cal.mesExp = null;
@@ -282,6 +264,7 @@ async function _calCarregar() {
         .gte('cod_municipio', startVal)
         .lte('cod_municipio', endVal)
     );
+    console.log('[Calendário] startVal:', startVal, 'endVal:',  endVal);
   }
 
   const [evRes, repRes] = await Promise.all(queries);
@@ -308,29 +291,11 @@ function _calShellHTML() {
           <div style="font-size:10px;color:#475569;font-weight:700;text-transform:uppercase;letter-spacing:.1em;margin-bottom:3px">Central</div>
           <div style="font-size:21px;font-weight:700;letter-spacing:-.02em;color:var(--rs-text,#f1f5f9)">Calendário</div>
         </div>
+        <div style="background:#1e293b;border-radius:10px;padding:3px;display:flex;gap:2px">
+          ${[['agenda', '≡'], ['sistema', '⊞'], ['geral', '◎'], ['repasses', '₿']].map(([v, ic]) => `
+          <button class="rs-cal-view-btn${_cal.view === v ? ' ativo' : ''}"
+            id="rs-cal-vbtn-${v}" onclick="_calSetView('${v}')">${ic}</button>`).join('')}
         </div>
-
-      <!-- Abas de visão — linha própria, scrollável, com ícone + texto -->
-      <div style="display:flex;gap:6px;overflow-x:auto;padding-bottom:10px;margin-bottom:2px;scrollbar-width:none;-webkit-overflow-scrolling:touch">
-        ${[
-          ['agenda',   '📋', 'Agenda'  ],
-          ['sistema',  '🏷️', 'Sistema' ],
-          ['geral',    '📅', 'Geral'   ],
-          ['repasses', '💰', 'Repasses'],
-        ].map(([v, ic, label]) => {
-          const ativo = _cal.view === v;
-          const cores = { agenda:'#38bdf8', sistema:'#34d399', geral:'#a78bfa', repasses:'#34d399' };
-          const cor   = cores[v];
-          return `<button class="rs-cal-view-btn${ativo ? ' ativo' : ''}"
-            id="rs-cal-vbtn-${v}" onclick="_calSetView('${v}')"
-            style="display:flex;align-items:center;gap:5px;white-space:nowrap;padding:7px 14px;border-radius:99px;font-size:12px;
-                   ${ativo
-                     ? `background:${cor}20;color:${cor};border:1px solid ${cor}40;`
-                     : 'background:rgba(255,255,255,.05);color:#64748b;border:1px solid transparent;'
-                   }">
-            <span style="font-size:13px">${ic}</span>${label}
-          </button>`;
-        }).join('')}
       </div>
 
       <div id="rs-cal-prox"></div>
@@ -785,24 +750,8 @@ window._calFecharSheet = function () {
 window._calSetView = function (v) {
   _cal.view = v;
   _cal.mesExp = null;
-  // Reaplica estilos das abas
-  const cores = { agenda:'#38bdf8', sistema:'#34d399', geral:'#a78bfa', repasses:'#34d399' };
-  ['agenda','sistema','geral','repasses'].forEach(key => {
-    const btn = document.getElementById(`rs-cal-vbtn-${key}`);
-    if (!btn) return;
-    const cor = cores[key];
-    if (key === v) {
-      btn.classList.add('ativo');
-      btn.style.background    = `${cor}20`;
-      btn.style.color         = cor;
-      btn.style.borderColor   = `${cor}40`;
-    } else {
-      btn.classList.remove('ativo');
-      btn.style.background    = 'rgba(255,255,255,.05)';
-      btn.style.color         = '#64748b';
-      btn.style.borderColor   = 'transparent';
-    }
-  });
+  document.querySelectorAll('.rs-cal-view-btn').forEach(b => b.classList.remove('ativo'));
+  document.getElementById(`rs-cal-vbtn-${v}`)?.classList.add('ativo');
   _calRenderizar();
 };
 window._calSetFiltro = f => { _cal.filtro = f; _calRenderizar(); };

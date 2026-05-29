@@ -421,6 +421,7 @@ function detectarAcesso(destinatario, newsletter, segmento, envio) {
     temAlertas: isAssinante && !!features.alertas_prioritarios,
     temChat: isAssinante ? !!features.pergunta_edicao : acessoProTemp,
     temRelatorio: isAssinante ? !!features.relatorio_conformidade : acessoProTemp,
+    temCalendario: isAssinante ? !!features.calendario : acessoProTemp,
     blurMunicipio: !isAssinante && !acessoProTemp,
     truncarTexto: !isAssinante && !acessoProTemp,
     modoPadrao: isAssinante && window.innerWidth > 768 ? 'completo' : 'rapido',
@@ -2705,6 +2706,19 @@ function _getCtx() {
 // ─── Calendário: painel de tela cheia ─────────────────────────────────────────
 
 function _abrirCalendario() {
+  // Verificação de acesso — mesmo padrão de temRelatorio / temChat
+  const isAssinante = !!window._radarUser?.isAssinante;
+  const features = window._radarUser?.features || {};
+  const temAcesso = isAssinante
+    ? !!features.calendario
+    : (window._leadAcessoProTemp === true);
+
+  if (!temAcesso) {
+    _solicitarUpgrade('calendario', isAssinante);
+    return;
+  }
+
+  // Monta ou reexibe o painel
   const PAINEL_ID = 'rs-cal-fullscreen';
   let painel = document.getElementById(PAINEL_ID);
 
@@ -2750,34 +2764,11 @@ function _abrirCalendario() {
     painel.style.display = 'flex';
   }
 
+  // Renderiza — sem passar acesso: calendario.js não faz mais controle de acesso
   const container = document.getElementById('rs-cal-container');
-  if (!container) return;
-
-  // ── Diagnóstico ──────────────────────────────────────────────────────────────
-  if (typeof window.renderizarCalendario !== 'function') {
-    console.error('[Calendário] window.renderizarCalendario não está disponível.',
-      'Verifique se calendario.js está carregado na página.');
-    container.innerHTML = `
-      <div style="padding:40px 20px;text-align:center;color:#94a3b8">
-        <div style="font-size:32px;margin-bottom:12px">⚠️</div>
-        <div style="font-size:14px;font-weight:600;color:#f1f5f9;margin-bottom:6px">
-          Módulo do calendário não carregado
-        </div>
-        <div style="font-size:12px;color:#64748b">
-          Verifique se calendario.js está incluído na página.<br>
-          Consulte o console para detalhes.
-        </div>
-      </div>`;
-    return;
+  if (container && typeof window.renderizarCalendario === 'function') {
+    window.renderizarCalendario(container);
   }
-
-  // ── Monta acesso e edicao ────────────────────────────────────────────────────
-  // window._radarUser.features vem do Firestore — precisa ter { calendario: true }
-  // para o usuário ter acesso. Sem isso, renderizarCalendario exibe o upgrade prompt.
-  const acesso = window._radarUser || {};
-  const edicao = {};
-
-  window.renderizarCalendario(container, { acesso, edicao });
 }
 
 // ─── Inicializar drawer ──────────────────────────────────────────────────────
@@ -2850,7 +2841,7 @@ async function iniciarDrawer(newsletter) {
   window.addEventListener('rs:abrirEdicoes', abrirDrawer);
 
   window.addEventListener('rs:abrirCalendario', _abrirCalendario);
-
+  
   // 🔒 Guard de sessão no botão Sentinela (intercepta antes dos handlers do menu)
   document.getElementById('rs-alertas-btn')?.addEventListener('click', async function (e) {
     if (this.dataset.sessaoOk === '1') { this.dataset.sessaoOk = '0'; return; }
