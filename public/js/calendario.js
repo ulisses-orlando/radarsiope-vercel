@@ -140,7 +140,7 @@ const _cal = {
 const _CAL_SIS = {
   fundeb: { label: 'FUNDEB', cor: '#38bdf8', bg: 'rgba(56,189,248,0.12)' },
   siope: { label: 'SIOPE', cor: '#34d399', bg: 'rgba(52,211,153,0.12)' },
-  salario_educacao: { label: 'Salário-Ed.', cor: '#fb923c', bg: 'rgba(251,146,60,0.12)' },
+  salario_educacao: { label: 'Salário-Educação', cor: '#fb923c', bg: 'rgba(251,146,60,0.12)' },
   siscacs: { label: 'SISCACS', cor: '#a78bfa', bg: 'rgba(167,139,250,0.12)' },
 };
 const _CAL_TIPOS = {
@@ -286,8 +286,7 @@ function _calShellHTML() {
 
       <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px">
         <div>
-          <div style="font-size:10px;color:#475569;font-weight:700;text-transform:uppercase;letter-spacing:.1em;margin-bottom:3px">Central</div>
-          <div style="font-size:21px;font-weight:700;letter-spacing:-.02em;color:var(--rs-text,#f1f5f9)">Calendário</div>
+          <div style="font-size:21px;font-weight:700;letter-spacing:-.02em;color:var(--rs-text,#f1f5f9)">Calendário de eventos e repasses de recursos</div>
         </div>
         </div>
 
@@ -682,7 +681,7 @@ window._calAbrirSheet = function (id) {
     rep.vl_vaaf && ['VAAF', rep.vl_vaaf],
     rep.vl_vaat && ['VAAT', rep.vl_vaat],
     rep.vl_vaar && ['VAAR', rep.vl_vaar],
-    rep.vl_sal_educ && ['Salário-Ed.', rep.vl_sal_educ],
+    rep.vl_sal_educ && ['Salário-Educação', rep.vl_sal_educ],
   ].filter(Boolean) : [];
 
   // status do repasse vem do _cal.repasses, não do evento
