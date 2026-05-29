@@ -62,16 +62,16 @@ async function renderCalendarioAdmin(container) {
 // ─── Shell ────────────────────────────────────────────────────────────────────
 function _cadShellHTML() {
   return `
-  <div id="cad-root" style="font-family:'DM Sans',sans-serif;color:#f1f5f9;padding:20px;">
+  <div id="cad-root" style="font-family:'DM Sans',sans-serif;color:#f1f5f9;padding:0 0 80px;">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
       <div>
         <div style="font-size:11px;color:#475569;font-weight:700;text-transform:uppercase;letter-spacing:.1em;margin-bottom:3px;">Central · Admin</div>
-        <div style="font-size:22px;font-weight:700;letter-spacing:-.02em;color:#0f172a;">Calendário</div>
+        <div style="font-size:22px;font-weight:700;letter-spacing:-.02em;">Calendário</div>
       </div>
-      <button id="cad-btn-novo" style="${_cadBtnStyle('#0A3D62')}">+ Novo evento</button>
+      <button id="cad-btn-novo" style="${_cadBtnStyle('#38bdf8')}">+ Novo evento</button>
     </div>
     
-    <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:20px;background:#fff;padding:12px;border-radius:8px;border:1px solid #e2e8f0;">
+    <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:20px;">
        <select id="cad-f-sistema" style="${_cadSelectStyle()}">
          <option value="">Todos os sistemas</option>
          ${Object.entries(_CAL_ADM_SIS).map(([v,l]) => `<option value="${v}">${l}</option>`).join('')}
@@ -84,19 +84,20 @@ function _cadShellHTML() {
          <option value="">Todos os status</option>
          ${Object.entries(_CAL_ADM_STA).map(([v,l]) => `<option value="${v}">${l}</option>`).join('')}
        </select>
-       <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#475569;cursor:pointer;padding:5px 10px;background:#f8fafc;border-radius:6px;">
-         <input type="checkbox" id="cad-f-inativos" style="accent-color:#0A3D62"> Ver inativos
+       <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#94a3b8;cursor:pointer;">
+         <input type="checkbox" id="cad-f-inativos" style="accent-color:#38bdf8;"> Ver inativos
        </label>
      </div>
 
-    <div id="cad-loading" style="display:none;text-align:center;padding:40px;color:#475569;font-size:13px">Carregando...</div>
+    <div id="cad-loading" style="display:none;text-align:center;padding:40px;color:#475569;font-size:13px;">Carregando...</div>
     <div id="cad-lista"></div>
 
-    <!-- Painel lateral (evento + repasses) -->
-    <div id="cad-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9998;backdrop-filter:blur(2px);"></div>
+    <!-- Painel lateral -->
+    <div id="cad-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:200;backdrop-filter:blur(4px);"></div>
     
-    <div id="cad-painel" style="display:none;position:fixed;top:0;right:0;width:450px;height:100vh;background:#fff;z-index:9999;overflow-y:auto;box-shadow:-4px 0 24px rgba(0,0,0,0.15);padding:0;">
-      <div id="cad-painel-conteudo" style="padding:24px;"></div>
+    <!-- ✅ Fundo branco e padding zero para o conteúdo cuidar do layout -->
+    <div id="cad-painel" style="display:none;position:fixed;top:0;right:0;width:min(520px,100vw);height:100vh;background:#ffffff;z-index:201;overflow-y:auto;box-shadow:-4px 0 24px rgba(0,0,0,.4);padding:0;">
+      <div id="cad-painel-conteudo" style="padding:0;"></div>
     </div>
 
     <div id="cad-toast" style="display:none;position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#1e293b;border:1px solid #334155;color:#f1f5f9;padding:10px 20px;border-radius:12px;font-size:13px;font-weight:600;z-index:300;white-space:nowrap;"></div>
@@ -179,86 +180,83 @@ function _cadHtmlForm(ev) {
   const v = ev || {};
   const avs = v.avisos_antecipados || [];
   const sel = (val, opt) => val === opt ? 'selected' : '';
-  
-  // Estilos isolados para garantir prioridade absoluta
-  const C = 'display:block !important; width:100% !important; max-width:100% !important; box-sizing:border-box !important; font-family:inherit !important;';
-  const R = 'display:block !important; width:100% !important; margin-bottom:16px !important; box-sizing:border-box !important;';
-  const L = 'display:block !important; width:100% !important; font-size:11px !important; font-weight:700 !important; color:#475569 !important; text-transform:uppercase !important; letter-spacing:.08em !important; margin-bottom:6px !important;';
-  const I = 'display:block !important; width:100% !important; background:#0f172a !important; border:1px solid #334155 !important; border-radius:8px !important; padding:10px 12px !important; color:#f1f5f9 !important; font-size:13px !important; font-family:inherit !important; outline:none !important; box-sizing:border-box !important; appearance:none !important;';
-  const G = 'display:grid !important; grid-template-columns:1fr 1fr !important; gap:12px !important; margin-bottom:16px !important; width:100% !important;';
+
+  // 🔒 Reset total de heranças CSS do admin.html
+  const wrapStyle = "all:initial;font-family:system-ui,-apple-system,sans-serif;color:#1e293b;background:#ffffff;padding:24px;box-sizing:border-box;display:block;width:100%;";
+  const rowStyle = "display:block!important;margin-bottom:16px;width:100%!important;box-sizing:border-box!important;";
+  const labelStyle = "display:block!important;font-size:12px!important;font-weight:600!important;color:#334155!important;margin-bottom:6px!important;text-transform:none!important;letter-spacing:normal!important;";
+  const inputStyle = "display:block!important;width:100%!important;background:#f8fafc!important;border:1px solid #cbd5e1!important;border-radius:8px!important;padding:10px 12px!important;color:#0f172a!important;font-size:14px!important;font-family:inherit!important;outline:none!important;box-sizing:border-box!important;appearance:none!important;line-height:1.5!important;";
 
   return `
-    <div style="${C} all:initial; font-family:sans-serif; color:#f1f5f9; padding:4px;">
-      
-      <div style="display:flex !important; justify-content:space-between !important; align-items:center !important; margin-bottom:24px !important; border-bottom:1px solid #334155 !important; padding-bottom:16px !important;">
-        <div style="font-size:17px !important; font-weight:700 !important; color:#f1f5f9 !important;">${ev ? 'Editar evento' : 'Novo evento'}</div>
-        <button onclick="window._cadFecharPainel()" style="background:none !important; border:none !important; color:#94a3b8 !important; font-size:20px !important; cursor:pointer !important; padding:0 !important;">✕</button>
+    <div style="${wrapStyle}">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;border-bottom:1px solid #e2e8f0;padding-bottom:16px;">
+        <div style="font-size:18px;font-weight:700;color:#0f172a;">${ev ? 'Editar evento' : 'Novo evento'}</div>
+        <button onclick="window._cadFecharPainel()" style="background:none;border:none;color:#64748b;font-size:24px;cursor:pointer;padding:0;line-height:1;">&times;</button>
       </div>
 
-      <div style="${C}">
-        
-        <div style="${R}">
-          <label style="${L}">Sistema</label>
-          <select id="cf-sistema" style="${I}">
-            ${Object.entries(_CAL_ADM_SIS).map(([val,lbl]) => `<option value="${val}" ${sel(v.sistema,val)}>${lbl}</option>`).join('')}
-          </select>
-        </div>
-
-        <div style="${R}">
-          <label style="${L}">Tipo</label>
-          <select id="cf-tipo" style="${I}">
-            ${Object.entries(_CAL_ADM_TIP).map(([val,lbl]) => `<option value="${val}" ${sel(v.tipo,val)}>${lbl}</option>`).join('')}
-          </select>
-        </div>
-
-        <div style="${R}">
-          <label style="${L}">Título</label>
-          <input id="cf-titulo" type="text" value="${v.titulo||''}" style="${I}" placeholder="Ex: Repasse FUNDEB – Jun/2026">
-        </div>
-
-        <div style="${R}">
-          <label style="${L}">Descrição <span style="font-weight:400 !important; text-transform:none !important; font-size:10px !important; color:#94a3b8 !important;">(opcional)</span></label>
-          <textarea id="cf-descricao" rows="3" style="${I}; resize:vertical !important;">${v.descricao||''}</textarea>
-        </div>
-
-        <div style="${G}">
-          <div style="${R}; margin-bottom:0 !important;">
-            <label style="${L}">Data</label>
-            <input id="cf-data" type="date" value="${v.data||''}" style="${I}">
-          </div>
-          <div style="${R}; margin-bottom:0 !important;">
-            <label style="${L}">Status</label>
-            <select id="cf-status" style="${I}">
-              ${Object.entries(_CAL_ADM_STA).map(([val,lbl]) => `<option value="${val}" ${sel(v.status||'previsto',val)}>${lbl}</option>`).join('')}
-            </select>
-          </div>
-        </div>
-
-        <div style="${R}">
-          <label style="${L}">Avisos antecipados (dias antes)</label>
-          <div style="display:flex !important; gap:8px !important; flex-wrap:wrap !important; margin-top:8px !important;">
-            ${_CAL_ADM_AVISOS.map(d => `
-              <label style="display:inline-flex !important; align-items:center !important; gap:6px !important; font-size:12px !important; color:#94a3b8 !important; cursor:pointer !important; background:#1e293b !important; padding:6px 10px !important; border-radius:6px !important; border:1px solid #334155 !important; margin-bottom:0 !important;">
-                <input type="checkbox" class="cf-aviso" value="${d}" ${avs.includes(d)?'checked':''} style="accent-color:#38bdf8 !important; width:14px !important; height:14px !important; margin:0 !important;"> ${d}d
-              </label>`).join('')}
-          </div>
-        </div>
-
-        <div style="display:flex !important; gap:20px !important; margin-bottom:24px !important; align-items:center !important;">
-          <label style="display:inline-flex !important; align-items:center !important; gap:8px !important; font-size:13px !important; color:#94a3b8 !important; cursor:pointer !important; margin-bottom:0 !important;">
-            <input type="checkbox" id="cf-free" ${v.visivel_free?'checked':''} style="accent-color:#fbbf24 !important; width:16px !important; height:16px !important; margin:0 !important;"> Visível no plano free
-          </label>
-          ${ev ? `
-          <label style="display:inline-flex !important; align-items:center !important; gap:8px !important; font-size:13px !important; color:#94a3b8 !important; cursor:pointer !important; margin-bottom:0 !important;">
-            <input type="checkbox" id="cf-ativo" ${v.ativo?'checked':''} style="accent-color:#34d399 !important; width:16px !important; height:16px !important; margin:0 !important;"> Ativo
-          </label>` : ''}
-        </div>
-
-        <button id="cf-salvar" style="display:block !important; width:100% !important; background:#38bdf8 !important; color:#0f172a !important; border:none !important; border-radius:8px !important; padding:12px !important; font-size:14px !important; font-weight:700 !important; cursor:pointer !important; font-family:inherit !important; margin-top:8px !important;">
-          ${ev ? '💾 Salvar alterações' : '➕ Criar evento'}
-        </button>
-
+      <div style="${rowStyle}">
+        <label style="${labelStyle}">Sistema</label>
+        <select id="cf-sistema" style="${inputStyle}">
+          ${Object.entries(_CAL_ADM_SIS).map(([val,lbl]) => `<option value="${val}" ${sel(v.sistema,val)}>${lbl}</option>`).join('')}
+        </select>
       </div>
+
+      <div style="${rowStyle}">
+        <label style="${labelStyle}">Tipo</label>
+        <select id="cf-tipo" style="${inputStyle}">
+          ${Object.entries(_CAL_ADM_TIP).map(([val,lbl]) => `<option value="${val}" ${sel(v.tipo,val)}>${lbl}</option>`).join('')}
+        </select>
+      </div>
+
+      <div style="${rowStyle}">
+        <label style="${labelStyle}">Título</label>
+        <input id="cf-titulo" type="text" value="${v.titulo||''}" style="${inputStyle}" placeholder="Ex: Repasse FUNDEB – Jun/2026">
+      </div>
+
+      <div style="${rowStyle}">
+        <label style="${labelStyle}">Descrição <span style="font-weight:400;font-size:11px;color:#64748b">(opcional)</span></label>
+        <textarea id="cf-descricao" rows="3" style="${inputStyle};resize:vertical;font-family:inherit;">${v.descricao||''}</textarea>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;">
+        <div style="${rowStyle};margin-bottom:0!important;">
+          <label style="${labelStyle}">Data</label>
+          <input id="cf-data" type="date" value="${v.data||''}" style="${inputStyle}">
+        </div>
+        <div style="${rowStyle};margin-bottom:0!important;">
+          <label style="${labelStyle}">Status</label>
+          <select id="cf-status" style="${inputStyle}">
+            ${Object.entries(_CAL_ADM_STA).map(([val,lbl]) => `<option value="${val}" ${sel(v.status||'previsto',val)}>${lbl}</option>`).join('')}
+          </select>
+        </div>
+      </div>
+
+      <div style="${rowStyle}">
+        <label style="${labelStyle}">Avisos antecipados (dias antes)</label>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;">
+          ${_CAL_ADM_AVISOS.map(d => `
+            <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:#475569;cursor:pointer;background:#f1f5f9;padding:6px 10px;border-radius:6px;border:1px solid #e2e8f0;">
+              <input type="checkbox" class="cf-aviso" value="${d}" ${avs.includes(d)?'checked':''} style="accent-color:#0A3D62;margin:0;width:15px;height:15px;">
+              ${d} dias
+            </label>`).join('')}
+        </div>
+      </div>
+
+      <div style="display:flex;gap:16px;margin-bottom:20px;align-items:center;">
+        <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:#475569;cursor:pointer;">
+          <input type="checkbox" id="cf-free" ${v.visivel_free?'checked':''} style="accent-color:#f59e0b;width:16px;height:16px;margin:0;">
+          Visível no plano free
+        </label>
+        ${ev ? `
+        <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:#475569;cursor:pointer;">
+          <input type="checkbox" id="cf-ativo" ${v.ativo?'checked':''} style="accent-color:#10b981;width:16px;height:16px;margin:0;">
+          Ativo
+        </label>` : ''}
+      </div>
+
+      <button id="cf-salvar" style="display:block;width:100%;background:#0A3D62;color:#fff;border:none;border-radius:8px;padding:12px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;margin-top:8px;transition:background 0.2s;">
+        ${ev ? '💾 Salvar alterações' : '➕ Criar evento'}
+      </button>
     </div>
   `;
 }
