@@ -1620,11 +1620,8 @@ function _fecharSheetSessao() {
 }
 
 function _abrirEmailAcesso(e) {
-  e.preventDefault();
-  // Tenta abrir o cliente de e-mail na caixa de entrada (sem compor e-mail novo)
-  // Fallback útil: abre a aba de e-mail para o usuário encontrar o link do Radar
+  if (e && typeof e.preventDefault === 'function') e.preventDefault();
   window.open('https://mail.google.com', '_blank');
-  // Para outros clientes, deixa o mailto como href padrão
 }
 
 window._fecharSheetSessao = _fecharSheetSessao;
@@ -1656,7 +1653,14 @@ async function _validarSessaoBackground(sessao) {
     }
 
     // Atualiza dados da sessão (plano/features)
-    const sessaoAtualizada = { ...sessao, validado_em: Date.now(), ...(data.plano_slug && { plano_slug: data.plano_slug }), ...(data.features && { features: data.features }) };
+    const sessaoAtualizada = {
+      ...sessao,
+      validado_em: Date.now(),
+      ...(data.plano_slug && { plano_slug: data.plano_slug }),
+      ...(data.features && { features: data.features }),
+      ...(data.municipios_plano && { municipios_plano: data.municipios_plano }),
+    };
+
     localStorage.setItem('rs_pwa_session', JSON.stringify(sessaoAtualizada));
   } catch (e) {
     console.warn('[verNL] Validação background offline:', e.message);
@@ -2225,8 +2229,21 @@ async function VerNewsletterComToken() {
             }
           }
         } else {
-          // Sessão existente com session_id — valida em background (a cada 24h)
+          // Sessão existente: dispara validação em background para atualizar features
           _validarSessaoBackground(_sessaoAtual);
+
+          // Garante que sessão ainda é válida antes de renderizar (bloqueante)
+          if (_sessaoAtual.session_id) {
+            try { sessionStorage.setItem('rs_tab_session_id', _sessaoAtual.session_id); } catch (e) { }
+          }
+          if (!(await _checarSessaoCritica())) {
+            const _msg = _sessaoAtual.status === 'cancelado'
+              ? 'Sua assinatura foi cancelada.'
+              : 'Sua sessão expirou. Acesse novamente pelo link enviado por e-mail.';
+            mostrarErro('<strong>Acesso encerrado.</strong>', _msg);
+            localStorage.removeItem('rs_pwa_session');
+            return;
+          }
         }
       } catch (e) {
         console.warn('[verNL] Erro no bootstrap de sessão (não fatal):', e.message);
@@ -2707,9 +2724,9 @@ function _getCtx() {
 
 function _abrirCalendario() {
   // Verificação de acesso — mesmo padrão de temRelatorio / temChat
-  const features  = window._radarUser?.features || {};
+  const features = window._radarUser?.features || {};
   const temAcesso = !!features.calendario          // assinante com feature ativa
-                 || (window._leadAcessoProTemp === true); // lead com acesso pro temp
+    || (window._leadAcessoProTemp === true); // lead com acesso pro temp
   if (!temAcesso) {
     _solicitarUpgrade('calendario', isAssinante);
     return;
