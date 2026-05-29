@@ -2707,13 +2707,9 @@ function _getCtx() {
 
 function _abrirCalendario() {
   // Verificação de acesso — mesmo padrão de temRelatorio / temChat
-  const isAssinante = !!window._radarUser?.isAssinante;
-  const features = window._radarUser?.features || {};
-  const temAcesso = isAssinante
-    ? !!features.calendario
-    : (window._leadAcessoProTemp === true);
-console.log('[drawer] Acesso ao calendário:', { isAssinante, temAcesso, features, leadProTemp: window._leadAcessoProTemp });
-console.log('temCalendario:', temCalendario);
+  const features  = window._radarUser?.features || {};
+  const temAcesso = !!features.calendario          // assinante com feature ativa
+                 || (window._leadAcessoProTemp === true); // lead com acesso pro temp
   if (!temAcesso) {
     _solicitarUpgrade('calendario', isAssinante);
     return;
