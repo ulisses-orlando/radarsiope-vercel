@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
+
 <head>
   <meta charset="UTF-8" />
   <title>Assinatura – Radar SIOPE</title>
@@ -8,7 +9,9 @@
   <meta name="theme-color" content="#0f172a" />
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Space+Grotesk:wght@400;500;600;700&display=swap"
+    rel="stylesheet">
   <style>
     :root {
       --primary: #0f172a;
@@ -27,13 +30,17 @@
       --surface-card: #162032;
       --border: rgba(148, 163, 184, 0.1);
       --gradient-accent: linear-gradient(135deg, #3b82f6 0%, #06b6d4 100%);
-      --shadow-sm: 0 1px 2px rgba(0,0,0,0.3);
-      --shadow-md: 0 4px 6px -1px rgba(0,0,0,0.4);
-      --shadow-lg: 0 10px 15px -3px rgba(0,0,0,0.5);
+      --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+      --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.4);
+      --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.5);
       --shadow-glow: 0 0 40px rgba(59, 130, 246, 0.15);
     }
 
-    * { margin: 0; padding: 0; box-sizing: border-box; }
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
 
     body {
       font-family: 'Inter', system-ui, -apple-system, sans-serif;
@@ -45,9 +52,18 @@
     }
 
     /* Scrollbar */
-    ::-webkit-scrollbar { width: 8px; }
-    ::-webkit-scrollbar-track { background: var(--primary); }
-    ::-webkit-scrollbar-thumb { background: var(--accent); border-radius: 4px; }
+    ::-webkit-scrollbar {
+      width: 8px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: var(--primary);
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: var(--accent);
+      border-radius: 4px;
+    }
 
     /* ── Container ── */
     .rs-container {
@@ -94,7 +110,9 @@
       color: var(--text);
     }
 
-    .rs-logo-text span { color: var(--accent); }
+    .rs-logo-text span {
+      color: var(--accent);
+    }
 
     .rs-nav-back {
       color: var(--text-muted);
@@ -107,7 +125,9 @@
       gap: 0.5rem;
     }
 
-    .rs-nav-back:hover { color: var(--accent); }
+    .rs-nav-back:hover {
+      color: var(--accent);
+    }
 
     /* ── Cabeçalho ── */
     .rs-header {
@@ -154,7 +174,10 @@
       color: var(--text-dim);
     }
 
-    .rs-progress-step.active { color: var(--accent); font-weight: 600; }
+    .rs-progress-step.active {
+      color: var(--accent);
+      font-weight: 600;
+    }
 
     .rs-progress-step .dot {
       width: 24px;
@@ -192,7 +215,9 @@
       transition: border-color 0.3s;
     }
 
-    .rs-section:hover { border-color: rgba(59, 130, 246, 0.2); }
+    .rs-section:hover {
+      border-color: rgba(59, 130, 246, 0.2);
+    }
 
     /* Garantir que seções não cortem dropdowns flutuantes */
     .rs-section {
@@ -221,7 +246,9 @@
     }
 
     /* ── Campos ── */
-    .rs-field { margin-bottom: 18px; }
+    .rs-field {
+      margin-bottom: 18px;
+    }
 
     .rs-field label {
       display: block;
@@ -249,7 +276,9 @@
     }
 
     .rs-field input::placeholder,
-    .rs-field textarea::placeholder { color: var(--text-dim); }
+    .rs-field textarea::placeholder {
+      color: var(--text-dim);
+    }
 
     .rs-field input:focus,
     .rs-field select:focus,
@@ -258,7 +287,10 @@
       box-shadow: 0 0 0 3px var(--accent-glow);
     }
 
-    .rs-field textarea { resize: vertical; min-height: 80px; }
+    .rs-field textarea {
+      resize: vertical;
+      min-height: 80px;
+    }
 
     .rs-field .field-error {
       display: none;
@@ -268,7 +300,9 @@
       font-weight: 500;
     }
 
-    .rs-field .field-error.visible { display: block; }
+    .rs-field .field-error.visible {
+      display: block;
+    }
 
     /* ── Grid 2 colunas ── */
     .rs-grid-2 {
@@ -278,8 +312,14 @@
     }
 
     @media (max-width: 560px) {
-      .rs-grid-2 { grid-template-columns: 1fr; }
-      .rs-nav { flex-direction: column; gap: 16px; }
+      .rs-grid-2 {
+        grid-template-columns: 1fr;
+      }
+
+      .rs-nav {
+        flex-direction: column;
+        gap: 16px;
+      }
     }
 
     /* ── Cards de plano ── */
@@ -290,7 +330,9 @@
     }
 
     @media (min-width: 600px) {
-      #planos-cards { grid-template-columns: 1fr 1fr; }
+      #planos-cards {
+        grid-template-columns: 1fr 1fr;
+      }
     }
 
     .plano-card {
@@ -405,7 +447,9 @@
       border-color: rgba(124, 58, 237, 0.3) !important;
     }
 
-    .plano-content--bloqueado { opacity: 0.7; }
+    .plano-content--bloqueado {
+      opacity: 0.7;
+    }
 
     .plano-em-breve-aviso {
       margin-top: 12px;
@@ -445,7 +489,9 @@
       margin-bottom: 4px;
     }
 
-    .plano-preco-wrap { margin: 10px 0; }
+    .plano-preco-wrap {
+      margin: 10px 0;
+    }
 
     .plano-preco-valor {
       font-family: 'Space Grotesk', sans-serif;
@@ -515,15 +561,25 @@
       transition: color 0.2s;
     }
 
-    .btn-ver-mais-features:hover { color: var(--accent-secondary); text-decoration: underline; }
+    .btn-ver-mais-features:hover {
+      color: var(--accent-secondary);
+      text-decoration: underline;
+    }
 
     .features-expanded {
       animation: fadeIn 0.25s ease-out;
     }
 
     @keyframes fadeIn {
-      from { opacity: 0; transform: translateY(-4px); }
-      to { opacity: 1; transform: translateY(0); }
+      from {
+        opacity: 0;
+        transform: translateY(-4px);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
     }
 
     /* ── Tabs de ciclo ── */
@@ -605,7 +661,9 @@
       align-items: center;
     }
 
-    .rs-cupom-row input { flex: 1; }
+    .rs-cupom-row input {
+      flex: 1;
+    }
 
     .rs-cupom-row button {
       padding: 12px 20px;
@@ -659,7 +717,9 @@
       font-family: 'Space Grotesk', sans-serif;
     }
 
-    .preview-row.desconto { color: var(--success); }
+    .preview-row.desconto {
+      color: var(--success);
+    }
 
     /* ── Termos ── */
     .rs-termos {
@@ -694,7 +754,9 @@
       font-weight: 600;
     }
 
-    .rs-termos a:hover { text-decoration: underline; }
+    .rs-termos a:hover {
+      text-decoration: underline;
+    }
 
     /* ── Botão submeter ── */
     #btn-assinar {
@@ -800,10 +862,14 @@
       border-top: 1px solid var(--border);
     }
 
-    .rs-seguranca span { margin: 0 8px; }
+    .rs-seguranca span {
+      margin: 0 8px;
+    }
 
     /* ── Municipios extra ── */
-    #container-municipios-extra { margin-top: 16px; }
+    #container-municipios-extra {
+      margin-top: 16px;
+    }
 
     #container-municipios-extra label {
       font-size: 0.8125rem;
@@ -834,7 +900,9 @@
       transition: border-color 0.2s;
     }
 
-    #municipios-trigger:hover { border-color: var(--accent); }
+    #municipios-trigger:hover {
+      border-color: var(--accent);
+    }
 
     #municipios-panel {
       display: none;
@@ -864,14 +932,16 @@
       font-family: inherit;
     }
 
-    #municipios-busca::placeholder { color: var(--text-dim); }
+    #municipios-busca::placeholder {
+      color: var(--text-dim);
+    }
 
     #municipios-lista {
       overflow-y: auto;
       max-height: 200px;
     }
 
-    #municipios-lista > div {
+    #municipios-lista>div {
       display: flex;
       align-items: center;
       gap: 10px;
@@ -881,7 +951,9 @@
       transition: background 0.15s;
     }
 
-    #municipios-lista > div:hover { background: rgba(59, 130, 246, 0.08); }
+    #municipios-lista>div:hover {
+      background: rgba(59, 130, 246, 0.08);
+    }
 
     #municipios-limit-info {
       font-size: 0.75rem;
@@ -909,8 +981,13 @@
     }
 
     @keyframes spin {
-      from { transform: rotate(0deg); }
-      to { transform: rotate(360deg); }
+      from {
+        transform: rotate(0deg);
+      }
+
+      to {
+        transform: rotate(360deg);
+      }
     }
 
     /* ── Animações de entrada ── */
@@ -921,14 +998,25 @@
     }
 
     @keyframes slideUp {
-      to { opacity: 1; transform: translateY(0); }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
     }
 
-    .delay-1 { animation-delay: 0.1s; }
-    .delay-2 { animation-delay: 0.2s; }
-    .delay-3 { animation-delay: 0.3s; }
-  
-    
+    .delay-1 {
+      animation-delay: 0.1s;
+    }
+
+    .delay-2 {
+      animation-delay: 0.2s;
+    }
+
+    .delay-3 {
+      animation-delay: 0.3s;
+    }
+
+
     /* ═══════════════════════════════════════════════════════════════
        OVERRIDE: Correções de tema dark para elementos renderizados
        dinamicamente pelo assinatura.js (não modificar o JS)
@@ -1058,7 +1146,7 @@
       max-height: 240px !important;
     }
 
-    #municipios-lista > div {
+    #municipios-lista>div {
       background: transparent !important;
       border-bottom: 1px solid var(--border) !important;
       color: var(--text) !important;
@@ -1066,7 +1154,7 @@
       cursor: pointer !important;
     }
 
-    #municipios-lista > div:hover {
+    #municipios-lista>div:hover {
       background: rgba(59, 130, 246, 0.1) !important;
     }
 
@@ -1110,7 +1198,7 @@
     }
 
     #secao-newsletters,
-    #secao-newsletters ~ .rs-section {
+    #secao-newsletters~.rs-section {
       z-index: 1;
     }
 
@@ -1122,8 +1210,8 @@
     }
 
     /* ── Loading de planos ── */
-    #planos-cards > .rs-loading,
-    #planos-cards > div:first-child {
+    #planos-cards>.rs-loading,
+    #planos-cards>div:first-child {
       color: var(--text-muted) !important;
     }
 
@@ -1152,7 +1240,7 @@
       color: var(--success) !important;
     }
 
-    
+
     /* ── Correção de z-index: dropdown acima de TODAS as seções ── */
     #municipios-dropdown-wrap {
       position: relative;
@@ -1188,7 +1276,7 @@
 
     /* Forçar todas as seções subsequentes a ficarem abaixo */
     #secao-newsletters,
-    #secao-newsletters ~ .rs-section {
+    #secao-newsletters~.rs-section {
       position: relative;
       z-index: 1;
     }
@@ -1205,7 +1293,7 @@
       visibility: visible !important;
     }
 
-    #municipios-lista > div {
+    #municipios-lista>div {
       display: flex !important;
       align-items: center !important;
       gap: 10px !important;
@@ -1214,12 +1302,12 @@
       min-height: 40px !important;
     }
 
-    #municipios-lista > div span {
+    #municipios-lista>div span {
       color: var(--text) !important;
       font-size: 0.875rem !important;
     }
 
-    #municipios-lista > div span span {
+    #municipios-lista>div span span {
       color: var(--text-dim) !important;
       font-size: 0.75rem !important;
     }
@@ -1248,7 +1336,8 @@
       padding: 4px 0 !important;
       cursor: pointer !important;
     }
-/* ── Avisos de plano em breve/sob consulta ── */
+
+    /* ── Avisos de plano em breve/sob consulta ── */
     .plano-em-breve-aviso {
       background: rgba(245, 158, 11, 0.1) !important;
       border-color: rgba(245, 158, 11, 0.2) !important;
@@ -1258,8 +1347,35 @@
     .plano-sob-consulta-aviso {
       color: #a78bfa !important;
     }
-</style>
-<base target="_blank">
+
+    /* 1. A seção de dados (que contém o dropdown) fica no topo */
+    #form-assinatura>.rs-section:nth-of-type(2) {
+      position: relative;
+      z-index: 100;
+    }
+
+    /* 2. Todas as seções APÓS a seção de dados ficam abaixo */
+    #form-assinatura>.rs-section:nth-of-type(n+3) {
+      position: relative;
+      z-index: 1;
+    }
+
+    /* 3. O wrap do dropdown NÃO cria contexto de empilhamento (deixa o filho escapar) */
+    #municipios-dropdown-wrap {
+      position: relative !important;
+      z-index: auto !important;
+    }
+
+    /* 4. O painel flutuante fica no topo absoluto dentro da seção de dados */
+    #municipios-panel {
+      position: absolute !important;
+      z-index: 9999 !important;
+      /* Aumentar espaço visual */
+      top: calc(100% + 8px) !important;
+      max-height: 300px !important;
+    }
+  </style>
+  <base target="_blank">
 </head>
 
 <body>
@@ -1349,7 +1465,8 @@
               <input type="checkbox" id="whatsapp-optin" checked />
               <label for="whatsapp-optin">
                 Autorizo o Radar SIOPE a enviar alertas e comunicados para este número
-                <span class="wa-detalhe">Você pode revogar este consentimento a qualquer momento pelo canal de suporte.</span>
+                <span class="wa-detalhe">Você pode revogar este consentimento a qualquer momento pelo canal de
+                  suporte.</span>
               </label>
             </div>
           </div>
@@ -1416,7 +1533,8 @@
         <div class="rs-termos">
           <label>
             <input type="checkbox" id="aceita-termos" />
-            <span>Li e concordo com os <a href="termos.html" target="_blank">Termos de Assinatura</a> do Radar SIOPE.</span>
+            <span>Li e concordo com os <a href="termos.html" target="_blank">Termos de Assinatura</a> do Radar
+              SIOPE.</span>
           </label>
           <span id="error-aceita_termos" class="field-error"></span>
         </div>
@@ -1458,12 +1576,12 @@
   <script src="js/assinatura.js"></script>
 
 
-    <!-- ═══════════════════════════════════════════════════════════════
+  <!-- ═══════════════════════════════════════════════════════════════
          SCRIPT: Reposicionamento do dropdown de municípios
          Garante que o painel flutue acima de todas as seções
          ═══════════════════════════════════════════════════════════════ -->
-    <script>
-    (function() {
+  <script>
+    (function () {
       'use strict';
 
       function fixMunicipiosDropdown() {
@@ -1525,6 +1643,7 @@
       // Timeout de segurança
       setTimeout(() => clearInterval(checkInterval), 10000);
     })();
-    </script>
+  </script>
 </body>
+
 </html>
