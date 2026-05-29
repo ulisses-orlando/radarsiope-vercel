@@ -218,25 +218,6 @@ async function renderizarCalendario(container, { acesso = {}, edicao = {} } = {}
     || window._radarUser?.municipio_cod
     || null;
 
-  // Verificação de acesso — mesmo padrão de outras features
-  const temAcesso = edicao?.features?.calendario || acesso?.features?.calendario;
-  if (!temAcesso) {
-    _solicitarUpgrade('calendario', acesso?.isAssinante);
-    container.innerHTML = `
-      <div style="text-align:center;padding:60px 20px;color:#475569">
-        <div style="font-size:40px;margin-bottom:12px">📅</div>
-        <div style="font-size:15px;font-weight:600;color:#64748b;margin-bottom:8px">Calendário de Datas Importantes e Repasses de Recursos do Fundeb e Salário-Educação</div>
-        <div style="font-size:13px;color:#475569">Disponível nos planos Essence e superiores</div>
-      </div>`;
-    // Expõe atualização para o seletor de município
-    window._calAtualizarMunicipio = async (codMunicipio) => {
-      _cal.codMunicipio = codMunicipio;
-      _cal.mesExp = null;
-      await _calCarregar();
-    };
-    return;
-  }
-
   container.innerHTML = _calShellHTML();
 
   // Expõe para o seletor de município — mesmo para quem tem acesso
