@@ -158,7 +158,7 @@ async function configurarUIMunicipiosExtra() {
       return;
     }
 
-    const principal = String(document.getElementById('municipio')?.value || '').trim() || null;
+    const principal = cod6(document.getElementById('municipio')?.value || '') || null;
 
     // ── Exibe município principal como item fixo pré-marcado ─────────────────
     const principalEl = document.getElementById('municipios-principal');
