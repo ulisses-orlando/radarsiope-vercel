@@ -52,6 +52,14 @@ async function configurarUIMunicipiosExtra() {
     <div id="municipios-aviso" style="font-size:12px;color:#64748b;margin-bottom:8px;">
       Selecione seu estado acima para liberar a escolha.
     </div>
+    <div id="municipios-principal" style="display:none;align-items:center;gap:10px;
+      padding:8px 12px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:6px;
+      margin-bottom:6px;font-size:13px;color:#1e293b;font-family:inherit;">
+      <input type="checkbox" checked disabled
+        style="width:15px;height:15px;flex-shrink:0;accent-color:#0A3D62;cursor:default;pointer-events:none;">
+      <span id="municipios-principal-nome" style="line-height:1.4;"></span>
+      <span style="font-size:11px;color:#0A3D62;margin-left:auto;white-space:nowrap;">Município do assinante</span>
+    </div>
     <div id="municipios-dropdown-wrap" style="position:relative;width:100%;">
       <button type="button" id="municipios-trigger" ...>
         <span id="municipios-trigger-label">Nenhum município adicional selecionado</span>
@@ -151,6 +159,23 @@ async function configurarUIMunicipiosExtra() {
     }
 
     const principal = String(document.getElementById('municipio')?.value || '').trim() || null;
+
+    // ── Exibe município principal como item fixo pré-marcado ─────────────────
+    const principalEl = document.getElementById('municipios-principal');
+    const principalNomeEl = document.getElementById('municipios-principal-nome');
+    if (principalEl && principalNomeEl) {
+      const munPrincipal = principal ? _municipiosDisponiveis.find(m => m.cod_municipio === principal) : null;
+      if (munPrincipal) {
+        principalNomeEl.innerHTML = `${munPrincipal.nome} <span style="font-size:11px;color:#64748b;">— ${munPrincipal.uf}</span>`;
+        principalEl.style.display = 'flex';
+      } else if (principal) {
+        principalNomeEl.textContent = principal;
+        principalEl.style.display = 'flex';
+      } else {
+        principalEl.style.display = 'none';
+      }
+    }
+
     const filtro = termo.toLowerCase();
     const lista = _municipiosDisponiveis.filter(m =>
       String(m.cod_municipio).trim() !== principal &&
