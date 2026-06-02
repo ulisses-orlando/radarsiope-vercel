@@ -426,7 +426,7 @@ async function carregarListaPlanos() {
         .plano-features { list-style: none; padding: 0; margin: 8px 0 0; font-size: 13px; line-height: 1.5; }
         .plano-features li { padding: 2px 0; color: #334155; }
         .plano-features li.inativo { color: #94a3b8; text-decoration: line-through; opacity: 0.7; }
-        .btn-ver-mais-features { display:block; background:none; border:none; color:#0A3D62; font-size:12px; font-weight:500; cursor:pointer; padding:4px 0; margin-top:4px; text-align:left; width:100%; }
+        .btn-ver-mais-features { pointer-events: auto !important; position: relative; z-index: 10;display:block; background:none; border:none; color:#0A3D62; font-size:12px; font-weight:500; cursor:pointer; padding:4px 0; margin-top:4px; text-align:left; width:100%; }
         .btn-ver-mais-features:hover { text-decoration: underline; color: #0f172a; }
         .features-expanded { animation: fadeIn 0.2s ease-out; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
