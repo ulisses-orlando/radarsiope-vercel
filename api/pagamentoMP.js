@@ -429,10 +429,10 @@ async function _handleAtivarSessao(req, res) {
       return json(res, 400, { ok: false, message: 'Token inválido.' });
     }
 
-    if (Date.now() > (pst.exp || 0)) {
+    if (pst.exp && Date.now() > pst.exp) {
       return json(res, 400, { ok: false, message: 'Link de ativação expirado. Solicite um novo acesso.' });
     }
-
+    
     if (pst.usado) {
       return json(res, 400, { ok: false, message: 'Link já utilizado. Acesse o app diretamente.' });
     }
