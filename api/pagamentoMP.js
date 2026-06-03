@@ -430,11 +430,11 @@ async function _handleAtivarSessao(req, res) {
     }
 
     if (pst.exp && Date.now() > pst.exp) {
-      return json(res, 400, { ok: false, message: 'Link de ativação expirado. Solicite um novo acesso.' });
+      return json(res, 400, { ok: false, codigo: 'token_expirado', message: 'Link de ativação expirado.' });
     }
-    
+
     if (pst.usado) {
-      return json(res, 400, { ok: false, message: 'Link já utilizado. Acesse o app diretamente.' });
+      return json(res, 400, { ok: false, codigo: 'token_usado', message: 'Link já utilizado.' });
     }
 
     const { assinaturaId } = pst;
