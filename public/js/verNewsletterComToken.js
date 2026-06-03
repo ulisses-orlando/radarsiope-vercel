@@ -1843,10 +1843,28 @@ async function _executarAtivacaoSessao(token, uid) {
     const data = await resp.json().catch(() => ({}));
 
     if (!resp.ok || !data.ok) {
-      mostrarErro(
-        '<strong>Link de ativação inválido ou expirado.</strong>',
-        (data.message || '') + ' Entre em contato com o suporte se o problema persistir.'
-      );
+      const _codigoErro = data.codigo || '';
+      const _precisaNovoLink = _codigoErro === 'token_expirado' || _codigoErro === 'token_usado';
+
+      if (_precisaNovoLink) {
+        mostrarErro(
+          '<strong>Este link de acesso não está mais disponível.</strong>',
+          _codigoErro === 'token_usado'
+            ? 'Este link já foi utilizado. Se você precisa acessar de um novo dispositivo, '
+              + '<a href="/login.html" style="color:var(--rs-gold,#c9a84c);font-weight:600">'
+              + 'acesse a Área do Assinante</a> e solicite um novo link.'
+            : 'O link expirou (válido por 72h após o pagamento). Para gerar um novo, '
+              + '<a href="/login.html" style="color:var(--rs-gold,#c9a84c);font-weight:600">'
+              + 'acesse a Área do Assinante</a>.'
+        );
+      } else {
+        mostrarErro(
+          '<strong>Link de ativação inválido.</strong>',
+          (data.message || '') + ' Se o problema persistir, acesse a '
+          + '<a href="/login.html" style="color:var(--rs-gold,#c9a84c);font-weight:600">'
+          + 'Área do Assinante</a>.'
+        );
+      }
       return;
     }
 
