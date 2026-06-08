@@ -526,7 +526,7 @@ async function _handleRegenerarTokenAtivacao(req, res) {
   const LIMITE = 3;
 
   try {
-    const usuarioRef    = db.collection('usuarios').doc(uid);
+    const usuarioRef = db.collection('usuarios').doc(uid);
     const assinaturaRef = usuarioRef.collection('assinaturas').doc(assinaturaId);
 
     // 1. Valida usuário
@@ -557,42 +557,164 @@ async function _handleRegenerarTokenAtivacao(req, res) {
     }
 
     // 4. Gera novo token
-    const novoToken   = crypto.randomBytes(32).toString('hex');
-    const novoCount   = count + 1;
-    const expMs       = Date.now() + 72 * 60 * 60 * 1000; // 72h
+    const novoToken = crypto.randomBytes(32).toString('hex');
+    const novoCount = count + 1;
+    const expMs = Date.now() + 72 * 60 * 60 * 1000; // 72h
 
     // 5. Persiste token e incrementa contador em paralelo
     await Promise.all([
       usuarioRef.update({
         pending_session_token: {
-          token:        novoToken,
-          exp:          expMs,
+          token: novoToken,
+          exp: expMs,
           assinaturaId,
-          usado:        false,
-          criado_em:    admin.firestore.FieldValue.serverTimestamp(),
+          usado: false,
+          criado_em: admin.firestore.FieldValue.serverTimestamp(),
         },
       }),
       assinaturaRef.update({
         self_link_gerado_count: novoCount,
-        self_link_ultimo_em:    admin.firestore.FieldValue.serverTimestamp(),
+        self_link_ultimo_em: admin.firestore.FieldValue.serverTimestamp(),
       }),
     ]);
 
     // 6. Monta link de ativação
     const usuarioData = usuarioSnap.data();
     const link = `https://app.radarsiope.com.br/verNewsletterComToken.html`
-               + `?ativar=${novoToken}&uid=${uid}`;
+      + `?ativar=${novoToken}&uid=${uid}`;
 
     return json(res, 200, {
-      ok:       true,
+      ok: true,
       link,
-      count:    novoCount,
+      count: novoCount,
       restantes: LIMITE - novoCount,
     });
 
   } catch (err) {
     console.error('[regenerar-token]', err);
     return json(res, 500, { ok: false, message: 'Erro interno. Tente novamente.' });
+  }
+}
+
+// ─── Admin: gera token e envia e-mail de link de acesso ───────────────────────
+async function _handleAdminEnviarLinkAcesso(req, res) {
+  const { uid, solId, assinaturaId: assinaturaIdParam, resetarContador } = req.body || {};
+  if (!uid) return json(res, 400, { ok: false, message: 'uid é obrigatório.' });
+
+  try {
+    const usuarioRef = db.collection('usuarios').doc(uid);
+
+    // 1. Valida usuário e obtém e-mail
+    const usuarioSnap = await usuarioRef.get();
+    if (!usuarioSnap.exists) {
+      return json(res, 404, { ok: false, message: 'Usuário não encontrado.' });
+    }
+    const usuarioData = usuarioSnap.data();
+    const email = usuarioData.email;
+    const nome = usuarioData.nome || 'Assinante';
+    if (!email) return json(res, 400, { ok: false, message: 'Usuário sem e-mail cadastrado.' });
+
+    // 2. Determina assinaturaId: usa o parâmetro enviado ou busca a ativa
+    let assinaturaId = assinaturaIdParam;
+    if (!assinaturaId) {
+      const assSnap = await usuarioRef.collection('assinaturas')
+        .where('status', 'in', ['ativa', 'ativo']).limit(1).get();
+      if (assSnap.empty) {
+        return json(res, 403, { ok: false, message: 'Nenhuma assinatura ativa encontrada.' });
+      }
+      assinaturaId = assSnap.docs[0].id;
+    }
+
+    // 3. Valida a assinatura
+    const assinaturaRef = usuarioRef.collection('assinaturas').doc(assinaturaId);
+    const assinaturaSnap = await assinaturaRef.get();
+    if (!assinaturaSnap.exists) {
+      return json(res, 404, { ok: false, message: 'Assinatura não encontrada.' });
+    }
+    const assinaturaData = assinaturaSnap.data();
+    if (assinaturaData.status !== 'ativa' && assinaturaData.status !== 'ativo') {
+      return json(res, 403, { ok: false, message: 'Assinatura não está ativa.' });
+    }
+
+    // 4. Gera novo token
+    const novoToken = crypto.randomBytes(32).toString('hex');
+    const expMs = Date.now() + 72 * 60 * 60 * 1000; // 72h
+
+    // 5. Persiste token + reseta contador se solicitado (em paralelo)
+    const updates = [
+      usuarioRef.update({
+        pending_session_token: {
+          token: novoToken,
+          exp: expMs,
+          assinaturaId,
+          usado: false,
+          criado_em: admin.firestore.FieldValue.serverTimestamp(),
+          gerado_por: 'admin',
+        },
+      }),
+    ];
+
+    if (resetarContador) {
+      updates.push(
+        assinaturaRef.update({
+          self_link_gerado_count: 0,
+          self_link_reset_em: admin.firestore.FieldValue.serverTimestamp(),
+        })
+      );
+    }
+
+    await Promise.all(updates);
+
+    // 6. Monta o link de ativação
+    const link = `https://app.radarsiope.com.br/verNewsletterComToken.html`
+      + `?ativar=${novoToken}&uid=${uid}`;
+
+    // 7. Envia e-mail via /api/enviarEmail (mesmo padrão de dispararMensagemAutomatica)
+    const assunto = 'Radar SIOPE — Seu novo link de acesso';
+    const mensagemHtml = `
+      <div style="font-family:sans-serif;max-width:600px;margin:0 auto">
+        <h2 style="color:#0A3D62">Olá, ${nome}!</h2>
+        <p>Conforme solicitado, segue seu novo link de acesso ao <strong>Radar SIOPE</strong>:</p>
+        <div style="margin:24px 0;text-align:center">
+          <a href="${link}"
+             style="background:#0A3D62;color:#fff;padding:14px 28px;border-radius:8px;
+                    text-decoration:none;font-weight:700;font-size:16px;display:inline-block">
+            🔗 Acessar o Radar SIOPE
+          </a>
+        </div>
+        <p style="color:#64748b;font-size:13px">
+          ⏰ <strong>Válido por 72 horas</strong> a partir do recebimento deste e-mail.<br>
+          Após clicar, o app ficará disponível normalmente no seu dispositivo.
+        </p>
+        <p style="color:#64748b;font-size:13px">
+          Se você não solicitou este link, ignore este e-mail com segurança.
+        </p>
+        <hr style="border:none;border-top:1px solid #e2e8f0;margin:24px 0">
+        <p style="color:#94a3b8;font-size:11px;text-align:center">
+          Radar SIOPE · Guia Digital FUNDEB e SIOPE
+        </p>
+      </div>`;
+
+    try {
+      await fetchWithTimeout(
+        `${process.env.NEXT_PUBLIC_BASE_URL}/api/enviarEmail`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ nome, email, assunto, mensagemHtml }),
+        },
+        8000
+      );
+    } catch (emailErr) {
+      // E-mail falhou mas token já foi gravado — logar e continuar
+      console.error('[admin-enviar-link-acesso] Falha no envio de e-mail:', emailErr.message);
+    }
+
+    return json(res, 200, { ok: true, link });
+
+  } catch (err) {
+    console.error('[admin-enviar-link-acesso]', err);
+    return json(res, 500, { ok: false, message: 'Erro interno: ' + err.message });
   }
 }
 
@@ -1145,7 +1267,7 @@ export default async function handler(req, res) {
 
     // Validar assinatura apenas para webhooks (não para criar-pedido / status-pedido)
     const acao = (req.query && req.query.acao) ? String(req.query.acao) : null;
-    const acoesPublicas = ['criar-pedido', 'status-pedido', 'ativar-sessao', 'validar-sessao', 'criar-sessao', 'encerrar-sessao', 'cancelar-assinatura', 'gerar-cobranca-cancelamento', 'salvar-quiz', 'quiz-historico', 'regenerar-token-ativacao'];
+    const acoesPublicas = ['criar-pedido', 'status-pedido', 'ativar-sessao', 'validar-sessao', 'criar-sessao', 'encerrar-sessao', 'cancelar-assinatura', 'gerar-cobranca-cancelamento', 'salvar-quiz', 'quiz-historico', 'regenerar-token-ativacao', 'admin-enviar-link-acesso'];
 
     if (!acao || !acoesPublicas.includes(acao)) {
       const sigCheck = validateMpWebhookSignature(rawBody, req);
@@ -1189,6 +1311,8 @@ export default async function handler(req, res) {
     }
 
     if (acao === 'regenerar-token-ativacao') return _handleRegenerarTokenAtivacao(req, res);
+
+    if (acao === 'admin-enviar-link-acesso') return _handleAdminEnviarLinkAcesso(req, res);
 
     if (req.method === 'GET' && acao === 'quiz-historico') {
       return _handleQuizHistorico(req, res);
