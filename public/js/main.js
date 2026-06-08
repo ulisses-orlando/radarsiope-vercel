@@ -551,10 +551,10 @@ async function abrirModalNewsletter(docId = null, isEdit = false) {
   faqInicial.forEach(item => renderFaqItem(item.pergunta, item.resposta));
   btnAddFaq.onclick = () => renderFaqItem();
 
-// ── QUIZ INTERATIVO ───────────────────────────────────────────────────────
-const quizSection = document.createElement('div');
-quizSection.style.cssText = 'margin-top:18px;padding:14px;border:1.5px solid #a78bfa;border-radius:8px;background:#faf5ff';
-quizSection.innerHTML = `
+  // ── QUIZ INTERATIVO ───────────────────────────────────────────────────────
+  const quizSection = document.createElement('div');
+  quizSection.style.cssText = 'margin-top:18px;padding:14px;border:1.5px solid #a78bfa;border-radius:8px;background:#faf5ff';
+  quizSection.innerHTML = `
 <div style="font-weight:600;font-size:13px;color:#5b21b6;margin-bottom:8px;display:flex;align-items:center;gap:6px">
 🧩 Quiz da Edição
  <span style="font-size:11px;color:#888;font-weight:400">— Disponível para assinantes</span>
@@ -590,21 +590,21 @@ style="flex:1;padding:6px 12px;background:#059669;color:#fff;border:none;border-
  </button>
  </div>
 `;
-col1.appendChild(quizSection);
+  col1.appendChild(quizSection);
 
-// 1. Função de renderização de perguntas (Carregamento)
-function renderQuizPergunta(pergunta = {}) {
+  // 1. Função de renderização de perguntas (Carregamento)
+  function renderQuizPergunta(pergunta = {}) {
     const container = document.getElementById('quiz-perguntas-container');
     if (!container) {
-        console.warn('[Quiz] Container #quiz-perguntas-container não encontrado!');
-        return;
+      console.warn('[Quiz] Container #quiz-perguntas-container não encontrado!');
+      return;
     }
-    
+
     const texto = pergunta.pergunta || pergunta.enunciado || pergunta.question || '';
-    
+
     const item = document.createElement('div');
     item.style.cssText = 'border:1px solid #ddd;border-radius:6px;padding:10px;background:#fff;position:relative';
-    
+
     // HTML da pergunta
     item.innerHTML = `
         <button type="button" title="Remover" style="position:absolute;top:6px;right:8px;background:none;border:none;color:#dc2626;cursor:pointer;font-size:16px"
@@ -641,43 +641,43 @@ function renderQuizPergunta(pergunta = {}) {
         </div>
     `;
     container.appendChild(item);
-}
+  }
 
-// 2. Botão Adicionar Pergunta
-document.getElementById('quiz-add-pergunta').addEventListener('click', () => {
+  // 2. Botão Adicionar Pergunta
+  document.getElementById('quiz-add-pergunta').addEventListener('click', () => {
     renderQuizPergunta({}); // Cria pergunta vazia
-});
+  });
 
-// 3. Botão Importar JSON
-document.getElementById('quiz-import-json').addEventListener('click', async () => {
+  // 3. Botão Importar JSON
+  document.getElementById('quiz-import-json').addEventListener('click', async () => {
     const jsonStr = prompt('Cole aqui o JSON do Quiz gerado pelo NotebookLM.');
     if (!jsonStr) return;
     try {
-        const quizData = JSON.parse(jsonStr);
-        // Atualiza configurações
-        if (quizData.tentativas_max !== undefined) document.getElementById('quiz-tentativas-max').value = quizData.tentativas_max;
-        if (quizData.pontuacao_minima !== undefined) document.getElementById('quiz-pontuacao-minima').value = quizData.pontuacao_minima;
-        if (quizData.visivel_leads !== undefined) document.getElementById('quiz-visivel-leads').checked = !!quizData.visivel_leads;
+      const quizData = JSON.parse(jsonStr);
+      // Atualiza configurações
+      if (quizData.tentativas_max !== undefined) document.getElementById('quiz-tentativas-max').value = quizData.tentativas_max;
+      if (quizData.pontuacao_minima !== undefined) document.getElementById('quiz-pontuacao-minima').value = quizData.pontuacao_minima;
+      if (quizData.visivel_leads !== undefined) document.getElementById('quiz-visivel-leads').checked = !!quizData.visivel_leads;
 
-        // Limpa atuais e renderiza novas
-        const container = document.getElementById('quiz-perguntas-container');
-        if (container) container.innerHTML = '';
-        
-        if (Array.isArray(quizData.perguntas)) {
-            quizData.perguntas.forEach(p => renderQuizPergunta(p));
-            alert('✅ Quiz importado com sucesso!');
-        }
+      // Limpa atuais e renderiza novas
+      const container = document.getElementById('quiz-perguntas-container');
+      if (container) container.innerHTML = '';
+
+      if (Array.isArray(quizData.perguntas)) {
+        quizData.perguntas.forEach(p => renderQuizPergunta(p));
+        alert('✅ Quiz importado com sucesso!');
+      }
     } catch (e) {
-        alert('❌ Erro ao processar JSON: ' + e.message);
+      alert('❌ Erro ao processar JSON: ' + e.message);
     }
-});
+  });
 
-// Verifica se há perguntas salvas
-const perguntasSalvas = data.quiz?.perguntas || [];
-if (Array.isArray(perguntasSalvas) && perguntasSalvas.length > 0) 
+  // Verifica se há perguntas salvas
+  const perguntasSalvas = data.quiz?.perguntas || [];
+  if (Array.isArray(perguntasSalvas) && perguntasSalvas.length > 0)
     perguntasSalvas.forEach(p => renderQuizPergunta(p));
 
-// ── MAPA MENTAL ────────────────────────────────────────────────────────────
+  // ── MAPA MENTAL ────────────────────────────────────────────────────────────
   const mapaMentalSection = document.createElement('div');
   mapaMentalSection.style.cssText = 'margin-top:18px;padding:14px;border:1.5px solid #0d9488;border-radius:8px;background:#f0fdfa';
   mapaMentalSection.innerHTML = `
@@ -729,9 +729,9 @@ if (Array.isArray(perguntasSalvas) && perguntasSalvas.length > 0)
     try {
       const obj = JSON.parse(raw);
       const erros = [];
-      if (!obj.titulo)                    erros.push('campo "titulo" ausente');
-      if (!obj.raiz?.id)                  erros.push('campo "raiz.id" ausente');
-      if (!obj.raiz?.texto)               erros.push('campo "raiz.texto" ausente');
+      if (!obj.titulo) erros.push('campo "titulo" ausente');
+      if (!obj.raiz?.id) erros.push('campo "raiz.id" ausente');
+      if (!obj.raiz?.texto) erros.push('campo "raiz.texto" ausente');
       if (!Array.isArray(obj.raiz?.filhos)) erros.push('"raiz.filhos" deve ser um array');
 
       if (erros.length) {
@@ -739,7 +739,7 @@ if (Array.isArray(perguntasSalvas) && perguntasSalvas.length > 0)
         return;
       }
 
-      const nTopicos   = obj.raiz.filhos.length;
+      const nTopicos = obj.raiz.filhos.length;
       const nSubtopicos = obj.raiz.filhos.reduce((s, n) => s + (n.filhos?.length || 0), 0);
       status.innerHTML =
         `<span style="color:#0d9488">✅ JSON válido — ${nTopicos} tópico(s), ${nSubtopicos} subtópico(s).</span>`;
@@ -1152,7 +1152,7 @@ if (Array.isArray(perguntasSalvas) && perguntasSalvas.length > 0)
           htmlBlocos += b.html || '';
         }
       });
-      
+
       const htmlEmailComBlocos = htmlEmailBase.includes('{{blocos}}')
         ? htmlEmailBase.replace('{{blocos}}', htmlBlocos)
         : htmlEmailBase + '\n' + htmlBlocos;
@@ -1365,17 +1365,17 @@ if (Array.isArray(perguntasSalvas) && perguntasSalvas.length > 0)
     const coletarQuiz = () => {
       const container = document.getElementById('quiz-perguntas-container');
       if (!container) return {};
-      
+
       const perguntas = [];
       container.querySelectorAll(':scope > div').forEach(item => {
         const perguntaTexto = item.querySelector('.quiz-pergunta-texto')?.value?.trim() || '';
         const alternativas = Array.from(item.querySelectorAll('.quiz-alternativa')).map(i => i.value.trim());
         const correta = parseInt(item.querySelector('.quiz-correta:checked')?.value) || 0;
         const explicacao = item.querySelector('.quiz-explicacao')?.value?.trim() || '';
-        
+
         if (perguntaTexto) {
           perguntas.push({
-            id: crypto.randomUUID?.() || `q_${Date.now()}_${Math.random().toString(36).substr(2,5)}`,
+            id: crypto.randomUUID?.() || `q_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
             pergunta: perguntaTexto,
             alternativas,
             correta,
@@ -1384,14 +1384,14 @@ if (Array.isArray(perguntasSalvas) && perguntasSalvas.length > 0)
         }
       });
 
-      return perguntas.length > 0 
-        ? { 
-            ativo: true, 
-            tentativas_max: parseInt(document.getElementById('quiz-tentativas-max')?.value) || 3,
-            pontuacao_minima: parseInt(document.getElementById('quiz-pontuacao-minima')?.value) || 70,
-            visivel_leads: document.getElementById('quiz-visivel-leads')?.checked || false,
-            perguntas 
-          } 
+      return perguntas.length > 0
+        ? {
+          ativo: true,
+          tentativas_max: parseInt(document.getElementById('quiz-tentativas-max')?.value) || 3,
+          pontuacao_minima: parseInt(document.getElementById('quiz-pontuacao-minima')?.value) || 70,
+          visivel_leads: document.getElementById('quiz-visivel-leads')?.checked || false,
+          perguntas
+        }
         : {};
     };
 
@@ -4990,7 +4990,7 @@ async function abrirModalProrrogarAcesso(leadId, nomeLead) {
   // Buscar envios do lead
   const { data: envios, error } = await window.supabase
     .from("leads_envios")
-    .select("id, newsletter_id, data_envio, expira_em, acessos_totais")
+    .select('id, newsletter_id, data_envio, expira_em, acessos_totais, sinalizacao_compartilhamento')
     .eq("lead_id", Number(leadId))
     .order("data_envio", { ascending: false });
 
@@ -5024,6 +5024,7 @@ async function abrirModalProrrogarAcesso(leadId, nomeLead) {
           <th style="padding:8px;text-align:left;border-bottom:1px solid #e2e8f0">Enviado em</th>
           <th style="padding:8px;text-align:left;border-bottom:1px solid #e2e8f0">Expira em</th>
           <th style="padding:8px;text-align:center;border-bottom:1px solid #e2e8f0">Acessos</th>
+          <th style="padding:8px;text-align:center;border-bottom:1px solid #e2e8f0">Compart.</th>
           <th style="padding:8px;text-align:left;border-bottom:1px solid #e2e8f0">Situação</th>
         </tr>
       </thead>
@@ -5045,6 +5046,11 @@ async function abrirModalProrrogarAcesso(leadId, nomeLead) {
               <td style="padding:8px">${envioFmt}</td>
               <td style="padding:8px">${expiraFmt}</td>
               <td style="padding:8px;text-align:center">${e.acessos_totais ?? 0}</td>
+              <td style="padding:8px;text-align:center">
+                ${e.sinalizacao_compartilhamento
+                  ? `<span title="Sinalizado por acesso excessivo" style="color:#e53e3e;font-weight:700">⚠️</span>`
+                  : `<span style="color:#94a3b8">—</span>`}
+              </td>
               <td style="padding:8px">${situacao}</td>
             </tr>`;
   }).join("")}
@@ -5072,7 +5078,10 @@ async function confirmarProrrogacao() {
   novaExpiracao.setDate(novaExpiracao.getDate() + dias);
 
   const update = { expira_em: novaExpiracao.toISOString() };
-  if (zerarAcessos) update.acessos_totais = 0;
+  if (zerarAcessos) {
+    update.acessos_totais = 0;
+    update.sinalizacao_compartilhamento = false; // limpa flag junto com o contador
+  }
 
   try {
     const { error } = await window.supabase
