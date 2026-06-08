@@ -516,6 +516,86 @@ async function _handleAtivarSessao(req, res) {
   }
 }
 
+// ─── Regeneração manual de token (self-service, máx 3×) ──────────────────────
+async function _handleRegenerarTokenAtivacao(req, res) {
+  const { uid, assinaturaId } = req.body || {};
+  if (!uid || !assinaturaId) {
+    return json(res, 400, { ok: false, message: 'uid e assinaturaId são obrigatórios.' });
+  }
+
+  const LIMITE = 3;
+
+  try {
+    const usuarioRef    = db.collection('usuarios').doc(uid);
+    const assinaturaRef = usuarioRef.collection('assinaturas').doc(assinaturaId);
+
+    // 1. Valida usuário
+    const usuarioSnap = await usuarioRef.get();
+    if (!usuarioSnap.exists) {
+      return json(res, 404, { ok: false, message: 'Usuário não encontrado.' });
+    }
+
+    // 2. Valida assinatura
+    const assinaturaSnap = await assinaturaRef.get();
+    if (!assinaturaSnap.exists) {
+      return json(res, 404, { ok: false, message: 'Assinatura não encontrada.' });
+    }
+
+    const assinaturaData = assinaturaSnap.data();
+    if (assinaturaData.status !== 'ativa' && assinaturaData.status !== 'ativo') {
+      return json(res, 403, { ok: false, message: 'A assinatura não está ativa.' });
+    }
+
+    // 3. Verifica limite de gerações self-service
+    const count = assinaturaData.self_link_gerado_count || 0;
+    if (count >= LIMITE) {
+      return json(res, 429, {
+        ok: false,
+        codigo: 'limite_atingido',
+        message: `Limite de ${LIMITE} links automáticos atingido. Solicite via Suporte.`,
+      });
+    }
+
+    // 4. Gera novo token
+    const novoToken   = crypto.randomBytes(32).toString('hex');
+    const novoCount   = count + 1;
+    const expMs       = Date.now() + 72 * 60 * 60 * 1000; // 72h
+
+    // 5. Persiste token e incrementa contador em paralelo
+    await Promise.all([
+      usuarioRef.update({
+        pending_session_token: {
+          token:        novoToken,
+          exp:          expMs,
+          assinaturaId,
+          usado:        false,
+          criado_em:    admin.firestore.FieldValue.serverTimestamp(),
+        },
+      }),
+      assinaturaRef.update({
+        self_link_gerado_count: novoCount,
+        self_link_ultimo_em:    admin.firestore.FieldValue.serverTimestamp(),
+      }),
+    ]);
+
+    // 6. Monta link de ativação
+    const usuarioData = usuarioSnap.data();
+    const link = `https://app.radarsiope.com.br/verNewsletterComToken.html`
+               + `?ativar=${novoToken}&uid=${uid}`;
+
+    return json(res, 200, {
+      ok:       true,
+      link,
+      count:    novoCount,
+      restantes: LIMITE - novoCount,
+    });
+
+  } catch (err) {
+    console.error('[regenerar-token]', err);
+    return json(res, 500, { ok: false, message: 'Erro interno. Tente novamente.' });
+  }
+}
+
 // ─── Validação periódica de sessão (chamado a cada 24h pelo app) ───────────
 async function _handleValidarSessao(req, res) {
   if (req.method !== 'POST') return json(res, 405, { ok: false, message: 'Método não permitido.' });
@@ -1065,7 +1145,7 @@ export default async function handler(req, res) {
 
     // Validar assinatura apenas para webhooks (não para criar-pedido / status-pedido)
     const acao = (req.query && req.query.acao) ? String(req.query.acao) : null;
-    const acoesPublicas = ['criar-pedido', 'status-pedido', 'ativar-sessao', 'validar-sessao', 'criar-sessao', 'encerrar-sessao', 'cancelar-assinatura', 'gerar-cobranca-cancelamento', 'salvar-quiz', 'quiz-historico'];
+    const acoesPublicas = ['criar-pedido', 'status-pedido', 'ativar-sessao', 'validar-sessao', 'criar-sessao', 'encerrar-sessao', 'cancelar-assinatura', 'gerar-cobranca-cancelamento', 'salvar-quiz', 'quiz-historico', 'regenerar-token-ativacao'];
 
     if (!acao || !acoesPublicas.includes(acao)) {
       const sigCheck = validateMpWebhookSignature(rawBody, req);
@@ -1107,6 +1187,8 @@ export default async function handler(req, res) {
         atualizadoEm: pd.atualizadoEm || null
       });
     }
+
+    if (acao === 'regenerar-token-ativacao') return _handleRegenerarTokenAtivacao(req, res);
 
     if (req.method === 'GET' && acao === 'quiz-historico') {
       return _handleQuizHistorico(req, res);
