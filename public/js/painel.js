@@ -1,25 +1,25 @@
 // ─── Estado global ────────────────────────────────────────────────────────────
 let filtroStatusSolicitacoes = 'todos';
 let solicitacaoEmEdicao = { usuarioId: null, solicitacaoId: null };
- 
+
 // ─── Inicialização ────────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
   const usuario = JSON.parse(localStorage.getItem('usuarioLogado'));
   if (!usuario) { window.location.href = 'login.html'; return; }
- 
+
   const uid = usuario.id;
- 
+
   carregarAssinaturas(uid);
   carregarBibliotecaNewsletters(uid);
   carregarHistoricoSolicitacoes(uid);
- 
+
   const nomeEl = document.getElementById('nome-usuario');
   if (nomeEl) {
     nomeEl.textContent = (usuario.nome || usuario.email || 'Usuário') +
       (usuario.tipo_perfil ? ` (${usuario.tipo_perfil})` : '');
   }
 });
- 
+
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 function fmtData(valor) {
   if (!valor) return '—';
@@ -27,12 +27,12 @@ function fmtData(valor) {
   if (isNaN(d)) return String(valor);
   return d.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' });
 }
- 
+
 function fmtBRL(centavos) {
   if (!centavos && centavos !== 0) return '—';
   return (Number(centavos) / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 }
- 
+
 function fmtStatus(status) {
   const mapa = {
     ativa: { cor: '#22c55e', icone: '✅', label: 'Ativa' },
@@ -49,7 +49,7 @@ function fmtStatus(status) {
   };
   return mapa[String(status).toLowerCase()] || { cor: '#94a3b8', icone: '❔', label: status || '—' };
 }
- 
+
 // Monta URL base64 para o web app (mesma lógica do EnvioLeads)
 function montarUrlWebApp(nid, envioId, uid, assinaturaId, token) {
   const qs = [
@@ -62,13 +62,13 @@ function montarUrlWebApp(nid, envioId, uid, assinaturaId, token) {
   const b64 = btoa(qs);
   return `https://app.radarsiope.com.br/verNewsletterComToken.html?d=${encodeURIComponent(b64)}`;
 }
- 
+
 // ─── Minhas Assinaturas ───────────────────────────────────────────────────────
 async function carregarAssinaturas(uid) {
   const container = document.getElementById('minhas-assinaturas');
   if (!container) return;
   container.innerHTML = '<p class="loading">Carregando...</p>';
- 
+
   try {
     // 1. Buscar features ativas dinamicamente da coleção 'features'
     let featuresList = [];
@@ -90,7 +90,7 @@ async function carregarAssinaturas(uid) {
 
     const assinSnap = await db.collection('usuarios').doc(uid)
       .collection('assinaturas').orderBy('createdAt', 'desc').get();
- 
+
     if (assinSnap.empty) {
       container.innerHTML = `
         <div class="empty-state">
@@ -102,15 +102,16 @@ async function carregarAssinaturas(uid) {
         </div>`;
       return;
     }
- 
+
     let html = '';
- 
+    let _cardLinkRendered = false;
+
     for (const doc of assinSnap.docs) {
       const a = doc.data();
       const assinaturaId = doc.id;
       const st = fmtStatus(a.status);
       const userFeatures = a.features_snapshot || {};
- 
+
       // 2. Renderização dinâmica das badges (substitui o objeto estático featuresLabels)
       const featuresHtml = featuresList
         .filter(f => f.ativo && userFeatures[f.id]) // Mostra apenas se ativo E se o usuário tem
@@ -122,7 +123,7 @@ async function carregarAssinaturas(uid) {
           else if (f.tipo === 'text' && val) label += ` (${val})`;
           return `<span class="feature-badge">${label}</span>`;
         }).join('');
- 
+
       // Buscar pagamentos desta assinatura
       let pagamentosHtml = '';
       try {
@@ -131,7 +132,7 @@ async function carregarAssinaturas(uid) {
           .collection('pagamentos')
           .orderBy('data_pagamento', 'desc')
           .limit(12).get();
- 
+
         if (!pagSnap.empty) {
           const linhas = pagSnap.docs.map(pd => {
             const p = pd.data();
@@ -152,7 +153,7 @@ async function carregarAssinaturas(uid) {
                 </div>
               </div>`;
           }).join('');
- 
+
           pagamentosHtml = `
             <div class="pagamentos-lista">
               <div class="pagamentos-titulo">💳 Pagamentos</div>
@@ -160,7 +161,7 @@ async function carregarAssinaturas(uid) {
             </div>`;
         }
       } catch (e) { /* pagamentos não críticos */ }
- 
+
       html += `
         <div class="assinatura-card" style="--st-cor:${st.cor}">
           <div class="assinatura-header">
@@ -189,16 +190,22 @@ async function carregarAssinaturas(uid) {
               </a>
             </div>` : ''}
         </div>`;
+
+      // Renderiza o card de novo link SOMENTE para a primeira assinatura ativa
+      if ((a.status === 'ativa' || a.status === 'ativo') && !_cardLinkRendered) {
+        _cardLinkRendered = true;
+        _renderCardNovoLink(uid, assinaturaId, a.self_link_gerado_count || 0);
+      }
     }
- 
+
     container.innerHTML = html;
- 
+
   } catch (err) {
     console.error('[assinaturas]', err);
     container.innerHTML = '<p class="erro">Erro ao carregar assinaturas.</p>';
   }
 }
- 
+
 // ─── Biblioteca de Newsletters ────────────────────────────────────────────────
 async function carregarBibliotecaNewsletters(uid) {
   const container = document.getElementById('biblioteca-tecnica');
@@ -222,10 +229,10 @@ async function carregarBibliotecaNewsletters(uid) {
     }
 
     // Usa a primeira assinatura ativa (caso comum — plano único)
-    const assinDoc     = assinSnap.docs[0];
+    const assinDoc = assinSnap.docs[0];
     const assinaturaId = assinDoc.id;
-    const assinData    = assinDoc.data();
-    const tiposSel     = Array.isArray(assinData.tipos_selecionados)
+    const assinData = assinDoc.data();
+    const tiposSel = Array.isArray(assinData.tipos_selecionados)
       ? assinData.tipos_selecionados.map(String)
       : [];
 
@@ -255,14 +262,14 @@ async function carregarBibliotecaNewsletters(uid) {
         return !tipo || tiposSel.includes(String(tipo));
       })
       .map(doc => {
-        const nl     = doc.data();
-        const nid    = doc.id;
+        const nl = doc.data();
+        const nid = doc.id;
         const titulo = nl.titulo || `Edição ${nl.numero || '—'}`;
         const numero = nl.numero || '—';
-        const data   = fmtData(nl.data_publicacao);
+        const data = fmtData(nl.data_publicacao);
 
         // URL sem token e sem envioId — assinante usa sessão
-        const qs  = [`nid=${nid}`, `uid=${uid}`, `assinaturaId=${assinaturaId}`].join('&');
+        const qs = [`nid=${nid}`, `uid=${uid}`, `assinaturaId=${assinaturaId}`].join('&');
         const url = `https://app.radarsiope.com.br/verNewsletterComToken.html?d=${encodeURIComponent(btoa(qs))}`;
 
         const _btnAcao = _noIframe
@@ -292,7 +299,7 @@ async function carregarBibliotecaNewsletters(uid) {
     container.innerHTML = '<p class="erro">Erro ao carregar newsletters.</p>';
   }
 }
- 
+
 // ─── Suporte ──────────────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
   const btnSuporte = document.getElementById('btn-enviar-suporte');
@@ -300,14 +307,14 @@ document.addEventListener('DOMContentLoaded', () => {
     btnSuporte.addEventListener('click', enviarSolicitacao);
   }
 });
- 
+
 // ─── ENVIO DE SOLICITAÇÃO (ATUALIZADA COM FLUXO DE CANCELAMENTO) ─────────────
 async function enviarSolicitacao() {
   const usuario = JSON.parse(localStorage.getItem('usuarioLogado'));
-  const tipoEl  = document.getElementById('tipo-suporte');
-  const descEl  = document.getElementById('mensagem-suporte');
+  const tipoEl = document.getElementById('tipo-suporte');
+  const descEl = document.getElementById('mensagem-suporte');
   const feedback = document.getElementById('suporte-feedback');
-  const tipo    = tipoEl?.value || '';
+  const tipo = tipoEl?.value || '';
   const descricao = descEl?.value.trim() || '';
   if (feedback) feedback.innerHTML = '';
 
@@ -343,7 +350,7 @@ async function _processarSolicitacaoCancelamento(uid, descricao) {
   const snap = await db.collection('usuarios').doc(uid)
     .collection('assinaturas').where('status', 'in', ['ativa', 'aprovada']).limit(1).get();
 
-    if (snap.empty) {
+  if (snap.empty) {
     alert('⚠️ Nenhuma assinatura ativa encontrada para solicitar cancelamento.');
     return;
   }
@@ -474,14 +481,14 @@ function filtrarSolicitacoes(status) {
   const usuario = JSON.parse(localStorage.getItem('usuarioLogado'));
   carregarHistoricoSolicitacoes(usuario.id);
 }
- 
+
 function carregarHistoricoSolicitacoes(uid) {
   const container = document.getElementById('historico-solicitacoes');
   if (!container) return;
   container.innerHTML = '<p class="loading">Carregando...</p>';
- 
+
   const contadores = { aberta: 0, pendente: 0, atendida: 0, cancelada: 0 };
- 
+
   db.collection('usuarios').doc(uid).collection('solicitacoes')
     .orderBy('data_solicitacao', 'desc')
     .get()
@@ -490,18 +497,18 @@ function carregarHistoricoSolicitacoes(uid) {
         container.innerHTML = '<p style="color:var(--muted);font-size:13px">Nenhuma solicitação registrada.</p>';
         return;
       }
- 
+
       let html = '';
- 
+
       snap.forEach(doc => {
         const s = doc.data();
         const status = (s.status || 'pendente').toLowerCase();
         contadores[status] = (contadores[status] || 0) + 1;
- 
+
         if (filtroStatusSolicitacoes !== 'todos' && status !== filtroStatusSolicitacoes) return;
- 
+
         const st = fmtStatus(status);
- 
+
         // Mensagem administrativa
         if (s.tipo === 'envio_manual_admin') {
           html += `
@@ -521,12 +528,12 @@ function carregarHistoricoSolicitacoes(uid) {
             </div>`;
           return;
         }
- 
+
         const respostaHtml = s.resposta && (status === 'atendida' || status === 'cancelada')
           ? `<div class="solicitacao-resposta">
                💡 <strong>Resposta:</strong> ${s.resposta}
              </div>` : '';
- 
+
         html += `
           <div class="solicitacao-item" style="--st-cor:${st.cor}">
             <div class="solicitacao-header">
@@ -546,7 +553,7 @@ function carregarHistoricoSolicitacoes(uid) {
             </div>
           </div>`;
       });
- 
+
       // Atualiza contadores nos filtros
       document.querySelectorAll('#filtros-solicitacoes button').forEach(btn => {
         const f = btn.dataset.filter;
@@ -554,7 +561,7 @@ function carregarHistoricoSolicitacoes(uid) {
         const c = contadores[f] || 0;
         btn.textContent = `${f.charAt(0).toUpperCase() + f.slice(1)}${c ? ` (${c})` : ''}`;
       });
- 
+
       container.innerHTML = html || '<p style="color:var(--muted);font-size:13px">Nenhuma solicitação neste filtro.</p>';
     })
     .catch(err => {
@@ -562,18 +569,18 @@ function carregarHistoricoSolicitacoes(uid) {
       container.innerHTML = '<p class="erro">Erro ao carregar histórico.</p>';
     });
 }
- 
+
 // ─── Editar / Cancelar Solicitação ────────────────────────────────────────────
 function editarSolicitacao(uid, solicitacaoId, descricaoAtual) {
   solicitacaoEmEdicao = { usuarioId: uid, solicitacaoId };
   document.getElementById('nova-descricao').value = descricaoAtual;
   document.getElementById('modal-editar-solicitacao').classList.add('show');
 }
- 
+
 function salvarEdicaoSolicitacao() {
   const novaDescricao = document.getElementById('nova-descricao').value.trim();
   if (!novaDescricao) { mostrarMensagem('A descrição não pode estar vazia.'); return; }
- 
+
   db.collection('usuarios')
     .doc(solicitacaoEmEdicao.usuarioId)
     .collection('solicitacoes')
@@ -585,31 +592,31 @@ function salvarEdicaoSolicitacao() {
     })
     .catch(err => { console.error(err); mostrarMensagem('Erro ao atualizar.'); });
 }
- 
+
 function fecharModalEdicao() {
   document.getElementById('modal-editar-solicitacao').classList.remove('show');
 }
- 
+
 function cancelarSolicitacao(uid, solicitacaoId) {
   if (!confirm('Deseja realmente cancelar esta solicitação?')) return;
   db.collection('usuarios').doc(uid).collection('solicitacoes').doc(solicitacaoId)
     .update({ status: 'cancelada' })
     .then(() => carregarHistoricoSolicitacoes(uid))
     .catch(err => { console.error(err); mostrarMensagem('Erro ao cancelar.'); });
- 
+
   db.collection('admin_contadores').doc('pendencias').set(
     { solicitacoes: firebase.firestore.FieldValue.increment(-1) },
     { merge: true }
   );
- 
+
 }
- 
+
 // ─── Expandir mensagem admin ──────────────────────────────────────────────────
 function expandirMensagem(id, mensagemEncoded) {
   const div = document.getElementById('msg-' + id);
   const btn = document.getElementById('btn-exp-' + id);
   if (!div || !btn) return;
- 
+
   if (div.dataset.expandido === 'true') {
     div.innerHTML = div.dataset.curta;
     div.dataset.expandido = 'false';
@@ -621,4 +628,120 @@ function expandirMensagem(id, mensagemEncoded) {
     btn.textContent = 'Recolher';
   }
 }
- 
+
+// ─── Card de Novo Link de Acesso ──────────────────────────────────────────────
+const LIMITE_SELF_LINK = 3;
+
+function _renderCardNovoLink(uid, assinaturaId, count) {
+  const card = document.getElementById('card-link-acesso');
+  if (!card) return;
+
+  const restantes = LIMITE_SELF_LINK - count;
+  const esgotado  = restantes <= 0;
+
+  if (esgotado) {
+    card.innerHTML = `
+      <div class="card-link-wrap">
+        <div class="card-link-corpo">
+          <div class="card-link-icone">🔗</div>
+          <div>
+            <div class="card-link-titulo">Precisa de um novo link de acesso?</div>
+            <div class="card-link-sub">
+              Você atingiu o limite de ${LIMITE_SELF_LINK} gerações automáticas.
+              Para obter um novo link, solicite pelo <strong>Suporte</strong> abaixo.
+            </div>
+          </div>
+        </div>
+        <div class="card-link-rodape">
+          <span class="card-link-badge">⛔ Limite atingido</span>
+          <button class="btn-gerar-link" disabled>Limite atingido</button>
+        </div>
+      </div>`;
+    return;
+  }
+
+  card.innerHTML = `
+    <div class="card-link-wrap">
+      <div class="card-link-corpo">
+        <div class="card-link-icone">🔗</div>
+        <div>
+          <div class="card-link-titulo">Precisa de um novo link de acesso?</div>
+          <div class="card-link-sub">
+            Use quando quiser acessar o app em um <strong>novo dispositivo</strong>
+            ou após limpar o navegador.
+          </div>
+        </div>
+      </div>
+      <div class="card-link-rodape">
+        <span class="card-link-badge">${restantes} de ${LIMITE_SELF_LINK} uso${restantes !== 1 ? 's' : ''} disponível${restantes !== 1 ? 'is' : ''}</span>
+        <button class="btn-gerar-link" id="btn-gerar-link"
+          onclick="gerarNovoLinkAcesso('${uid}', '${assinaturaId}', ${count})">
+          🔗 Gerar link
+        </button>
+      </div>
+    </div>`;
+}
+
+async function gerarNovoLinkAcesso(uid, assinaturaId, countAtual) {
+  const restantes = LIMITE_SELF_LINK - countAtual;
+  if (restantes <= 0) return;
+
+  const btn = document.getElementById('btn-gerar-link');
+  if (btn) { btn.disabled = true; btn.textContent = 'Gerando...'; }
+
+  try {
+    const resp = await fetch('/api/pagamentoMP?acao=regenerar-token-ativacao', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ uid, assinaturaId }),
+    });
+
+    const data = await resp.json().catch(() => ({}));
+
+    if (!resp.ok || !data.ok) {
+      alert('❌ ' + (data.message || 'Não foi possível gerar o link. Tente novamente.'));
+      if (btn) { btn.disabled = false; btn.textContent = '🔗 Gerar link'; }
+      return;
+    }
+
+    // Exibe o link no modal
+    document.getElementById('link-acesso-gerado').textContent = data.link;
+
+    const novoRestantes = LIMITE_SELF_LINK - data.count;
+    const msgRestantes = novoRestantes > 0
+      ? `Você ainda pode gerar mais ${novoRestantes} link${novoRestantes !== 1 ? 's' : ''} automaticamente.`
+      : `Você utilizou todos os ${LIMITE_SELF_LINK} links automáticos. Próximas solicitações devem ser feitas pelo Suporte.`;
+    document.getElementById('card-link-restantes-modal').textContent = msgRestantes;
+
+    document.getElementById('modal-link-acesso').classList.add('show');
+
+    // Atualiza o card imediatamente com o novo contador
+    _renderCardNovoLink(uid, assinaturaId, data.count);
+
+  } catch (err) {
+    console.error('[link-acesso]', err);
+    alert('❌ Erro de conexão. Verifique sua internet e tente novamente.');
+    if (btn) { btn.disabled = false; btn.textContent = '🔗 Gerar link'; }
+  }
+}
+
+function copiarLinkAcesso() {
+  const link = document.getElementById('link-acesso-gerado')?.textContent || '';
+  if (!link || link === '—') return;
+  navigator.clipboard.writeText(link)
+    .then(() => {
+      const fb = document.getElementById('feedback-copia');
+      if (fb) { fb.style.display = 'inline'; setTimeout(() => fb.style.display = 'none', 2500); }
+    })
+    .catch(() => {
+      // Fallback para iOS/Safari
+      const el = document.getElementById('link-acesso-gerado');
+      if (!el) return;
+      const range = document.createRange();
+      range.selectNodeContents(el);
+      const sel = window.getSelection();
+      sel.removeAllRanges();
+      sel.addRange(range);
+      document.execCommand('copy');
+    });
+}
