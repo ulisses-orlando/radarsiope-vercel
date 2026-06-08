@@ -329,6 +329,12 @@ async function enviarSolicitacao() {
     return;
   }
 
+  // 🔹 Intercepta solicitação de novo link de acesso
+  if (tipo === 'solicitar_link_acesso') {
+    await _processarSolicitacaoLinkAcesso(usuario.id, descricao);
+    return;
+  }
+
   // ✅ Fluxo normal
   try {
     await db.collection('usuarios').doc(usuario.id).collection('solicitacoes').add({
@@ -415,6 +421,50 @@ async function _processarSolicitacaoCancelamento(uid, descricao) {
       _fecharModalCancelamento();
     }
   });
+}
+
+// ─── SOLICITAÇÃO DE NOVO LINK DE ACESSO ──────────────────────────────────────
+async function _processarSolicitacaoLinkAcesso(uid, descricao) {
+  const feedback = document.getElementById('suporte-feedback');
+  if (feedback) feedback.innerHTML = '<span style="color:var(--muted)">⏳ Enviando...</span>';
+
+  try {
+    // Busca assinatura ativa para incluir o assinaturaId na solicitação
+    const snap = await db.collection('usuarios').doc(uid)
+      .collection('assinaturas')
+      .where('status', 'in', ['ativa', 'ativo'])
+      .limit(1).get();
+
+    if (snap.empty) {
+      if (feedback) feedback.innerHTML = `<span style="color:#ef4444">❌ Nenhuma assinatura ativa encontrada.</span>`;
+      return;
+    }
+
+    const assinaturaId = snap.docs[0].id;
+    const selfCount    = snap.docs[0].data().self_link_gerado_count || 0;
+
+    await db.collection('usuarios').doc(uid).collection('solicitacoes').add({
+      tipo:              'solicitar_link_acesso',
+      descricao:         descricao || 'Solicitação de novo link de acesso ao app.',
+      status:            'aberta',
+      assinaturaId,
+      self_count_no_momento: selfCount,   // informativo para o admin
+      data_solicitacao:  new Date().toISOString(),
+    });
+
+    await db.collection('admin_contadores').doc('pendencias').set(
+      { solicitacoes: firebase.firestore.FieldValue.increment(1) },
+      { merge: true }
+    );
+
+    if (feedback) feedback.innerHTML = `<span style="color:#22c55e">✅ Solicitação enviada! Nossa equipe enviará o link em breve.</span>`;
+    document.getElementById('mensagem-suporte').value = '';
+    carregarHistoricoSolicitacoes(uid);
+
+  } catch (err) {
+    console.error('[link-acesso-suporte]', err);
+    if (feedback) feedback.innerHTML = `<span style="color:#ef4444">❌ Erro ao enviar. Tente novamente.</span>`;
+  }
 }
 
 // ─── RENDERIZAÇÃO DO MODAL ────────────────────────────────────────────────────

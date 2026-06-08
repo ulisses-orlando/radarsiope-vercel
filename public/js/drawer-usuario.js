@@ -679,6 +679,41 @@ async function _renderSolicitacoes() {
         }
       }
 
+      // ── Botões exclusivos para SOLICITAR LINK DE ACESSO ──────────────────
+      const isLinkAcesso = s.tipo === 'solicitar_link_acesso';
+      if (isLinkAcesso) {
+        const assinaturaId = s.assinaturaId || '';
+        const selfCount = s.self_count_no_momento != null ? s.self_count_no_momento : '—';
+
+        if (status === 'aberta' || status === 'pendente') {
+          acoes = `
+            <div style="margin-top:8px;padding:10px;background:#fffbeb;border:1px solid #fde68a;
+              border-radius:6px;font-size:12px">
+              <div style="font-weight:600;margin-bottom:4px;color:#92400e">
+                🔗 Solicitação de Link de Acesso
+              </div>
+              <div style="color:#78350f;font-size:11px;margin-bottom:8px">
+                Uso self-service no momento da solicitação: <strong>${selfCount}/3</strong>
+              </div>
+              <div style="display:flex;gap:6px;flex-wrap:wrap">
+                <button class="btn-drawer-sm btn-verde"
+                  onclick="_enviarLinkAcessoAdmin('${uid}','${doc.id}','${assinaturaId}',false)"
+                  title="Gera novo token e envia e-mail. Contador permanece em 3.">
+                  🔗 Enviar novo link
+                </button>
+                <button class="btn-drawer-sm"
+                  style="background:#7c3aed;color:#fff;border:none"
+                  onclick="_enviarLinkAcessoAdmin('${uid}','${doc.id}','${assinaturaId}',true)"
+                  title="Zera o contador self-service, gera novo token e envia e-mail.">
+                  🔄 Resetar contador + enviar link
+                </button>
+              </div>
+            </div>`;
+        } else if (status === 'atendida') {
+          acoes = `<div style="margin-top:6px;font-size:12px;color:#22c55e">✅ Link enviado por e-mail.</div>`;
+        }
+      }
+
       // Renderização do card da solicitação
       html += `
         <div id="sol-card-${doc.id}" style="border-left:4px solid ${c};border-radius:8px;background:#f8fafc;padding:10px 12px;margin-bottom:10px">
@@ -1252,6 +1287,57 @@ async function _revogarTodasSessoes() {
   } catch (e) { mostrarMensagem('Erro: ' + e.message); }
 }
 
+// ─── Admin: Enviar link de acesso por e-mail ──────────────────────────────────
+async function _enviarLinkAcessoAdmin(uid, solId, assinaturaId, resetarContador) {
+  const acao = resetarContador
+    ? 'Resetar contador (self-service volta a 0) e enviar novo link'
+    : 'Gerar e enviar novo link (contador permanece em 3)';
+
+  if (!confirm(`${acao}?\n\nUm e-mail com o link de ativação será enviado ao assinante.`)) return;
+
+  // Desabilita os botões do card durante a operação
+  const card = document.getElementById(`sol-card-${solId}`);
+  const btns = card?.querySelectorAll('button');
+  btns?.forEach(b => { b.disabled = true; });
+
+  try {
+    const resp = await fetch('/api/pagamentoMP?acao=admin-enviar-link-acesso', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ uid, solId, assinaturaId, resetarContador }),
+    });
+
+    const data = await resp.json().catch(() => ({}));
+    if (!resp.ok || !data.ok) throw new Error(data.message || 'Erro ao processar.');
+
+    // Atualiza a solicitação como atendida
+    await db.collection('usuarios').doc(uid).collection('solicitacoes').doc(solId).update({
+      status:        'atendida',
+      resposta:      resetarContador
+        ? 'Contador resetado e novo link de acesso enviado por e-mail pelo administrador.'
+        : 'Novo link de acesso enviado por e-mail pelo administrador.',
+      data_resposta: new Date().toISOString(),
+      atualizadoEm:  new Date().toISOString(),
+    });
+
+    // Decrementa o contador de pendências
+    await _incrementarContador('solicitacoes', -1);
+    await atualizarBadgeUsuarios();
+
+    const msg = resetarContador
+      ? '✅ Contador zerado e link enviado por e-mail!'
+      : '✅ Link enviado por e-mail com sucesso!';
+    mostrarMensagem(msg);
+
+    // Recarrega a aba para refletir o novo status
+    _ativarDrawerTab('solicitacoes');
+
+  } catch (err) {
+    mostrarMensagem('❌ Erro: ' + err.message);
+    btns?.forEach(b => { b.disabled = false; });
+  }
+}
+
 // ─── Reset de feedback por envio ─────────────────────────────────────────────
 async function _resetarFeedbackEnvio(assinId, envioId) {
   if (!confirm('Permitir que o assinante envie um novo feedback neste envio?')) return;
@@ -1364,5 +1450,6 @@ window._gerarLinkMulta = _gerarLinkMulta;
 window._confirmarEncerramentoDireto = _confirmarEncerramentoDireto;
 window._confirmarEncerramentoFinal = _confirmarEncerramentoFinal;
 window._salvarFeaturesUsuario = _salvarFeaturesUsuario;
+window._enviarLinkAcessoAdmin = _enviarLinkAcessoAdmin;
 
 document.addEventListener('DOMContentLoaded', () => setTimeout(atualizarBadgeUsuarios, 1500));
