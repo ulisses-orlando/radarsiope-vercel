@@ -1,6 +1,11 @@
 /* cupons.js - CRUD compatível com admin.html
    Requisitos: window.db (Firestore) já inicializado; modal HTML com ids:
    modal-edit-overlay, modal-edit-body, modal-edit-title, modal-edit-save.
+
+   Campos adicionados (suporte a cupons multi-usuário):
+   - plano_id            : ID do plano ao qual o cupom é restrito
+   - municipios_plano_master : array [{cod_municipio, nome, uf}] herdado pelos usuários do cupom
+   - assinante_master_uid: UID do assinante master que originou o cupom (opcional, para rastreio)
 */
 
 async function carregarCupons() {
@@ -14,7 +19,12 @@ async function carregarCupons() {
       const expiraFmt = d.expira_em ? d.expira_em.toDate().toLocaleDateString('pt-BR') : '—';
       const maxUsos = d.max_usos || 0;
       const usosFmt = maxUsos > 0 ? `${d.usos_atuais || 0} / ${maxUsos}` : `${d.usos_atuais || 0} / ∞`;
-      
+      const planoFmt = d.plano_id ? escapeHtml(d.plano_id) : '<span style="color:#94a3b8">—</span>';
+      const masterMuns = Array.isArray(d.municipios_plano_master) ? d.municipios_plano_master : [];
+      const masterFmt = masterMuns.length > 0
+        ? `<span title="${escapeHtml(masterMuns.map(m => m.nome || m.cod_municipio).join(', '))}" style="cursor:help">${masterMuns.length} mun.</span>`
+        : '<span style="color:#94a3b8">—</span>';
+
       const tr = document.createElement('tr');
       tr.innerHTML = `
         <td>${escapeHtml(d.codigo || '')}</td>
@@ -23,8 +33,11 @@ async function carregarCupons() {
         <td style="text-align:center">${escapeHtml(d.status || '--')}</td>
         <td style="text-align:center">${expiraFmt}</td>
         <td style="text-align:center">${usosFmt}</td>
+        <td style="text-align:center">${planoFmt}</td>
+        <td style="text-align:center">${masterFmt}</td>
         <td style="text-align:center">
           <span class="icon-btn" title="Editar" onclick="abrirModalCupom('${doc.id}', true)">✏️</span>
+          <span class="icon-btn" title="Ver assinantes" onclick="_verAssinantesCupom('${escapeHtml(d.codigo || '')}')">👥</span>
           <span class="icon-btn" title="Excluir" onclick="confirmarExclusaoCupom('${doc.id}','${(d.codigo || '').replace(/'/g, "\\'")}')">🗑️</span>
         </td>
       `;
