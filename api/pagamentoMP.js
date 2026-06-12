@@ -151,7 +151,7 @@ async function registrarPagamentoPendente(userId, assinaturaId, amountCentavos, 
 }
 
 // ─── Validação Atômica de Cupom (Backend Seguro) ──────────────────────────────
-async function validarECustomizarCupomAtomico(codigo, userId, email, cpf, assinaturaId) {
+async function validarECustomizarCupomAtomico(codigo, userId, email, cpf, assinaturaId, planId = null, cicloMeses = null) {
   return db.runTransaction(async (tx) => {
     const q = db.collection('cupons').where('codigo', '==', codigo).limit(1);
     const snap = await tx.get(q);
@@ -173,6 +173,18 @@ async function validarECustomizarCupomAtomico(codigo, userId, email, cpf, assina
     const maxUsos = data.max_usos || 0; // 0 ou null = ilimitado
     const usosAtuais = data.usos_atuais || 0;
     if (maxUsos > 0 && usosAtuais >= maxUsos) throw new Error('Limite de usos do cupom atingido.');
+
+    // Validação de plano vinculado (barreira de segurança backend)
+    if (data.plano_id && planId && data.plano_id !== planId) {
+      throw new Error(`Este cupom é válido apenas para o plano "${data.plano_id}".`);
+    }
+
+    // Validação de ciclo vinculado (barreira de segurança backend)
+    if (data.ciclo_cupom && cicloMeses && String(data.ciclo_cupom) !== String(cicloMeses)) {
+      const _cicloNomes = { '1': 'Mensal', '3': 'Trimestral', '6': 'Semestral', '12': 'Anual' };
+      const nomeCiclo = _cicloNomes[String(data.ciclo_cupom)] || `${data.ciclo_cupom} meses`;
+      throw new Error(`Este cupom é válido apenas para o ciclo ${nomeCiclo}.`);
+    }
 
     // Atualização atômica
     const novosUsos = usosAtuais + 1;
@@ -1419,7 +1431,7 @@ export default async function handler(req, res) {
       // 🔐 VALIDAÇÃO ATÔMICA DO CUPOM (ANTES DE QUALQUER FLUXO)
       if (body.cupomCodigo) {
         try {
-          await validarECustomizarCupomAtomico(body.cupomCodigo, userId, email, cpf, assinaturaId);
+          await validarECustomizarCupomAtomico(body.cupomCodigo, userId, email, cpf, assinaturaId, body.planId || null, body.ciclo_meses || null);
         } catch (cupomErr) {
           return json(res, 400, { ok: false, message: `Cupom inválido: ${cupomErr.message}` });
         }
@@ -1430,7 +1442,17 @@ export default async function handler(req, res) {
         await registrarPagamentoPendente(userId, assinaturaId, 0, 1, 'cupom_gratuito', novoPedidoRef.id);
         await novoPedidoRef.set({ status: 'pago', mpStatus: 'approved', mpPaymentMethod: 'cupom_gratuito', atualizadoEm: admin.firestore.FieldValue.serverTimestamp() }, { merge: true });
         const assinRef = db.collection('usuarios').doc(userId).collection('assinaturas').doc(assinaturaId);
-        await assinRef.set({ status: 'ativa', paymentProvider: 'cupom_gratuito', orderId: `GRAT-${novoPedidoRef.id.slice(0, 8)}`, pedidoId: novoPedidoRef.id, ativadoEm: admin.firestore.FieldValue.serverTimestamp(), atualizadoEm: admin.firestore.FieldValue.serverTimestamp() }, { merge: true });
+        await assinRef.set({
+          status: 'ativa',
+          paymentProvider: 'cupom_gratuito',
+          orderId: `GRAT-${novoPedidoRef.id.slice(0, 8)}`,
+          pedidoId: novoPedidoRef.id,
+          // Grava código do cupom para permitir collectionGroup query no admin ("Ver assinantes")
+          cupom_utilizado: body.cupomCodigo || null,
+          ativadoEm: admin.firestore.FieldValue.serverTimestamp(),
+          atualizadoEm: admin.firestore.FieldValue.serverTimestamp()
+        }, { merge: true });
+        
         await db.collection('usuarios').doc(userId).update({ ativo: true });
 
         const _sessionToken = crypto.randomBytes(32).toString('hex');
