@@ -758,6 +758,25 @@ async function validarCupom(codigo) {
       msgUso = `Restam apenas ${maxUsos - usosAtuais} uso(s).`;
     }
 
+    // Validação de plano vinculado (UX — segurança fica no backend)
+    // Se o cupom tem plano_id, o plano selecionado deve ser o mesmo
+    if (cupom.plano_id && _planoAtual) {
+      if (_planoAtual.id !== cupom.plano_id) {
+        const nomePlano = cupom.plano_id; // fallback: exibe o id caso não tenhamos o nome
+        mostrarMensagem(`Este cupom é válido apenas para o plano "${nomePlano}". Selecione o plano correto e tente novamente.`);
+        return null;
+      }
+      // Se o cupom também restringe o ciclo, verifica o ciclo selecionado
+      if (cupom.ciclo_cupom && _planoAtual.cicloSelecionado) {
+        if (String(_planoAtual.cicloSelecionado) !== String(cupom.ciclo_cupom)) {
+          const _cicloNomes = { '1': 'Mensal', '3': 'Trimestral', '6': 'Semestral', '12': 'Anual' };
+          const nomeCiclo = _cicloNomes[String(cupom.ciclo_cupom)] || `${cupom.ciclo_cupom} meses`;
+          mostrarMensagem(`Este cupom é válido apenas para o ciclo ${nomeCiclo}. Selecione o ciclo correto e tente novamente.`);
+          return null;
+        }
+      }
+    }
+
     return { ...cupom, _id: snap.docs[0].id, msgUso };
   } catch (err) {
     console.error('[assinatura] Erro ao validar cupom:', err);
@@ -940,7 +959,9 @@ async function registrarAssinatura(userId, payload, preview) {
     desconto_pct: preview.desconto_pct ?? 0, tem_fidelizacao: preview.tem_fidelizacao ?? false,
     data_fim_fidelizacao: preview.tem_fidelizacao
       ? firebase.firestore.Timestamp.fromDate(preview.data_fim_fidelizacao) : null,
-    cupom: payload.cupom || null, features_snapshot: payload.features || null,
+    cupom: payload.cupom || null,
+    cupom_utilizado: payload.cupom_utilizado || null,  // código do cupom para collectionGroup query no admin
+    features_snapshot: payload.features || null, 
     municipios_plano: municipiosPlano,
     data_inicio: firebase.firestore.Timestamp.fromDate(agora),
     data_proxima_renovacao: firebase.firestore.Timestamp.fromDate(renovacao),
@@ -1095,6 +1116,16 @@ async function processarEnvioAssinatura(e) {
     if (munC) { munC.style.display = 'none'; munC.style.pointerEvents = 'none'; }
   }
 
+  // ── Municípios extras: quando cupom de gratuidade, herda do master (sem sobrescrever [0]) ──
+  // municipios_plano_master do cupom são os extras herdados; [0] sempre vem do formulário.
+  // Para assinaturas normais, usa a seleção do usuário.
+  const extrasParaAssinatura = isGratuidade && Array.isArray(_cupomAplicado?.municipios_plano_master) && _cupomAplicado.municipios_plano_master.length > 0
+    ? _cupomAplicado.municipios_plano_master.map(m => ({ ...m, cod_municipio: cod6(m.cod_municipio) }))
+    : _municipiosExtrasSelecionados.map(cod => {
+      const det = _municipiosDisponiveis.find(m => m.cod_municipio === cod);
+      return { cod_municipio: cod, nome: det?.nome || cod, uf: det?.uf || dadosUf?.cod_uf || '' };
+    });
+
   setStatus('Registrando dados...', '#555');
   try {
     const userId = await upsertUsuario({
@@ -1109,15 +1140,13 @@ async function processarEnvioAssinatura(e) {
       plano_nome: _planoAtual.nome || null,
       tipos_selecionados: tiposSelecionados,
       cupom: cupomCod || null,
+      cupom_utilizado: _cupomAplicado?.codigo || null,  // gravado na assinatura para query admin
       features: _planoAtual.features || null,
       cod_uf: dadosUf?.cod_uf || '',
       cod_municipio: dadosUf?.cod_municipio || null,
       nome_municipio: dadosUf?.nome_municipio || '',
-      // Extras: array de objetos {cod_municipio, nome, uf}
-      municipiosExtras: _municipiosExtrasSelecionados.map(cod => {
-        const det = _municipiosDisponiveis.find(m => m.cod_municipio === cod);
-        return { cod_municipio: cod, nome: det?.nome || cod, uf: det?.uf || dadosUf?.cod_uf || '' };
-      }),
+      // [0] = município do formulário; extras = seleção do user OU herança do cupom master
+      municipiosExtras: extrasParaAssinatura,
     }, preview);
 
     setStatus(isGratuidade ? 'Ativando gratuidade...' : 'Iniciando pagamento...', '#555');
@@ -1126,6 +1155,7 @@ async function processarEnvioAssinatura(e) {
       userId, assinaturaId,
       amountCentavos: isGratuidade ? 0 : preview.amountCentavos,
       cpf, nome, email,
+      planId: _planoAtual.id || null,  // usado pelo backend para validar plano_id do cupom
       descricao: `${_planoAtual.nome || 'Assinatura Radar SIOPE'} — ${preview.ciclo_meses} meses`,
       installmentsMax: _planoAtual.parcelas_sem_juros || preview.ciclo_meses,
       dataPrimeiroVencimento: new Date().toISOString().split('T')[0],
