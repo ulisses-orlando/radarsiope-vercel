@@ -239,10 +239,10 @@ async function abrirModalCupom(id, editar = false) {
     resultDiv.innerHTML = '<div style="padding:8px 12px;font-size:12px;color:#64748b;">Buscando...</div>';
 
     try {
-      // Busca por nome (range query) e por e-mail (equality)
+      // Busca por nome_busca (lowercase — gravado em upsertUsuario) e por e-mail (equality)
       const [snapNome, snapEmail] = await Promise.all([
         db.collection('usuarios')
-          .orderBy('nome').startAt(termo).endAt(termo + '\uf8ff').limit(8).get(),
+          .orderBy('nome_busca').startAt(termo).endAt(termo + '\uf8ff').limit(8).get(),
         db.collection('usuarios')
           .where('email', '==', termo).limit(3).get(),
       ]);

@@ -902,7 +902,8 @@ async function upsertUsuario(dados) {
   const waNumber = whatsapp ? String(whatsapp).replace(/\D/g, '') : '';
 
   const base = {
-    nome, cpfNormalizado: cpfNorm, telefone: telefone || null,
+    nome, nome_busca: (nome || '').toLowerCase().trim(),
+    cpfNormalizado: cpfNorm, telefone: telefone || null,
     whatsapp: whatsapp || null, whatsapp_number: waNumber,
     whatsapp_optin: whatsapp ? (whatsappOptin ?? true) : false,
     whatsapp_optin_em: whatsapp ? firebase.firestore.FieldValue.serverTimestamp() : null,
