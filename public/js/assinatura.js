@@ -962,7 +962,7 @@ async function registrarAssinatura(userId, payload, preview) {
       ? firebase.firestore.Timestamp.fromDate(preview.data_fim_fidelizacao) : null,
     cupom: payload.cupom || null,
     cupom_utilizado: payload.cupom_utilizado || null,  // código do cupom para collectionGroup query no admin
-    features_snapshot: payload.features || null, 
+    features_snapshot: payload.features || null,
     municipios_plano: municipiosPlano,
     data_inicio: firebase.firestore.Timestamp.fromDate(agora),
     data_proxima_renovacao: firebase.firestore.Timestamp.fromDate(renovacao),
@@ -1116,16 +1116,13 @@ async function processarEnvioAssinatura(e) {
     const munC = document.getElementById('container-municipios-extra');
     if (munC) { munC.style.display = 'none'; munC.style.pointerEvents = 'none'; }
   }
-
-  // ── Municípios extras: quando cupom de gratuidade, herda do master (sem sobrescrever [0]) ──
-  // municipios_plano_master do cupom são os extras herdados; [0] sempre vem do formulário.
-  // Para assinaturas normais, usa a seleção do usuário.
-  const extrasParaAssinatura = isGratuidade && Array.isArray(_cupomAplicado?.municipios_plano_master) && _cupomAplicado.municipios_plano_master.length > 0
-    ? _cupomAplicado.municipios_plano_master.map(m => ({ ...m, cod_municipio: cod6(m.cod_municipio) }))
-    : _municipiosExtrasSelecionados.map(cod => {
-      const det = _municipiosDisponiveis.find(m => m.cod_municipio === cod);
-      return { cod_municipio: cod, nome: det?.nome || cod, uf: det?.uf || dadosUf?.cod_uf || '' };
-    });
+  
+  // ── Municípios extras: sempre seleção do próprio usuário no formulário ──
+  // Cada assinante define seus próprios municípios conforme o plano contratado.
+  const extrasParaAssinatura = _municipiosExtrasSelecionados.map(cod => {
+    const det = _municipiosDisponiveis.find(m => m.cod_municipio === cod);
+    return { cod_municipio: cod, nome: det?.nome || cod, uf: det?.uf || dadosUf?.cod_uf || '' };
+  });
 
   setStatus('Registrando dados...', '#555');
   try {
@@ -1146,7 +1143,7 @@ async function processarEnvioAssinatura(e) {
       cod_uf: dadosUf?.cod_uf || '',
       cod_municipio: dadosUf?.cod_municipio || null,
       nome_municipio: dadosUf?.nome_municipio || '',
-      // [0] = município do formulário; extras = seleção do user OU herança do cupom master
+      // [0] = município do formulário; extras = seleção do próprio usuário conforme o plano
       municipiosExtras: extrasParaAssinatura,
     }, preview);
 
