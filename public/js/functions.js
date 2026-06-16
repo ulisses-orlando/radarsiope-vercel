@@ -176,6 +176,7 @@ function mostrarMensagem(mensagem) {
   texto.innerText = mensagem;
   texto.style.fontSize = "16px";
   texto.style.margin = "15px 0";
+  texto.style.color = "#333";
 
   const botao = document.createElement("button");
   botao.innerText = "OK";
