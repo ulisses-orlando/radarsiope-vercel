@@ -11,53 +11,49 @@ firebase.firestore.FieldValue (Firebase SDK)
 ========================================================================== */
 'use strict';
 
-const _mostrarMensagemOrig = window.mostrarMensagem;
-window.mostrarMensagem = function(msg) {
-  // 1. Injeta CSS de emergência para forçar contraste em classes comuns de toast/alerta
-  if (!document.getElementById('css-fix-mostrar-mensagem')) {
-    const style = document.createElement('style');
-    style.id = 'css-fix-mostrar-mensagem';
-    style.textContent = `
-      /* Força contraste em elementos comuns de mensagem/toast */
-      .toast, .alert, .mensagem, .snackbar, [role="alert"], #msg-toast-custom {
-        color: #1e293b !important; /* Texto escuro */
-        background-color: #ffffff !important; /* Fundo claro */
-        border: 1px solid #cbd5e1 !important;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.1) !important;
-      }
-      /* Caso o sistema use fundo escuro, garante texto branco */
-      .toast.bg-dark, .alert.bg-dark, .mensagem.bg-dark {
-        color: #ffffff !important;
-        background-color: #1e293b !important;
-      }
-    `;
-    document.head.appendChild(style);
-  }
+const mostrarMensagem = function(msg) {
+  // Remove toasts anteriores para não empilhar na tela
+  const existentes = document.querySelectorAll('.toast-seguro-radar');
+  existentes.forEach(el => el.remove());
 
-  // 2. Se a função original existir e não for um simples 'alert', usa ela (agora com o CSS fix aplicado)
-  if (typeof _mostrarMensagemOrig === 'function' && _mostrarMensagemOrig.toString().indexOf('alert') === -1) {
-    _mostrarMensagemOrig(msg);
-  } else {
-    // 3. Fallback próprio com estilos explícitos e garantidos caso a original falhe
-    const existente = document.getElementById('msg-toast-seguro');
-    if (existente) existente.remove();
+  const toast = document.createElement('div');
+  toast.className = 'toast-seguro-radar';
+  toast.textContent = msg;
+  
+  // Estilos inline com !important para garantir que nenhuma folha de estilo sobrescreva
+  toast.style.setProperty('position', 'fixed', 'important');
+  toast.style.setProperty('top', '24px', 'important');
+  toast.style.setProperty('left', '50%', 'important');
+  toast.style.setProperty('transform', 'translateX(-50%)', 'important');
+  toast.style.setProperty('background-color', '#ffffff', 'important'); // Fundo branco
+  toast.style.setProperty('color', '#0f172a', 'important'); // Texto escuro (quase preto)
+  toast.style.setProperty('border', '1px solid #cbd5e1', 'important');
+  toast.style.setProperty('box-shadow', '0 10px 15px -3px rgba(0, 0, 0, 0.15)', 'important');
+  toast.style.setProperty('padding', '14px 28px', 'important');
+  toast.style.setProperty('border-radius', '8px', 'important');
+  toast.style.setProperty('font-size', '15px', 'important');
+  toast.style.setProperty('font-weight', '600', 'important');
+  toast.style.setProperty('font-family', 'system-ui, -apple-system, sans-serif', 'important');
+  toast.style.setProperty('z-index', '999999', 'important');
+  toast.style.setProperty('text-align', 'center', 'important');
+  toast.style.setProperty('max-width', '90vw', 'important');
+  toast.style.setProperty('opacity', '0', 'important');
+  toast.style.setProperty('transition', 'opacity 0.3s ease, transform 0.3s ease', 'important');
 
-    const toast = document.createElement('div');
-    toast.id = 'msg-toast-seguro';
-    toast.textContent = msg;
-    toast.style.cssText = `
-      position: fixed; top: 20px; left: 50%; transform: translateX(-50%);
-      background-color: #1e293b; color: #ffffff; 
-      padding: 12px 24px; border-radius: 8px; font-size: 14px; font-weight: 500;
-      font-family: inherit; box-shadow: 0 4px 12px rgba(0,0,0,0.2);
-      z-index: 99999; text-align: center; max-width: 90vw; border: 1px solid #334155;
-    `;
-    document.body.appendChild(toast);
-    setTimeout(() => {
-      toast.style.opacity = '0'; toast.style.transition = 'opacity 0.3s';
-      setTimeout(() => toast.remove(), 300);
-    }, 4000);
-  }
+  document.body.appendChild(toast);
+
+  // Animação de entrada
+  requestAnimationFrame(() => {
+    toast.style.setProperty('opacity', '1', 'important');
+    toast.style.setProperty('transform', 'translateX(-50%) translateY(0)', 'important');
+  });
+
+  // Auto-remove após 4 segundos
+  setTimeout(() => {
+    toast.style.setProperty('opacity', '0', 'important');
+    toast.style.setProperty('transform', 'translateX(-50%) translateY(-10px)', 'important');
+    setTimeout(() => toast.remove(), 300);
+  }, 4000);
 };
 
 // ─── Parâmetros de URL ────────────────────────────────────────────────────────
