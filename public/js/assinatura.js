@@ -303,7 +303,7 @@ async function configurarUIMunicipiosExtra() {
 function fmtBRL(v) {
   const n = Number(v);
   if (isNaN(n) || v === null || v === undefined) return '—';
-  return n.toLocaleString('pt-BRL', { style: 'currency', currency: 'BRL' });
+  return n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }); // CORRIGIDO: 'pt-BR' em vez de 'pt-BRL'
 }
 
 function safeNum(v) {
