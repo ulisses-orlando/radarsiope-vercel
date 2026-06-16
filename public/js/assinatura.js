@@ -762,16 +762,23 @@ async function validarCupom(codigo) {
     // Se o cupom tem plano_id, o plano selecionado deve ser o mesmo
     if (cupom.plano_id && _planoAtual) {
       if (_planoAtual.id !== cupom.plano_id) {
-        const nomePlano = cupom.plano_id; // fallback: exibe o id caso não tenhamos o nome
-        mostrarMensagem(`Este cupom é válido apenas para o plano "${nomePlano}". Selecione o plano correto e tente novamente.`);
+        // Busca nome real do plano vinculado ao cupom para exibição amigável
+        let nomePlanoVinculado = cupom.plano_id;
+        try {
+          const planoDoc = await db.collection('planos').doc(cupom.plano_id).get();
+          if (planoDoc.exists) nomePlanoVinculado = planoDoc.data().nome || cupom.plano_id;
+        } catch (e) { /* fallback para o id */ }
+        const _cicloNomesCupom = { '1': '1 mês', '3': '3 meses', '6': '6 meses', '12': '12 meses' };
+        const sufixoCiclo = cupom.ciclo_cupom ? ` ${_cicloNomesCupom[String(cupom.ciclo_cupom)] || cupom.ciclo_cupom}` : '';
+        _setCupomFeedbackErro(`Este cupom é válido apenas para o plano ${nomePlanoVinculado}${sufixoCiclo}. Selecione o plano correto e tente novamente.`);
         return null;
       }
       // Se o cupom também restringe o ciclo, verifica o ciclo selecionado
       if (cupom.ciclo_cupom && _planoAtual.cicloSelecionado) {
         if (String(_planoAtual.cicloSelecionado) !== String(cupom.ciclo_cupom)) {
-          const _cicloNomes = { '1': 'Mensal', '3': 'Trimestral', '6': 'Semestral', '12': 'Anual' };
+          const _cicloNomes = { '1': 'Mensal (1 mês)', '3': 'Trimestral (3 meses)', '6': 'Semestral (6 meses)', '12': 'Anual (12 meses)' };
           const nomeCiclo = _cicloNomes[String(cupom.ciclo_cupom)] || `${cupom.ciclo_cupom} meses`;
-          mostrarMensagem(`Este cupom é válido apenas para o ciclo ${nomeCiclo}. Selecione o ciclo correto e tente novamente.`);
+          _setCupomFeedbackErro(`Este cupom é válido apenas para o ciclo ${nomeCiclo}. Selecione o ciclo correto e tente novamente.`);
           return null;
         }
       }
@@ -962,7 +969,7 @@ async function registrarAssinatura(userId, payload, preview) {
       ? firebase.firestore.Timestamp.fromDate(preview.data_fim_fidelizacao) : null,
     cupom: payload.cupom || null,
     cupom_utilizado: payload.cupom_utilizado || null,  // código do cupom para collectionGroup query no admin
-    features_snapshot: payload.features || null,
+    features_snapshot: payload.features || null, 
     municipios_plano: municipiosPlano,
     data_inicio: firebase.firestore.Timestamp.fromDate(agora),
     data_proxima_renovacao: firebase.firestore.Timestamp.fromDate(renovacao),
@@ -1116,13 +1123,6 @@ async function processarEnvioAssinatura(e) {
     const munC = document.getElementById('container-municipios-extra');
     if (munC) { munC.style.display = 'none'; munC.style.pointerEvents = 'none'; }
   }
-  
-  // ── Municípios extras: sempre seleção do próprio usuário no formulário ──
-  // Cada assinante define seus próprios municípios conforme o plano contratado.
-  const extrasParaAssinatura = _municipiosExtrasSelecionados.map(cod => {
-    const det = _municipiosDisponiveis.find(m => m.cod_municipio === cod);
-    return { cod_municipio: cod, nome: det?.nome || cod, uf: det?.uf || dadosUf?.cod_uf || '' };
-  });
 
   setStatus('Registrando dados...', '#555');
   try {
