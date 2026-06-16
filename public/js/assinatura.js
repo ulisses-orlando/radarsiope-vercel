@@ -600,9 +600,25 @@ async function _onPlanoSelecionado(planId, cicloInicial = null) {
 
   const ciclosDisp = Array.isArray(plano.ciclos_disponiveis) && plano.ciclos_disponiveis.length
     ? plano.ciclos_disponiveis : ['3'];
+  const novoCiclo = Number(cicloInicial || ciclosDisp[0]);
+
+  // ── Reset do cupom ao trocar plano ou ciclo ──────────────────────────────────
+  // Se já havia um cupom aplicado e o usuário mudou o plano ou o ciclo,
+  // o desconto é invalidado automaticamente para evitar cupom em combinação errada.
+  if (_cupomAplicado) {
+    const planoMudou = _planoAtual?.id !== planId;
+    const cicloMudou = _planoAtual?.cicloSelecionado !== novoCiclo;
+    if (planoMudou || cicloMudou) {
+      _cupomAplicado = null;
+      const inputCupom = document.getElementById('cupom');
+      if (inputCupom) inputCupom.value = '';
+      const fb = document.getElementById('cupom-feedback');
+      if (fb) { fb.textContent = 'Cupom removido pois o plano ou ciclo foi alterado.'; fb.style.color = 'var(--warning, #b45309)'; }
+    }
+  }
 
   _planoAtual = plano;
-  _planoAtual.cicloSelecionado = Number(cicloInicial || ciclosDisp[0]);
+  _planoAtual.cicloSelecionado = novoCiclo;
 
   const maxMun = Number(_planoAtual?.features?.max_municipios) || 1;
   const containerMun = document.getElementById('container-municipios-extra');
@@ -759,23 +775,17 @@ async function validarCupom(codigo) {
     }
 
     // Validação de plano vinculado (UX — segurança fica no backend)
+    // Se o cupom tem plano_id, o plano selecionado deve ser o mesmo
     if (cupom.plano_id && _planoAtual) {
       if (_planoAtual.id !== cupom.plano_id) {
-        // Busca nome real do plano vinculado ao cupom para exibição amigável
-        let nomePlanoVinculado = cupom.plano_id;
-        try {
-          const planoDoc = await db.collection('planos').doc(cupom.plano_id).get();
-          if (planoDoc.exists) nomePlanoVinculado = planoDoc.data().nome || cupom.plano_id;
-        } catch (e) { /* fallback para o id */ }
-        const _cicloNomesCupom = { '1': '1 mês', '3': '3 meses', '6': '6 meses', '12': '12 meses' };
-        const sufixoCiclo = cupom.ciclo_cupom ? ` ${_cicloNomesCupom[String(cupom.ciclo_cupom)] || cupom.ciclo_cupom}` : '';
-        mostrarMensagem(`Este cupom é válido apenas para o plano ${nomePlanoVinculado}${sufixoCiclo}. Selecione o plano correto e tente novamente.`);
+        const nomePlano = cupom.plano_id; // fallback: exibe o id caso não tenhamos o nome
+        mostrarMensagem(`Este cupom é válido apenas para o plano "${nomePlano}". Selecione o plano correto e tente novamente.`);
         return null;
       }
       // Se o cupom também restringe o ciclo, verifica o ciclo selecionado
       if (cupom.ciclo_cupom && _planoAtual.cicloSelecionado) {
         if (String(_planoAtual.cicloSelecionado) !== String(cupom.ciclo_cupom)) {
-          const _cicloNomes = { '1': 'Mensal (1 mês)', '3': 'Trimestral (3 meses)', '6': 'Semestral (6 meses)', '12': 'Anual (12 meses)' };
+          const _cicloNomes = { '1': 'Mensal', '3': 'Trimestral', '6': 'Semestral', '12': 'Anual' };
           const nomeCiclo = _cicloNomes[String(cupom.ciclo_cupom)] || `${cupom.ciclo_cupom} meses`;
           mostrarMensagem(`Este cupom é válido apenas para o ciclo ${nomeCiclo}. Selecione o ciclo correto e tente novamente.`);
           return null;
