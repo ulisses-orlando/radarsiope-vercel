@@ -11,6 +11,55 @@ firebase.firestore.FieldValue (Firebase SDK)
 ========================================================================== */
 'use strict';
 
+const _mostrarMensagemOrig = window.mostrarMensagem;
+window.mostrarMensagem = function(msg) {
+  // 1. Injeta CSS de emergência para forçar contraste em classes comuns de toast/alerta
+  if (!document.getElementById('css-fix-mostrar-mensagem')) {
+    const style = document.createElement('style');
+    style.id = 'css-fix-mostrar-mensagem';
+    style.textContent = `
+      /* Força contraste em elementos comuns de mensagem/toast */
+      .toast, .alert, .mensagem, .snackbar, [role="alert"], #msg-toast-custom {
+        color: #1e293b !important; /* Texto escuro */
+        background-color: #ffffff !important; /* Fundo claro */
+        border: 1px solid #cbd5e1 !important;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.1) !important;
+      }
+      /* Caso o sistema use fundo escuro, garante texto branco */
+      .toast.bg-dark, .alert.bg-dark, .mensagem.bg-dark {
+        color: #ffffff !important;
+        background-color: #1e293b !important;
+      }
+    `;
+    document.head.appendChild(style);
+  }
+
+  // 2. Se a função original existir e não for um simples 'alert', usa ela (agora com o CSS fix aplicado)
+  if (typeof _mostrarMensagemOrig === 'function' && _mostrarMensagemOrig.toString().indexOf('alert') === -1) {
+    _mostrarMensagemOrig(msg);
+  } else {
+    // 3. Fallback próprio com estilos explícitos e garantidos caso a original falhe
+    const existente = document.getElementById('msg-toast-seguro');
+    if (existente) existente.remove();
+
+    const toast = document.createElement('div');
+    toast.id = 'msg-toast-seguro';
+    toast.textContent = msg;
+    toast.style.cssText = `
+      position: fixed; top: 20px; left: 50%; transform: translateX(-50%);
+      background-color: #1e293b; color: #ffffff; 
+      padding: 12px 24px; border-radius: 8px; font-size: 14px; font-weight: 500;
+      font-family: inherit; box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+      z-index: 99999; text-align: center; max-width: 90vw; border: 1px solid #334155;
+    `;
+    document.body.appendChild(toast);
+    setTimeout(() => {
+      toast.style.opacity = '0'; toast.style.transition = 'opacity 0.3s';
+      setTimeout(() => toast.remove(), 300);
+    }, 4000);
+  }
+};
+
 // ─── Parâmetros de URL ────────────────────────────────────────────────────────
 function getParam(nome) {
   return new URL(window.location.href).searchParams.get(nome);
@@ -740,7 +789,7 @@ async function validarCupom(codigo) {
     if (snap.empty) { mostrarMensagem('Cupom não encontrado.'); return null; }
     const cupom = snap.docs[0].data();
     if (cupom.status !== 'ativo') { mostrarMensagem('Cupom inativo.'); return null; }
-
+    
     // Validação de validade (Brasília UTC-3 fixo)
     if (cupom.expira_em) {
       const now = new Date();
@@ -759,26 +808,34 @@ async function validarCupom(codigo) {
     }
 
     // Validação de plano vinculado (UX — segurança fica no backend)
-    // Se o cupom tem plano_id, o plano selecionado deve ser o mesmo
     if (cupom.plano_id && _planoAtual) {
       if (_planoAtual.id !== cupom.plano_id) {
-        // Busca nome real do plano vinculado ao cupom para exibição amigável
-        let nomePlanoVinculado = cupom.plano_id;
+        let nomePlanoExibicao = cupom.plano_id;
         try {
-          const planoDoc = await db.collection('planos').doc(cupom.plano_id).get();
-          if (planoDoc.exists) nomePlanoVinculado = planoDoc.data().nome || cupom.plano_id;
-        } catch (e) { /* fallback para o id */ }
-        const _cicloNomesCupom = { '1': '1 mês', '3': '3 meses', '6': '6 meses', '12': '12 meses' };
-        const sufixoCiclo = cupom.ciclo_cupom ? ` ${_cicloNomesCupom[String(cupom.ciclo_cupom)] || cupom.ciclo_cupom}` : '';
-        _setCupomFeedbackErro(`Este cupom é válido apenas para o plano ${nomePlanoVinculado}${sufixoCiclo}. Selecione o plano correto e tente novamente.`);
+          // Busca o nome real do plano no Firestore para exibir de forma amigável
+          const planoCupomDoc = await db.collection('planos').doc(cupom.plano_id).get();
+          if (planoCupomDoc.exists) {
+            const dados = planoCupomDoc.data();
+            nomePlanoExibicao = dados.nome || dados.plano_nome || cupom.plano_id;
+          }
+        } catch (e) {
+          console.warn('[assinatura] Erro ao buscar nome do plano do cupom:', e);
+        }
+
+        const _cicloNomes = { '1': 'Mensal', '3': 'Trimestral', '6': 'Semestral', '12': 'Anual' };
+        const nomeCiclo = cupom.ciclo_cupom ? (_cicloNomes[String(cupom.ciclo_cupom)] || `${cupom.ciclo_cupom} meses`) : '';
+        const nomeCompleto = nomeCiclo ? `${nomePlanoExibicao} ${nomeCiclo}` : nomePlanoExibicao;
+
+        mostrarMensagem(`Este cupom é válido apenas para o plano ${nomeCompleto}. Selecione o plano correto e tente novamente.`);
         return null;
       }
+      
       // Se o cupom também restringe o ciclo, verifica o ciclo selecionado
       if (cupom.ciclo_cupom && _planoAtual.cicloSelecionado) {
         if (String(_planoAtual.cicloSelecionado) !== String(cupom.ciclo_cupom)) {
-          const _cicloNomes = { '1': 'Mensal (1 mês)', '3': 'Trimestral (3 meses)', '6': 'Semestral (6 meses)', '12': 'Anual (12 meses)' };
+          const _cicloNomes = { '1': 'Mensal', '3': 'Trimestral', '6': 'Semestral', '12': 'Anual' };
           const nomeCiclo = _cicloNomes[String(cupom.ciclo_cupom)] || `${cupom.ciclo_cupom} meses`;
-          _setCupomFeedbackErro(`Este cupom é válido apenas para o ciclo ${nomeCiclo}. Selecione o ciclo correto e tente novamente.`);
+          mostrarMensagem(`Este cupom é válido apenas para o ciclo ${nomeCiclo} deste plano. Selecione o ciclo correto e tente novamente.`);
           return null;
         }
       }
