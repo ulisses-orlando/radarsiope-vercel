@@ -1,45 +1,145 @@
-# .github/workflows/sync-cauc.yml
-# Carga diária dos dados do CAUC (Tesouro Nacional) no Supabase.
-# Executa às 4h horário de Brasília (7h UTC).
-# Garante que o relatório de conformidade sempre use dados atualizados,
-# sem latência para o usuário final.
+# .github/workflows/ping-supabase.yml
+# Carga diária dos dados do CAUC diretamente do Tesouro Transparente para o Supabase.
+# Roda no GitHub Actions (sem limite de 10s do Vercel Hobby).
+# Resolve dois objetivos:
+#   1. Mantém o projeto Supabase ativo no plano gratuito
+#   2. Atualiza os dados do CAUC diariamente às 4h de Brasília
 
-name: Sync CAUC
+name: Ping Supabase
 
 on:
   schedule:
     - cron: '0 7 * * *'   # 7h UTC = 4h Brasília (UTC-3), todos os dias
-  workflow_dispatch:       # permite disparo manual pelo painel do GitHub
+  workflow_dispatch:
 
 jobs:
-  sync:
+  ping:
     runs-on: ubuntu-latest
+    timeout-minutes: 15    # limite generoso para download + processamento do CSV
+
     steps:
-      - name: Disparar sync CAUC via endpoint Vercel
+      - name: Baixar CSV do Tesouro Transparente
         run: |
-          echo "🔄 Iniciando carga CAUC em $(date -u)"
-
-          RESPONSE=$(curl -s -w "\n%{http_code}" \
-            -X GET \
-            -H "x-cron-secret: ${{ secrets.CRON_SECRET }}" \
-            "https://radarsiope.com.br/api/sendViaSES?acao=sync_cauc&force=true")
-
-          HTTP_BODY=$(echo "$RESPONSE" | head -n -1)
-          HTTP_CODE=$(echo "$RESPONSE" | tail -n 1)
-
-          echo "HTTP status: $HTTP_CODE"
-          echo "Resposta: $HTTP_BODY"
-
-          if [ "$HTTP_CODE" != "200" ]; then
-            echo "❌ Sync CAUC falhou com status $HTTP_CODE"
+          echo "📥 Baixando CSV do CAUC em $(date -u)"
+          curl -L --max-time 120 --retry 3 --retry-delay 10 \
+            -o /tmp/cauc.csv \
+            "https://www.tesourotransparente.gov.br/ckan/dataset/72b5f371-0c35-4613-8076-c99c821a6410/resource/07af297a-5e59-494a-a88a-55ddfd2f4b01/download/relatorio-situacao-de-varios-entes---municipios---uf-todas---abrangencia-1.csv"
+          LINES=$(wc -l < /tmp/cauc.csv)
+          echo "✅ CSV baixado: $LINES linhas"
+          if [ "$LINES" -lt 100 ]; then
+            echo "❌ CSV suspeito (menos de 100 linhas)"
             exit 1
           fi
 
-          # Verifica se a resposta indica sucesso
-          if echo "$HTTP_BODY" | grep -q '"ok":true'; then
-            echo "✅ Sync CAUC concluído com sucesso"
-          else
-            echo "⚠️ Resposta inesperada do servidor:"
-            echo "$HTTP_BODY"
-            exit 1
-          fi
+      - name: Processar e enviar para Supabase
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+        run: |
+          python3 << 'PYEOF'
+          import csv, json, os, urllib.request, urllib.error
+          from datetime import datetime, timezone
+
+          SUPABASE_URL = os.environ['SUPABASE_URL']
+          SERVICE_KEY  = os.environ['SUPABASE_SERVICE_KEY']
+
+          def supabase_request(method, path, body=None):
+            url = f"{SUPABASE_URL}/rest/v1/{path}"
+            data = json.dumps(body).encode() if body else None
+            req = urllib.request.Request(url, data=data, method=method, headers={
+              'apikey': SERVICE_KEY,
+              'Authorization': f'Bearer {SERVICE_KEY}',
+              'Content-Type': 'application/json',
+              'Prefer': 'resolution=merge-duplicates,return=minimal',
+            })
+            try:
+              with urllib.request.urlopen(req) as r:
+                return r.status, r.read().decode()
+            except urllib.error.HTTPError as e:
+              return e.code, e.read().decode()
+
+          # Marca sync como pending
+          supabase_request('POST', 'cauc_cache_meta', [{
+            'id': 1, 'sync_status': 'pending',
+            'last_sync': datetime.now(timezone.utc).isoformat()
+          }])
+
+          # Parseia o CSV
+          records = []
+          with open('/tmp/cauc.csv', encoding='utf-8', errors='replace') as f:
+            lines = f.readlines()
+
+          # Encontra linha do header (contém "IBGE" e tem >30 colunas)
+          header_idx = 3
+          for i, line in enumerate(lines[:8]):
+            parts = line.split(';')
+            if len(parts) > 30 and 'IBGE' in line:
+              header_idx = i
+              break
+
+          data_lines = lines[header_idx + 1:]
+          seen = set()
+          skipped = 0
+
+          for line in data_lines:
+            line = line.strip()
+            if not line:
+              continue
+            cols = line.split(';')
+            cols = [c.strip().strip('"') for c in cols]
+            if len(cols) < 35:
+              skipped += 1
+              continue
+
+            cod_raw = ''.join(c for c in cols[2] if c.isdigit())
+            cod_ibge = cod_raw.zfill(7)
+            if len(cod_ibge) != 7 or cod_ibge in seen:
+              continue
+            seen.add(cod_ibge)
+
+            records.append({
+              'cod_ibge':  cod_ibge,
+              'uf':        cols[0][:2].upper(),
+              'municipio': cols[1][:255],
+              'item_3_2_3': cols[18] if len(cols) > 18 else None,
+              'item_5_1':   cols[28] if len(cols) > 28 else None,
+              'item_5_5':   cols[32] if len(cols) > 32 else None,
+              'item_5_6':   cols[33] if len(cols) > 33 else None,
+              'item_5_7':   cols[34] if len(cols) > 34 else None,
+            })
+
+          print(f"📊 {len(records)} municípios processados ({skipped} linhas ignoradas)")
+
+          # Upsert em batches de 500
+          BATCH = 500
+          errors = []
+          for i in range(0, len(records), BATCH):
+            batch = records[i:i+BATCH]
+            status, body = supabase_request('POST', 'cauc_municipios', batch)
+            if status not in (200, 201, 204):
+              errors.append(f"Batch {i//BATCH + 1}: HTTP {status} — {body[:200]}")
+              print(f"⚠️  Erro no batch {i//BATCH + 1}: {status}")
+            else:
+              print(f"✅ Batch {i//BATCH + 1}/{(len(records)-1)//BATCH + 1} enviado")
+
+          if errors:
+            supabase_request('POST', 'cauc_cache_meta', [{
+              'id': 1, 'sync_status': 'failed',
+              'error_log': '; '.join(errors),
+              'last_sync': datetime.now(timezone.utc).isoformat()
+            }])
+            print(f"❌ Sync concluído com erros: {errors}")
+            raise SystemExit(1)
+
+          # Marca sucesso
+          now = datetime.now(timezone.utc).isoformat()
+          status, body = supabase_request('POST', 'cauc_cache_meta', [{
+            'id': 1,
+            'sync_status': 'success',
+            'last_sync': now,
+            'error_log': None,
+            'source_url': 'https://www.tesourotransparente.gov.br/ckan/dataset/72b5f371-0c35-4613-8076-c99c821a6410/resource/07af297a-5e59-494a-a88a-55ddfd2f4b01/download/relatorio-situacao-de-varios-entes---municipios---uf-todas---abrangencia-1.csv'
+          }])
+          print(f"🎉 Sync CAUC concluído com sucesso em {now}")
+          print(f"   Supabase ativo — projeto não será pausado")
+          PYEOF
