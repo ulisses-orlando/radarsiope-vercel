@@ -1,4 +1,4 @@
-export const config = { runtime: 'nodejs', api: { bodyParser: false } };
+export const config = { runtime: 'nodejs', api: { bodyParser: false }, maxDuration: 300  };
 
 import crypto from 'crypto';
 import admin from 'firebase-admin';
