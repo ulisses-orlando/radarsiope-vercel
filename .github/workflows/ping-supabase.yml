@@ -1,27 +1,45 @@
-# .github/workflows/ping-supabase.yml
-# Mantém o projeto Supabase ativo no plano gratuito.
-# Executa a cada 3 dias às 8h UTC — bem dentro da janela de 7 dias do Supabase.
+# .github/workflows/sync-cauc.yml
+# Carga diária dos dados do CAUC (Tesouro Nacional) no Supabase.
+# Executa às 4h horário de Brasília (7h UTC).
+# Garante que o relatório de conformidade sempre use dados atualizados,
+# sem latência para o usuário final.
 
-name: Ping Supabase
+name: Sync CAUC
 
 on:
   schedule:
-    - cron: '0 8 */3 * *'
-  workflow_dispatch:       # permite disparo manual pelo painel do GitHub se precisar
+    - cron: '0 7 * * *'   # 7h UTC = 4h Brasília (UTC-3), todos os dias
+  workflow_dispatch:       # permite disparo manual pelo painel do GitHub
 
 jobs:
-  ping:
+  sync:
     runs-on: ubuntu-latest
     steps:
-      - name: Ping Supabase
+      - name: Disparar sync CAUC via endpoint Vercel
         run: |
-          RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" \
-            "${{ secrets.SUPABASE_URL }}/rest/v1/vw_municipio_resumo?select=cod_municipio&limit=1" \
-            -H "apikey: ${{ secrets.SUPABASE_ANON_KEY }}" \
-            -H "Authorization: Bearer ${{ secrets.SUPABASE_ANON_KEY }}")
-          echo "HTTP status: $RESPONSE"
-          if [ "$RESPONSE" != "200" ]; then
-            echo "❌ Ping falhou com status $RESPONSE"
+          echo "🔄 Iniciando carga CAUC em $(date -u)"
+
+          RESPONSE=$(curl -s -w "\n%{http_code}" \
+            -X GET \
+            -H "x-cron-secret: ${{ secrets.CRON_SECRET }}" \
+            "https://radarsiope.com.br/api/sendViaSES?acao=sync_cauc&force=true")
+
+          HTTP_BODY=$(echo "$RESPONSE" | head -n -1)
+          HTTP_CODE=$(echo "$RESPONSE" | tail -n 1)
+
+          echo "HTTP status: $HTTP_CODE"
+          echo "Resposta: $HTTP_BODY"
+
+          if [ "$HTTP_CODE" != "200" ]; then
+            echo "❌ Sync CAUC falhou com status $HTTP_CODE"
             exit 1
           fi
-          echo "✅ Supabase ativo em $(date -u)"
+
+          # Verifica se a resposta indica sucesso
+          if echo "$HTTP_BODY" | grep -q '"ok":true'; then
+            echo "✅ Sync CAUC concluído com sucesso"
+          else
+            echo "⚠️ Resposta inesperada do servidor:"
+            echo "$HTTP_BODY"
+            exit 1
+          fi
