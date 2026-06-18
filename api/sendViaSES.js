@@ -195,8 +195,8 @@ async function _calListar({ sistema, tipo, status, incluirInativos }) {
 
   if (!incluirInativos) q = q.eq('ativo', true);
   if (sistema) q = q.eq('sistema', sistema);
-  if (tipo)    q = q.eq('tipo', tipo);
-  if (status)  q = q.eq('status', status);
+  if (tipo) q = q.eq('tipo', tipo);
+  if (status) q = q.eq('status', status);
 
   const { data, error } = await q;
   if (error) throw error;
@@ -233,7 +233,7 @@ async function _calRepListar({ evento_id, cod_municipio }) {
     .from('calendario_repasses')
     .select('*')
     .order('cod_municipio', { ascending: true });
-  if (evento_id)     q = q.eq('evento_id', evento_id);
+  if (evento_id) q = q.eq('evento_id', evento_id);
   if (cod_municipio) q = q.eq('cod_municipio', cod_municipio);
   const { data, error } = await q;
   if (error) throw error;
@@ -373,6 +373,28 @@ async function _buscarCaucComCache(cod7) {
     const horasDesdeSync = (Date.now() - new Date(data.updated_at)) / (1000 * 60 * 60);
     const fonte = horasDesdeSync < 24 ? 'cache (atualizado hoje)' : 'cache (atualizado recentemente)';
 
+    // ── Fallback: se dados têm mais de 25h, dispara sync em background ────────
+    // Não bloqueia a resposta — o usuário recebe os dados do cache imediatamente
+    // e a próxima consulta já terá os dados atualizados.
+    if (horasDesdeSync > 25) {
+      supabase.from('cauc_cache_meta')
+        .select('sync_status, last_sync')
+        .eq('id', 1)
+        .maybeSingle()
+        .then(({ data: meta }) => {
+          const syncEmAndamento = meta?.sync_status === 'pending';
+          const falhaRecente = meta?.sync_status === 'failed' &&
+            meta?.last_sync && new Date(meta.last_sync) > new Date(Date.now() - 4 * 60 * 60 * 1000);
+          if (!syncEmAndamento && !falhaRecente) {
+            console.log('[CAUC] Dados defasados (>25h) — disparando sync em background');
+            syncCaucData({ force: true }).catch(e =>
+              console.warn('[CAUC] Sync background falhou:', e.message)
+            );
+          }
+        })
+        .catch(() => { }); // silencia erro na checagem de meta
+    }
+
     return { ok: true, itens, fonte, updated_at: data.updated_at };
   }
 
@@ -453,14 +475,6 @@ async function _relatorioConformidade(req, res) {
         upgrade_slug: 'profissional',
       });
     }
-  }
-
-  if (!user.features?.relatorio_conformidade) {
-    return res.status(403).json({
-      ok: false,
-      error: 'Recurso não disponível no plano atual.',
-      upgrade_slug: 'profissional',
-    });
   }
 
   const codStr = String(cod_municipio).replace(/\D/g, '');
@@ -606,6 +620,11 @@ export default async function handler(req, res) {
 
   // Dentro do handler principal, após a verificação de 'relatorio_conformidade':
   if (req.query.acao === 'sync_cauc') {
+    // Proteção: requer header x-cron-secret para evitar disparo não autorizado
+    const cronSecret = process.env.CRON_SECRET;
+    if (!cronSecret || req.headers['x-cron-secret'] !== cronSecret) {
+      return res.status(401).json({ ok: false, error: 'Não autorizado.' });
+    }
     const force = req.query.force === 'true';
     try {
       const result = await syncCaucData({ force });
@@ -697,7 +716,7 @@ export default async function handler(req, res) {
       return res.status(500).json({ ok: false, error: e.message });
     }
   }
-  
+
   // ── SES: envio de e-mail ───────────────────────────────────────────────────
   res.setHeader('Access-Control-Allow-Origin', 'https://radarsiope-vercel.vercel.app');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
