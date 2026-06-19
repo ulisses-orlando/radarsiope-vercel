@@ -1468,7 +1468,7 @@ async function _salvarFeaturesUsuario(uid, btn) {
 
     // 4. Monta entrada de log (apenas se houve alteração real)
     const logEntry = {
-      alterado_em: firebase.firestore.FieldValue.serverTimestamp(),
+      alterado_em: Date.now(),
       alterado_por: adminIdentificador,
       motivo: motivo || null,
       features_anteriores: featuresAnteriores,
@@ -1528,14 +1528,24 @@ async function _carregarLogCortesia(uid) {
     wrap.style.display = 'block';
     // Ordena do mais recente para o mais antigo
     const logOrdenado = [...log].sort((a, b) => {
-      const ta = a.alterado_em?.toMillis?.() || 0;
-      const tb = b.alterado_em?.toMillis?.() || 0;
+      const ta = typeof a.alterado_em === 'number' 
+        ? a.alterado_em 
+        : (a.alterado_em?.toMillis?.() || a.alterado_em?.seconds * 1000 || 0);
+      const tb = typeof b.alterado_em === 'number' 
+        ? b.alterado_em 
+        : (b.alterado_em?.toMillis?.() || b.alterado_em?.seconds * 1000 || 0);
       return tb - ta;
     });
 
     body.innerHTML = logOrdenado.map(entry => {
-      const data = entry.alterado_em?.toDate?.() || new Date();
-      const dataStr = data.toLocaleString('pt-BR');
+      let dataStr;
+      if (typeof entry.alterado_em === 'number') {
+        dataStr = new Date(entry.alterado_em).toLocaleString('pt-BR');
+      } else if (entry.alterado_em?.toDate) {
+        dataStr = entry.alterado_em.toDate().toLocaleString('pt-BR');
+      } else {
+        dataStr = '—';
+      }
       const diff = entry.diff || [];
       const diffHtml = diff.length
         ? diff.map(k => `<span style="background:#e0f2fe;color:#0284c7;padding:1px 6px;border-radius:10px;font-size:10px;font-weight:600;margin-right:4px;display:inline-block;margin-bottom:2px">${k}</span>`).join('')
