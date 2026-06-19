@@ -1527,23 +1527,58 @@ async function validarETocarAudio(url, btn) {
 
   // ✅ MODO PREVIEW: toca imediatamente, sem validação nem espera
   if (window._isPreviewMode === true) {
+    const card = btn.closest('.rs-media-card');
     const wrap = btn.parentElement;
+
+    // Esconde botão original
     btn.style.display = 'none';
+
+    // Cria container mais visível para o player
+    const playerWrap = document.createElement('div');
+    playerWrap.style.cssText = 'width:100%;display:flex;flex-direction:column;gap:8px;align-items:center;padding:8px 0;';
+
+    // Cria o elemento audio
     const audio = document.createElement('audio');
     audio.controls = true;
+    audio.preload = 'auto'; // ✅ auto em vez de metadata
     audio.src = url;
-    audio.preload = 'metadata';
-    audio.style.cssText = 'width:100%;border-radius:8px;outline:none;';
-    wrap.appendChild(audio);
-    // Tenta play imediatamente — agora é resposta direta ao clique do usuário
+    audio.style.cssText = 'width:100%;max-width:400px;height:40px;border-radius:8px;outline:none;background:#0f1729;';
+
+    // Mensagem de fallback
+    const fallbackMsg = document.createElement('div');
+    fallbackMsg.style.cssText = 'font-size:11px;color:#94a3b8;text-align:center;display:none;';
+    fallbackMsg.innerHTML = 'Se o player não tocar, <a href="' + url + '" target="_blank" style="color:#60A5FA;text-decoration:underline;">clique aqui para abrir em nova aba</a>';
+
+    playerWrap.appendChild(audio);
+    playerWrap.appendChild(fallbackMsg);
+    wrap.appendChild(playerWrap);
+
+    // Tenta play imediato
     try {
-      await audio.play();
+      audio.addEventListener('canplay', () => {
+        audio.play().catch(err => {
+          console.warn('[Preview Audio] Autoplay bloqueado:', err.message);
+          fallbackMsg.style.display = 'block';
+        });
+      }, { once: true });
+
+      // Fallback: se canplay não disparar em 2s, tenta play direto
+      setTimeout(() => {
+        if (audio.paused) {
+          audio.play().catch(err => {
+            console.warn('[Preview Audio] Play direto falhou:', err.message);
+            fallbackMsg.style.display = 'block';
+          });
+        }
+      }, 2000);
     } catch (e) {
-      // Se autoplay bloqueado, o usuário clica manualmente no player (aceitável)
+      console.error('[Preview Audio] Erro:', e);
+      fallbackMsg.style.display = 'block';
     }
+
     return;
   }
-  
+
   // 🔒 Valida sessão antes de liberar o player
   if (await _checarSessaoCritica()) {
     const wrap = btn.parentElement;
