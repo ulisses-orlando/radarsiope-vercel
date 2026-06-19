@@ -2404,6 +2404,8 @@ async function VerNewsletterComToken() {
           }
 
           // features do usuário tem precedencia, mas se estiverem ausentes, usa o snapshot da assinatura 
+          // motivo: se quiser dar um agrado para um assinante posso mudar as features do assinante sem alterar as características do plano contratado 
+          
           destinatario.features = destinatario.features || assinaturaData.features_snapshot || {};
           destinatario.plano_slug = assinaturaData.plano_slug || destinatario.plano_slug || null;
 

@@ -433,21 +433,41 @@ async function _renderResumo() {
         </div>
       </div>
 
-      🆕 <div class="drawer-secao">
-        <div class="drawer-secao-titulo">⚙️ Features do Usuário</div>
-        <div id="feat-panel-usuario">
+      🆕  <div class="drawer-secao">
+              <div class="drawer-secao-titulo">⚙️ Features do Usuário (Cortesia)</div>
+              <div style="font-size:11px;color:#64748b;margin-bottom:8px;padding:6px 8px;background:#fffbeb;border-left:3px solid #f59e0b;border-radius:4px;">
+                💡 Estas features são <strong>concessões administrativas</strong> (fallback). A fonte da verdade do plano contratado está nas features da assinatura abaixo.
+          </div>
+          <div id="feat-panel-usuario">
           <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px">${userFeatChecksUsuario}</div>
+          <div style="margin-bottom:8px">
+              <label style="font-size:11px;font-weight:700;color:#334155;display:block;margin-bottom:3px">
+                  📝 Motivo da alteração (opcional)
+              </label>
+              <input id="feat-motivo-usuario" type="text"
+                placeholder="Ex: Retenção - cliente insatisfeito / Cortesia 3 meses / Teste"
+                style="width:100%;padding:6px 8px;border:1px solid #cbd5e1;border-radius:6px;font-size:12px;box-sizing:border-box">
+          </div>
           <button onclick="_salvarFeaturesUsuario('${uid}', this)" style="font-size:12px;padding:4px 14px;border-radius:6px;border:none;background:#0A3D62;color:#fff;cursor:pointer;font-weight:600">
-            💾 Salvar features
+              💾 Salvar features
           </button>
           <span id="feat-status-usuario" style="font-size:11px;color:#64748b;margin-left:8px"></span>
         </div>
       </div>
 
+   🆕 <div id="feat-cortesia-log-${uid}" class="drawer-secao" style="display:none">
+     <div class="drawer-secao-titulo">📜 Histórico de Cortesias</div>
+     <div id="feat-cortesia-log-body-${uid}">
+       <div class="drawer-loading">⏳ Carregando...</div>
+     </div>
+   </div>
+
       <div class="drawer-secao">
         <div class="drawer-secao-titulo">📑 Assinaturas</div>
         ${assinHtml}
       </div>`;
+        // ✅ Carrega histórico de cortesias (fire-and-forget, não bloqueia)
+        _carregarLogCortesia(uid);
   } catch (e) {
     body.innerHTML = `<p style="color:#ef4444">Erro: ${e.message}</p>`;
   }
@@ -1302,9 +1322,9 @@ async function _enviarLinkAcessoAdmin(uid, solId, assinaturaId, resetarContador)
 
   try {
     const resp = await fetch('/api/pagamentoMP?acao=admin-enviar-link-acesso', {
-      method:  'POST',
+      method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ uid, solId, assinaturaId, resetarContador }),
+      body: JSON.stringify({ uid, solId, assinaturaId, resetarContador }),
     });
 
     const data = await resp.json().catch(() => ({}));
@@ -1312,12 +1332,12 @@ async function _enviarLinkAcessoAdmin(uid, solId, assinaturaId, resetarContador)
 
     // Atualiza a solicitação como atendida
     await db.collection('usuarios').doc(uid).collection('solicitacoes').doc(solId).update({
-      status:        'atendida',
-      resposta:      resetarContador
+      status: 'atendida',
+      resposta: resetarContador
         ? 'Contador resetado e novo link de acesso enviado por e-mail pelo administrador.'
         : 'Novo link de acesso enviado por e-mail pelo administrador.',
       data_resposta: new Date().toISOString(),
-      atualizadoEm:  new Date().toISOString(),
+      atualizadoEm: new Date().toISOString(),
     });
 
     // Decrementa o contador de pendências
@@ -1417,19 +1437,129 @@ async function _salvarFeaturesUsuario(uid, btn) {
     }
   });
 
+  // ✅ Captura motivo (cortesia comercial)
+  const motivoInput = document.getElementById('feat-motivo-usuario');
+  const motivo = motivoInput?.value?.trim() || '';
+  if (motivoInput) motivoInput.value = ''; // limpa para próxima edição
+
   btn.disabled = true; btn.textContent = '⏳ Salvando...'; status.textContent = '';
   try {
-    await db.collection('usuarios').doc(uid).update({ features: novasFeatures });
-    // Atualiza cache local para manter consistência sem recarregar a aba
+    // 1. Lê features atuais para calcular diff
+    const userDoc = await db.collection('usuarios').doc(uid).get();
+    const featuresAnteriores = userDoc.data()?.features || {};
+
+    // 2. Calcula diff (o que realmente mudou)
+    const todasChaves = new Set([
+      ...Object.keys(featuresAnteriores),
+      ...Object.keys(novasFeatures)
+    ]);
+    const diff = [];
+    todasChaves.forEach(k => {
+      const antes = featuresAnteriores[k];
+      const depois = novasFeatures[k];
+      if (JSON.stringify(antes) !== JSON.stringify(depois)) {
+        diff.push(k);
+      }
+    });
+
+    // 3. Admin responsável
+    const admin = JSON.parse(localStorage.getItem('usuarioLogado') || '{}');
+    const adminIdentificador = admin.nome || admin.email || 'Admin';
+
+    // 4. Monta entrada de log (apenas se houve alteração real)
+    const logEntry = {
+      alterado_em: firebase.firestore.FieldValue.serverTimestamp(),
+      alterado_por: adminIdentificador,
+      motivo: motivo || null,
+      features_anteriores: featuresAnteriores,
+      features_novas: novasFeatures,
+      diff: diff,
+    };
+
+    // 5. Salva features + log (array limitado a 20 entradas mais recentes)
+    const userRef = db.collection('usuarios').doc(uid);
+    await userRef.update({ features: novasFeatures });
+
+    // Adiciona entrada ao log de cortesia
+    await userRef.set({
+      features_cortesia_log: firebase.firestore.FieldValue.arrayUnion(logEntry)
+    }, { merge: true });
+
+    // 6. Trunca log para 20 entradas (evita doc muito grande)
+    try {
+      const docAtual = await userRef.get();
+      const log = docAtual.data()?.features_cortesia_log || [];
+      if (log.length > 20) {
+        await userRef.update({
+          features_cortesia_log: log.slice(-20)
+        });
+      }
+    } catch (e) { /* não fatal */ }
+
+    // Atualiza cache local
     _drawerDados.features = novasFeatures;
     status.textContent = '✅ Salvo!'; status.style.color = '#16a34a';
     setTimeout(() => { status.textContent = ''; }, 3000);
+
+    // Recarrega o histórico de cortesias (se a seção existir)
+    _carregarLogCortesia(uid);
   } catch (e) {
     status.textContent = '❌ Erro: ' + e.message; status.style.color = '#dc2626';
   } finally {
     btn.disabled = false; btn.textContent = '💾 Salvar features';
   }
 }
+
+// ─── Carregar histórico de cortesias do usuário ─────────────────────────────
+async function _carregarLogCortesia(uid) {
+  const wrap = document.getElementById(`feat-cortesia-log-${uid}`);
+  const body = document.getElementById(`feat-cortesia-log-body-${uid}`);
+  if (!wrap || !body) return;
+
+  try {
+    const doc = await db.collection('usuarios').doc(uid).get();
+    const log = doc.data()?.features_cortesia_log || [];
+
+    if (!log.length) {
+      wrap.style.display = 'none';
+      return;
+    }
+
+    wrap.style.display = 'block';
+    // Ordena do mais recente para o mais antigo
+    const logOrdenado = [...log].sort((a, b) => {
+      const ta = a.alterado_em?.toMillis?.() || 0;
+      const tb = b.alterado_em?.toMillis?.() || 0;
+      return tb - ta;
+    });
+
+    body.innerHTML = logOrdenado.map(entry => {
+      const data = entry.alterado_em?.toDate?.() || new Date();
+      const dataStr = data.toLocaleString('pt-BR');
+      const diff = entry.diff || [];
+      const diffHtml = diff.length
+        ? diff.map(k => `<span style="background:#e0f2fe;color:#0284c7;padding:1px 6px;border-radius:10px;font-size:10px;font-weight:600;margin-right:4px;display:inline-block;margin-bottom:2px">${k}</span>`).join('')
+        : '<span style="color:#94a3b8;font-size:11px">sem alterações</span>';
+
+      return `
+        <div style="border-left:3px solid #0284c7;background:#f8fafc;padding:8px 10px;border-radius:0 6px 6px 0;margin-bottom:6px;font-size:12px">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;flex-wrap:wrap;gap:4px">
+            <strong style="color:#0A3D62">${entry.alterado_por || 'Admin'}</strong>
+            <span style="font-size:10px;color:#94a3b8">${dataStr}</span>
+          </div>
+          ${entry.motivo ? `<div style="color:#475569;font-style:italic;margin-bottom:4px">💬 "${entry.motivo}"</div>` : ''}
+          <div style="margin-top:4px">
+            <span style="font-size:10px;color:#64748b;font-weight:600;text-transform:uppercase">Features alteradas:</span><br>
+            ${diffHtml}
+          </div>
+        </div>`;
+    }).join('');
+  } catch (e) {
+    console.warn('[cortesia-log]', e.message);
+    wrap.style.display = 'none';
+  }
+}
+
 // ─── Exportações globais ─────────────────────────────────────────────────────
 window._resetarFeedbackEnvio = _resetarFeedbackEnvio;
 window.abrirDrawerUsuario = abrirDrawerUsuario;
