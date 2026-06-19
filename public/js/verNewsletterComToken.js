@@ -1524,6 +1524,26 @@ async function _checarSessaoCritica() {
 
 // ─── Validação + Reprodução de Áudio (Ponto Crítico) ───────────────────────
 async function validarETocarAudio(url, btn) {
+
+  // ✅ MODO PREVIEW: toca imediatamente, sem validação nem espera
+  if (window._isPreviewMode === true) {
+    const wrap = btn.parentElement;
+    btn.style.display = 'none';
+    const audio = document.createElement('audio');
+    audio.controls = true;
+    audio.src = url;
+    audio.preload = 'metadata';
+    audio.style.cssText = 'width:100%;border-radius:8px;outline:none;';
+    wrap.appendChild(audio);
+    // Tenta play imediatamente — agora é resposta direta ao clique do usuário
+    try {
+      await audio.play();
+    } catch (e) {
+      // Se autoplay bloqueado, o usuário clica manualmente no player (aceitável)
+    }
+    return;
+  }
+  
   // 🔒 Valida sessão antes de liberar o player
   if (await _checarSessaoCritica()) {
     const wrap = btn.parentElement;
