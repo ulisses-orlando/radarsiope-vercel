@@ -159,6 +159,7 @@
             <li><a href="#privacidade">Privacidade e dados</a></li>
             <li><a href="#suporte">Suporte e contato</a></li>
             <li><a href="#foro">Foro</a></li>
+            <li><a href="#grupo-vip">Grupo VIP de Suporte</a></li>
             <li><a href="#faq">FAQ Assinatura</a></li>
           </ul>
         </nav>
@@ -243,6 +244,34 @@
         <section id="foro">
           <h2>10. Foro</h2>
           <p>Fica eleito o foro da comarca de <strong>Brasília/DF</strong> para dirimir quaisquer dúvidas ou controvérsias oriundas destes Termos, com renúncia a qualquer outro, por mais privilegiado que seja.</p>
+        </section>
+
+        <section id="grupo-vip">
+          <h2>11. Grupo VIP de Suporte Técnico (WhatsApp)</h2>
+          <p>Os planos <strong>Premium</strong> e <strong>Consultoria VIP</strong> incluem acesso a um grupo exclusivo de suporte técnico via WhatsApp, destinado à troca de informações técnico-orçamentárias relacionadas ao SIOPE, ao FUNDEB e temas correlatos.</p>
+
+          <h3 style="font-family:var(--font-head);font-weight:700;font-size:.97rem;color:var(--navy2);margin:20px 0 8px;">11.1 Acesso e identificação</h3>
+          <p>O acesso ao grupo é restrito a até <strong>2 (dois) números de telefone por município assinante</strong>, indicados no momento da adesão. Ao ingressar, o membro deve alterar seu nome de exibição no WhatsApp para o padrão: <em>[Nome] | [Cargo] — [Município/UF]</em>. Membros que não se identificarem conforme este padrão no prazo de 48 horas poderão ser removidos pelo moderador, sem prejuízo da assinatura.</p>
+
+          <h3 style="font-family:var(--font-head);font-weight:700;font-size:.97rem;color:var(--navy2);margin:20px 0 8px;">11.2 Dinâmica de perguntas e respostas</h3>
+          <p>As dúvidas técnicas devem ser enviadas com a hashtag <strong>#DuvidaRadar</strong>, seguida de descrição clara do contexto. As respostas da equipe técnica serão consolidadas e publicadas no grupo <strong>diariamente, preferencialmente até as 17h</strong> (horário de Brasília). Esse horário é meramente orientativo e pode variar em razão de feriados, recesso, indisponibilidade técnica ou outras circunstâncias. O Radar SIOPE não assume obrigação de resposta individual em tempo real.</p>
+
+          <h3 style="font-family:var(--font-head);font-weight:700;font-size:.97rem;color:var(--navy2);margin:20px 0 8px;">11.3 Conteúdo permitido</h3>
+          <p>O grupo destina-se exclusivamente a consultas técnicas relacionadas ao objeto do plano contratado. São vedados:</p>
+          <ul>
+            <li>mensagens de saudação isolada, figurinhas, correntes ou conteúdo sem caráter técnico;</li>
+            <li>debates político-partidários ou críticas a gestores públicos identificados;</li>
+            <li>divulgação de softwares, cursos, consultorias ou serviços de terceiros;</li>
+            <li>envio de documentos ou imagens contendo dados pessoais sensíveis de servidores ou alunos (CPF, RG, holerites, dados cadastrais) sem a devida anonimização, em conformidade com a LGPD. A responsabilidade pelo eventual compartilhamento indevido de dados pessoais no grupo é exclusiva do membro remetente.</li>
+          </ul>
+
+          <h3 style="font-family:var(--font-head);font-weight:700;font-size:.97rem;color:var(--navy2);margin:20px 0 8px;">11.4 Moderação e penalidades</h3>
+          <p>O grupo conta com moderação ativa. As infrações às regras deste item sujeitam o membro às seguintes medidas progressivas:</p>
+          <ol>
+            <li><strong>Advertência privada</strong> pelo moderador, com exclusão da mensagem inadequada;</li>
+            <li><strong>Suspensão temporária</strong> do envio de mensagens por até 3 dias corridos;</li>
+            <li><strong>Remoção definitiva</strong> do grupo, mantendo-se o acesso às demais funcionalidades do plano contratado, sem direito a desconto, reembolso parcial ou migração de plano em razão da remoção.</li>
+          </ol>
         </section>
 
         <hr />
@@ -337,11 +366,13 @@
   <script>
     const toggle = document.getElementById('nav-toggle');
     const menu   = document.getElementById('nav-menu');
-    toggle.addEventListener('click', () => {
-      const open = menu.classList.toggle('open');
-      toggle.setAttribute('aria-expanded', open);
-      toggle.textContent = open ? '✕' : '☰';
-    });
+    if (toggle && menu) {
+      toggle.addEventListener('click', () => {
+        const open = menu.classList.toggle('open');
+        toggle.setAttribute('aria-expanded', open);
+        toggle.textContent = open ? '✕' : '☰';
+      });
+    }
     document.querySelectorAll('.nav__item--drop').forEach(item => {
       item.querySelector('a').addEventListener('click', e => {
         if (window.innerWidth < 640) { e.preventDefault(); item.classList.toggle('open'); }
