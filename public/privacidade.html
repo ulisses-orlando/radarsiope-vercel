@@ -232,6 +232,7 @@
             <li><strong>Dados de assinatura:</strong> plano selecionado, cupons aplicados, valores e parcelas.</li>
             <li><strong>Dados de pagamento:</strong> método escolhido, status de cobrança, vencimentos e confirmação de pagamento — processados via Mercado Pago.</li>
             <li><strong>Dados técnicos:</strong> registros de acesso, logs de uso, cookies e identificadores de dispositivo/navegador.</li>
+            <li><strong>Dados de engajamento:</strong> registros de abertura de e-mails (pixel de rastreamento) e cliques em links presentes nas comunicações enviadas pelo Radar SIOPE, utilizados exclusivamente para análise de relevância e melhoria editorial.</li>
           </ul>
           <p>Alguns dados são fornecidos por você; outros são gerados durante a utilização (ex.: logs) ou obtidos por integrações (ex.: provedor de pagamento).</p>
         </section>
@@ -245,19 +246,12 @@
             <li><strong>Cumprimento de obrigações legais:</strong> registros fiscais/contábeis e prevenção à fraude. <em>Base legal: cumprimento de obrigação legal/regulatória.</em></li>
           </ul>
           <p>Quando a base for <strong>consentimento</strong>, você poderá revogá-lo a qualquer momento, sem afetar tratamentos anteriores realizados sob essa base.</p>
+          <p><strong>Cadastros não-assinantes (leads):</strong> profissionais que se cadastraram para receber conteúdo gratuito do Radar SIOPE (newsletters, alertas e materiais técnicos) têm seus dados tratados com base no <em>legítimo interesse</em> do controlador para comunicação de conteúdo relevante à sua área de atuação, ou no <em>consentimento</em> manifestado no momento do cadastro. Esses titulares têm os mesmos direitos previstos na LGPD e podem solicitar a exclusão ou cancelamento do recebimento de comunicações a qualquer momento pelos canais indicados nesta Política.</p>
         </section>
 
         <section id="compartilhamento">
           <h2>Compartilhamento de dados</h2>
-          <p>Compartilhamos dados pessoais apenas com prestadores essenciais à operação do serviço, entre eles:</p>
-          <ul>
-            <li><strong>Mercado Pago</strong> — processamento de pagamentos;</li>
-            <li><strong>Firebase / Firestore</strong> — armazenamento e autenticação;</li>
-            <li><strong>AWS SES</strong> — envio de e-mails transacionais;</li>
-            <li><strong>OneSignal</strong> — notificações push;</li>
-            <li><strong>Vercel</strong> — hospedagem da plataforma.</li>
-          </ul>
-          <p>Todos os parceiros operam sob contratos com obrigações de confidencialidade e proteção de dados. Também poderemos compartilhar informações para cumprir determinações legais, judiciais ou regulatórias.</p>
+          <p>Compartilhamos dados pessoais apenas com prestadores de serviço essenciais à operação da plataforma — incluindo processamento de pagamentos, envio de e-mails, hospedagem, análise de uso e notificações. Todos os prestadores operam sob contratos com obrigações de confidencialidade e exigência de proteção de dados compatível com a LGPD. Também poderemos compartilhar informações para cumprir determinações legais, judiciais ou regulatórias.</p>
         </section>
 
         <section id="cookies">
@@ -333,7 +327,7 @@
           </div>
           <div class="faq-item">
             <h3>Vocês compartilham meus dados?</h3>
-            <p>Apenas com parceiros essenciais à operação (Mercado Pago, Firebase, AWS SES, OneSignal e Vercel), sempre sob contrato e proteção de dados.</p>
+            <p>Apenas com prestadores de serviço essenciais à operação da plataforma (pagamentos, e-mails, hospedagem, notificações), sempre sob contrato e com exigência de proteção compatível com a LGPD.</p>
           </div>
           <div class="faq-item">
             <h3>Meus dados estão seguros?</h3>
@@ -404,11 +398,13 @@
   <script>
     const toggle = document.getElementById('nav-toggle');
     const menu   = document.getElementById('nav-menu');
-    toggle.addEventListener('click', () => {
-      const open = menu.classList.toggle('open');
-      toggle.setAttribute('aria-expanded', open);
-      toggle.textContent = open ? '✕' : '☰';
-    });
+    if (toggle && menu) {
+      toggle.addEventListener('click', () => {
+        const open = menu.classList.toggle('open');
+        toggle.setAttribute('aria-expanded', open);
+        toggle.textContent = open ? '✕' : '☰';
+      });
+    }
     document.querySelectorAll('.nav__item--drop').forEach(item => {
       item.querySelector('a').addEventListener('click', e => {
         if (window.innerWidth < 640) { e.preventDefault(); item.classList.toggle('open'); }
