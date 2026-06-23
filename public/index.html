@@ -1,10 +1,12 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Radar SIOPE — Inteligência em Educação</title>
-    <meta name="description" content="Plataforma PWA de monitoramento, conformidade e capacitação para gestores da educação no Brasil.">
+    <meta name="description"
+        content="Plataforma PWA de monitoramento, conformidade e capacitação para gestores da educação no Brasil.">
 
     <!-- Canônica: informa ao Google qual é a URL oficial da página -->
     <link rel="canonical" href="https://radarsiope.com.br/">
@@ -12,14 +14,17 @@
     <!-- Open Graph: reforça a URL canônica para redes sociais e crawlers -->
     <meta property="og:url" content="https://radarsiope.com.br/">
     <meta property="og:title" content="Radar SIOPE — Inteligência em Educação">
-    <meta property="og:description" content="Plataforma PWA de monitoramento, conformidade e capacitação para gestores da educação no Brasil.">
+    <meta property="og:description"
+        content="Plataforma PWA de monitoramento, conformidade e capacitação para gestores da educação no Brasil.">
     <meta property="og:type" content="website">
 
     <!-- Robots: permite indexação e garante que o Google siga os links -->
     <meta name="robots" content="index, follow">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Space+Grotesk:wght@400;500;600;700&display=swap"
+        rel="stylesheet">
     <style>
         :root {
             --primary: #0f172a;
@@ -39,9 +44,9 @@
             --border: rgba(148, 163, 184, 0.1);
             --gradient-hero: linear-gradient(135deg, #0f172a 0%, #1e3a5f 50%, #0f172a 100%);
             --gradient-accent: linear-gradient(135deg, #3b82f6 0%, #06b6d4 100%);
-            --shadow-sm: 0 1px 2px rgba(0,0,0,0.3);
-            --shadow-md: 0 4px 6px -1px rgba(0,0,0,0.4);
-            --shadow-lg: 0 10px 15px -3px rgba(0,0,0,0.5);
+            --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+            --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.4);
+            --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.5);
             --shadow-glow: 0 0 40px rgba(59, 130, 246, 0.15);
         }
 
@@ -67,9 +72,11 @@
         ::-webkit-scrollbar {
             width: 8px;
         }
+
         ::-webkit-scrollbar-track {
             background: var(--primary);
         }
+
         ::-webkit-scrollbar-thumb {
             background: var(--accent);
             border-radius: 4px;
@@ -77,49 +84,107 @@
 
         /* Animations */
         @keyframes fadeInUp {
-            from { opacity: 0; transform: translateY(30px); }
-            to { opacity: 1; transform: translateY(0); }
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
         }
 
         @keyframes fadeIn {
-            from { opacity: 0; }
-            to { opacity: 1; }
+            from {
+                opacity: 0;
+            }
+
+            to {
+                opacity: 1;
+            }
         }
 
         @keyframes slideInLeft {
-            from { opacity: 0; transform: translateX(-40px); }
-            to { opacity: 1; transform: translateX(0); }
+            from {
+                opacity: 0;
+                transform: translateX(-40px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
         }
 
         @keyframes slideInRight {
-            from { opacity: 0; transform: translateX(40px); }
-            to { opacity: 1; transform: translateX(0); }
+            from {
+                opacity: 0;
+                transform: translateX(40px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
         }
 
         @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.5; }
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.5;
+            }
         }
 
         @keyframes float {
-            0%, 100% { transform: translateY(0); }
-            50% { transform: translateY(-10px); }
+
+            0%,
+            100% {
+                transform: translateY(0);
+            }
+
+            50% {
+                transform: translateY(-10px);
+            }
         }
 
         @keyframes gradientShift {
-            0% { background-position: 0% 50%; }
-            50% { background-position: 100% 50%; }
-            100% { background-position: 0% 50%; }
+            0% {
+                background-position: 0% 50%;
+            }
+
+            50% {
+                background-position: 100% 50%;
+            }
+
+            100% {
+                background-position: 0% 50%;
+            }
         }
 
         @keyframes spin {
-            from { transform: rotate(0deg); }
-            to { transform: rotate(360deg); }
+            from {
+                transform: rotate(0deg);
+            }
+
+            to {
+                transform: rotate(360deg);
+            }
         }
 
         @keyframes drawLine {
-            from { stroke-dashoffset: 1000; }
-            to { stroke-dashoffset: 0; }
+            from {
+                stroke-dashoffset: 1000;
+            }
+
+            to {
+                stroke-dashoffset: 0;
+            }
         }
 
         .animate-on-scroll {
@@ -133,11 +198,25 @@
             transform: translateY(0);
         }
 
-        .delay-1 { transition-delay: 0.1s; }
-        .delay-2 { transition-delay: 0.2s; }
-        .delay-3 { transition-delay: 0.3s; }
-        .delay-4 { transition-delay: 0.4s; }
-        .delay-5 { transition-delay: 0.5s; }
+        .delay-1 {
+            transition-delay: 0.1s;
+        }
+
+        .delay-2 {
+            transition-delay: 0.2s;
+        }
+
+        .delay-3 {
+            transition-delay: 0.3s;
+        }
+
+        .delay-4 {
+            transition-delay: 0.4s;
+        }
+
+        .delay-5 {
+            transition-delay: 0.5s;
+        }
 
         /* Navigation */
         .navbar {
@@ -281,7 +360,7 @@
         .hero-grid {
             position: absolute;
             inset: 0;
-            background-image: 
+            background-image:
                 linear-gradient(rgba(59, 130, 246, 0.03) 1px, transparent 1px),
                 linear-gradient(90deg, rgba(59, 130, 246, 0.03) 1px, transparent 1px);
             background-size: 60px 60px;
@@ -472,7 +551,7 @@
             background: var(--surface-elevated);
             border-radius: 40px;
             padding: 12px;
-            box-shadow: 
+            box-shadow:
                 0 25px 50px -12px rgba(0, 0, 0, 0.5),
                 0 0 0 1px rgba(255, 255, 255, 0.05),
                 inset 0 0 0 1px rgba(255, 255, 255, 0.05);
@@ -922,7 +1001,7 @@
         .ai-bg-grid {
             position: absolute;
             inset: 0;
-            background-image: 
+            background-image:
                 linear-gradient(rgba(6, 182, 212, 0.03) 1px, transparent 1px),
                 linear-gradient(90deg, rgba(6, 182, 212, 0.03) 1px, transparent 1px);
             background-size: 40px 40px;
@@ -1612,6 +1691,7 @@
         }
     </style>
 </head>
+
 <body>
     <!-- Navigation -->
     <nav class="navbar" id="navbar">
@@ -1628,7 +1708,9 @@
                 <a href="#planos">Planos</a>
                 <a href="#retencao">Engajamento</a>
                 <a href="noticias.html">Notícias</a>
-                <a href="login.html" class="nav-cta" style="background:transparent;border:1px solid var(--border);color:var(--text);box-shadow:none;">Área do Assinante</a>
+                <a href="login.html" class="nav-cta"
+                    style="background:transparent;border:1px solid var(--border);color:var(--text);box-shadow:none;">Área
+                    do Assinante</a>
                 <a href="assinatura.html?origem=site" class="nav-cta">Começar Agora</a>
             </div>
             <button class="mobile-menu-btn" onclick="toggleMobileMenu()">☰</button>
@@ -1667,7 +1749,8 @@
                     para a <span class="gradient-text">gestão educacional</span>
                 </h1>
                 <p class="hero-subtitle">
-                    Monitoramento, conformidade e capacitação especializada para gestores da educação. Tudo sobre FUNDEB, SIOPE, CACS e Salário-Educação em um só lugar.
+                    Monitoramento, conformidade e capacitação especializada para gestores da educação. Tudo sobre
+                    FUNDEB, SIOPE, CACS e Salário-Educação em um só lugar.
                 </p>
                 <div class="hero-cta-group">
                     <a href="assinatura.html?origem=site" class="btn-primary">
@@ -1757,27 +1840,88 @@
             <div class="section-header animate-on-scroll">
                 <div class="section-label">⚡ O Desafio</div>
                 <h2 class="section-title">Gestores sob pressão, sem suporte especializado</h2>
-                <p class="section-desc">A rotatividade eleitoral, os prazos legais apertados e a complexidade da legislação criam um cenário de alto risco para gestores da educação.</p>
+                <p class="section-desc">A rotatividade eleitoral, os prazos legais apertados e a complexidade da
+                    legislação criam um cenário de alto risco para gestores da educação.</p>
             </div>
             <div class="problem-grid">
                 <div class="problem-card animate-on-scroll delay-1">
                     <div class="problem-icon">⏰</div>
                     <h3>Prazos apertados</h3>
-                    <p>Prestação de contas do FUNDEB, envios do SIOPE e obrigações do CACS-Fundeb operam em ciclos rigorosos. Um atraso pode gerar penalidades institucionais severas.</p>
+                    <p>Prestação de contas do FUNDEB, envios do SIOPE e obrigações do CACS-Fundeb operam em ciclos
+                        rigorosos. Um atraso pode gerar penalidades institucionais severas.</p>
                 </div>
                 <div class="problem-card animate-on-scroll delay-2">
                     <div class="problem-icon">🔄</div>
                     <h3>Alta rotatividade</h3>
-                    <p>A cada ciclo eleitoral, uma parcela significativa dos gestores é renovada. O conhecimento institucional se perde e a curva de aprendizado recomeça do zero.</p>
+                    <p>A cada ciclo eleitoral, uma parcela significativa dos gestores é renovada. O conhecimento
+                        institucional se perde e a curva de aprendizado recomeça do zero.</p>
                 </div>
                 <div class="problem-card animate-on-scroll delay-3">
                     <div class="problem-icon">🏛️</div>
                     <h3>Sem suporte local</h3>
-                    <p>Raramente o ente federado conta com assessoria técnica especializada em FUNDEB e SIOPE no próprio quadro. A dependência de consultorias externas é estrutural.</p>
+                    <p>Raramente o ente federado conta com assessoria técnica especializada em FUNDEB e SIOPE no próprio
+                        quadro. A dependência de consultorias externas é estrutural.</p>
                 </div>
             </div>
         </div>
     </section>
+
+
+    <!-- ═══════════════════════════════════════════════════════════
+     SHOWCASE INTERATIVO — Radar SIOPE
+     ═══════════════════════════════════════════════════════════ -->
+    <section id="showcase" style="padding: 60px 0; background: #050810; position: relative; overflow: hidden;">
+        <div style="max-width: 1280px; margin: 0 auto; padding: 0 24px;">
+
+            <div style="text-align: center; margin-bottom: 40px;">
+                <div
+                    style="display: inline-flex; align-items: center; gap: 8px; padding: 6px 14px; background: rgba(56,189,248,0.1); border: 1px solid rgba(56,189,248,0.3); border-radius: 99px; font-family: 'Syne', system-ui, sans-serif; font-size: 11px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: #38bdf8; margin-bottom: 16px;">
+                    <span
+                        style="width: 6px; height: 6px; border-radius: 50%; background: #34d399; box-shadow: 0 0 12px #34d399; animation: pulse 2s ease-in-out infinite;"></span>
+                    Demonstração Interativa
+                </div>
+                <h2
+                    style="font-family: 'Syne', system-ui, sans-serif; font-size: clamp(1.8rem, 4vw, 2.8rem); font-weight: 800; letter-spacing: -0.03em; line-height: 1.05; margin-bottom: 16px; background: linear-gradient(135deg, #fff 0%, #a5d8ff 50%, #fff 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;">
+                    Conheça a Plataforma em Ação
+                </h2>
+                <p
+                    style="font-size: 1.1rem; color: #94a3b8; max-width: 640px; margin: 0 auto; line-height: 1.6; font-style: italic;">
+                    Explore cada funcionalidade do Radar SIOPE em uma experiência interativa. Use as setas ou arraste
+                    para navegar.
+                </p>
+            </div>
+
+            <iframe src="showcase.html" width="100%" height="780"
+                style="border: none; border-radius: 20px; box-shadow: 0 40px 80px rgba(0,0,0,0.5); background: #0f172a;"
+                loading="lazy" title="Showcase Radar SIOPE"></iframe>
+
+            <div style="text-align: center; margin-top: 40px;">
+                <a href="assinatura.html?origem=site"
+                    style="display: inline-flex; align-items: center; gap: 10px; padding: 14px 32px; background: linear-gradient(135deg, #0A3D62, #1A5276); color: #fff; border-radius: 99px; font-family: 'Syne', system-ui, sans-serif; font-size: 1rem; font-weight: 700; text-decoration: none; border: 1px solid rgba(56,189,248,0.3); box-shadow: 0 8px 24px rgba(10,61,98,0.4); transition: all 0.3s;"
+                    onmouseover="this.style.transform='translateY(-3px)'" onmouseout="this.style.transform=''">
+                    <span>Experimente o Radar SIOPE</span>
+                    <span>→</span>
+                </a>
+            </div>
+
+        </div>
+    </section>
+
+    <style>
+        @keyframes pulse {
+
+            0%,
+            100% {
+                opacity: 1;
+                transform: scale(1);
+            }
+
+            50% {
+                opacity: 0.6;
+                transform: scale(1.3);
+            }
+        }
+    </style>
 
     <!-- Features Section -->
     <section class="section" id="funcionalidades">
@@ -1785,13 +1929,15 @@
             <div class="section-header animate-on-scroll">
                 <div class="section-label">🛠️ Funcionalidades</div>
                 <h2 class="section-title">Tudo que você precisa em uma só plataforma</h2>
-                <p class="section-desc">Do monitoramento de prazos ao suporte técnico individualizado, o Radar SIOPE cobre todo o ciclo de gestão educacional.</p>
+                <p class="section-desc">Do monitoramento de prazos ao suporte técnico individualizado, o Radar SIOPE
+                    cobre todo o ciclo de gestão educacional.</p>
             </div>
             <div class="features-grid">
                 <div class="feature-card animate-on-scroll delay-1">
                     <div class="feature-icon">📰</div>
                     <h3>Newsletter Multimídia</h3>
-                    <p>Cada edição é entregue por link personalizado com acesso controlado. Conteúdo em múltiplos formatos: texto editorial, áudio (podcast), vídeo, infográfico e mapa mental.</p>
+                    <p>Cada edição é entregue por link personalizado com acesso controlado. Conteúdo em múltiplos
+                        formatos: texto editorial, áudio (podcast), vídeo, infográfico e mapa mental.</p>
                     <div class="feature-tags">
                         <span class="feature-tag">Texto</span>
                         <span class="feature-tag">Áudio</span>
@@ -1803,7 +1949,8 @@
                 <div class="feature-card animate-on-scroll delay-2">
                     <div class="feature-icon">🔔</div>
                     <h3>Alertas Prioritários</h3>
-                    <p>Notificações push e via WhatsApp para eventos críticos: prazos de prestação de contas, publicações do FNDE, mudanças na legislação do FUNDEB, abertura e fechamento do SIOPE.</p>
+                    <p>Notificações push e via WhatsApp para eventos críticos: prazos de prestação de contas,
+                        publicações do FNDE, mudanças na legislação do FUNDEB, abertura e fechamento do SIOPE.</p>
                     <div class="feature-tags">
                         <span class="feature-tag">Push</span>
                         <span class="feature-tag">WhatsApp</span>
@@ -1813,7 +1960,8 @@
                 <div class="feature-card animate-on-scroll delay-3">
                     <div class="feature-icon">📋</div>
                     <h3>Relatório de Conformidade</h3>
-                    <p>Documento PDF gerado automaticamente com o diagnóstico de conformidade do município no SIOPE, FUNDEB e CAUC. Entregue por e-mail com base nos dados oficiais atualizados diariamente.</p>
+                    <p>Documento PDF gerado automaticamente com o diagnóstico de conformidade do município no SIOPE,
+                        FUNDEB e CAUC. Entregue por e-mail com base nos dados oficiais atualizados diariamente.</p>
                     <div class="feature-tags">
                         <span class="feature-tag">SIOPE</span>
                         <span class="feature-tag">FUNDEB</span>
@@ -1823,7 +1971,8 @@
                 <div class="feature-card animate-on-scroll delay-4">
                     <div class="feature-icon">📅</div>
                     <h3>Calendário de Eventos e Repasses</h3>
-                    <p>Agenda integrada com os principais prazos do FUNDEB, SIOPE, Salário-Educação e SISCACS, mais o cronograma de repasses de recursos — tudo em um só lugar, sempre atualizado.</p>
+                    <p>Agenda integrada com os principais prazos do FUNDEB, SIOPE, Salário-Educação e SISCACS, mais o
+                        cronograma de repasses de recursos — tudo em um só lugar, sempre atualizado.</p>
                     <div class="feature-tags">
                         <span class="feature-tag">FUNDEB</span>
                         <span class="feature-tag">Salário-Educação</span>
@@ -1833,7 +1982,8 @@
                 <div class="feature-card animate-on-scroll delay-1">
                     <div class="feature-icon">🔍</div>
                     <h3>Críticas do SIOPE</h3>
-                    <p>Monitoramento das inconsistências e pendências apontadas pelo sistema federal no lançamento do município. Identifique e corrija críticas antes do fechamento do módulo.</p>
+                    <p>Monitoramento das inconsistências e pendências apontadas pelo sistema federal no lançamento do
+                        município. Identifique e corrija críticas antes do fechamento do módulo.</p>
                     <div class="feature-tags">
                         <span class="feature-tag">SIOPE</span>
                         <span class="feature-tag">Pendências</span>
@@ -1843,7 +1993,8 @@
                 <div class="feature-card animate-on-scroll delay-2">
                     <div class="feature-icon">💡</div>
                     <h3>Sugestão de Tema</h3>
-                    <p>Canal direto para que assinantes indiquem temas prioritários para as próximas edições. As sugestões mais votadas pautam o conteúdo editorial — sua dúvida vira pauta.</p>
+                    <p>Canal direto para que assinantes indiquem temas prioritários para as próximas edições. As
+                        sugestões mais votadas pautam o conteúdo editorial — sua dúvida vira pauta.</p>
                     <div class="feature-tags">
                         <span class="feature-tag">Comunidade</span>
                         <span class="feature-tag">Editorial</span>
@@ -1853,7 +2004,8 @@
                 <div class="feature-card animate-on-scroll delay-3">
                     <div class="feature-icon">📊</div>
                     <h3>Gráficos Personalizados</h3>
-                    <p>Indicadores com série histórica renderizados em SVG. Cada assinante visualiza os dados do próprio ente federado comparados com médias regionais e nacionais.</p>
+                    <p>Indicadores com série histórica renderizados em SVG. Cada assinante visualiza os dados do próprio
+                        ente federado comparados com médias regionais e nacionais.</p>
                     <div class="feature-tags">
                         <span class="feature-tag">SVG</span>
                         <span class="feature-tag">Firestore</span>
@@ -1893,7 +2045,8 @@
                 <div class="feature-card animate-on-scroll delay-3">
                     <div class="feature-icon">💼</div>
                     <h3>Consultorias</h3>
-                    <p>Sessões remotas de suporte técnico individualizado ou atendimento presencial para planos superiores. Quantificadas em horas mensais por plano.</p>
+                    <p>Sessões remotas de suporte técnico individualizado ou atendimento presencial para planos
+                        superiores. Quantificadas em horas mensais por plano.</p>
                     <div class="feature-tags">
                         <span class="feature-tag">Online</span>
                         <span class="feature-tag">In loco</span>
@@ -1920,23 +2073,27 @@
             <div class="section-header animate-on-scroll">
                 <div class="section-label">🎨 Mídias</div>
                 <h2 class="section-title">Cinco formatos para cada perfil de aprendizado</h2>
-                <p class="section-desc">A mesma informação, adaptada ao seu estilo. Escolha como consome o conteúdo — ou consuma em todos os formatos.</p>
+                <p class="section-desc">A mesma informação, adaptada ao seu estilo. Escolha como consome o conteúdo — ou
+                    consuma em todos os formatos.</p>
             </div>
             <div class="media-showcase">
                 <div class="media-item animate-on-scroll delay-1">
                     <span class="media-icon">📝</span>
                     <div class="media-name">Texto</div>
-                    <div class="media-desc">Edição completa em formato editorial, com aprofundamento técnico e referências legais.</div>
+                    <div class="media-desc">Edição completa em formato editorial, com aprofundamento técnico e
+                        referências legais.</div>
                 </div>
                 <div class="media-item animate-on-scroll delay-2">
                     <span class="media-icon">🎧</span>
                     <div class="media-name">Áudio</div>
-                    <div class="media-desc">Versão narrada em podcast para consumo durante deslocamentos e rotinas.</div>
+                    <div class="media-desc">Versão narrada em podcast para consumo durante deslocamentos e rotinas.
+                    </div>
                 </div>
                 <div class="media-item animate-on-scroll delay-3">
                     <span class="media-icon">🎬</span>
                     <div class="media-name">Vídeo</div>
-                    <div class="media-desc">Apresentação audiovisual com demonstrações práticas de sistemas e processos.</div>
+                    <div class="media-desc">Apresentação audiovisual com demonstrações práticas de sistemas e processos.
+                    </div>
                 </div>
                 <div class="media-item animate-on-scroll delay-4">
                     <span class="media-icon">📊</span>
@@ -1946,7 +2103,8 @@
                 <div class="media-item featured animate-on-scroll delay-5">
                     <span class="media-icon">🧠</span>
                     <div class="media-name">Mapa Mental</div>
-                    <div class="media-desc">Visão estruturada e hierárquica dos temas. Ideal para gestores visuais e para revisão rápida antes de reuniões e prestações de contas.</div>
+                    <div class="media-desc">Visão estruturada e hierárquica dos temas. Ideal para gestores visuais e
+                        para revisão rápida antes de reuniões e prestações de contas.</div>
                 </div>
             </div>
         </div>
@@ -1975,26 +2133,33 @@
                         <div class="chat-message">
                             <div class="chat-avatar" style="width:32px;height:32px;font-size:1rem;">🤖</div>
                             <div>
-                                <div class="message-bubble">O prazo para envio do SIOPE módulo 3 em 2026 é <strong>30 de junho</strong>. Conforme a edição #138 do Radar, o FNDE antecipou em 15 dias em relação ao ano passado. Você precisa de ajuda com o preenchimento?</div>
+                                <div class="message-bubble">O prazo para envio do SIOPE módulo 3 em 2026 é <strong>30 de
+                                        junho</strong>. Conforme a edição #138 do Radar, o FNDE antecipou em 15 dias em
+                                    relação ao ano passado. Você precisa de ajuda com o preenchimento?</div>
                                 <div class="message-time">10:23</div>
                             </div>
                         </div>
                         <div class="chat-message user">
                             <div>
-                                <div class="message-bubble">Sim, como lançar a despesa de transporte escolar no CACS?</div>
+                                <div class="message-bubble">Sim, como lançar a despesa de transporte escolar no CACS?
+                                </div>
                                 <div class="message-time">10:24</div>
                             </div>
                         </div>
                         <div class="chat-message">
                             <div class="chat-avatar" style="width:32px;height:32px;font-size:1rem;">🤖</div>
                             <div>
-                                <div class="message-bubble">💡 Baseado na edição #124 e no Guia Prático de CACS-Fundeb: a despesa de transporte escolar deve ser lançada na categoria <strong>"Manutenção e Desenvolvimento do Ensino"</strong>, subcódigo <strong>33.90.39</strong> (Serviços de Transporte Escolar)...</div>
+                                <div class="message-bubble">💡 Baseado na edição #124 e no Guia Prático de CACS-Fundeb:
+                                    a despesa de transporte escolar deve ser lançada na categoria <strong>"Manutenção e
+                                        Desenvolvimento do Ensino"</strong>, subcódigo <strong>33.90.39</strong>
+                                    (Serviços de Transporte Escolar)...</div>
                                 <div class="message-time">10:24</div>
                             </div>
                         </div>
                     </div>
                     <div class="chat-input">
-                        <input type="text" class="chat-input-field" placeholder="Digite sua dúvida sobre FUNDEB, SIOPE...">
+                        <input type="text" class="chat-input-field"
+                            placeholder="Digite sua dúvida sobre FUNDEB, SIOPE...">
                         <button class="chat-send">➤</button>
                     </div>
                 </div>
@@ -2009,14 +2174,16 @@
                     <div class="ai-feature-icon">📖</div>
                     <div class="ai-feature-text">
                         <h4>Contexto das Edições</h4>
-                        <p>A IA acessa o conteúdo da edição para responder com base em informações atualizadas e verificadas.</p>
+                        <p>A IA acessa o conteúdo da edição para responder com base em informações atualizadas e
+                            verificadas.</p>
                     </div>
                 </div>
                 <div class="ai-feature-item animate-on-scroll delay-2">
                     <div class="ai-feature-icon">⚡</div>
                     <div class="ai-feature-text">
                         <h4>Gemini 2.0 Flash Lite</h4>
-                        <p>Modelo otimizado para respostas rápidas e precisas sobre regulamentação do FNDE, FUNDEB e SIOPE.</p>
+                        <p>Modelo otimizado para respostas rápidas e precisas sobre regulamentação do FNDE, FUNDEB e
+                            SIOPE.</p>
                     </div>
                 </div>
                 <div class="ai-feature-item animate-on-scroll delay-3">
@@ -2036,58 +2203,79 @@
             <div class="section-header animate-on-scroll">
                 <div class="section-label">💰 Planos</div>
                 <h2 class="section-title">Escolha seu plano</h2>
-                <p class="section-desc">Planos flexíveis para cada necessidade. Assine em minutos e comece a monitorar sua gestão educacional.</p>
+                <p class="section-desc">Planos flexíveis para cada necessidade. Assine em minutos e comece a monitorar
+                    sua gestão educacional.</p>
             </div>
             <div class="pricing-grid" id="pricingGrid" style="display:flex;justify-content:center;">
-                <div class="pricing-card animate-on-scroll" style="max-width:480px;width:100%;text-align:center;padding:3rem 2rem;border-color:var(--accent);box-shadow:0 0 40px var(--accent-glow);">
+                <div class="pricing-card animate-on-scroll"
+                    style="max-width:480px;width:100%;text-align:center;padding:3rem 2rem;border-color:var(--accent);box-shadow:0 0 40px var(--accent-glow);">
                     <div style="font-size:4rem;margin-bottom:1.5rem;">🎯</div>
                     <div class="plan-name" style="font-size:1.5rem;margin-bottom:0.75rem;">Conheça nossos planos</div>
                     <div class="plan-desc" style="font-size:1rem;line-height:1.6;margin-bottom:2rem;">
                         Escolha o plano ideal.<br>
                         Do monitoramento básico ao acompanhamento técnico completo com consultoria.
                     </div>
-                    <div style="display:flex;flex-direction:column;gap:0.75rem;margin-bottom:2rem;text-align:left;padding:0 1rem;">
-                        <div style="display:flex;align-items:center;gap:0.75rem;font-size:0.9375rem;color:var(--text-muted);">
+                    <div
+                        style="display:flex;flex-direction:column;gap:0.75rem;margin-bottom:2rem;text-align:left;padding:0 1rem;">
+                        <div
+                            style="display:flex;align-items:center;gap:0.75rem;font-size:0.9375rem;color:var(--text-muted);">
                             <span style="color:var(--success);font-weight:700;">✓</span> 5 formatos de conteúdo
                         </div>
-                        <div style="display:flex;align-items:center;gap:0.75rem;font-size:0.9375rem;color:var(--text-muted);">
+                        <div
+                            style="display:flex;align-items:center;gap:0.75rem;font-size:0.9375rem;color:var(--text-muted);">
                             <span style="color:var(--success);font-weight:700;">✓</span> Alertas em tempo real
                         </div>
-                        <div style="display:flex;align-items:center;gap:0.75rem;font-size:0.9375rem;color:var(--text-muted);">
+                        <div
+                            style="display:flex;align-items:center;gap:0.75rem;font-size:0.9375rem;color:var(--text-muted);">
                             <span style="color:var(--success);font-weight:700;">✓</span> Assistente IA especializado
                         </div>
-                        <div style="display:flex;align-items:center;gap:0.75rem;font-size:0.9375rem;color:var(--text-muted);">
-                            <span style="color:var(--success);font-weight:700;">✓</span> Relatórios de conformidade personalizados 
+                        <div
+                            style="display:flex;align-items:center;gap:0.75rem;font-size:0.9375rem;color:var(--text-muted);">
+                            <span style="color:var(--success);font-weight:700;">✓</span> Relatórios de conformidade
+                            personalizados
                         </div>
-                        <div style="display:flex;align-items:center;gap:0.75rem;font-size:0.9375rem;color:var(--text-muted);">
-                            <span style="color:var(--success);font-weight:700;">✓</span> Calendário de eventos importantes
+                        <div
+                            style="display:flex;align-items:center;gap:0.75rem;font-size:0.9375rem;color:var(--text-muted);">
+                            <span style="color:var(--success);font-weight:700;">✓</span> Calendário de eventos
+                            importantes
                         </div>
-                        <div style="display:flex;align-items:center;gap:0.75rem;font-size:0.9375rem;color:var(--text-muted);">
-                            <span style="color:var(--success);font-weight:700;">✓</span> Cronograma  de repasses de recursos do Fundeb e salário-educação
+                        <div
+                            style="display:flex;align-items:center;gap:0.75rem;font-size:0.9375rem;color:var(--text-muted);">
+                            <span style="color:var(--success);font-weight:700;">✓</span> Cronograma de repasses de
+                            recursos do Fundeb e salário-educação
                         </div>
-                        <div style="display:flex;align-items:center;gap:0.75rem;font-size:0.9375rem;color:var(--text-muted);">
+                        <div
+                            style="display:flex;align-items:center;gap:0.75rem;font-size:0.9375rem;color:var(--text-muted);">
                             <span style="color:var(--success);font-weight:700;">✓</span> Biblioteca viva
                         </div>
-                        <div style="display:flex;align-items:center;gap:0.75rem;font-size:0.9375rem;color:var(--text-muted);">
-                            <span style="color:var(--success);font-weight:700;">✓</span> Suporte a múltiplos municípios na mesma conta
+                        <div
+                            style="display:flex;align-items:center;gap:0.75rem;font-size:0.9375rem;color:var(--text-muted);">
+                            <span style="color:var(--success);font-weight:700;">✓</span> Suporte a múltiplos municípios
+                            na mesma conta
                         </div>
-                        <div style="display:flex;align-items:center;gap:0.75rem;font-size:0.9375rem;color:var(--text-muted);">
-                            <span style="color:var(--success);font-weight:700;">✓</span> Múltiplos usuários por assinatura
+                        <div
+                            style="display:flex;align-items:center;gap:0.75rem;font-size:0.9375rem;color:var(--text-muted);">
+                            <span style="color:var(--success);font-weight:700;">✓</span> Múltiplos usuários por
+                            assinatura
                         </div>
-                        <div style="display:flex;align-items:center;gap:0.75rem;font-size:0.9375rem;color:var(--text-muted);">
+                        <div
+                            style="display:flex;align-items:center;gap:0.75rem;font-size:0.9375rem;color:var(--text-muted);">
                             <span style="color:var(--success);font-weight:700;">✓</span> E muito mais...
                         </div>
                     </div>
-                    <a href="assinatura.html?origem=site" class="plan-cta" style="display:inline-block;width:100%;text-align:center;text-decoration:none;background:var(--gradient-accent);border:none;color:white;box-shadow:0 0 20px var(--accent-glow);padding:1rem;font-size:1.125rem;border-radius:10px;font-weight:600;transition:all 0.3s ease;">
+                    <a href="assinatura.html?origem=site" class="plan-cta"
+                        style="display:inline-block;width:100%;text-align:center;text-decoration:none;background:var(--gradient-accent);border:none;color:white;box-shadow:0 0 20px var(--accent-glow);padding:1rem;font-size:1.125rem;border-radius:10px;font-weight:600;transition:all 0.3s ease;">
                         Ver Planos e Assinar →
                     </a>
                     <p style="margin-top:1.25rem;font-size:0.875rem;color:var(--text-dim);">
-                        Ainda tem dúvidas? <a href="capturaLead.html" style="color:var(--accent);text-decoration:none;font-weight:500;">Fale conosco</a>
+                        Ainda tem dúvidas? <a href="capturaLead.html"
+                            style="color:var(--accent);text-decoration:none;font-weight:500;">Fale conosco</a>
                     </p>
                 </div>
             </div>
             <p class="fidelity-note animate-on-scroll" style="margin-top:2rem;">
-                <strong>Cláusula de fidelização:</strong> cancelamento antecipado gera ajuste equivalente ao desconto já usufruído. Não é multa — é devolução do benefício concedido.
+                <strong>Cláusula de fidelização:</strong> cancelamento antecipado gera ajuste equivalente ao desconto já
+                usufruído. Não é multa — é devolução do benefício concedido.
             </p>
         </div>
     </section>
@@ -2131,10 +2319,12 @@
                 Seu ente federado não pode<br>ficar desatualizado
             </h2>
             <p class="cta-desc animate-on-scroll delay-1">
-                Junte-se aos gestores que usam o Radar SIOPE para navegar a complexidade da gestão educacional com segurança e precisão.
+                Junte-se aos gestores que usam o Radar SIOPE para navegar a complexidade da gestão educacional com
+                segurança e precisão.
             </p>
             <div class="cta-buttons animate-on-scroll delay-2">
-                <a href="assinatura.html?origem=site" class="btn-primary" style="font-size: 1.125rem; padding: 1.125rem 2.5rem;">
+                <a href="assinatura.html?origem=site" class="btn-primary"
+                    style="font-size: 1.125rem; padding: 1.125rem 2.5rem;">
                     Escolher Meu Plano
                     <span>→</span>
                 </a>
@@ -2238,7 +2428,7 @@
 
         // Smooth scroll for anchor links
         document.querySelectorAll('a[href^="#"]').forEach(anchor => {
-            anchor.addEventListener('click', function(e) {
+            anchor.addEventListener('click', function (e) {
                 e.preventDefault();
                 const target = document.querySelector(this.getAttribute('href'));
                 if (target) {
@@ -2257,6 +2447,7 @@
     </script>
 
 
-    
+
 </body>
+
 </html>
