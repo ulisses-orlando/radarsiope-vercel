@@ -825,15 +825,37 @@ style="flex:1;padding:6px 12px;background:#059669;color:#fff;border:none;border-
   const selectClassificacao = generateDomainSelect('classificacao', ['Básica', 'Premium'], data.classificacao || 'Básica');
   col1.appendChild(selectClassificacao);
 
-  // Campo "Enviada" (somente leitura)
-  const enviadaDiv = document.createElement("div");
-  enviadaDiv.className = "field";
-  enviadaDiv.style.marginTop = "10px";
-  enviadaDiv.innerHTML = `
-      <label><strong>Status de Envio:</strong></label>
-      <div id="status-envio-news" style="margin-top:4px; color:#555;">Carregando...</div>
-    `;
-  col1.appendChild(enviadaDiv);
+  // ── Controle manual de status (substitui o readonly) ─────────────────────
+  const statusWrap = document.createElement('div');
+  statusWrap.className = 'field';
+  statusWrap.style.cssText = 'margin-top:14px;padding:12px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px';
+  statusWrap.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+      <label style="font-weight:600;font-size:13px;color:#1e293b">📤 Status da edição</label>
+      <span id="status-badge-news" style="font-size:11px;padding:3px 10px;border-radius:99px;font-weight:700"></span>
+    </div>
+
+    <div id="status-botoes-news" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
+      <button type="button" id="btn-marcar-publicada"
+        style="padding:6px 12px;background:#22c55e;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600">
+        ✅ Marcar como Publicada
+      </button>
+      <button type="button" id="btn-marcar-enviada-email"
+        style="padding:6px 12px;background:#0A3D62;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600">
+        📧 Marcar como Enviada (e-mail)
+      </button>
+      <button type="button" id="btn-reverter-rascunho"
+        style="padding:6px 12px;background:#f1f5f9;color:#64748b;border:1px solid #e2e8f0;border-radius:6px;cursor:pointer;font-size:12px">
+        🚫 Reverter p/ Rascunho
+      </button>
+    </div>
+
+    <details style="font-size:11px;color:#64748b">
+      <summary style="cursor:pointer;font-weight:600">📜 Histórico de alterações</summary>
+      <div id="status-historico-news" style="margin-top:6px;padding:8px;background:#fff;border:1px solid #e2e8f0;border-radius:6px;max-height:140px;overflow-y:auto"></div>
+    </details>
+  `;
+  col1.appendChild(statusWrap);
 
   // -----------------------------
   // COLUNA 2 — EDITOR HTML + TEMPLATES + PREVIEW
@@ -1450,16 +1472,59 @@ style="flex:1;padding:6px 12px;background:#059669;color:#fff;border:none;border-
   // -----------------------------
   // CARREGA STATUS DE ENVIO
   // -----------------------------
+  // ── Inicializa o controle de status ──────────────────────────────────────
   if (isEdit && docId) {
-    const statusDiv = document.getElementById("status-envio-news");
+    _atualizarBadgeStatus(data);
+    _renderHistoricoStatus(data);
 
-    if (statusDiv) {
-      if (!data || data.enviada !== true) {
-        statusDiv.innerHTML = `<span style="color:red;">❌ Ainda não enviada</span>`;
-      } else {
-        statusDiv.innerHTML = `<span style="color:green;">✔️ Enviada</span>`;
+    // Botão: Marcar como Publicada (aparece no app)
+    document.getElementById('btn-marcar-publicada').onclick = async () => {
+      if (data.enviada) return mostrarMensagem('Esta edição já está publicada.');
+      const motivo = prompt('Motivo (opcional):', 'Publicação manual no app') || '';
+      await db.collection('newsletters').doc(docId).update({
+        enviada: true,
+        data_publicacao_app: firebase.firestore.Timestamp.now()
+      });
+      await _registrarAlteracaoStatus(docId, 'Marcada como Publicada', motivo);
+      mostrarMensagem('✅ Edição marcada como publicada no app.');
+      // Atualiza o objeto local para refletir no badge
+      data.enviada = true;
+      _atualizarBadgeStatus(data);
+      _renderHistoricoStatus({ ...data, status_historico: [...(data.status_historico || []), { acao: 'Marcada como Publicada', feito_por: 'você', em: new Date().toISOString(), motivo }] });
+    };
+
+    // Botão: Marcar como Enviada por e-mail
+    document.getElementById('btn-marcar-enviada-email').onclick = async () => {
+      const motivo = prompt('Motivo (opcional):', 'Envio de e-mail realizado') || '';
+      await db.collection('newsletters').doc(docId).update({
+        enviada: true,
+        enviada_email: true,
+        data_envio_email: firebase.firestore.Timestamp.now()
+      });
+      await _registrarAlteracaoStatus(docId, 'Marcada como Enviada (e-mail)', motivo);
+      mostrarMensagem('📧 Edição marcada como enviada por e-mail.');
+      data.enviada = true;
+      data.enviada_email = true;
+      _atualizarBadgeStatus(data);
+    };
+
+    // Botão: Reverter para rascunho
+    document.getElementById('btn-reverter-rascunho').onclick = async () => {
+      if (!data.enviada && !data.enviada_email) {
+        return mostrarMensagem('Esta edição já está como rascunho.');
       }
-    }
+      if (!confirm('Tem certeza? A edição deixará de aparecer no app imediatamente.')) return;
+      const motivo = prompt('Motivo da reversão:', 'Ajustes de conteúdo') || '';
+      await db.collection('newsletters').doc(docId).update({
+        enviada: false,
+        enviada_email: false
+      });
+      await _registrarAlteracaoStatus(docId, 'Revertida para Rascunho', motivo);
+      mostrarMensagem('🚫 Edição revertida para rascunho.');
+      data.enviada = false;
+      data.enviada_email = false;
+      _atualizarBadgeStatus(data);
+    };
   }
 
   // -----------------------------
@@ -5048,8 +5113,8 @@ async function abrirModalProrrogarAcesso(leadId, nomeLead) {
               <td style="padding:8px;text-align:center">${e.acessos_totais ?? 0}</td>
               <td style="padding:8px;text-align:center">
                 ${e.sinalizacao_compartilhamento
-                  ? `<span title="Sinalizado por acesso excessivo" style="color:#e53e3e;font-weight:700">⚠️</span>`
-                  : `<span style="color:#94a3b8">—</span>`}
+        ? `<span title="Sinalizado por acesso excessivo" style="color:#e53e3e;font-weight:700">⚠️</span>`
+        : `<span style="color:#94a3b8">—</span>`}
               </td>
               <td style="padding:8px">${situacao}</td>
             </tr>`;
@@ -5101,6 +5166,65 @@ async function confirmarProrrogacao() {
     mostrarMensagem("Erro ao prorrogar: " + e.message);
   }
 }
+
+// ─── Helpers de status da newsletter ───────────────────────────────────────
+function _atualizarBadgeStatus(data) {
+  const badge = document.getElementById('status-badge-news');
+  if (!badge) return;
+
+  if (data.enviada_email) {
+    badge.textContent = '📧 Enviada por e-mail';
+    badge.style.background = '#dbeafe';
+    badge.style.color = '#1e40af';
+  } else if (data.enviada) {
+    badge.textContent = '✅ Publicada no app';
+    badge.style.background = '#dcfce7';
+    badge.style.color = '#166534';
+  } else {
+    badge.textContent = '📝 Rascunho';
+    badge.style.background = '#fef3c7';
+    badge.style.color = '#92400e';
+  }
+}
+
+function _renderHistoricoStatus(data) {
+  const el = document.getElementById('status-historico-news');
+  if (!el) return;
+  const hist = Array.isArray(data.status_historico) ? data.status_historico : [];
+  if (!hist.length) {
+    el.innerHTML = '<em style="color:#94a3b8">Nenhuma alteração registrada.</em>';
+    return;
+  }
+  el.innerHTML = hist.slice().reverse().map(h => `
+    <div style="padding:4px 0;border-bottom:1px dashed #e2e8f0;font-size:11px">
+      <strong>${h.acao}</strong> por ${h.feito_por}
+      <span style="color:#94a3b8">· ${new Date(h.em).toLocaleString('pt-BR')}</span>
+      ${h.motivo ? `<div style="color:#64748b;margin-top:2px">↳ ${h.motivo}</div>` : ''}
+    </div>
+  `).join('');
+}
+
+async function _registrarAlteracaoStatus(docId, acao, motivo = '') {
+  const usuario = JSON.parse(localStorage.getItem('usuarioLogado') || '{}');
+  const feitoPor = usuario.nome || usuario.email || 'Desconhecido';
+  const registro = {
+    acao,
+    feito_por: feitoPor,
+    em: new Date().toISOString(),
+    motivo: motivo.trim()
+  };
+
+  // Lê documento atual para fazer append no array
+  const snap = await db.collection('newsletters').doc(docId).get();
+  const atual = snap.data() || {};
+  const hist = Array.isArray(atual.status_historico) ? atual.status_historico : [];
+  hist.push(registro);
+
+  await db.collection('newsletters').doc(docId).update({
+    status_historico: hist
+  });
+}
+
 /* ======================
    EXPORTAR GLOBAL
    ====================== */
