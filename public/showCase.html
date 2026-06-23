@@ -1,0 +1,3115 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Radar SIOPE · A plataforma definitiva para gestores educacionais</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&family=Source+Serif+4:ital,wght@0,400;0,600;1,400&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+/* ═══════════════════════════════════════════════════════════════
+   DESIGN SYSTEM — IDÊNTICO AO APP
+   ═══════════════════════════════════════════════════════════════ */
+:root {
+  --azul: #0A3D62;
+  --azul-mid: #1A5276;
+  --rs-bg: #0f172a;
+  --rs-card: #1e293b;
+  --rs-card2: #162032;
+  --rs-muted: #94a3b8;
+  --rs-borda: rgba(148,163,184,.12);
+  --rs-text: #f1f5f9;
+  --sky: #38bdf8;
+  --emerald: #34d399;
+  --violet: #a78bfa;
+  --orange: #fb923c;
+  --red: #ef4444;
+  --yellow: #fbbf24;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+
+body {
+  font-family: 'Source Serif 4', Georgia, serif;
+  background: #050810;
+  color: #fff;
+  min-height: 100vh;
+  overflow-x: hidden;
+  position: relative;
+}
+
+/* Fundo animado com grid + aurora */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image:
+    radial-gradient(circle at 20% 30%, rgba(10,61,98,0.35) 0%, transparent 50%),
+    radial-gradient(circle at 80% 70%, rgba(139,92,246,0.18) 0%, transparent 50%),
+    radial-gradient(circle at 50% 100%, rgba(52,211,153,0.15) 0%, transparent 50%);
+  z-index: 0;
+  animation: auroraShift 20s ease-in-out infinite;
+}
+
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(148,163,184,0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(148,163,184,0.04) 1px, transparent 1px);
+  background-size: 60px 60px;
+  mask-image: radial-gradient(ellipse at center, black 30%, transparent 80%);
+  z-index: 0;
+  pointer-events: none;
+}
+
+@keyframes auroraShift {
+  0%, 100% { transform: translate(0,0) scale(1); }
+  50% { transform: translate(-20px, 20px) scale(1.05); }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   CONTAINER
+   ═══════════════════════════════════════════════════════════════ */
+.showcase {
+  position: relative;
+  z-index: 1;
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 60px 24px 80px;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   HEADER
+   ═══════════════════════════════════════════════════════════════ */
+.showcase-header {
+  text-align: center;
+  margin-bottom: 56px;
+  animation: rsFadeIn 1s ease;
+}
+
+.showcase-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 14px;
+  background: rgba(56,189,248,0.1);
+  border: 1px solid rgba(56,189,248,0.3);
+  border-radius: 99px;
+  font-family: 'Syne', system-ui, sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--sky);
+  margin-bottom: 24px;
+}
+
+.showcase-badge::before {
+  content: '';
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--emerald);
+  box-shadow: 0 0 12px var(--emerald);
+  animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.6; transform: scale(1.3); }
+}
+
+.showcase-header h1 {
+  font-family: 'Syne', system-ui, sans-serif;
+  font-size: clamp(2rem, 5vw, 3.6rem);
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1.05;
+  margin-bottom: 20px;
+  background: linear-gradient(135deg, #fff 0%, #a5d8ff 50%, #fff 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.showcase-header h1 .destaque {
+  background: linear-gradient(135deg, var(--sky) 0%, var(--emerald) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.showcase-header p {
+  font-size: clamp(1rem, 1.8vw, 1.2rem);
+  color: var(--rs-muted);
+  max-width: 640px;
+  margin: 0 auto;
+  line-height: 1.6;
+  font-style: italic;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   CARROSSEL
+   ═══════════════════════════════════════════════════════════════ */
+.carousel {
+  position: relative;
+  border-radius: 24px;
+  background: linear-gradient(145deg, rgba(30,41,59,0.6), rgba(15,23,42,0.8));
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(148,163,184,0.15);
+  box-shadow:
+    0 40px 80px rgba(0,0,0,0.5),
+    0 0 0 1px rgba(255,255,255,0.05) inset;
+  overflow: hidden;
+}
+
+.carousel::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(56,189,248,0.5), transparent);
+}
+
+.carousel-progress {
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 2px;
+  background: rgba(255,255,255,0.05);
+  z-index: 10;
+}
+
+.carousel-progress-bar {
+  height: 100%;
+  width: 0;
+  background: linear-gradient(90deg, var(--sky), var(--emerald));
+  box-shadow: 0 0 10px var(--sky);
+  transition: width 0.1s linear;
+}
+
+.carousel-track {
+  display: flex;
+  transition: transform 0.8s cubic-bezier(0.65, 0, 0.35, 1);
+}
+
+.slide {
+  min-width: 100%;
+  padding: 60px 48px;
+  display: grid;
+  grid-template-columns: 1fr 1.1fr;
+  gap: 56px;
+  align-items: center;
+  min-height: 560px;
+}
+
+@media (max-width: 900px) {
+  .slide {
+    grid-template-columns: 1fr;
+    padding: 40px 24px;
+    gap: 32px;
+    min-height: auto;
+  }
+}
+
+/* ── Conteúdo do slide ─────────────────────────────── */
+.slide-content {
+  opacity: 0;
+  transform: translateX(-20px);
+  transition: all 0.7s cubic-bezier(0.16, 1, 0.3, 1) 0.2s;
+}
+
+.slide.active .slide-content {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+.slide-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  background: rgba(165,216,255,0.08);
+  border: 1px solid rgba(165,216,255,0.2);
+  border-radius: 99px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--sky);
+  margin-bottom: 18px;
+}
+
+.slide-tag::before {
+  content: '';
+  width: 5px; height: 5px;
+  border-radius: 50%;
+  background: var(--sky);
+}
+
+.slide-content h2 {
+  font-family: 'Syne', system-ui, sans-serif;
+  font-size: clamp(1.5rem, 3vw, 2.2rem);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+  margin-bottom: 16px;
+  color: #fff;
+}
+
+.slide-content p {
+  font-size: 1.05rem;
+  line-height: 1.65;
+  color: #cbd5e1;
+  margin-bottom: 24px;
+  font-style: italic;
+}
+
+.slide-content ul {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.slide-content ul li {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 0.95rem;
+  color: #e2e8f0;
+  line-height: 1.5;
+}
+
+.slide-content ul li::before {
+  content: '✓';
+  color: var(--emerald);
+  font-weight: 700;
+  font-size: 1rem;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   MOCK WINDOW (janela do app simulada)
+   ═══════════════════════════════════════════════════════════════ */
+.mock-wrap {
+  perspective: 1500px;
+  opacity: 0;
+  transform: translateX(40px);
+  transition: all 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.3s;
+}
+
+.slide.active .mock-wrap {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+.mock-window {
+  background: var(--rs-bg);
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow:
+    0 30px 60px rgba(0,0,0,0.5),
+    0 0 0 1px rgba(255,255,255,0.08) inset;
+  transform: rotateY(-8deg) rotateX(2deg);
+  transition: transform 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+  position: relative;
+}
+
+.slide.active .mock-window {
+  transform: rotateY(-3deg) rotateX(1deg);
+}
+
+.mock-window::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, rgba(56,189,248,0.08), transparent 40%);
+  pointer-events: none;
+}
+
+.mock-titlebar {
+  background: var(--rs-card2);
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-bottom: 1px solid var(--rs-borda);
+  position: relative;
+  z-index: 1;
+}
+
+.mock-dot {
+  width: 11px; height: 11px;
+  border-radius: 50%;
+}
+.mock-dot.r { background: #ef4444; }
+.mock-dot.y { background: #f59e0b; }
+.mock-dot.g { background: #22c55e; }
+
+.mock-url {
+  margin-left: 12px;
+  flex: 1;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: var(--rs-muted);
+  background: rgba(0,0,0,0.3);
+  padding: 4px 12px;
+  border-radius: 6px;
+  border: 1px solid var(--rs-borda);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mock-body {
+  padding: 18px;
+  background: var(--rs-bg);
+  color: var(--rs-text);
+  font-family: 'Source Serif 4', Georgia, serif;
+  font-size: 12px;
+  min-height: 360px;
+  position: relative;
+  z-index: 1;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   COMPONENTES DO MOCK (fiéis ao app)
+   ═══════════════════════════════════════════════════════════════ */
+
+/* ——— SLIDE 1: VISÃO DA EDIÇÃO ——— */
+.rs-section {
+  background: var(--rs-card);
+  border-radius: 12px;
+  padding: 14px;
+  margin-bottom: 10px;
+  border: 1px solid var(--rs-borda);
+}
+
+.rs-section-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+  font-family: 'Syne', system-ui, sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--rs-text);
+}
+
+.rs-section-header .icon {
+  font-size: 14px;
+}
+
+.rs-toggle {
+  display: flex;
+  background: var(--rs-card2);
+  border: 1px solid var(--rs-borda);
+  border-radius: 99px;
+  padding: 3px;
+  margin-bottom: 12px;
+  font-family: 'Syne', system-ui, sans-serif;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.rs-toggle button {
+  flex: 1;
+  padding: 7px 10px;
+  background: transparent;
+  border: none;
+  color: var(--rs-muted);
+  cursor: pointer;
+  border-radius: 99px;
+  transition: all 0.3s;
+}
+
+.rs-toggle button.ativo {
+  background: var(--azul);
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(10,61,98,0.4);
+}
+
+.rs-bullets {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.rs-bullet {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 8px 10px;
+  background: var(--rs-card2);
+  border-left: 3px solid var(--azul);
+  border-radius: 6px;
+  font-size: 11px;
+  line-height: 1.5;
+  color: #e2e8f0;
+  opacity: 0;
+  transform: translateX(-10px);
+  animation: bulletIn 0.5s ease forwards;
+  animation-play-state: paused;
+}
+
+.slide.active .rs-bullet { animation-play-state: running; }
+.rs-bullet:nth-child(1) { animation-delay: 0.3s; }
+.rs-bullet:nth-child(2) { animation-delay: 0.45s; }
+.rs-bullet:nth-child(3) { animation-delay: 0.6s; filter: blur(3px); opacity: 0.5; }
+.rs-bullet:nth-child(4) { animation-delay: 0.75s; filter: blur(3px); opacity: 0.5; }
+
+@keyframes bulletIn {
+  to { opacity: 1; transform: translateX(0); }
+}
+
+.rs-bullet .num {
+  color: var(--sky);
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 700;
+  font-size: 10px;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.mock-lock-overlay {
+  position: absolute;
+  bottom: 8px;
+  left: 14px;
+  right: 14px;
+  padding: 10px;
+  background: linear-gradient(135deg, rgba(10,61,98,0.95), rgba(26,82,118,0.95));
+  border-radius: 8px;
+  text-align: center;
+  font-family: 'Syne', system-ui, sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  color: #fff;
+  border: 1px solid rgba(56,189,248,0.3);
+  box-shadow: 0 8px 20px rgba(0,0,0,0.3);
+  animation: lockPulse 2s ease-in-out infinite;
+}
+
+@keyframes lockPulse {
+  0%, 100% { box-shadow: 0 8px 20px rgba(0,0,0,0.3), 0 0 0 0 rgba(56,189,248,0.4); }
+  50% { box-shadow: 0 8px 20px rgba(0,0,0,0.3), 0 0 0 6px rgba(56,189,248,0); }
+}
+
+/* ——— SLIDE 2: SÉRIE HISTÓRICA ——— */
+.rs-municipio-card {
+  background: var(--rs-card);
+  border-radius: 12px;
+  padding: 14px;
+  border: 1px solid var(--rs-borda);
+}
+
+.rs-mun-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.rs-mun-ref {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  color: var(--rs-muted);
+}
+
+.rs-mun-status {
+  font-family: 'Syne', system-ui, sans-serif;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 3px 10px;
+  border-radius: 99px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.rs-mde-label {
+  display: flex;
+  justify-content: space-between;
+  font-family: 'Syne', system-ui, sans-serif;
+  font-size: 11px;
+  margin-bottom: 6px;
+  color: var(--rs-muted);
+}
+
+.rs-mde-label strong {
+  color: var(--emerald);
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.rs-mde-track {
+  height: 10px;
+  background: var(--rs-card2);
+  border-radius: 99px;
+  overflow: hidden;
+  position: relative;
+  border: 1px solid var(--rs-borda);
+}
+
+.rs-mde-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--azul), var(--emerald));
+  border-radius: 99px;
+  width: 0;
+  transition: width 1.5s cubic-bezier(0.16, 1, 0.3, 1) 0.4s;
+  box-shadow: 0 0 10px rgba(52,211,153,0.4);
+}
+
+.slide.active .rs-mde-fill { width: 92%; }
+
+.rs-mde-min {
+  position: absolute;
+  top: -2px;
+  bottom: -2px;
+  width: 2px;
+  background: var(--red);
+  left: 83%;
+  box-shadow: 0 0 6px var(--red);
+}
+
+.rs-mde-min::after {
+  content: '25%';
+  position: absolute;
+  top: -16px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px;
+  color: var(--red);
+  font-weight: 700;
+}
+
+.rs-mini-chart {
+  margin-top: 14px;
+  background: var(--rs-card2);
+  border: 1px solid var(--rs-borda);
+  border-radius: 8px;
+  padding: 10px;
+  height: 130px;
+  position: relative;
+  overflow: hidden;
+}
+
+.rs-mini-chart svg {
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.rs-chart-line {
+  fill: none;
+  stroke: var(--emerald);
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 400;
+  stroke-dashoffset: 400;
+  animation: drawLine 2s ease-out 0.6s forwards;
+  filter: drop-shadow(0 0 4px rgba(52,211,153,0.5));
+}
+
+.rs-chart-line-2 {
+  fill: none;
+  stroke: var(--sky);
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 400;
+  stroke-dashoffset: 400;
+  animation: drawLine 2s ease-out 0.9s forwards;
+  filter: drop-shadow(0 0 4px rgba(56,189,248,0.5));
+}
+
+@keyframes drawLine {
+  to { stroke-dashoffset: 0; }
+}
+
+.rs-chart-dot {
+  fill: var(--emerald);
+  stroke: var(--rs-card2);
+  stroke-width: 2;
+  opacity: 0;
+  animation: dotIn 0.3s ease forwards;
+}
+
+.slide.active .rs-chart-dot:nth-child(3) { animation-delay: 1s; }
+.slide.active .rs-chart-dot:nth-child(4) { animation-delay: 1.2s; }
+.slide.active .rs-chart-dot:nth-child(5) { animation-delay: 1.4s; }
+.slide.active .rs-chart-dot:nth-child(6) { animation-delay: 1.6s; }
+
+@keyframes dotIn { to { opacity: 1; } }
+
+.rs-chart-legend {
+  position: absolute;
+  bottom: 6px;
+  left: 10px;
+  right: 10px;
+  display: flex;
+  gap: 12px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px;
+  color: var(--rs-muted);
+}
+
+.rs-chart-legend span::before {
+  content: '';
+  display: inline-block;
+  width: 8px;
+  height: 2px;
+  margin-right: 4px;
+  vertical-align: middle;
+}
+
+.rs-chart-legend .leg-mde::before { background: var(--emerald); }
+.rs-chart-legend .leg-fundeb::before { background: var(--sky); }
+
+/* ——— SLIDE 3: RELATÓRIO ——— */
+.mock-pdf {
+  background: #fff;
+  border-radius: 8px;
+  padding: 0;
+  overflow: hidden;
+  color: #1e293b;
+  font-family: 'Source Serif 4', serif;
+  box-shadow: 0 20px 40px rgba(0,0,0,0.5);
+  animation: pdfFloat 4s ease-in-out infinite;
+}
+
+@keyframes pdfFloat {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-4px); }
+}
+
+.pdf-cabecalho {
+  background: linear-gradient(135deg, #0A3D62, #1a5c91);
+  color: #fff;
+  padding: 10px 14px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-family: 'Syne', sans-serif;
+}
+
+.pdf-logo {
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+
+.pdf-logo small {
+  display: block;
+  font-size: 8px;
+  opacity: 0.75;
+  font-weight: 400;
+  letter-spacing: 0;
+}
+
+.pdf-btn-print {
+  font-size: 9px;
+  padding: 3px 8px;
+  background: rgba(255,255,255,0.2);
+  border: 1px solid rgba(255,255,255,0.3);
+  border-radius: 4px;
+  color: #fff;
+}
+
+.pdf-faixa {
+  background: #e8f0f7;
+  border-bottom: 2px solid #0A3D62;
+  padding: 6px 14px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #0A3D62;
+  display: flex;
+  justify-content: space-between;
+}
+
+.pdf-faixa small {
+  font-size: 8px;
+  color: #475569;
+  font-weight: 400;
+}
+
+.pdf-corpo {
+  padding: 12px 14px;
+}
+
+.pdf-secao-titulo {
+  font-family: 'Syne', sans-serif;
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #0A3D62;
+  border-bottom: 1.5px solid #dbeafe;
+  padding-bottom: 3px;
+  margin-bottom: 8px;
+  margin-top: 10px;
+}
+
+.pdf-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 9px;
+}
+
+.pdf-table thead tr {
+  background: #0A3D62;
+  color: #fff;
+}
+
+.pdf-table th {
+  padding: 4px 6px;
+  text-align: left;
+  font-weight: 600;
+  font-size: 8px;
+  letter-spacing: 0.03em;
+}
+
+.pdf-table td {
+  padding: 4px 6px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.pdf-table tbody tr:nth-child(even) {
+  background: #f8fafc;
+}
+
+.pdf-badge {
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: 99px;
+  font-size: 8px;
+  font-weight: 700;
+}
+
+.pdf-badge.verde { background: #dcfce7; color: #166534; }
+.pdf-badge.azul { background: #dbeafe; color: #1e40af; }
+.pdf-badge.vermelho { background: #fee2e2; color: #991b1b; }
+
+.pdf-ind-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 5px;
+  margin-top: 8px;
+}
+
+.pdf-ind-card {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 4px;
+  padding: 6px;
+}
+
+.pdf-ind-card.ok { border-left: 3px solid #16a34a; }
+.pdf-ind-card.alerta { border-left: 3px solid #dc2626; background: #fff5f5; }
+
+.pdf-ind-card-label {
+  font-size: 8px;
+  color: #64748b;
+  margin-bottom: 2px;
+}
+
+.pdf-ind-card-valor {
+  font-size: 11px;
+  font-weight: 700;
+  color: #1e293b;
+}
+
+/* ——— SLIDE 4: QUIZ ——— */
+.rs-quiz-modal {
+  background: var(--rs-card);
+  border-radius: 12px;
+  border: 1px solid var(--rs-borda);
+  overflow: hidden;
+}
+
+.rs-quiz-header {
+  padding: 10px 14px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid var(--rs-borda);
+  font-family: 'Syne', sans-serif;
+  font-size: 12px;
+  color: var(--rs-muted);
+}
+
+.rs-quiz-badge {
+  background: rgba(10,61,98,0.5);
+  color: var(--sky);
+  font-size: 9px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 99px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  margin-right: 6px;
+}
+
+.rs-quiz-progress {
+  height: 3px;
+  background: var(--rs-card2);
+  overflow: hidden;
+}
+
+.rs-quiz-progress-fill {
+  height: 100%;
+  width: 0;
+  background: linear-gradient(90deg, var(--azul), var(--emerald));
+  transition: width 1s ease 0.5s;
+}
+
+.slide.active .rs-quiz-progress-fill { width: 40%; }
+
+.rs-quiz-body {
+  padding: 16px;
+}
+
+.rs-quiz-texto {
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--rs-text);
+  margin-bottom: 14px;
+  font-weight: 500;
+}
+
+.rs-quiz-opcao {
+  background: rgba(255,255,255,0.04);
+  border: 1.5px solid var(--rs-borda);
+  padding: 8px 10px;
+  border-radius: 8px;
+  margin-bottom: 6px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  color: var(--rs-text);
+  transition: all 0.3s;
+  opacity: 0;
+  transform: translateY(8px);
+  animation: opcaoIn 0.4s ease forwards;
+}
+
+.slide.active .rs-quiz-opcao:nth-child(1) { animation-delay: 0.4s; }
+.slide.active .rs-quiz-opcao:nth-child(2) { animation-delay: 0.55s; }
+.slide.active .rs-quiz-opcao:nth-child(3) { animation-delay: 0.7s; }
+.slide.active .rs-quiz-opcao:nth-child(4) { animation-delay: 0.85s; }
+
+@keyframes opcaoIn {
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.rs-quiz-opcao.correta {
+  background: rgba(34,197,94,0.12);
+  border-color: var(--emerald);
+}
+
+.rs-quiz-opcao.errada {
+  background: rgba(239,68,68,0.1);
+  border-color: var(--red);
+  opacity: 0.6;
+}
+
+.rs-quiz-letra {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.08);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--rs-muted);
+  flex-shrink: 0;
+}
+
+.rs-quiz-opcao.correta .rs-quiz-letra {
+  background: var(--emerald);
+  color: #fff;
+}
+
+.rs-quiz-opcao.errada .rs-quiz-letra {
+  background: var(--red);
+  color: #fff;
+}
+
+.rs-quiz-explicacao {
+  margin-top: 10px;
+  padding: 8px 10px;
+  background: rgba(139,92,246,0.1);
+  border-left: 3px solid var(--violet);
+  border-radius: 0 6px 6px 0;
+  font-size: 10px;
+  color: var(--rs-muted);
+  line-height: 1.5;
+  opacity: 0;
+  animation: fadeIn 0.5s ease 1.2s forwards;
+}
+
+@keyframes fadeIn { to { opacity: 1; } }
+
+.rs-quiz-explicacao strong {
+  color: var(--violet);
+}
+
+/* ——— SLIDE 5: PERGUNTE À EDIÇÃO ——— */
+.rs-chat-container {
+  background: var(--rs-card);
+  border-radius: 12px;
+  border: 1px solid var(--rs-borda);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  height: 340px;
+}
+
+.rs-chat-header {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--rs-borda);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.rs-chat-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #f97316, #ef4444);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  box-shadow: 0 2px 10px rgba(249,115,22,0.35);
+}
+
+.rs-chat-info {
+  flex: 1;
+  font-family: 'Syne', sans-serif;
+}
+
+.rs-chat-titulo {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--rs-text);
+  line-height: 1.2;
+}
+
+.rs-chat-status {
+  font-size: 9px;
+  color: var(--emerald);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 2px;
+}
+
+.rs-chat-status::before {
+  content: '';
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--emerald);
+  box-shadow: 0 0 6px var(--emerald);
+  animation: pulse 2s infinite;
+}
+
+.rs-chat-messages {
+  flex: 1;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  overflow: hidden;
+}
+
+.rs-msg {
+  max-width: 78%;
+  padding: 8px 12px;
+  border-radius: 14px;
+  font-size: 11px;
+  line-height: 1.5;
+  opacity: 0;
+  animation: msgIn 0.5s ease forwards;
+}
+
+.slide.active .rs-msg.user { animation-delay: 0.3s; }
+.slide.active .rs-msg.bot { animation-delay: 1s; }
+.slide.active .rs-msg.typing { animation-delay: 1.8s; }
+.slide.active .rs-msg.bot-2 { animation-delay: 2.6s; }
+
+@keyframes msgIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.rs-msg.user {
+  background: var(--azul);
+  color: #fff;
+  align-self: flex-end;
+  border-bottom-right-radius: 4px;
+}
+
+.rs-msg.bot, .rs-msg.bot-2 {
+  background: var(--rs-card2);
+  color: var(--rs-text);
+  align-self: flex-start;
+  border-bottom-left-radius: 4px;
+  border: 1px solid var(--rs-borda);
+}
+
+.rs-typing {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.rs-typing span {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--rs-muted);
+  animation: typingDot 1.2s ease-in-out infinite;
+}
+
+.rs-typing span:nth-child(2) { animation-delay: 0.2s; }
+.rs-typing span:nth-child(3) { animation-delay: 0.4s; }
+
+@keyframes typingDot {
+  0%, 60%, 100% { transform: translateY(0); opacity: 0.5; }
+  30% { transform: translateY(-4px); opacity: 1; }
+}
+
+.rs-chat-input {
+  padding: 10px 12px;
+  border-top: 1px solid var(--rs-borda);
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.rs-chat-input-field {
+  flex: 1;
+  background: var(--rs-card2);
+  border: 1px solid var(--rs-borda);
+  border-radius: 99px;
+  padding: 6px 12px;
+  font-size: 11px;
+  color: var(--rs-muted);
+  font-family: inherit;
+}
+
+.rs-chat-send {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--azul);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: 11px;
+}
+
+/* ——— SLIDE 6: MAPA MENTAL ——— */
+.rs-map-container {
+  background: linear-gradient(135deg, var(--rs-bg) 0%, #111d30 100%);
+  border-radius: 12px;
+  border: 1px solid var(--rs-borda);
+  height: 360px;
+  position: relative;
+  overflow: hidden;
+}
+
+.rs-map-bg {
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(circle, rgba(255,255,255,0.05) 1px, transparent 1px);
+  background-size: 20px 20px;
+  opacity: 0.5;
+}
+
+.rs-map-svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.rs-map-curve {
+  fill: none;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-dasharray: 200;
+  stroke-dashoffset: 200;
+  opacity: 0.6;
+}
+
+.slide.active .rs-map-curve {
+  animation: drawCurve 1s ease forwards;
+}
+
+.slide.active .rs-map-curve:nth-child(1) { animation-delay: 0.3s; }
+.slide.active .rs-map-curve:nth-child(2) { animation-delay: 0.5s; }
+.slide.active .rs-map-curve:nth-child(3) { animation-delay: 0.7s; }
+.slide.active .rs-map-curve:nth-child(4) { animation-delay: 0.9s; }
+
+@keyframes drawCurve {
+  to { stroke-dashoffset: 0; }
+}
+
+.rs-map-node {
+  position: absolute;
+  background: var(--rs-card);
+  border-radius: 20px;
+  padding: 6px 12px;
+  font-family: 'Syne', sans-serif;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--rs-text);
+  white-space: nowrap;
+  opacity: 0;
+  transform: scale(0.5);
+  animation: nodeIn 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+  border: 1.5px solid;
+}
+
+.slide.active .rs-map-node.root { animation-delay: 0.1s; }
+.slide.active .rs-map-node.n1 { animation-delay: 0.8s; }
+.slide.active .rs-map-node.n2 { animation-delay: 1s; }
+.slide.active .rs-map-node.n3 { animation-delay: 1.2s; }
+.slide.active .rs-map-node.n4 { animation-delay: 1.4s; }
+.slide.active .rs-map-node.n1-1 { animation-delay: 1.6s; }
+.slide.active .rs-map-node.n2-1 { animation-delay: 1.8s; }
+
+@keyframes nodeIn {
+  to { opacity: 1; transform: scale(1); }
+}
+
+.rs-map-node.root {
+  background: var(--azul);
+  border-color: #1d5a8c;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 800;
+  padding: 8px 16px;
+}
+
+.rs-map-node .faixa {
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 3px;
+  height: 60%;
+  border-radius: 0 2px 2px 0;
+}
+
+.rs-map-popover {
+  position: absolute;
+  background: #1e2d45;
+  border: 1px solid rgba(255,255,255,0.1);
+  border-left: 3px solid var(--sky);
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 9px;
+  color: #cbd5e1;
+  line-height: 1.5;
+  max-width: 160px;
+  opacity: 0;
+  animation: fadeIn 0.5s ease 2.2s forwards;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+}
+
+.rs-map-popover-header {
+  font-family: 'Syne', sans-serif;
+  font-size: 8px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--sky);
+  margin-bottom: 4px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.rs-map-popover-header::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--sky);
+}
+
+.rs-map-hint {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 6px 12px;
+  background: rgba(0,0,0,0.3);
+  border-top: 1px solid var(--rs-borda);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px;
+  color: var(--rs-muted);
+  text-align: center;
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+}
+
+/* ——— SLIDE 7: CENTRAL EDIÇÕES ——— */
+.rs-drawer {
+  background: var(--rs-bg);
+  border-radius: 12px;
+  border: 1px solid var(--rs-borda);
+  overflow: hidden;
+  height: 380px;
+  display: flex;
+  flex-direction: column;
+}
+
+.rs-drawer-header {
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--rs-borda);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--rs-card2);
+}
+
+.rs-drawer-titulo {
+  font-family: 'Syne', sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--rs-text);
+}
+
+.rs-drawer-close {
+  background: none;
+  border: none;
+  color: var(--rs-muted);
+  font-size: 16px;
+  cursor: pointer;
+}
+
+.rs-drawer-body {
+  flex: 1;
+  padding: 12px;
+  overflow-y: auto;
+}
+
+.rs-busca {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--rs-card2);
+  border: 1px solid var(--rs-borda);
+  border-radius: 8px;
+  padding: 5px 10px;
+  margin-bottom: 10px;
+  font-size: 11px;
+  color: var(--rs-muted);
+}
+
+.rs-tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 10px;
+  background: var(--rs-card2);
+  padding: 3px;
+  border-radius: 8px;
+  font-family: 'Syne', sans-serif;
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.rs-tab {
+  flex: 1;
+  padding: 5px;
+  text-align: center;
+  border-radius: 6px;
+  color: var(--rs-muted);
+  cursor: pointer;
+}
+
+.rs-tab.ativa {
+  background: var(--azul);
+  color: #fff;
+}
+
+.rs-edicao-card {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px;
+  background: var(--rs-card);
+  border-radius: 8px;
+  border: 1px solid var(--rs-borda);
+  margin-bottom: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+  opacity: 0;
+  transform: translateY(10px);
+  animation: edicaoIn 0.4s ease forwards;
+}
+
+.slide.active .rs-edicao-card:nth-child(1) { animation-delay: 0.3s; }
+.slide.active .rs-edicao-card:nth-child(2) { animation-delay: 0.45s; }
+.slide.active .rs-edicao-card:nth-child(3) { animation-delay: 0.6s; }
+.slide.active .rs-edicao-card:nth-child(4) { animation-delay: 0.75s; }
+.slide.active .rs-edicao-card:nth-child(5) { animation-delay: 0.9s; }
+
+@keyframes edicaoIn {
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.rs-edicao-card.atual {
+  border-color: var(--azul);
+  background: rgba(10,61,98,0.2);
+}
+
+.rs-dot-lida {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--azul);
+  border: 1.5px solid var(--azul);
+  flex-shrink: 0;
+}
+
+.rs-dot-lida.lida {
+  background: transparent;
+}
+
+.rs-edicao-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.rs-edicao-titulo {
+  font-family: 'Syne', sans-serif;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--rs-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.rs-edicao-meta {
+  font-size: 9px;
+  color: var(--rs-muted);
+  margin-top: 2px;
+}
+
+.rs-badge-atual {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 8px;
+  font-weight: 700;
+  padding: 2px 6px;
+  background: var(--azul);
+  color: #fff;
+  border-radius: 99px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.rs-fav {
+  color: var(--yellow);
+  font-size: 14px;
+}
+
+.rs-chevron {
+  color: var(--rs-muted);
+  font-size: 14px;
+}
+
+/* ——— SLIDE 8: SENTINELA ——— */
+.rs-sentinela {
+  background: var(--rs-bg);
+  border-radius: 12px;
+  border: 1px solid var(--rs-borda);
+  overflow: hidden;
+  height: 380px;
+  display: flex;
+  flex-direction: column;
+}
+
+.rs-sentinela-header {
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--rs-borda);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--rs-card2);
+}
+
+.rs-sentinela-titulo {
+  font-family: 'Syne', sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--rs-text);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.rs-sentinela-badge {
+  background: var(--red);
+  color: #fff;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px;
+  font-weight: 800;
+  padding: 2px 7px;
+  border-radius: 99px;
+  animation: pulseBadge 1.5s ease-in-out infinite;
+}
+
+@keyframes pulseBadge {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(239,68,68,0.6); }
+  50% { box-shadow: 0 0 0 6px rgba(239,68,68,0); }
+}
+
+.rs-sentinela-body {
+  flex: 1;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.rs-alerta-card {
+  background: var(--rs-card);
+  border: 1px solid var(--rs-borda);
+  border-radius: 10px;
+  padding: 12px;
+  opacity: 0;
+  transform: translateX(20px);
+  animation: alertaIn 0.5s ease forwards;
+}
+
+.slide.active .rs-alerta-card:nth-child(1) { animation-delay: 0.3s; }
+.slide.active .rs-alerta-card:nth-child(2) { animation-delay: 0.5s; }
+.slide.active .rs-alerta-card:nth-child(3) { animation-delay: 0.7s; }
+.slide.active .rs-alerta-card:nth-child(4) { animation-delay: 0.9s; }
+
+@keyframes alertaIn {
+  to { opacity: 1; transform: translateX(0); }
+}
+
+.rs-alerta-card.novo {
+  border-color: rgba(239,68,68,0.4);
+  background: rgba(239,68,68,0.05);
+}
+
+.rs-alerta-card.urgente {
+  border-color: rgba(251,146,60,0.4);
+  background: rgba(251,146,60,0.05);
+}
+
+.rs-alerta-topo {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.rs-alerta-titulo {
+  font-family: 'Syne', sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--rs-text);
+  line-height: 1.3;
+  flex: 1;
+}
+
+.rs-alerta-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--red);
+  flex-shrink: 0;
+  margin-top: 4px;
+  animation: pulse 2s infinite;
+}
+
+.rs-alerta-corpo {
+  font-size: 10px;
+  color: var(--rs-muted);
+  line-height: 1.5;
+  margin-bottom: 6px;
+}
+
+.rs-alerta-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 9px;
+  color: var(--rs-muted);
+}
+
+.rs-alerta-chip {
+  padding: 1px 6px;
+  border-radius: 99px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 8px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.rs-alerta-chip.prazo {
+  background: rgba(251,146,60,0.15);
+  color: var(--orange);
+}
+
+.rs-alerta-chip.nova {
+  background: rgba(56,189,248,0.15);
+  color: var(--sky);
+}
+
+.rs-alerta-chip.repasse {
+  background: rgba(52,211,153,0.15);
+  color: var(--emerald);
+}
+
+/* ——— SLIDE 9: CALENDÁRIO ——— */
+.rs-cal {
+  background: var(--rs-bg);
+  border-radius: 12px;
+  border: 1px solid var(--rs-borda);
+  overflow: hidden;
+  height: 380px;
+  display: flex;
+  flex-direction: column;
+}
+
+.rs-cal-header {
+  padding: 12px 14px;
+  background: var(--rs-card2);
+  border-bottom: 1px solid var(--rs-borda);
+}
+
+.rs-cal-titulo {
+  font-family: 'Syne', sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--rs-text);
+  margin-bottom: 8px;
+}
+
+.rs-cal-views {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  font-family: 'Syne', sans-serif;
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.rs-cal-view {
+  padding: 5px 10px;
+  background: rgba(255,255,255,0.05);
+  color: var(--rs-muted);
+  border-radius: 99px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.rs-cal-view.ativa {
+  border: 1px solid;
+}
+
+.rs-cal-view.agenda.ativa {
+  background: rgba(56,189,248,0.15);
+  color: var(--sky);
+  border-color: rgba(56,189,248,0.4);
+}
+
+.rs-cal-view.sistema.ativa {
+  background: rgba(52,211,153,0.15);
+  color: var(--emerald);
+  border-color: rgba(52,211,153,0.4);
+}
+
+.rs-cal-view.geral.ativa {
+  background: rgba(167,139,250,0.15);
+  color: var(--violet);
+  border-color: rgba(167,139,250,0.4);
+}
+
+.rs-cal-view.repasses.ativa {
+  background: rgba(52,211,153,0.15);
+  color: var(--emerald);
+  border-color: rgba(52,211,153,0.4);
+}
+
+.rs-cal-body {
+  flex: 1;
+  padding: 12px;
+  overflow-y: auto;
+}
+
+.rs-cal-mes-label {
+  font-family: 'Syne', sans-serif;
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--rs-muted);
+  margin-bottom: 8px;
+  margin-top: 4px;
+}
+
+.rs-cal-card {
+  background: var(--rs-card2);
+  border-radius: 10px;
+  padding: 10px 12px;
+  margin-bottom: 6px;
+  border-left: 3px solid;
+  cursor: pointer;
+  opacity: 0;
+  transform: translateY(8px);
+  animation: calCardIn 0.4s ease forwards;
+}
+
+.slide.active .rs-cal-card:nth-child(1) { animation-delay: 0.3s; }
+.slide.active .rs-cal-card:nth-child(2) { animation-delay: 0.45s; }
+.slide.active .rs-cal-card:nth-child(3) { animation-delay: 0.6s; }
+.slide.active .rs-cal-card:nth-child(4) { animation-delay: 0.75s; }
+
+@keyframes calCardIn {
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.rs-cal-card.fundeb { border-left-color: var(--sky); }
+.rs-cal-card.siope { border-left-color: var(--emerald); }
+.rs-cal-card.salario { border-left-color: var(--orange); }
+
+.rs-cal-card-topo {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 4px;
+  flex-wrap: wrap;
+}
+
+.rs-cal-chip {
+  padding: 1px 6px;
+  border-radius: 99px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 8px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.rs-cal-chip.fundeb {
+  background: rgba(56,189,248,0.15);
+  color: var(--sky);
+}
+
+.rs-cal-chip.siope {
+  background: rgba(52,211,153,0.15);
+  color: var(--emerald);
+}
+
+.rs-cal-chip.repasse {
+  background: rgba(255,255,255,0.05);
+  color: var(--rs-muted);
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.rs-cal-urgencia {
+  padding: 1px 7px;
+  border-radius: 99px;
+  font-size: 9px;
+  font-weight: 600;
+  margin-left: auto;
+}
+
+.rs-cal-urgencia.urgente {
+  background: rgba(239,68,68,0.15);
+  color: var(--red);
+  animation: pulseUrg 1.5s ease-in-out infinite;
+}
+
+@keyframes pulseUrg {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(239,68,68,0.3); }
+  50% { box-shadow: 0 0 0 4px rgba(239,68,68,0); }
+}
+
+.rs-cal-urgencia.proximo {
+  background: rgba(251,146,60,0.15);
+  color: var(--orange);
+}
+
+.rs-cal-urgencia.normal {
+  background: rgba(148,163,184,0.1);
+  color: var(--rs-muted);
+}
+
+.rs-cal-card-titulo {
+  font-family: 'Syne', sans-serif;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--rs-text);
+  line-height: 1.3;
+  margin-bottom: 4px;
+}
+
+.rs-cal-card-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 10px;
+  color: var(--rs-muted);
+}
+
+.rs-cal-card-valor {
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 700;
+  color: var(--emerald);
+  font-size: 11px;
+}
+
+/* ——— SLIDE 10: AÇÕES ——— */
+.rs-acoes {
+  background: var(--rs-bg);
+  border-radius: 12px;
+  border: 1px solid var(--rs-borda);
+  padding: 14px;
+  height: 380px;
+  display: flex;
+  flex-direction: column;
+}
+
+.rs-acoes-header {
+  font-family: 'Syne', sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--rs-text);
+  margin-bottom: 6px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.rs-acoes-sub {
+  font-size: 10px;
+  color: var(--rs-muted);
+  margin-bottom: 12px;
+  line-height: 1.5;
+}
+
+.rs-acoes-tipos {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.rs-acao-tipo {
+  flex: 1;
+  padding: 10px 8px;
+  background: var(--rs-card);
+  border: 2px solid var(--rs-borda);
+  border-radius: 8px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-family: 'Syne', sans-serif;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--rs-text);
+  opacity: 0;
+  transform: scale(0.9);
+  animation: tipoIn 0.4s ease forwards;
+}
+
+.slide.active .rs-acao-tipo:nth-child(1) { animation-delay: 0.3s; }
+.slide.active .rs-acao-tipo:nth-child(2) { animation-delay: 0.45s; }
+.slide.active .rs-acao-tipo:nth-child(3) { animation-delay: 0.6s; }
+
+@keyframes tipoIn {
+  to { opacity: 1; transform: scale(1); }
+}
+
+.rs-acao-tipo.ativo {
+  border-color: #0e7490;
+  background: rgba(14,116,144,0.15);
+}
+
+.rs-acao-tipo-icon {
+  display: block;
+  font-size: 18px;
+  margin-bottom: 4px;
+}
+
+.rs-acoes-form {
+  background: var(--rs-card);
+  border: 1px solid var(--rs-borda);
+  border-radius: 10px;
+  padding: 12px;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  opacity: 0;
+  animation: fadeIn 0.5s ease 0.8s forwards;
+}
+
+.rs-acoes-label {
+  font-family: 'Syne', sans-serif;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--rs-muted);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.rs-acoes-textarea {
+  flex: 1;
+  background: var(--rs-card2);
+  border: 1px solid var(--rs-borda);
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-family: inherit;
+  font-size: 10px;
+  color: var(--rs-text);
+  line-height: 1.5;
+  resize: none;
+  min-height: 70px;
+}
+
+.rs-acoes-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.rs-acoes-chars {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px;
+  color: var(--rs-muted);
+}
+
+.rs-acoes-enviar {
+  padding: 7px 14px;
+  background: #0e7490;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-family: 'Syne', sans-serif;
+  font-size: 10px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(14,116,144,0.3);
+}
+
+.rs-votacao-card {
+  background: var(--rs-card);
+  border: 1px solid var(--rs-borda);
+  border-radius: 8px;
+  padding: 8px 10px;
+  margin-top: 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  opacity: 0;
+  animation: fadeIn 0.5s ease 1.2s forwards;
+}
+
+.rs-votacao-pos {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  font-weight: 800;
+  color: #0e7490;
+  min-width: 20px;
+}
+
+.rs-votacao-texto {
+  flex: 1;
+  font-size: 10px;
+  color: var(--rs-text);
+  line-height: 1.3;
+}
+
+.rs-voto-btn {
+  padding: 3px 10px;
+  background: var(--rs-card2);
+  border: 2px solid var(--rs-borda);
+  border-radius: 99px;
+  color: var(--rs-text);
+  font-family: 'Syne', sans-serif;
+  font-size: 9px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.rs-voto-btn.votado {
+  border-color: var(--emerald);
+  background: rgba(34,197,94,0.15);
+  color: var(--emerald);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   CONTROLES DO CARROSSEL
+   ═══════════════════════════════════════════════════════════════ */
+.carousel-controls {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 20px;
+  padding: 24px;
+  background: rgba(0,0,0,0.3);
+  border-top: 1px solid var(--rs-borda);
+}
+
+.carousel-btn {
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.15);
+  color: #fff;
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 18px;
+  transition: all 0.3s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Syne', sans-serif;
+  font-weight: 700;
+}
+
+.carousel-btn:hover {
+  background: rgba(255,255,255,0.15);
+  transform: scale(1.08);
+  border-color: var(--sky);
+}
+
+.carousel-btn:active {
+  transform: scale(0.95);
+}
+
+.carousel-dots {
+  display: flex;
+  gap: 6px;
+}
+
+.carousel-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.2);
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.carousel-dot.active {
+  background: var(--sky);
+  width: 28px;
+  border-radius: 4px;
+  box-shadow: 0 0 8px var(--sky);
+}
+
+.carousel-counter {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  color: var(--rs-muted);
+  font-weight: 600;
+  min-width: 50px;
+  text-align: center;
+}
+
+.carousel-counter .current {
+  color: #fff;
+  font-weight: 800;
+  font-size: 14px;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   CTA FINAL
+   ═══════════════════════════════════════════════════════════════ */
+.showcase-cta {
+  margin-top: 60px;
+  padding: 48px 32px;
+  background:
+    radial-gradient(ellipse at top, rgba(10,61,98,0.4) 0%, transparent 60%),
+    linear-gradient(145deg, rgba(30,41,59,0.8), rgba(15,23,42,0.9));
+  border: 1px solid rgba(56,189,248,0.2);
+  border-radius: 24px;
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 40px 80px rgba(0,0,0,0.5);
+}
+
+.showcase-cta::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(148,163,184,0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(148,163,184,0.03) 1px, transparent 1px);
+  background-size: 40px 40px;
+  pointer-events: none;
+}
+
+.showcase-cta h2 {
+  font-family: 'Syne', system-ui, sans-serif;
+  font-size: clamp(1.6rem, 3.5vw, 2.4rem);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+  margin-bottom: 16px;
+  background: linear-gradient(135deg, #fff 0%, #a5d8ff 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  position: relative;
+}
+
+.showcase-cta p {
+  font-size: 1.1rem;
+  color: #cbd5e1;
+  max-width: 640px;
+  margin: 0 auto 32px;
+  line-height: 1.6;
+  font-style: italic;
+  position: relative;
+}
+
+.showcase-cta-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 16px 36px;
+  background: linear-gradient(135deg, var(--azul), var(--azul-mid));
+  color: #fff;
+  border-radius: 99px;
+  font-family: 'Syne', system-ui, sans-serif;
+  font-size: 1rem;
+  font-weight: 700;
+  text-decoration: none;
+  border: 1px solid rgba(56,189,248,0.3);
+  box-shadow:
+    0 8px 24px rgba(10,61,98,0.4),
+    0 0 0 1px rgba(255,255,255,0.1) inset;
+  transition: all 0.3s;
+  position: relative;
+  overflow: hidden;
+}
+
+.showcase-cta-btn::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, var(--sky), var(--emerald));
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+
+.showcase-cta-btn:hover {
+  transform: translateY(-3px);
+  box-shadow:
+    0 16px 40px rgba(10,61,98,0.6),
+    0 0 0 1px rgba(255,255,255,0.15) inset;
+}
+
+.showcase-cta-btn:hover::before {
+  opacity: 1;
+}
+
+.showcase-cta-btn span {
+  position: relative;
+  z-index: 1;
+}
+
+.showcase-cta-btn .arrow {
+  transition: transform 0.3s;
+  position: relative;
+  z-index: 1;
+}
+
+.showcase-cta-btn:hover .arrow {
+  transform: translateX(4px);
+}
+
+.showcase-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 24px;
+  margin-top: 40px;
+  position: relative;
+}
+
+.showcase-stat {
+  text-align: center;
+}
+
+.showcase-stat-num {
+  font-family: 'Syne', system-ui, sans-serif;
+  font-size: 2.2rem;
+  font-weight: 800;
+  background: linear-gradient(135deg, var(--sky), var(--emerald));
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  letter-spacing: -0.02em;
+  line-height: 1;
+  margin-bottom: 6px;
+}
+
+.showcase-stat-label {
+  font-size: 0.85rem;
+  color: var(--rs-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-family: 'Syne', sans-serif;
+  font-weight: 600;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   FOOTER
+   ═══════════════════════════════════════════════════════════════ */
+.showcase-footer {
+  margin-top: 40px;
+  text-align: center;
+  color: var(--rs-muted);
+  font-size: 0.85rem;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.showcase-footer a {
+  color: var(--sky);
+  text-decoration: none;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   RESPONSIVO
+   ═══════════════════════════════════════════════════════════════ */
+@media (max-width: 640px) {
+  .showcase { padding: 32px 16px 60px; }
+  .slide { padding: 32px 20px; }
+  .carousel-controls { gap: 12px; padding: 16px; }
+  .carousel-btn { width: 36px; height: 36px; font-size: 14px; }
+  .carousel-dot { width: 6px; height: 6px; }
+  .carousel-dot.active { width: 20px; }
+  .showcase-cta { padding: 32px 20px; }
+  .showcase-cta-btn { padding: 14px 28px; font-size: 0.9rem; }
+  .mock-window { transform: rotateY(0); }
+  .slide.active .mock-window { transform: rotateY(0); }
+}
+
+@keyframes rsFadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes rsSlideUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+</style>
+</head>
+<body>
+
+<div class="showcase">
+
+  <!-- ═══════ HEADER ═══════ -->
+  <header class="showcase-header">
+    <div class="showcase-badge">Para Secretários e Técnicos de Educação</div>
+    <h1>Domine o SIOPE e o FUNDEB<br>do seu município <span class="destaque">em tempo real</span></h1>
+    <p>Uma plataforma completa de inteligência educacional — alertas prioritários, relatórios de conformidade, dados históricos e acompanhamento contínuo das obrigações legais do seu ente federativo.</p>
+  </header>
+
+  <!-- ═══════ CARROSSEL ═══════ -->
+  <div class="carousel">
+    <div class="carousel-progress"><div class="carousel-progress-bar" id="progressBar"></div></div>
+    <div class="carousel-track" id="track">
+
+      <!-- ═══════ SLIDE 1: VISÃO DA EDIÇÃO ═══════ -->
+      <div class="slide">
+        <div class="slide-content">
+          <span class="slide-tag">Leitura Inteligente</span>
+          <h2>Conteúdo técnico em dois modos de leitura</h2>
+          <p>Cada edição traz os <strong style="color:#a5d8ff">pontos-chave em bullets</strong> para leitura rápida e a <strong style="color:#a5d8ff">análise completa</strong> para aprofundamento. Leads veem uma prévia — assinantes têm acesso total.</p>
+          <ul>
+            <li>Modo Rápido com bullets navegáveis</li>
+            <li>Leitura Completa com blocos segmentados</li>
+            <li>Preview de acesso Lead vs Assinante</li>
+          </ul>
+        </div>
+        <div class="mock-wrap">
+          <div class="mock-window">
+            <div class="mock-titlebar">
+              <div class="mock-dot r"></div>
+              <div class="mock-dot y"></div>
+              <div class="mock-dot g"></div>
+              <div class="mock-url">app.radarsiope.com.br/edicao/042</div>
+            </div>
+            <div class="mock-body">
+              <div class="rs-toggle">
+                <button class="ativo">⚡ Modo Rápido</button>
+                <button>📖 Leitura Completa</button>
+              </div>
+              <div class="rs-section">
+                <div class="rs-section-header">
+                  <span class="icon">⚡</span>
+                  <span>Pontos-chave desta edição</span>
+                </div>
+                <ul class="rs-bullets">
+                  <li class="rs-bullet">
+                    <span class="num">01</span>
+                    <span>Município aplicou 28,4% em MDE no 6º bimestre — acima do mínimo constitucional de 25%.</span>
+                  </li>
+                  <li class="rs-bullet">
+                    <span class="num">02</span>
+                    <span>72% do FUNDEB foi destinado à remuneração de profissionais da educação.</span>
+                  </li>
+                  <li class="rs-bullet">
+                    <span class="num">03</span>
+                    <span>Novo repasse VAAT confirmado para o próximo mês.</span>
+                  </li>
+                  <li class="rs-bullet">
+                    <span class="num">04</span>
+                    <span>Análise detalhada dos indicadores IDEB e projeções 2026.</span>
+                  </li>
+                </ul>
+              </div>
+              <div class="mock-lock-overlay">
+                🔒 +2 pontos · Assine para ver todos
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══════ SLIDE 2: SÉRIE HISTÓRICA ═══════ -->
+      <div class="slide">
+        <div class="slide-content">
+          <span class="slide-tag">Inteligência Municipal</span>
+          <h2>Série histórica e indicadores do seu município</h2>
+          <p>Acompanhe a evolução dos <strong style="color:#a5d8ff">principais indicadores SIOPE/FUNDEB</strong> do seu ente federativo, com gráficos interativos, comparativos anuais e alertas de não conformidade.</p>
+          <ul>
+            <li>Indicador 1.1 — MDE aplicado em tempo real</li>
+            <li>Histórico plurianual com variação percentual</li>
+            <li>Vitrine customizável por edição</li>
+          </ul>
+        </div>
+        <div class="mock-wrap">
+          <div class="mock-window">
+            <div class="mock-titlebar">
+              <div class="mock-dot r"></div>
+              <div class="mock-dot y"></div>
+              <div class="mock-dot g"></div>
+              <div class="mock-url">📍 Maceió / AL</div>
+            </div>
+            <div class="mock-body">
+              <div class="rs-municipio-card">
+                <div class="rs-mun-header">
+                  <span class="rs-mun-ref">6º bimestre / 2025</span>
+                  <span class="rs-mun-status" style="background:rgba(34,197,94,0.15);color:#4ade80">✅ Regular</span>
+                </div>
+                <div class="rs-mde-label">
+                  <span>Indicador 1.1 — MDE aplicado</span>
+                  <strong>27,6%</strong>
+                </div>
+                <div class="rs-mde-track">
+                  <div class="rs-mde-fill"></div>
+                  <div class="rs-mde-min"></div>
+                </div>
+                <div class="rs-mini-chart">
+                  <svg viewBox="0 0 300 110" preserveAspectRatio="none">
+                    <!-- Grid -->
+                    <line x1="0" y1="85" x2="300" y2="85" stroke="#334155" stroke-width="0.5" stroke-dasharray="2,2"/>
+                    <line x1="0" y1="55" x2="300" y2="55" stroke="#334155" stroke-width="0.5" stroke-dasharray="2,2"/>
+                    <line x1="0" y1="25" x2="300" y2="25" stroke="#334155" stroke-width="0.5" stroke-dasharray="2,2"/>
+                    <!-- Linha MDE -->
+                    <polyline class="rs-chart-line" points="20,75 80,65 140,55 200,48 260,35"/>
+                    <!-- Linha FUNDEB -->
+                    <polyline class="rs-chart-line-2" points="20,50 80,48 140,42 200,38 260,30"/>
+                    <!-- Dots MDE -->
+                    <circle class="rs-chart-dot" cx="20" cy="75" r="3"/>
+                    <circle class="rs-chart-dot" cx="80" cy="65" r="3"/>
+                    <circle class="rs-chart-dot" cx="140" cy="55" r="3"/>
+                    <circle class="rs-chart-dot" cx="200" cy="48" r="3"/>
+                  </svg>
+                  <div class="rs-chart-legend">
+                    <span class="leg-mde">MDE Aplicado</span>
+                    <span class="leg-fundeb">FUNDEB Remuneração</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══════ SLIDE 3: RELATÓRIO CONFORMIDADE ═══════ -->
+      <div class="slide">
+        <div class="slide-content">
+          <span class="slide-tag">Compliance</span>
+          <h2>Relatório de Conformidade em PDF</h2>
+          <p>Gere um documento oficial consolidando <strong style="color:#a5d8ff">série histórica SIOPE, indicadores financeiros, situação no CAUC</strong> e alertas recebidos nos últimos 12 meses — pronto para apresentar em audiências e conselhos.</p>
+          <ul>
+            <li>Gráficos evolutivos MDE e FUNDEB</li>
+            <li>Consulta automática ao CAUC/STN</li>
+            <li>ID de verificação para auditoria</li>
+          </ul>
+        </div>
+        <div class="mock-wrap">
+          <div class="mock-window">
+            <div class="mock-titlebar">
+              <div class="mock-dot r"></div>
+              <div class="mock-dot y"></div>
+              <div class="mock-dot g"></div>
+              <div class="mock-url">📋 Relatório de Conformidade · PDF</div>
+            </div>
+            <div class="mock-body" style="background:#e5e7eb;padding:12px">
+              <div class="mock-pdf">
+                <div class="pdf-cabecalho">
+                  <div class="pdf-logo">
+                    📡 Radar SIOPE
+                    <small>radarsiope.com.br</small>
+                  </div>
+                  <div class="pdf-btn-print">🖨️ Imprimir</div>
+                </div>
+                <div class="pdf-faixa">
+                  <div>
+                    Maceió / AL
+                    <small style="display:block;font-weight:400;font-size:8px;color:#475569">IBGE: 2704302</small>
+                  </div>
+                  <div style="text-align:right">
+                    <div style="font-size:10px">Plano Profissional</div>
+                  </div>
+                </div>
+                <div class="pdf-corpo">
+                  <div class="pdf-secao-titulo">📊 SIOPE/FUNDEB — Série Histórica</div>
+                  <table class="pdf-table">
+                    <thead>
+                      <tr>
+                        <th>Período</th>
+                        <th>Situação</th>
+                        <th>% MDE</th>
+                        <th>% FUNDEB</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <td style="font-weight:700;color:#1e3a5f">2025 · 6º Bim</td>
+                        <td><span class="pdf-badge verde">Homologado</span></td>
+                        <td style="color:#16a34a;font-weight:700">27,6%</td>
+                        <td>73,2%</td>
+                      </tr>
+                      <tr>
+                        <td style="font-weight:700;color:#1e3a5f">2024 · 6º Bim</td>
+                        <td><span class="pdf-badge azul">Enviado</span></td>
+                        <td style="color:#16a34a;font-weight:700">26,8%</td>
+                        <td>71,5%</td>
+                      </tr>
+                      <tr>
+                        <td style="font-weight:700;color:#1e3a5f">2023 · 6º Bim</td>
+                        <td><span class="pdf-badge vermelho">Não enviado</span></td>
+                        <td style="color:#991b1b;font-weight:700">—</td>
+                        <td>—</td>
+                      </tr>
+                    </tbody>
+                  </table>
+
+                  <div class="pdf-secao-titulo">💰 Indicadores Financeiros</div>
+                  <div class="pdf-ind-grid">
+                    <div class="pdf-ind-card ok">
+                      <div class="pdf-ind-card-label">MDE Aplicado</div>
+                      <div class="pdf-ind-card-valor">R$ 48,2 mi</div>
+                    </div>
+                    <div class="pdf-ind-card alerta">
+                      <div class="pdf-ind-card-label">FUNDEB não aplicado</div>
+                      <div class="pdf-ind-card-valor">R$ 3,1 mi</div>
+                    </div>
+                    <div class="pdf-ind-card">
+                      <div class="pdf-ind-card-label">Invest/aluno</div>
+                      <div class="pdf-ind-card-valor">R$ 5.820</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══════ SLIDE 4: QUIZ ═══════ -->
+      <div class="slide">
+        <div class="slide-content">
+          <span class="slide-tag">Engajamento</span>
+          <h2>Quiz interativo a cada edição</h2>
+          <p>Valide o aprendizado da equipe com <strong style="color:#a5d8ff">perguntas contextualizadas</strong>, feedback explicativo imediato e pontuação mínima de aprovação. Ideal para capacitação continuada.</p>
+          <ul>
+            <li>Múltiplas tentativas configuráveis</li>
+            <li>Feedback explicativo por questão</li>
+            <li>Histórico completo de desempenho</li>
+          </ul>
+        </div>
+        <div class="mock-wrap">
+          <div class="mock-window">
+            <div class="mock-titlebar">
+              <div class="mock-dot r"></div>
+              <div class="mock-dot y"></div>
+              <div class="mock-dot g"></div>
+              <div class="mock-url">🧩 Quiz · Edição 042</div>
+            </div>
+            <div class="mock-body">
+              <div class="rs-quiz-modal">
+                <div class="rs-quiz-header">
+                  <div>
+                    <span class="rs-quiz-badge">Quiz</span>
+                    Pergunta 2 de 5
+                  </div>
+                  <span style="font-size:14px;color:var(--rs-muted)">✕</span>
+                </div>
+                <div class="rs-quiz-progress">
+                  <div class="rs-quiz-progress-fill"></div>
+                </div>
+                <div class="rs-quiz-body">
+                  <div class="rs-quiz-texto">
+                    Qual o percentual mínimo constitucional de aplicação em Manutenção e Desenvolvimento do Ensino (MDE)?
+                  </div>
+                  <div class="rs-quiz-opcao errada">
+                    <span class="rs-quiz-letra">A</span>
+                    <span>18% da receita resultante de impostos</span>
+                  </div>
+                  <div class="rs-quiz-opcao correta">
+                    <span class="rs-quiz-letra">B</span>
+                    <span>25% da receita resultante de impostos ✓</span>
+                  </div>
+                  <div class="rs-quiz-opcao">
+                    <span class="rs-quiz-letra">C</span>
+                    <span>30% das transferências constitucionais</span>
+                  </div>
+                  <div class="rs-quiz-opcao errada">
+                    <span class="rs-quiz-letra">D</span>
+                    <span>20% do FUNDEB recebido</span>
+                  </div>
+                  <div class="rs-quiz-explicacao">
+                    <strong>💡 Explicação:</strong> Conforme Art. 212 da CF/88, a União aplicará nunca menos de 18%, e os Estados, DF e Municípios <strong>25%</strong>, no mínimo, da receita resultante de impostos.
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══════ SLIDE 5: PERGUNTE À EDIÇÃO ═══════ -->
+      <div class="slide">
+        <div class="slide-content">
+          <span class="slide-tag">IA Generativa</span>
+          <h2>Pergunte à edição em linguagem natural</h2>
+          <p>Um <strong style="color:#a5d8ff">assistente de IA contextualizado</strong> no conteúdo de cada edição responde suas dúvidas técnicas imediatamente — sem precisar reler todo o material.</p>
+          <ul>
+            <li>Contexto da edição + município do usuário</li>
+            <li>Histórico da conversa preservado</li>
+            <li>Respostas técnicas fundamentadas</li>
+          </ul>
+        </div>
+        <div class="mock-wrap">
+          <div class="mock-window">
+            <div class="mock-titlebar">
+              <div class="mock-dot r"></div>
+              <div class="mock-dot y"></div>
+              <div class="mock-dot g"></div>
+              <div class="mock-url">✦ Pergunte ao Radar · Edição 042</div>
+            </div>
+            <div class="mock-body" style="padding:0">
+              <div class="rs-chat-container">
+                <div class="rs-chat-header">
+                  <div class="rs-chat-avatar">✦</div>
+                  <div class="rs-chat-info">
+                    <div class="rs-chat-titulo">Pergunte ao Radar · Ed. 042</div>
+                    <div class="rs-chat-status">online agora</div>
+                  </div>
+                  <span style="color:var(--rs-muted);font-size:14px">✕</span>
+                </div>
+                <div class="rs-chat-messages">
+                  <div class="rs-msg user">
+                    Meu município cumpriu o mínimo de 25% em MDE este ano?
+                  </div>
+                  <div class="rs-msg bot">
+                    <strong>Sim.</strong> Conforme os dados mais recentes do SIOPE homologados, Maceió aplicou <strong style="color:var(--emerald)">27,6%</strong> em MDE no 6º bimestre de 2025, superando o mínimo constitucional em 2,6 pontos percentuais.
+                  </div>
+                  <div class="rs-msg typing">
+                    <div class="rs-typing">
+                      <span></span><span></span><span></span>
+                    </div>
+                  </div>
+                </div>
+                <div class="rs-chat-input">
+                  <div class="rs-chat-input-field">Digite sua pergunta…</div>
+                  <div class="rs-chat-send">➤</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══════ SLIDE 6: MAPA MENTAL ═══════ -->
+      <div class="slide">
+        <div class="slide-content">
+          <span class="slide-tag">Visualização</span>
+          <h2>Mapas mentais interativos</h2>
+          <p>Transforme análises complexas em <strong style="color:#a5d8ff">visualizações hierárquicas</strong> navegáveis. Explore tópicos, subtópicos e detalhes com toque ou clique.</p>
+          <ul>
+            <li>Pan & zoom com gestos ou mouse</li>
+            <li>Popovers de detalhe em cada nó</li>
+            <li>Expansão inteligente por nível</li>
+          </ul>
+        </div>
+        <div class="mock-wrap">
+          <div class="mock-window">
+            <div class="mock-titlebar">
+              <div class="mock-dot r"></div>
+              <div class="mock-dot y"></div>
+              <div class="mock-dot g"></div>
+              <div class="mock-url">🗺️ Mapa Mental · FUNDEB 2026</div>
+            </div>
+            <div class="mock-body" style="padding:0">
+              <div class="rs-map-container">
+                <div class="rs-map-bg"></div>
+                <svg class="rs-map-svg" viewBox="0 0 400 320" preserveAspectRatio="xMidYMid meet">
+                  <!-- Curvas raiz → nível 1 -->
+                  <path class="rs-map-curve" stroke="#60A5FA" d="M 200 160 C 150 140, 120 100, 90 80"/>
+                  <path class="rs-map-curve" stroke="#34D399" d="M 200 160 C 250 140, 280 100, 310 80"/>
+                  <path class="rs-map-curve" stroke="#A78BFA" d="M 200 160 C 150 180, 120 220, 90 240"/>
+                  <path class="rs-map-curve" stroke="#FBBF24" d="M 200 160 C 250 180, 280 220, 310 240"/>
+                  <!-- Curvas nível 1 → nível 2 -->
+                  <path class="rs-map-curve" stroke="#60A5FA" d="M 90 80 C 70 70, 50 55, 30 50" style="animation-delay: 1.5s"/>
+                  <path class="rs-map-curve" stroke="#34D399" d="M 310 80 C 330 70, 350 55, 370 50" style="animation-delay: 1.7s"/>
+                </svg>
+                <!-- Nós -->
+                <div class="rs-map-node root" style="left:calc(50% - 55px);top:calc(50% - 18px);width:110px">
+                  FUNDEB 2026
+                </div>
+                <div class="rs-map-node n1" style="left:30px;top:55px;width:120px;border-color:#60A5FA">
+                  <div class="faixa" style="background:#60A5FA"></div>
+                  <span style="padding-left:6px">Fontes</span>
+                </div>
+                <div class="rs-map-node n2" style="right:30px;top:55px;width:120px;border-color:#34D399">
+                  <div class="faixa" style="background:#34D399"></div>
+                  <span style="padding-left:6px">Distribuição</span>
+                </div>
+                <div class="rs-map-node n3" style="left:30px;bottom:40px;width:140px;border-color:#A78BFA">
+                  <div class="faixa" style="background:#A78BFA"></div>
+                  <span style="padding-left:6px">Controle Social</span>
+                </div>
+                <div class="rs-map-node n4" style="right:30px;bottom:40px;width:100px;border-color:#FBBF24">
+                  <div class="faixa" style="background:#FBBF24"></div>
+                  <span style="padding-left:6px">VAAT</span>
+                </div>
+                <div class="rs-map-node n1-1" style="left:5px;top:25px;width:80px;border-color:#60A5FA;font-size:9px">
+                  <span style="padding-left:6px">ICMS 20%</span>
+                </div>
+                <div class="rs-map-node n2-1" style="right:5px;top:25px;width:90px;border-color:#34D399;font-size:9px">
+                  <span style="padding-left:6px">VAAF + VAAT</span>
+                </div>
+                <!-- Popover -->
+                <div class="rs-map-popover" style="right:145px;top:110px">
+                  <div class="rs-map-popover-header">Detalhes</div>
+                  <div>O VAAT complementa o VAAF para municípios que não atingem o valor mínimo anual por aluno.</div>
+                </div>
+                <div class="rs-map-hint">
+                  <span>Toque para expandir</span>
+                  <span>·</span>
+                  <span>💡 têm detalhes</span>
+                  <span>·</span>
+                  <span>Arraste para navegar</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══════ SLIDE 7: CENTRAL EDIÇÕES ═══════ -->
+      <div class="slide">
+        <div class="slide-content">
+          <span class="slide-tag">Navegação</span>
+          <h2>Central de edições com histórico completo</h2>
+          <p>Acesse todas as edições já publicadas, organizadas por tipo. Marque como <strong style="color:#a5d8ff">lidas</strong>, favorite as mais relevantes e retome a leitura de onde parou.</p>
+          <ul>
+            <li>Busca por título ou número</li>
+            <li>Filtros: Todas / Não lidas / Lidas</li>
+            <li>Favoritos no topo da lista</li>
+          </ul>
+        </div>
+        <div class="mock-wrap">
+          <div class="mock-window">
+            <div class="mock-titlebar">
+              <div class="mock-dot r"></div>
+              <div class="mock-dot y"></div>
+              <div class="mock-dot g"></div>
+              <div class="mock-url">📚 Edições por tipo</div>
+            </div>
+            <div class="mock-body" style="padding:0">
+              <div class="rs-drawer">
+                <div class="rs-drawer-header">
+                  <span style="color:var(--rs-muted);font-size:11px">‹</span>
+                  <div class="rs-drawer-titulo">📰 Radar SIOPE Semanal</div>
+                  <button class="rs-drawer-close">✕</button>
+                </div>
+                <div class="rs-drawer-body">
+                  <div class="rs-busca">🔍 Buscar por título…</div>
+                  <div class="rs-tabs">
+                    <div class="rs-tab ativa">Todas</div>
+                    <div class="rs-tab">Não lidas</div>
+                    <div class="rs-tab">Lidas</div>
+                  </div>
+                  <div class="rs-edicao-card atual">
+                    <span class="rs-dot-lida lida"></span>
+                    <div class="rs-edicao-info">
+                      <div class="rs-edicao-titulo">Análise FUNDEB — 6º Bimestre 2025</div>
+                      <div class="rs-edicao-meta">24 Jun 2026 · Ed. 042</div>
+                    </div>
+                    <span class="rs-badge-atual">👁 lendo</span>
+                  </div>
+                  <div class="rs-edicao-card">
+                    <span class="rs-dot-lida"></span>
+                    <div class="rs-edicao-info">
+                      <div class="rs-edicao-titulo">Portaria FNDE: novos prazos SIOPE</div>
+                      <div class="rs-edicao-meta">17 Jun 2026 · Ed. 041</div>
+                    </div>
+                    <span class="rs-fav">★</span>
+                    <span class="rs-chevron">›</span>
+                  </div>
+                  <div class="rs-edicao-card">
+                    <span class="rs-dot-lida"></span>
+                    <div class="rs-edicao-info">
+                      <div class="rs-edicao-titulo">Impacto do VAAT nos municípios</div>
+                      <div class="rs-edicao-meta">10 Jun 2026 · Ed. 040</div>
+                    </div>
+                    <span class="rs-chevron">›</span>
+                  </div>
+                  <div class="rs-edicao-card">
+                    <span class="rs-dot-lida lida"></span>
+                    <div class="rs-edicao-info">
+                      <div class="rs-edicao-titulo">CACS-FUNDEB: atribuições legais</div>
+                      <div class="rs-edicao-meta">03 Jun 2026 · Ed. 039</div>
+                    </div>
+                    <span class="rs-fav">★</span>
+                    <span class="rs-chevron">›</span>
+                  </div>
+                  <div class="rs-edicao-card">
+                    <span class="rs-dot-lida lida"></span>
+                    <div class="rs-edicao-info">
+                      <div class="rs-edicao-titulo">IDEB 2025: metodologia completa</div>
+                      <div class="rs-edicao-meta">27 Mai 2026 · Ed. 038</div>
+                    </div>
+                    <span class="rs-chevron">›</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══════ SLIDE 8: SENTINELA ═══════ -->
+      <div class="slide">
+        <div class="slide-content">
+          <span class="slide-tag">Alertas Prioritários</span>
+          <h2>Sentinela: nunca perca um prazo</h2>
+          <p>Receba <strong style="color:#a5d8ff">alertas em tempo real</strong> sobre prazos SIOPE, repasses FUNDEB creditados, homologações e portarias publicadas que impactam seu município.</p>
+          <ul>
+            <li>Push notifications segmentadas</li>
+            <li>Central unificada de mensagens</li>
+            <li>Filtragem automática por município</li>
+          </ul>
+        </div>
+        <div class="mock-wrap">
+          <div class="mock-window">
+            <div class="mock-titlebar">
+              <div class="mock-dot r"></div>
+              <div class="mock-dot y"></div>
+              <div class="mock-dot g"></div>
+              <div class="mock-url">🔔 Central de Alertas</div>
+            </div>
+            <div class="mock-body" style="padding:0">
+              <div class="rs-sentinela">
+                <div class="rs-sentinela-header">
+                  <div class="rs-sentinela-titulo">
+                    🔔 Central de Alertas
+                    <span class="rs-sentinela-badge">3</span>
+                  </div>
+                  <button class="rs-drawer-close">✕</button>
+                </div>
+                <div class="rs-sentinela-body">
+                  <div class="rs-alerta-card urgente">
+                    <div class="rs-alerta-topo">
+                      <div class="rs-alerta-titulo">⏰ Prazo SIOPE em 3 dias</div>
+                      <span class="rs-alerta-dot"></span>
+                    </div>
+                    <div class="rs-alerta-corpo">
+                      Maceió/AL: envio do 3º bimestre vence em 27/06/2026. Não perca o prazo.
+                    </div>
+                    <div class="rs-alerta-meta">
+                      <span class="rs-alerta-chip prazo">Prazo</span>
+                      <span>há 2 horas</span>
+                    </div>
+                  </div>
+                  <div class="rs-alerta-card novo">
+                    <div class="rs-alerta-topo">
+                      <div class="rs-alerta-titulo">💰 Repasse FUNDEB creditado</div>
+                      <span class="rs-alerta-dot"></span>
+                    </div>
+                    <div class="rs-alerta-corpo">
+                      Maceió/AL: R$ 4,8 milhões creditados em 24/06/2026.
+                    </div>
+                    <div class="rs-alerta-meta">
+                      <span class="rs-alerta-chip repasse">Repasse</span>
+                      <span>há 5 horas</span>
+                    </div>
+                  </div>
+                  <div class="rs-alerta-card">
+                    <div class="rs-alerta-topo">
+                      <div class="rs-alerta-titulo">✅ SIOPE homologado</div>
+                    </div>
+                    <div class="rs-alerta-corpo">
+                      Dados do 2º bimestre de 2026 foram homologados pela SASE/MEC.
+                    </div>
+                    <div class="rs-alerta-meta">
+                      <span class="rs-alerta-chip nova">Homologação</span>
+                      <span>há 1 dia</span>
+                    </div>
+                  </div>
+                  <div class="rs-alerta-card">
+                    <div class="rs-alerta-topo">
+                      <div class="rs-alerta-titulo">📡 Nova edição disponível</div>
+                    </div>
+                    <div class="rs-alerta-corpo">
+                      Edição 042 — Análise FUNDEB 6º Bimestre 2025.
+                    </div>
+                    <div class="rs-alerta-meta">
+                      <span class="rs-alerta-chip nova">Edição</span>
+                      <span>há 2 dias</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══════ SLIDE 9: CALENDÁRIO ═══════ -->
+      <div class="slide">
+        <div class="slide-content">
+          <span class="slide-tag">Planejamento</span>
+          <h2>Calendário de eventos e repasses</h2>
+          <p>Visualize em <strong style="color:#a5d8ff">4 visões diferentes</strong> todos os prazos legais, repasses previstos e eventos dos próximos 12 meses — segmentados por FUNDEB, SIOPE e Salário-Educação.</p>
+          <ul>
+            <li>Agenda, Sistema, Geral ou Repasses</li>
+            <li>Valores previstos com status do repasse</li>
+            <li>Avisos antecipados configuráveis</li>
+          </ul>
+        </div>
+        <div class="mock-wrap">
+          <div class="mock-window">
+            <div class="mock-titlebar">
+              <div class="mock-dot r"></div>
+              <div class="mock-dot y"></div>
+              <div class="mock-dot g"></div>
+              <div class="mock-url">📅 Calendário · Próximos 6 meses</div>
+            </div>
+            <div class="mock-body" style="padding:0">
+              <div class="rs-cal">
+                <div class="rs-cal-header">
+                  <div class="rs-cal-titulo">Calendário de eventos e repasses</div>
+                  <div class="rs-cal-views">
+                    <span class="rs-cal-view agenda ativa">📋 Agenda</span>
+                    <span class="rs-cal-view sistema">🏷️ Sistema</span>
+                    <span class="rs-cal-view geral">📅 Geral</span>
+                    <span class="rs-cal-view repasses">💰 Repasses</span>
+                  </div>
+                </div>
+                <div class="rs-cal-body">
+                  <div class="rs-cal-card fundeb">
+                    <div class="rs-cal-card-topo">
+                      <span class="rs-cal-chip fundeb">FUNDEB</span>
+                      <span class="rs-cal-chip repasse">Repasse</span>
+                      <span class="rs-cal-urgencia urgente">Em 3d</span>
+                    </div>
+                    <div class="rs-cal-card-titulo">Repasse VAAT — 2ª parcela</div>
+                    <div class="rs-cal-card-meta">
+                      <span>📅 27/06/2026</span>
+                      <span class="rs-cal-card-valor">R$ 1,2 mi</span>
+                    </div>
+                  </div>
+                  <div class="rs-cal-card siope">
+                    <div class="rs-cal-card-topo">
+                      <span class="rs-cal-chip siope">SIOPE</span>
+                      <span class="rs-cal-chip repasse">Prazo</span>
+                      <span class="rs-cal-urgencia urgente">Em 3d</span>
+                    </div>
+                    <div class="rs-cal-card-titulo">Envio do 3º bimestre ao SIOPE</div>
+                    <div class="rs-cal-card-meta">
+                      <span>📅 27/06/2026</span>
+                    </div>
+                  </div>
+                  <div class="rs-cal-mes-label">Julho 2026</div>
+                  <div class="rs-cal-card salario">
+                    <div class="rs-cal-card-topo">
+                      <span class="rs-cal-chip" style="background:rgba(251,146,60,0.15);color:#fb923c">Salário-Educação</span>
+                      <span class="rs-cal-chip repasse">Repasse</span>
+                      <span class="rs-cal-urgencia proximo">Em 7d</span>
+                    </div>
+                    <div class="rs-cal-card-titulo">Cota-parte Salário-Educação</div>
+                    <div class="rs-cal-card-meta">
+                      <span>📅 01/07/2026</span>
+                      <span class="rs-cal-card-valor">R$ 850 mil</span>
+                    </div>
+                  </div>
+                  <div class="rs-cal-card fundeb">
+                    <div class="rs-cal-card-topo">
+                      <span class="rs-cal-chip fundeb">FUNDEB</span>
+                      <span class="rs-cal-chip repasse">Repasse</span>
+                      <span class="rs-cal-urgencia normal">Em 15d</span>
+                    </div>
+                    <div class="rs-cal-card-titulo">Repasse VAAF mensal</div>
+                    <div class="rs-cal-card-meta">
+                      <span>📅 09/07/2026</span>
+                      <span class="rs-cal-card-valor">R$ 3,4 mi</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══════ SLIDE 10: AÇÕES ═══════ -->
+      <div class="slide">
+        <div class="slide-content">
+          <span class="slide-tag">Participação</span>
+          <h2>Canal direto com a equipe editorial</h2>
+          <p>Envie mensagens, <strong style="color:#a5d8ff">sugira temas</strong> para próximas edições e vote nas sugestões da comunidade. A pauta da próxima edição é construída com você.</p>
+          <ul>
+            <li>Mensagens com resposta da equipe</li>
+            <li>Sugestão de temas com quota mensal</li>
+            <li>Votação democrática da comunidade</li>
+          </ul>
+        </div>
+        <div class="mock-wrap">
+          <div class="mock-window">
+            <div class="mock-titlebar">
+              <div class="mock-dot r"></div>
+              <div class="mock-dot y"></div>
+              <div class="mock-dot g"></div>
+              <div class="mock-url">💬 Ações</div>
+            </div>
+            <div class="mock-body">
+              <div class="rs-acoes">
+                <div class="rs-acoes-header">💬 Canal Direto com a Equipe</div>
+                <div class="rs-acoes-sub">Envie dúvidas, sugira temas e vote nas sugestões da comunidade de assinantes.</div>
+                <div class="rs-acoes-tipos">
+                  <div class="rs-acao-tipo ativo">
+                    <span class="rs-acao-tipo-icon">💬</span>
+                    Mensagem
+                  </div>
+                  <div class="rs-acao-tipo">
+                    <span class="rs-acao-tipo-icon">💡</span>
+                    Sugerir tema
+                  </div>
+                  <div class="rs-acao-tipo">
+                    <span class="rs-acao-tipo-icon">🗳️</span>
+                    Votação
+                  </div>
+                </div>
+                <div class="rs-acoes-form">
+                  <div class="rs-acoes-label">✍️ Nova mensagem</div>
+                  <textarea class="rs-acoes-textarea" readonly>Gostaria de entender melhor o impacto do novo VAAT nos repasses de 2026 para municípios pequenos.</textarea>
+                  <div class="rs-acoes-footer">
+                    <span class="rs-acoes-chars">128/250</span>
+                    <button class="rs-acoes-enviar">Enviar</button>
+                  </div>
+                </div>
+                <div class="rs-votacao-card">
+                  <span class="rs-votacao-pos">#1</span>
+                  <span class="rs-votacao-texto">Análise comparativa FUNDEB 2020-2026</span>
+                  <button class="rs-voto-btn votado">✅ Votado</button>
+                </div>
+                <div class="rs-votacao-card" style="animation-delay: 1.4s">
+                  <span class="rs-votacao-pos">#2</span>
+                  <span class="rs-votacao-texto">Guia prático do CACS-FUNDEB</span>
+                  <button class="rs-voto-btn">👍 Votar</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="carousel-controls">
+      <button class="carousel-btn" id="prevBtn">‹</button>
+      <div class="carousel-dots" id="dots"></div>
+      <div class="carousel-counter"><span class="current" id="current">1</span> / <span id="total">10</span></div>
+      <button class="carousel-btn" id="nextBtn">›</button>
+    </div>
+  </div>
+
+  <!-- ═══════ CTA FINAL ═══════ -->
+  <section class="showcase-cta">
+    <h2>Pronto para transformar a gestão educacional<br>do seu município?</h2>
+    <p>Junte-se a secretários e técnicos de todo o Brasil que já monitoram SIOPE, FUNDEB e obrigações legais em tempo real. Nossa equipe está pronta para apresentar a plataforma.</p>
+    <a href="https://www.radarsiope.com.br/assinatura.html?origem=site" target="_blank" rel="noopener" class="showcase-cta-btn">
+      <span>Fale com a equipe Radar SIOPE</span>
+      <span class="arrow">→</span>
+    </a>
+
+    <div class="showcase-stats">
+      <div class="showcase-stat">
+        <div class="showcase-stat-num">5.570</div>
+        <div class="showcase-stat-label">Municípios brasileiros</div>
+      </div>
+      <div class="showcase-stat">
+        <div class="showcase-stat-num">24/7</div>
+        <div class="showcase-stat-label">Monitoramento ativo</div>
+      </div>
+      <div class="showcase-stat">
+        <div class="showcase-stat-num">12+</div>
+        <div class="showcase-stat-label">Indicadores rastreados</div>
+      </div>
+      <div class="showcase-stat">
+        <div class="showcase-stat-num">100%</div>
+        <div class="showcase-stat-label">Dados oficiais</div>
+      </div>
+    </div>
+  </section>
+
+  <footer class="showcase-footer">
+    © 2026 Radar SIOPE · <a href="https://radarsiope.com.br" target="_blank">radarsiope.com.br</a>
+  </footer>
+
+</div>
+
+<script>
+  const track = document.getElementById('track');
+  const slides = track.querySelectorAll('.slide');
+  const dotsContainer = document.getElementById('dots');
+  const progressBar = document.getElementById('progressBar');
+  const prevBtn = document.getElementById('prevBtn');
+  const nextBtn = document.getElementById('nextBtn');
+  const currentEl = document.getElementById('current');
+  const totalEl = document.getElementById('total');
+
+  let current = 0;
+  const total = slides.length;
+  const AUTOPLAY_MS = 7000;
+  let autoplayTimer = null;
+  let progressTimer = null;
+
+  totalEl.textContent = total;
+
+  // Criar dots
+  slides.forEach((_, i) => {
+    const dot = document.createElement('div');
+    dot.className = 'carousel-dot' + (i === 0 ? ' active' : '');
+    dot.onclick = () => goTo(i);
+    dotsContainer.appendChild(dot);
+  });
+  const dots = dotsContainer.querySelectorAll('.carousel-dot');
+
+  function goTo(idx) {
+    slides[current].classList.remove('active');
+    current = (idx + total) % total;
+    track.style.transform = `translateX(-${current * 100}%)`;
+    slides[current].classList.add('active');
+    dots.forEach((d, i) => d.classList.toggle('active', i === current));
+    currentEl.textContent = current + 1;
+    resetAutoplay();
+  }
+
+  function next() { goTo(current + 1); }
+  function prev() { goTo(current - 1); }
+
+  prevBtn.onclick = prev;
+  nextBtn.onclick = next;
+
+  // Autoplay com progress bar
+  function startProgress() {
+    let start = Date.now();
+    progressBar.style.transition = 'none';
+    progressBar.style.width = '0%';
+    progressTimer = setInterval(() => {
+      const elapsed = Date.now() - start;
+      const pct = Math.min(100, (elapsed / AUTOPLAY_MS) * 100);
+      progressBar.style.width = pct + '%';
+      if (pct >= 100) clearInterval(progressTimer);
+    }, 50);
+  }
+
+  function resetAutoplay() {
+    clearTimeout(autoplayTimer);
+    clearInterval(progressTimer);
+    startProgress();
+    autoplayTimer = setTimeout(next, AUTOPLAY_MS);
+  }
+
+  // Inicializar
+  slides[0].classList.add('active');
+  resetAutoplay();
+
+  // Teclado
+  document.addEventListener('keydown', e => {
+    if (e.key === 'ArrowLeft') prev();
+    if (e.key === 'ArrowRight') next();
+  });
+
+  // Swipe em mobile
+  let touchStartX = 0;
+  let touchEndX = 0;
+  track.addEventListener('touchstart', e => {
+    touchStartX = e.changedTouches[0].screenX;
+  }, { passive: true });
+  track.addEventListener('touchend', e => {
+    touchEndX = e.changedTouches[0].screenX;
+    const diff = touchStartX - touchEndX;
+    if (Math.abs(diff) > 50) {
+      if (diff > 0) next();
+      else prev();
+    }
+  }, { passive: true });
+
+  // Pausar no hover
+  const carousel = document.querySelector('.carousel');
+  carousel.addEventListener('mouseenter', () => {
+    clearTimeout(autoplayTimer);
+    clearInterval(progressTimer);
+  });
+  carousel.addEventListener('mouseleave', resetAutoplay);
+</script>
+
+</body>
+</html>
