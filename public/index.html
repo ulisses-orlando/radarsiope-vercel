@@ -1870,202 +1870,54 @@
     <!-- ═══════════════════════════════════════════════════════════
      SHOWCASE INTERATIVO — Radar SIOPE
      ═══════════════════════════════════════════════════════════ -->
-    <section id="showcase" style="padding: 60px 0; background: #050810; position: relative; overflow: hidden;">
-        <div style="max-width: 1280px; margin: 0 auto; padding: 0 24px;">
+<section id="funcionalidades" style="padding: 80px 0; background: #050810; position: relative; overflow: hidden;">
+  <div style="max-width: 1280px; margin: 0 auto; padding: 0 24px;">
+    
+    <!-- Título da seção -->
+    <div style="text-align: center; margin-bottom: 48px;">
+      <div style="display: inline-flex; align-items: center; gap: 8px; padding: 6px 14px; background: rgba(56,189,248,0.1); border: 1px solid rgba(56,189,248,0.3); border-radius: 99px; font-family: 'Syne', system-ui, sans-serif; font-size: 11px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: #38bdf8; margin-bottom: 16px;">
+        <span style="width: 6px; height: 6px; border-radius: 50%; background: #34d399; box-shadow: 0 0 12px #34d399; animation: pulse 2s ease-in-out infinite;"></span>
+        Demonstração Interativa
+      </div>
+      <h2 style="font-family: 'Syne', system-ui, sans-serif; font-size: clamp(2rem, 4vw, 3rem); font-weight: 800; letter-spacing: -0.03em; line-height: 1.05; margin-bottom: 16px; background: linear-gradient(135deg, #fff 0%, #a5d8ff 50%, #fff 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;">
+        Conheça a Plataforma em Ação
+      </h2>
+      <p style="font-size: 1.15rem; color: #94a3b8; max-width: 640px; margin: 0 auto; line-height: 1.6; font-style: italic;">
+        Explore cada funcionalidade do Radar SIOPE em uma experiência interativa. Use as setas ou arraste para navegar.
+      </p>
+    </div>
 
-            <div style="text-align: center; margin-bottom: 40px;">
-                <div
-                    style="display: inline-flex; align-items: center; gap: 8px; padding: 6px 14px; background: rgba(56,189,248,0.1); border: 1px solid rgba(56,189,248,0.3); border-radius: 99px; font-family: 'Syne', system-ui, sans-serif; font-size: 11px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: #38bdf8; margin-bottom: 16px;">
-                    <span
-                        style="width: 6px; height: 6px; border-radius: 50%; background: #34d399; box-shadow: 0 0 12px #34d399; animation: pulse 2s ease-in-out infinite;"></span>
-                    Demonstração Interativa
-                </div>
-                <h2
-                    style="font-family: 'Syne', system-ui, sans-serif; font-size: clamp(1.8rem, 4vw, 2.8rem); font-weight: 800; letter-spacing: -0.03em; line-height: 1.05; margin-bottom: 16px; background: linear-gradient(135deg, #fff 0%, #a5d8ff 50%, #fff 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;">
-                    Conheça a Plataforma em Ação
-                </h2>
-                <p
-                    style="font-size: 1.1rem; color: #94a3b8; max-width: 640px; margin: 0 auto; line-height: 1.6; font-style: italic;">
-                    Explore cada funcionalidade do Radar SIOPE em uma experiência interativa. Use as setas ou arraste
-                    para navegar.
-                </p>
-            </div>
+    <!-- Iframe do showcase -->
+    <iframe 
+      src="showcase.html" 
+      width="100%" 
+      height="1200" 
+      style="border: none; border-radius: 20px; box-shadow: 0 40px 80px rgba(0,0,0,0.5); background: #0f172a;"
+      loading="lazy"
+      title="Showcase Radar SIOPE"
+      allow="autoplay"
+    ></iframe>
 
-            <iframe src="showCase.html" width="100%" height="780"
-                style="border: none; border-radius: 20px; box-shadow: 0 40px 80px rgba(0,0,0,0.5); background: #0f172a;"
-                loading="lazy" title="Showcase Radar SIOPE"></iframe>
+    <!-- CTA abaixo do showcase -->
+    <div style="text-align: center; margin-top: 48px;">
+      <a href="assinatura.html?origem=site" 
+         style="display: inline-flex; align-items: center; gap: 10px; padding: 16px 36px; background: linear-gradient(135deg, #0A3D62, #1A5276); color: #fff; border-radius: 99px; font-family: 'Syne', system-ui, sans-serif; font-size: 1rem; font-weight: 700; text-decoration: none; border: 1px solid rgba(56,189,248,0.3); box-shadow: 0 8px 24px rgba(10,61,98,0.4); transition: all 0.3s;"
+         onmouseover="this.style.transform='translateY(-3px)'; this.style.boxShadow='0 16px 40px rgba(10,61,98,0.6)'"
+         onmouseout="this.style.transform=''; this.style.boxShadow='0 8px 24px rgba(10,61,98,0.4)'">
+        <span>Experimente o Radar SIOPE</span>
+        <span style="transition: transform 0.3s;">→</span>
+      </a>
+    </div>
 
-            <div style="text-align: center; margin-top: 40px;">
-                <a href="assinatura.html?origem=site"
-                    style="display: inline-flex; align-items: center; gap: 10px; padding: 14px 32px; background: linear-gradient(135deg, #0A3D62, #1A5276); color: #fff; border-radius: 99px; font-family: 'Syne', system-ui, sans-serif; font-size: 1rem; font-weight: 700; text-decoration: none; border: 1px solid rgba(56,189,248,0.3); box-shadow: 0 8px 24px rgba(10,61,98,0.4); transition: all 0.3s;"
-                    onmouseover="this.style.transform='translateY(-3px)'" onmouseout="this.style.transform=''">
-                    <span>Experimente o Radar SIOPE</span>
-                    <span>→</span>
-                </a>
-            </div>
+  </div>
+</section>
 
-        </div>
-    </section>
-
-    <style>
-        @keyframes pulse {
-
-            0%,
-            100% {
-                opacity: 1;
-                transform: scale(1);
-            }
-
-            50% {
-                opacity: 0.6;
-                transform: scale(1.3);
-            }
-        }
-    </style>
-
-    <!-- Features Section -->
-    <section class="section" id="funcionalidades">
-        <div class="section-container">
-            <div class="section-header animate-on-scroll">
-                <div class="section-label">🛠️ Funcionalidades</div>
-                <h2 class="section-title">Tudo que você precisa em uma só plataforma</h2>
-                <p class="section-desc">Do monitoramento de prazos ao suporte técnico individualizado, o Radar SIOPE
-                    cobre todo o ciclo de gestão educacional.</p>
-            </div>
-            <div class="features-grid">
-                <div class="feature-card animate-on-scroll delay-1">
-                    <div class="feature-icon">📰</div>
-                    <h3>Newsletter Multimídia</h3>
-                    <p>Cada edição é entregue por link personalizado com acesso controlado. Conteúdo em múltiplos
-                        formatos: texto editorial, áudio (podcast), vídeo, infográfico e mapa mental.</p>
-                    <div class="feature-tags">
-                        <span class="feature-tag">Texto</span>
-                        <span class="feature-tag">Áudio</span>
-                        <span class="feature-tag">Vídeo</span>
-                        <span class="feature-tag">Infográfico</span>
-                        <span class="feature-tag">Mapa Mental</span>
-                    </div>
-                </div>
-                <div class="feature-card animate-on-scroll delay-2">
-                    <div class="feature-icon">🔔</div>
-                    <h3>Alertas Prioritários</h3>
-                    <p>Notificações push e via WhatsApp para eventos críticos: prazos de prestação de contas,
-                        publicações do FNDE, mudanças na legislação do FUNDEB, abertura e fechamento do SIOPE.</p>
-                    <div class="feature-tags">
-                        <span class="feature-tag">Push</span>
-                        <span class="feature-tag">WhatsApp</span>
-                        <span class="feature-tag">OneSignal</span>
-                    </div>
-                </div>
-                <div class="feature-card animate-on-scroll delay-3">
-                    <div class="feature-icon">📋</div>
-                    <h3>Relatório de Conformidade</h3>
-                    <p>Documento PDF gerado automaticamente com o diagnóstico de conformidade do município no SIOPE,
-                        FUNDEB e CAUC. Entregue por e-mail com base nos dados oficiais atualizados diariamente.</p>
-                    <div class="feature-tags">
-                        <span class="feature-tag">SIOPE</span>
-                        <span class="feature-tag">FUNDEB</span>
-                        <span class="feature-tag">CAUC</span>
-                    </div>
-                </div>
-                <div class="feature-card animate-on-scroll delay-4">
-                    <div class="feature-icon">📅</div>
-                    <h3>Calendário de Eventos e Repasses</h3>
-                    <p>Agenda integrada com os principais prazos do FUNDEB, SIOPE, Salário-Educação e SISCACS, mais o
-                        cronograma de repasses de recursos — tudo em um só lugar, sempre atualizado.</p>
-                    <div class="feature-tags">
-                        <span class="feature-tag">FUNDEB</span>
-                        <span class="feature-tag">Salário-Educação</span>
-                        <span class="feature-tag">Repasses</span>
-                    </div>
-                </div>
-                <div class="feature-card animate-on-scroll delay-1">
-                    <div class="feature-icon">🔍</div>
-                    <h3>Críticas do SIOPE</h3>
-                    <p>Monitoramento das inconsistências e pendências apontadas pelo sistema federal no lançamento do
-                        município. Identifique e corrija críticas antes do fechamento do módulo.</p>
-                    <div class="feature-tags">
-                        <span class="feature-tag">SIOPE</span>
-                        <span class="feature-tag">Pendências</span>
-                        <span class="feature-tag">Conformidade</span>
-                    </div>
-                </div>
-                <div class="feature-card animate-on-scroll delay-2">
-                    <div class="feature-icon">💡</div>
-                    <h3>Sugestão de Tema</h3>
-                    <p>Canal direto para que assinantes indiquem temas prioritários para as próximas edições. As
-                        sugestões mais votadas pautam o conteúdo editorial — sua dúvida vira pauta.</p>
-                    <div class="feature-tags">
-                        <span class="feature-tag">Comunidade</span>
-                        <span class="feature-tag">Editorial</span>
-                        <span class="feature-tag">Votação</span>
-                    </div>
-                </div>
-                <div class="feature-card animate-on-scroll delay-3">
-                    <div class="feature-icon">📊</div>
-                    <h3>Gráficos Personalizados</h3>
-                    <p>Indicadores com série histórica renderizados em SVG. Cada assinante visualiza os dados do próprio
-                        ente federado comparados com médias regionais e nacionais.</p>
-                    <div class="feature-tags">
-                        <span class="feature-tag">SVG</span>
-                        <span class="feature-tag">Firestore</span>
-                        <span class="feature-tag">Comparativo</span>
-                    </div>
-                </div>
-                <div class="feature-card animate-on-scroll delay-4">
-                    <div class="feature-icon">👥</div>
-                    <h3>Grupo VIP WhatsApp</h3>
-                    <p>Canal exclusivo para assinantes dos planos superiores.</p>
-                    <div class="feature-tags">
-                        <span class="feature-tag">VIP</span>
-                        <span class="feature-tag">LGPD</span>
-                        <span class="feature-tag">Exclusivo</span>
-                    </div>
-                </div>
-                <div class="feature-card animate-on-scroll delay-1">
-                    <div class="feature-icon">📚</div>
-                    <h3>Biblioteca Viva</h3>
-                    <p>Todo o conteúdo do Radar SIOPE, sempre atualizado, enquanto sua assinatura estiver ativa.</p>
-                    <div class="feature-tags">
-                        <span class="feature-tag">Engajamento</span>
-                        <span class="feature-tag">Arquivo</span>
-                        <span class="feature-tag">Vitalício</span>
-                    </div>
-                </div>
-                <div class="feature-card animate-on-scroll delay-2">
-                    <div class="feature-icon">🎓</div>
-                    <h3>Trilha de Conhecimento</h3>
-                    <p>Módulo estruturado de formação sobre FUNDEB, SIOPE, CACS-Fundeb e Salário-Educação.</p>
-                    <div class="feature-tags">
-                        <span class="feature-tag">Capacitação</span>
-                        <span class="feature-tag">Guias</span>
-                        <span class="feature-tag">Engajamento</span>
-                    </div>
-                </div>
-                <div class="feature-card animate-on-scroll delay-3">
-                    <div class="feature-icon">💼</div>
-                    <h3>Consultorias</h3>
-                    <p>Sessões remotas de suporte técnico individualizado ou atendimento presencial para planos
-                        superiores. Quantificadas em horas mensais por plano.</p>
-                    <div class="feature-tags">
-                        <span class="feature-tag">Online</span>
-                        <span class="feature-tag">In loco</span>
-                        <span class="feature-tag">4h/mês</span>
-                    </div>
-                </div>
-                <div class="feature-card animate-on-scroll delay-4">
-                    <div class="feature-icon">🔐</div>
-                    <h3>Controle de Acesso</h3>
-                    <p>Sessão PWA com interface intuitiva e recursos de segurança avançados.</p>
-                    <div class="feature-tags">
-                        <span class="feature-tag">Segurança</span>
-                        <span class="feature-tag">LGPD</span>
-                        <span class="feature-tag">Anti-fraude</span>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </section>
+<style>
+@keyframes pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.6; transform: scale(1.3); }
+}
+</style>
 
     <!-- Media Section -->
     <section class="section media-section" id="midias">
