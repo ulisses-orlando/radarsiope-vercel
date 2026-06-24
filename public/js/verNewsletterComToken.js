@@ -619,9 +619,15 @@ async function renderMunicipio(destinatario, acesso, newsletter) {
 
 function _injetarBotaoRelatorio(cod, nome, uf, temRelatorio) {
   // Remove grupo anterior (troca de município)
-  document.getElementById('rs-acoes-municipio')?.remove();
+  const grupoAntigo = document.getElementById('rs-acoes-municipio');
   const btnHistorico = document.getElementById('btn-toggle-historico');
-  if (!btnHistorico) return; // seção município não renderizou
+  if (grupoAntigo) {
+    if (btnHistorico && grupoAntigo.contains(btnHistorico)) {
+      grupoAntigo.parentNode?.insertBefore(btnHistorico, grupoAntigo);
+    }
+    grupoAntigo.remove();
+  }
+  if (!btnHistorico) return;
 
   // ── Wrapper flex que agrupa os dois botões ─────────────────────────────────
   const grupo = document.createElement('div');
