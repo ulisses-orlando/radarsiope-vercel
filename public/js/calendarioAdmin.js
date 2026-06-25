@@ -13,7 +13,8 @@ const _CAL_ADM_SIS = {
 };
 const _CAL_ADM_TIP = {
   repasse: 'Repasse', prazo: 'Prazo',
-  reuniao: 'Reunião', mandato: 'Mandato', outro: 'Outro',
+  reuniao: 'Reunião', mandato: 'Mandato',
+   outro: 'Outro', publicacao: 'Publicação',
 };
 const _CAL_ADM_STA = {
   previsto: 'Previsto', confirmado: 'Confirmado', realizado: 'Realizado',
