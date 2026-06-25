@@ -206,7 +206,7 @@ function _calStatusHTML(status) {
 }
 
 // ─── Ponto de entrada público ─────────────────────────────────────────────────
-async function renderizarCalendario(container, { acesso = {}, edicao = {} } = {}) {
+async function renderizarCalendario(container, { acesso = {}, edicao = {}, codMunicipio = null } = {}) {
   _cal.acesso = acesso;
   _cal.view = 'agenda';
   _cal.filtro = 'todos';
