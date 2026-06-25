@@ -2411,7 +2411,7 @@ async function VerNewsletterComToken() {
 
           // features do usuário tem precedencia, mas se estiverem ausentes, usa o snapshot da assinatura 
           // motivo: se quiser dar um agrado para um assinante posso mudar as features do assinante sem alterar as características do plano contratado 
-          
+
           destinatario.features = destinatario.features || assinaturaData.features_snapshot || {};
           destinatario.plano_slug = assinaturaData.plano_slug || destinatario.plano_slug || null;
 
@@ -2843,7 +2843,10 @@ function _abrirCalendario() {
   // Renderiza — sem passar acesso: calendario.js não faz mais controle de acesso
   const container = document.getElementById('rs-cal-container');
   if (container && typeof window.renderizarCalendario === 'function') {
-    window.renderizarCalendario(container);
+    // Passa o município ativo (do seletor) ou o do usuário logado como fallback
+    window.renderizarCalendario(container, {
+      codMunicipio: _municipioAtivo?.cod_municipio || window._radarUser?.municipio_cod
+    });
   }
 }
 
