@@ -188,10 +188,48 @@
       html += `<div><label class="rs-fc-label" for="rs-fc-txt">💬 Nova mensagem</label><textarea id="rs-fc-txt" class="rs-fc-textarea" placeholder="Digite sua mensagem ou dúvida…" maxlength="${MAX_CHARS}"></textarea><div class="rs-fc-chars" id="rs-fc-chars">0/${MAX_CHARS}</div></div><button class="rs-fc-enviar" id="rs-fc-enviar" disabled onclick="window._fcEnviar('mensagem')">Enviar</button>`;
     }
 
-    const historicoFiltrado = tipoAtivo === 'mensagem' ? historico.filter(m => m.tipo !== 'sugestao_tema') : historico.filter(m => m.tipo === 'sugestao_tema');
+    const historicoFiltrado = tipoAtivo === 'mensagem'
+      ? historico.filter(m => m.tipo !== 'sugestao_tema')
+      : historico.filter(m => m.tipo === 'sugestao_tema');
     if (historicoFiltrado.length > 0) {
       html += `<div class="rs-fc-sep">Histórico</div>`;
       historicoFiltrado.forEach(msg => {
+        // ── Card especial para mensagem_admin ──────────────────────────────
+        if (msg.tipo === 'mensagem_admin') {
+          let dataFormatada = '—';
+          try { const rawDate = msg.data_solicitacao; if (rawDate) { const d = new Date(rawDate); if (!isNaN(d.getTime())) dataFormatada = `em ${d.toLocaleDateString('pt-BR')}`; } } catch (e) {}
+          const respostaBtn = msg.permite_resposta
+            ? `<button class="rs-fc-enviar" style="margin-top:8px;font-size:12px;padding:8px 14px;background:#1d4ed8"
+                onclick="window._fcResponderMensagemAdmin('${msg.id || ''}')">
+                💬 Responder
+               </button>` : '';
+          const respostaAssinante = msg.resposta_assinante
+            ? `<div class="rs-fc-msg-resposta" style="border-color:#3b82f6;background:rgba(59,130,246,.1)">
+                <div class="rs-fc-msg-resposta-label" style="color:#3b82f6">✅ Sua resposta</div>
+                ${_esc(msg.resposta_assinante)}
+               </div>` : '';
+          // Marca como lida no Firestore (fire-and-forget)
+          if (!msg.lida && msg.id) {
+            window.db.collection('usuarios').doc(user.uid)
+              .collection('solicitacoes').doc(msg.id)
+              .update({ lida: true }).catch(() => {});
+          }
+          html += `
+            <div class="rs-fc-msg-card respondida"
+              style="border-color:#3b82f6;background:rgba(59,130,246,.08)">
+              <div class="rs-fc-msg-topo">
+                <span class="rs-fc-msg-tipo" style="color:#3b82f6">📣 Equipe Radar SIOPE</span>
+                <span class="rs-fc-msg-data">${dataFormatada}</span>
+              </div>
+              ${msg.titulo ? `<div style="font-size:13px;font-weight:700;color:var(--rs-text,#f8fafc);margin-bottom:2px">${_esc(msg.titulo)}</div>` : ''}
+              <div class="rs-fc-msg-texto">${_esc(msg.descricao || '')}</div>
+              ${respostaAssinante}
+              ${!msg.resposta_assinante ? respostaBtn : ''}
+            </div>`;
+          return;
+        }
+
+        // ── Card padrão (mensagem / sugestao_tema) ─────────────────────────
         const respondida = !!msg.resposta; let dataFormatada = '—';
         try { const rawDate = msg.criado_em || msg.data_solicitacao; if (rawDate) { const d = rawDate.seconds ? new Date(rawDate.seconds * 1000) : new Date(rawDate); if (!isNaN(d.getTime())) dataFormatada = `em ${d.toLocaleDateString('pt-BR')}`; } } catch (e) { }
         const tipoLabel = msg.tipo === 'sugestao_tema' ? '💡 Sugestão de tema' : '💬 Mensagem';
@@ -302,7 +340,7 @@
     try {
       if (user.segmento === 'assinante') {
         const dataCorte = user._assinaturaCreatedAt || null;
-        const snap = await window.db.collection('usuarios').doc(user.uid).collection('solicitacoes').where('tipo', 'in', ['mensagem', 'sugestao_tema']).orderBy('data_solicitacao', 'desc').limit(20).get();
+        const snap = await window.db.collection('usuarios').doc(user.uid).collection('solicitacoes').where('tipo', 'in', ['mensagem', 'sugestao_tema', 'mensagem_admin']).orderBy('data_solicitacao', 'desc').limit(20).get();
         const docs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
         const resultado = !dataCorte ? docs : docs.filter(d => { const ds = d.data_solicitacao; return ds && new Date(ds) >= dataCorte; });
         _historicoCache = resultado; _historicoCacheTs = Date.now(); return resultado;

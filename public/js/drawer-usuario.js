@@ -603,6 +603,106 @@ async function _renderPagamentos() {
   }
 }
 
+// ─── ENVIAR MENSAGEM DIRETA AO ASSINANTE ─────────────────────────────────────
+async function _enviarMensagemAdmin(uid, btn) {
+  const titulo = document.getElementById('rs-admmsg-titulo')?.value?.trim();
+  const corpo  = document.getElementById('rs-admmsg-corpo')?.value?.trim();
+  const permite = document.getElementById('rs-admmsg-permite')?.checked || false;
+  const status  = document.getElementById('rs-admmsg-status');
+
+  if (!titulo) { status.textContent = '⚠️ Informe um título.'; status.style.color = '#d97706'; return; }
+  if (!corpo)  { status.textContent = '⚠️ Informe o corpo da mensagem.'; status.style.color = '#d97706'; return; }
+
+  const admin = JSON.parse(localStorage.getItem('usuarioLogado') || '{}');
+  btn.disabled = true; btn.textContent = '⏳ Enviando...'; status.textContent = '';
+
+  try {
+    await db.collection('usuarios').doc(uid).collection('solicitacoes').add({
+      tipo: 'mensagem_admin',
+      titulo,
+      descricao: corpo,
+      status: 'atendida',
+      permite_resposta: permite,
+      lida: false,
+      enviado_por: admin.nome || admin.email || 'Admin',
+      data_solicitacao: new Date().toISOString(),
+    });
+
+    status.textContent = '✅ Mensagem enviada!'; status.style.color = '#16a34a';
+    document.getElementById('rs-admmsg-titulo').value = '';
+    document.getElementById('rs-admmsg-corpo').value = '';
+    document.getElementById('rs-admmsg-chars').textContent = '0/500';
+
+    // Recarrega lista de mensagens enviadas
+    await _carregarMensagensAdmin(uid);
+    setTimeout(() => { status.textContent = ''; }, 3000);
+  } catch (e) {
+    status.textContent = '❌ Erro: ' + e.message; status.style.color = '#dc2626';
+  } finally {
+    btn.disabled = false; btn.textContent = '📨 Enviar mensagem';
+  }
+}
+window._enviarMensagemAdmin = _enviarMensagemAdmin;
+
+async function _carregarMensagensAdmin(uid) {
+  const wrap = document.getElementById('rs-admmsg-historico');
+  if (!wrap) return;
+  wrap.innerHTML = '<div style="color:#94a3b8;font-size:12px;padding:8px 0">⏳ Carregando...</div>';
+  try {
+    const snap = await db.collection('usuarios').doc(uid)
+      .collection('solicitacoes')
+      .where('tipo', '==', 'mensagem_admin')
+      .orderBy('data_solicitacao', 'desc')
+      .limit(10)
+      .get();
+
+    if (snap.empty) {
+      wrap.innerHTML = '<div style="color:#94a3b8;font-size:12px;padding:6px 0">Nenhuma mensagem enviada ainda.</div>';
+      return;
+    }
+
+    wrap.innerHTML = snap.docs.map(doc => {
+      const m = doc.data();
+      let dataStr = '—';
+      try { dataStr = new Date(m.data_solicitacao).toLocaleString('pt-BR', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' }); } catch (e) {}
+      const lidaLabel = m.lida
+        ? `<span style="color:#22c55e;font-size:10px;font-weight:700">✅ Lida</span>`
+        : `<span style="color:#f59e0b;font-size:10px;font-weight:700">👁 Não lida</span>`;
+      const respostaHtml = m.resposta_assinante
+        ? `<div style="margin-top:6px;padding:6px 8px;background:#eff6ff;border-left:3px solid #3b82f6;border-radius:0 4px 4px 0;font-size:11px;color:#1e40af">
+            <span style="font-weight:700;font-size:10px;display:block;margin-bottom:2px">💬 Resposta do assinante</span>
+            ${m.resposta_assinante}
+           </div>` : '';
+      return `
+        <div style="border:1px solid #e2e8f0;border-radius:6px;padding:8px 10px;margin-bottom:6px;background:#fff;font-size:12px">
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:4px">
+            <strong style="color:#0A3D62;font-size:12px">${m.titulo || '—'}</strong>
+            <div style="display:flex;gap:6px;align-items:center">${lidaLabel}<span style="color:#94a3b8;font-size:10px">${dataStr}</span></div>
+          </div>
+          <div style="color:#475569;line-height:1.4">${m.descricao || ''}</div>
+          <div style="margin-top:4px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+            ${m.permite_resposta ? '<span style="font-size:10px;color:#0284c7;background:#e0f2fe;padding:1px 6px;border-radius:10px;font-weight:600">Permite resposta</span>' : '<span style="font-size:10px;color:#94a3b8">Sem resposta</span>'}
+          </div>
+          ${respostaHtml}
+        </div>`;
+    }).join('');
+  } catch (e) {
+    wrap.innerHTML = `<div style="color:#ef4444;font-size:12px">Erro: ${e.message}</div>`;
+  }
+}
+window._carregarMensagensAdmin = _carregarMensagensAdmin;
+
+function _toggleMensagemAdmin(uid) {
+  const painel = document.getElementById('rs-admmsg-painel');
+  const chevron = document.getElementById('rs-admmsg-chevron');
+  if (!painel) return;
+  const aberto = painel.style.display !== 'none';
+  painel.style.display = aberto ? 'none' : 'block';
+  if (chevron) chevron.textContent = aberto ? '▸' : '▾';
+  if (!aberto) _carregarMensagensAdmin(uid);
+}
+window._toggleMensagemAdmin = _toggleMensagemAdmin;
+
 // ─── ABA: SOLICITAÇÕES ───────────────────────────────────────────────────────
 async function _renderSolicitacoes() {
   const body = document.getElementById('drawer-usuario-body');
@@ -613,8 +713,59 @@ async function _renderSolicitacoes() {
       .orderBy('data_solicitacao', 'desc')
       .get();
 
-    // ✅ Remove botão "Enviar mensagem manual" conforme solicitado
-    let html = '';
+    // Bloco "Enviar mensagem direta" — expansível, no topo da aba
+    let html = `
+      <div style="border:1px solid #bfdbfe;border-radius:8px;background:#eff6ff;margin-bottom:12px;overflow:hidden">
+        <button onclick="_toggleMensagemAdmin('${uid}')"
+          style="width:100%;display:flex;justify-content:space-between;align-items:center;
+                 padding:10px 12px;background:transparent;border:none;cursor:pointer;
+                 font-size:13px;font-weight:700;color:#1e40af;text-align:left">
+          <span>📣 Enviar mensagem ao assinante</span>
+          <span id="rs-admmsg-chevron" style="font-size:12px;color:#3b82f6">▸</span>
+        </button>
+        <div id="rs-admmsg-painel" style="display:none;padding:0 12px 12px">
+          <div style="display:flex;flex-direction:column;gap:8px">
+            <div>
+              <label style="font-size:11px;font-weight:700;color:#1e40af;display:block;margin-bottom:3px">Título</label>
+              <input id="rs-admmsg-titulo" type="text" maxlength="80"
+                placeholder="Ex: Atualização sobre seu acesso"
+                style="width:100%;padding:7px 9px;border:1px solid #bfdbfe;border-radius:6px;
+                       font-size:12px;box-sizing:border-box;background:#fff;color:#0f172a">
+            </div>
+            <div>
+              <label style="font-size:11px;font-weight:700;color:#1e40af;display:block;margin-bottom:3px">Mensagem</label>
+              <textarea id="rs-admmsg-corpo" maxlength="500"
+                placeholder="Escreva a mensagem para o assinante…"
+                oninput="document.getElementById('rs-admmsg-chars').textContent=this.value.length+'/500'"
+                style="width:100%;min-height:80px;padding:7px 9px;border:1px solid #bfdbfe;border-radius:6px;
+                       font-size:12px;resize:vertical;box-sizing:border-box;background:#fff;color:#0f172a;
+                       font-family:inherit"></textarea>
+              <div id="rs-admmsg-chars" style="font-size:10px;color:#94a3b8;text-align:right">0/500</div>
+            </div>
+            <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#1e40af;cursor:pointer">
+              <input id="rs-admmsg-permite" type="checkbox"
+                style="width:14px;height:14px;cursor:pointer;accent-color:#3b82f6">
+              Permitir que o assinante responda esta mensagem
+            </label>
+            <div style="display:flex;align-items:center;gap:10px">
+              <button onclick="_enviarMensagemAdmin('${uid}', this)"
+                style="padding:7px 16px;background:#1d4ed8;color:#fff;border:none;border-radius:6px;
+                       font-size:12px;font-weight:700;cursor:pointer">
+                📨 Enviar mensagem
+              </button>
+              <span id="rs-admmsg-status" style="font-size:11px"></span>
+            </div>
+          </div>
+
+          <div style="margin-top:12px;padding-top:10px;border-top:1px solid #bfdbfe">
+            <div style="font-size:11px;font-weight:700;color:#1e40af;text-transform:uppercase;
+                        letter-spacing:0.5px;margin-bottom:6px">Mensagens enviadas</div>
+            <div id="rs-admmsg-historico">
+              <div style="color:#94a3b8;font-size:12px">Expanda para carregar.</div>
+            </div>
+          </div>
+        </div>
+      </div>`;
 
     if (snap.empty) {
       body.innerHTML = html + '<p style="color:#94a3b8;font-size:13px">Nenhuma solicitação.</p>';
@@ -627,8 +778,8 @@ async function _renderSolicitacoes() {
       const s = doc.data();
       const status = (s.status || 'pendente').toLowerCase();
 
-      // ✅ FILTRO 1: Ignorar completamente solicitações do tipo "sugestao_tema"
-      if (s.tipo === 'sugestao_tema') return;
+      // ✅ FILTRO 1: Ignorar completamente sugestões de tema e mensagens admin (têm bloco próprio)
+      if (s.tipo === 'sugestao_tema' || s.tipo === 'mensagem_admin') return;
 
       // ✅ FILTRO 2: Contar pendentes apenas para tipos permitidos
       //const tiposPermitidos = ['mensagem', 'cancelamento','treinamento'];
