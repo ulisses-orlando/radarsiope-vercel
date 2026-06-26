@@ -71,7 +71,64 @@
   }
 
   // ── Inicialização ─────────────────────────────────────────────────────────
-  function init() { _injetarHTML(); _injetarCSS(); _bindEventos(); _atualizarBadge(); }
+  function init() {
+    _injetarHTML();
+    _injetarCSS();
+    _bindEventos();
+
+    // _radarUser pode ainda não estar disponível no momento do init()
+    // (publicarRadarUser() é chamado depois, no fluxo do verNewsletterComToken).
+    // Aguarda até 8s em polling de 200ms; quando disponível, atualiza badge e
+    // liga o listener em tempo real do Firestore para mensagens_admin.
+    let _tentativas = 0;
+    const _aguardarUser = setInterval(() => {
+      const user = window._radarUser;
+      if (user && user.uid && user.segmento === 'assinante') {
+        clearInterval(_aguardarUser);
+        _atualizarBadge();
+        _iniciarListenerMensagensAdmin(user.uid);
+      } else if (++_tentativas >= 40) { // 40 × 200ms = 8s
+        clearInterval(_aguardarUser);
+        _atualizarBadge(); // tenta mesmo assim (pode ser lead ou sem user)
+      }
+    }, 200);
+  }
+
+  // ── Listener em tempo real: mensagens_admin não lidas ─────────────────────
+  let _unsubscribeMensagensAdmin = null;
+  function _iniciarListenerMensagensAdmin(uid) {
+    // Garante que não duplica listeners em navegações
+    if (_unsubscribeMensagensAdmin) {
+      try { _unsubscribeMensagensAdmin(); } catch (_) {}
+    }
+
+    try {
+      _unsubscribeMensagensAdmin = window.db
+        .collection('usuarios').doc(uid)
+        .collection('solicitacoes')
+        .where('tipo', '==', 'mensagem_admin')
+        .where('lida', '==', false)
+        .onSnapshot(snap => {
+          const badge = document.getElementById('rs-fc-badge');
+          if (!badge) return;
+
+          // Filtra pelo Set local (pode ter sido marcada vista mas ainda não gravada)
+          const vistas = _getVistas();
+          const novas = snap.docs.filter(d => !vistas.has(d.id));
+          const count = novas.length;
+
+          badge.textContent = count > 9 ? '9+' : String(count);
+          badge.style.display = count > 0 ? 'inline-block' : 'none';
+
+          // Invalida cache do histórico para forçar reload na próxima abertura
+          if (count > 0) _historicoCache = null;
+        }, err => {
+          console.warn('[faleConosco] listener mensagens_admin:', err.message);
+        });
+    } catch (e) {
+      console.warn('[faleConosco] _iniciarListenerMensagensAdmin:', e.message);
+    }
+  }
   // ── HTML ──────────────────────────────────────────────────────────────────
   function _injetarHTML() { const overlay = document.createElement('div'); overlay.id = 'rs-fc-overlay'; overlay.setAttribute('role', 'presentation'); document.body.appendChild(overlay); const drawer = document.createElement('aside'); drawer.id = 'rs-fc-panel'; drawer.setAttribute('role', 'dialog'); drawer.setAttribute('aria-modal', 'true'); drawer.setAttribute('aria-label', 'Fale Conosco'); drawer.innerHTML = `<div id="rs-fc-header"><span id="rs-fc-titulo">💬 Ações</span><button id="rs-fc-fechar" type="button" aria-label="Fechar">×</button></div><div id="rs-fc-body"><div class="rs-fc-loading">Carregando…</div></div>`; document.body.appendChild(drawer); }
   // ── CSS ───────────────────────────────────────────────────────────────────
@@ -542,5 +599,13 @@
     else window.addEventListener('radarUserReady', () => setTimeout(init, 500), { once: true });
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', _boot); else _boot();
-  window._rsFcAbrir = _abrirDrawer; window._rsFcBadgeAtualizar = _atualizarBadge;
+  window._rsFcAbrir = _abrirDrawer;
+  window._rsFcBadgeAtualizar = _atualizarBadge;
+  // Cleanup: cancela listener ao destruir (ex: troca de edição)
+  window._rsFcDestroy = () => {
+    if (_unsubscribeMensagensAdmin) {
+      try { _unsubscribeMensagensAdmin(); } catch (_) {}
+      _unsubscribeMensagensAdmin = null;
+    }
+  };
 })();
