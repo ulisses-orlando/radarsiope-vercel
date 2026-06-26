@@ -319,6 +319,82 @@
     }
   };
 
+  // ── Responder mensagem do admin ───────────────────────────────────────────
+  window._fcResponderMensagemAdmin = function (solId) {
+    const user = window._radarUser;
+    if (!user || !solId) return;
+
+    // Cria modal inline simples no body
+    const existing = document.getElementById('rs-fc-resposta-modal');
+    if (existing) existing.remove();
+
+    const modal = document.createElement('div');
+    modal.id = 'rs-fc-resposta-modal';
+    modal.style.cssText = `
+      position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999;
+      display:flex;align-items:center;justify-content:center;padding:20px;box-sizing:border-box`;
+    modal.innerHTML = `
+      <div style="background:#1e293b;border:1px solid #3b82f6;border-radius:10px;
+                  padding:20px;width:100%;max-width:420px;box-sizing:border-box">
+        <div style="font-size:14px;font-weight:700;color:#e2e8f0;margin-bottom:12px">
+          💬 Responder mensagem da equipe
+        </div>
+        <textarea id="rs-fc-resposta-txt" maxlength="500"
+          placeholder="Escreva sua resposta…"
+          style="width:100%;min-height:100px;padding:8px 10px;border:1px solid #3b82f6;
+                 border-radius:6px;background:#0f172a;color:#f8fafc;font-size:13px;
+                 resize:vertical;box-sizing:border-box;font-family:inherit"></textarea>
+        <div style="font-size:10px;color:#64748b;text-align:right;margin-bottom:10px"
+             id="rs-fc-resposta-chars">0/500</div>
+        <div style="display:flex;gap:10px;justify-content:flex-end">
+          <button onclick="document.getElementById('rs-fc-resposta-modal').remove()"
+            style="padding:7px 14px;background:transparent;border:1px solid #475569;
+                   border-radius:6px;color:#94a3b8;font-size:12px;cursor:pointer">
+            Cancelar
+          </button>
+          <button id="rs-fc-resposta-btn"
+            onclick="window._fcEnviarRespostaAdmin('${solId}')"
+            style="padding:7px 14px;background:#1d4ed8;border:none;border-radius:6px;
+                   color:#fff;font-size:12px;font-weight:700;cursor:pointer">
+            Enviar resposta
+          </button>
+        </div>
+        <div id="rs-fc-resposta-status" style="font-size:11px;margin-top:6px;text-align:right"></div>
+      </div>`;
+    document.body.appendChild(modal);
+
+    const ta = document.getElementById('rs-fc-resposta-txt');
+    const ch = document.getElementById('rs-fc-resposta-chars');
+    if (ta) ta.addEventListener('input', () => { ch.textContent = ta.value.length + '/500'; });
+    ta?.focus();
+  };
+
+  window._fcEnviarRespostaAdmin = async function (solId) {
+    const user = window._radarUser;
+    const ta   = document.getElementById('rs-fc-resposta-txt');
+    const btn  = document.getElementById('rs-fc-resposta-btn');
+    const status = document.getElementById('rs-fc-resposta-status');
+    const texto = ta?.value?.trim();
+    if (!texto) { status.textContent = '⚠️ Escreva uma resposta.'; status.style.color = '#d97706'; return; }
+
+    btn.disabled = true; btn.textContent = 'Enviando…';
+    try {
+      await window.db.collection('usuarios').doc(user.uid)
+        .collection('solicitacoes').doc(solId)
+        .update({ resposta_assinante: texto, lida: true });
+
+      status.textContent = '✅ Resposta enviada!'; status.style.color = '#22c55e';
+      _historicoCache = null;
+      setTimeout(() => {
+        document.getElementById('rs-fc-resposta-modal')?.remove();
+        _renderDrawer('mensagem');
+      }, 800);
+    } catch (e) {
+      status.textContent = '❌ Erro: ' + e.message; status.style.color = '#ef4444';
+      btn.disabled = false; btn.textContent = 'Enviar resposta';
+    }
+  };
+
   // ✅ NOVO: Helper para validar quota de indicação
   function _checarQuotaIndicacao(user) {
     try {
@@ -355,9 +431,35 @@
     } catch (e) { console.warn('[faleConosco] histórico:', e.message); return []; }
   }
   // ── Badge ─────────────────────────────────────────────────────────────────
-  async function _atualizarBadge() { const badge = document.getElementById('rs-fc-badge'); if (!badge) return; const user = window._radarUser; if (!user) { badge.style.display = 'none'; return; } try { const historico = await _buscarHistorico(user); const vistas = _getVistas(); const novas = historico.filter(m => m.resposta && !vistas.has(String(m.id || m.data_solicitacao))); badge.textContent = novas.length > 9 ? '9+' : String(novas.length); badge.style.display = novas.length > 0 ? 'inline-block' : 'none'; } catch (e) { badge.style.display = 'none'; } }
+  async function _atualizarBadge() {
+    const badge = document.getElementById('rs-fc-badge');
+    if (!badge) return;
+    const user = window._radarUser;
+    if (!user) { badge.style.display = 'none'; return; }
+    try {
+      const historico = await _buscarHistorico(user);
+      const vistas = _getVistas();
+      // Conta: respostas da equipe não vistas + mensagens_admin não lidas
+      const novas = historico.filter(m => {
+        const key = String(m.id || m.data_solicitacao);
+        if (m.tipo === 'mensagem_admin') return !m.lida && !vistas.has(key);
+        return m.resposta && !vistas.has(key);
+      });
+      badge.textContent = novas.length > 9 ? '9+' : String(novas.length);
+      badge.style.display = novas.length > 0 ? 'inline-block' : 'none';
+    } catch (e) { badge.style.display = 'none'; }
+  }
   function _getVistas() { try { return new Set(JSON.parse(localStorage.getItem(STORAGE_KEY_BADGE) || '[]')); } catch { return new Set(); } }
-  function _marcarRespostasVistas(historico) { try { const vistas = _getVistas(); historico.forEach(m => { if (m.resposta) vistas.add(String(m.id || m.data_solicitacao)); }); localStorage.setItem(STORAGE_KEY_BADGE, JSON.stringify([...vistas])); } catch { } }
+  function _marcarRespostasVistas(historico) {
+    try {
+      const vistas = _getVistas();
+      historico.forEach(m => {
+        // Marca como vista: respostas da equipe + mensagens_admin (lida no Firestore, mas também no Set local)
+        if (m.resposta || m.tipo === 'mensagem_admin') vistas.add(String(m.id || m.data_solicitacao));
+      });
+      localStorage.setItem(STORAGE_KEY_BADGE, JSON.stringify([...vistas]));
+    } catch { }
+  }
   // ── UTILITÁRIOS ───────────────────────────────────────────────────────────
   function _getPeriodoAtual() { return new Date().toISOString().slice(0, 7); }
   function _getPeriodoAnterior() { const d = new Date(); return d.getMonth() === 0 ? `${d.getFullYear() - 1}-12` : `${d.getFullYear()}-${String(d.getMonth()).padStart(2, '0')}`; }
