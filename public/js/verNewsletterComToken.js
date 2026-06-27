@@ -388,7 +388,7 @@ async function montarBlocos(newsletter, dados, segmento) {
 
 function _edicaoLiberadaParaAssinante(edicao, dataAtivacao) {
   if (!dataAtivacao) return true; // sem data de ativação: libera tudo (segurança)
-  if (edicao.formato === 'extra' || !edicao.formato) return true;
+  if (edicao.formato === 'extra') return true;
 
   const numero = parseInt(edicao.numero, 10);
   if (!numero || isNaN(numero)) return true; // numero inválido → trata como extra
