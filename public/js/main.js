@@ -383,8 +383,26 @@ async function abrirModalNewsletter(docId = null, isEdit = false) {
       placeholder="Ex: 001"
       style="font-family:monospace;letter-spacing:1px">
   `;
+
   col1.appendChild(numeroWrap);
 
+  // ── Formato da edição (regular ou extra) ──────────────────────────────────
+  const formatoWrap = document.createElement('div');
+  formatoWrap.className = 'field';
+  formatoWrap.style.marginTop = '10px';
+  formatoWrap.innerHTML = `
+    <label style="font-weight:600">Formato da edição
+      <span style="font-weight:400;color:#888;font-size:11px">
+        — Regular: entra no drip semanal · Extra: liberada imediatamente para todos
+      </span>
+    </label>
+    <select data-field-name="formato" style="width:100%;margin-top:4px">
+      <option value="regular" ${(data.formato || 'regular') === 'regular' ? 'selected' : ''}>📅 Regular — drip semanal</option>
+      <option value="extra"   ${data.formato === 'extra' ? 'selected' : ''}>⚡ Extra — liberação imediata</option>
+    </select>
+  `;
+  col1.appendChild(formatoWrap);
+  
   // ── Resumo bullets (modo rápido) ───────────────────────────────────────────
   const bulletsWrap = document.createElement('div');
   bulletsWrap.className = 'field';

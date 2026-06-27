@@ -380,6 +380,34 @@ async function montarBlocos(newsletter, dados, segmento) {
   return aplicarPlaceholders(htmlFinal, dados);
 }
 
+// ─── Drip semanal: verifica se edição está liberada para o assinante ─────────
+// Regras:
+//   - formato === 'extra' (ou ausente/null): sempre liberada
+//   - formato === 'regular': liberada 1 por semana a partir de data_ativacao
+//   - Leads: apenas numero === '001' + extras
+
+function _edicaoLiberadaParaAssinante(edicao, dataAtivacao) {
+  if (!dataAtivacao) return true; // sem data de ativação: libera tudo (segurança)
+  if (edicao.formato === 'extra' || !edicao.formato) return true;
+
+  const numero = parseInt(edicao.numero, 10);
+  if (!numero || isNaN(numero)) return true; // numero inválido → trata como extra
+
+  const msAtivacao = dataAtivacao instanceof Date
+    ? dataAtivacao.getTime()
+    : (dataAtivacao.toDate ? dataAtivacao.toDate().getTime() : Number(dataAtivacao));
+
+  const semanasDesdeAtivacao = Math.floor(
+    (Date.now() - msAtivacao) / (7 * 24 * 60 * 60 * 1000)
+  );
+  return numero <= semanasDesdeAtivacao + 1;
+}
+
+function _edicaoLiberadaParaLead(edicao) {
+  if (edicao.formato === 'extra') return true;
+  return String(edicao.numero) === '001';
+}
+
 // ─── Regras de acesso por segmento / plano ────────────────────────────────────
 
 function detectarAcesso(destinatario, newsletter, segmento, envio) {
@@ -1439,7 +1467,7 @@ function publicarRadarUser(destinatario, segmento, assinaturaId) {
   try {
     const sessaoExistente = JSON.parse(localStorage.getItem('rs_pwa_session') || '{}');
     const novaSessao = {
-      ...sessaoExistente, // ← mantém dados antigos
+      ...sessaoExistente, // ← mantém dados antigos (inclui data_ativacao se já gravada)
       uid,
       assinaturaId: assinaturaId || null,
       segmento: isAssinante ? 'assinante' : 'lead',
@@ -1450,6 +1478,10 @@ function publicarRadarUser(destinatario, segmento, assinaturaId) {
       ...(destinatario.cod_municipio && { cod_municipio: destinatario.cod_municipio }),
       ...(destinatario.nome_municipio && { nome_municipio: destinatario.nome_municipio }),
       ...(destinatario.perfil && { perfil: destinatario.perfil }),
+      // data_ativacao: só grava se ainda não existir (preserva a data real de entrada)
+      ...(!sessaoExistente.data_ativacao && isAssinante && {
+        data_ativacao: destinatario.data_ativacao || new Date().toISOString()
+      }),
     };
     localStorage.setItem('rs_pwa_session', JSON.stringify(novaSessao));
   } catch (e) { /* ignora se localStorage bloqueado */ }
@@ -1740,20 +1772,27 @@ async function _tentarModoAssinante(dadosSessao) {
 
     publicarRadarUser(destinatario, 'assinantes', sessao.assinaturaId);
 
-    // Busca edição mais recente publicada
-    const snap = await db.collection('newsletters')
+    // Busca edições publicadas e aplica drip semanal
+    const dataAtivacao = sessao.data_ativacao
+      ? new Date(sessao.data_ativacao)
+      : null;
+
+    const snapTodas = await db.collection('newsletters')
       .where('enviada', '==', true)
       .orderBy('data_publicacao', 'desc')
-      .limit(1)
+      .limit(50)
       .get();
 
-    if (snap.empty) {
-      // Nenhuma edição publicada ainda → exibe app sem edição
+    const edicoesLiberadas = snapTodas.docs
+      .map(d => ({ id: d.id, ...d.data() }))
+      .filter(ed => _edicaoLiberadaParaAssinante(ed, dataAtivacao));
+
+    if (!edicoesLiberadas.length) {
       _exibirAppSemEdicao(destinatario, sessao.assinaturaId);
       return true;
     }
 
-    const newsletter = { id: snap.docs[0].id, ...snap.docs[0].data() };
+    const newsletter = edicoesLiberadas[0]; // já ordenado desc → mais recente liberada
     const nid = newsletter.id;
     const segmento = 'assinantes';
 
@@ -1923,6 +1962,7 @@ async function _executarAtivacaoSessao(token, uid) {
         nome_municipio: data.nome_municipio,
         perfil: data.tipo_perfil,
         municipios_plano: data.municipios_plano || [],
+        data_ativacao: data.data_ativacao || new Date().toISOString(),
         validado_em: Date.now(),
       }));
     } catch (e) { /* ignora se localStorage bloqueado */ }
@@ -2019,6 +2059,7 @@ async function _tentarModoAlerta() {
           cod_municipio: _sessaoNova.cod_municipio,
           nome_municipio: _sessaoNova.nome_municipio,
           perfil: _sessaoNova.perfil,
+          data_ativacao: _sessaoNova.data_ativacao || new Date().toISOString(),
           validado_em: Date.now(),
         };
         try { localStorage.setItem('rs_pwa_session', JSON.stringify(_sessaoCompleta)); } catch (e) { /* ignora */ }
@@ -2282,6 +2323,7 @@ async function VerNewsletterComToken() {
                   cod_municipio: _sessaoNova.cod_municipio,
                   nome_municipio: _sessaoNova.nome_municipio,
                   perfil: _sessaoNova.perfil,
+                  data_ativacao: _sessaoNova.data_ativacao || new Date().toISOString(),
                   validado_em: Date.now(),
                 }));
               } catch (e) { /* ignora se localStorage bloqueado */ }
@@ -3110,15 +3152,26 @@ async function abrirTipo(tipoId, tipoNome, tipoIcone) {
   let edicoesVisiveis;
 
   if (isAssinante) {
+    // Drip semanal: filtra pelo numero/formato antes de aplicar filtro lidas
+    const dataAtivacao = (() => {
+      try {
+        const sess = JSON.parse(localStorage.getItem('rs_pwa_session') || '{}');
+        return sess.data_ativacao ? new Date(sess.data_ativacao) : null;
+      } catch { return null; }
+    })();
+
     const filtro = _drawer.filtroLidas || 'todas';
     edicoesVisiveis = edicoes.filter(ed => {
+      if (!_edicaoLiberadaParaAssinante(ed, dataAtivacao)) return false;
       const lida = _edicaoLida(_uid, ed.id);
       if (filtro === 'lidas') return lida;
       if (filtro === 'nao_lidas') return !lida;
       return true; // 'todas'
     });
   } else {
+    // Leads: numero 001 + extras com envio vigente
     edicoesVisiveis = edicoes.filter(ed => {
+      if (!_edicaoLiberadaParaLead(ed)) return false;
       const envio = enviosLead[ed.id];
       if (!envio) return false;
       if (envio.expira_em && new Date(envio.expira_em) <= new Date()) return false;
