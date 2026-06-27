@@ -520,6 +520,9 @@ async function _handleAtivarSessao(req, res) {
       nome_municipio: usuarioData.nome_municipio || '',
       perfil: usuarioData.tipo_perfil || '',
       municipios_plano: assinaturaData.municipios_plano || [],
+      data_ativacao: usuarioData.data_cadastro?.toDate?.()?.toISOString?.()
+        || usuarioData.data_ativacao?.toDate?.()?.toISOString?.()
+        || new Date().toISOString(),
     });
 
   } catch (err) {
@@ -933,6 +936,9 @@ async function _handleCriarSessao(req, res) {
       cod_municipio: usuarioData.cod_municipio || '',
       nome_municipio: usuarioData.nome_municipio || '',
       perfil: usuarioData.tipo_perfil || '',
+      data_ativacao: usuarioData.data_cadastro?.toDate?.()?.toISOString?.()
+        || usuarioData.data_ativacao?.toDate?.()?.toISOString?.()
+        || new Date().toISOString(),
       validado_em: Date.now(),
     });
 
