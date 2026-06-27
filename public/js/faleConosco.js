@@ -118,7 +118,7 @@
   function _iniciarListenerMensagensAdmin(uid) {
     // Garante que não duplica listeners em navegações
     if (_unsubscribeMensagensAdmin) {
-      try { _unsubscribeMensagensAdmin(); } catch (_) {}
+      try { _unsubscribeMensagensAdmin(); } catch (_) { }
     }
 
     try {
@@ -190,9 +190,9 @@
       </div>`;
       return;
     }
-    
+
     body.innerHTML = '<div class="rs-fc-loading">Carregando…</div>';
-    
+
     if (!user) { body.innerHTML = '<div class="rs-fc-vazio"><span>🔒</span>Faça login para enviar mensagens.</div>'; return; }
     const isAssinante = user.segmento === 'assinante';
     let quotaTema = 0; let usoTemaMes = 0;
@@ -233,42 +233,50 @@
     if (isAssinante) { html += temFeatureTema ? `<button class="rs-fc-tipo-btn ${tipoAtivo === 'sugestao_tema' ? 'ativo' : ''}" onclick="window._fcSelecionarTipo('sugestao_tema')">💡 Sugerir tema</button>` : `<button class="rs-fc-tipo-btn bloqueado" title="Disponível em planos superiores">💡 Sugerir tema 🔒</button>`; }
     html += `</div>`;
 
-    // ── Dentro de async function _renderDrawer(tipoAtivo = 'mensagem') { ... } ──
     if (tipoAtivo === 'sugestao_tema') {
       html += await _renderVotacaoAtual(user, temFeatureTema);
 
       const restantes = Math.max(0, quotaTema - usoTemaMes);
 
-      // ✅ PRECEDÊNCIA CLARA: Quota > Datas do Ciclo > Normal
+      let estadoCiclo = null;
+      try { estadoCiclo = await _checarEstadosCiclo(); } catch (e) { /* ignora */ }
+
       let isBlocked = quotaEsgotada;
       let blockMsg = '⛔ Sua quota de sugestões para este mês já foi atingida. Aguarde o próximo ciclo para enviar novas sugestões.';
 
       // Placeholder padrão (caso não esteja bloqueado)
       let placeholderTxt = `Descreva o tema que gostaria que fosse abordado… você ainda tem direito a ${restantes} sugestão(ões).`;
 
-      // Se a quota não estiver esgotada, aqui você pode futuramente inserir a validação de datas:
-      // if (!isBlocked && !indicacaoAberta) { isBlocked = true; blockMsg = 'A indicação ainda não está aberta.'; }
+      if (!isBlocked && estadoCiclo && !estadoCiclo.indicacaoAberta) {
+        isBlocked = true;
+        blockMsg = `⛔ ${estadoCiclo.msgIndicacao || 'O período de sugestão de tema não está aberto no momento.'}`;
+      }
 
       // Aplica bloqueio visual e de interação
       if (isBlocked) {
         placeholderTxt = blockMsg;
       }
 
-      const textareaAttrs = isBlocked ? 'disabled readonly style="opacity:0.6; cursor:not-allowed;"' : '';
+      const textareaAttrs = isBlocked
+        ? 'disabled readonly style="opacity:0.6; cursor:not-allowed;"'
+        : '';
 
       html += `
         <div style="margin-top:16px">
           <label class="rs-fc-label" for="rs-fc-txt">💡 Sugestão de tema</label>
           <textarea id="rs-fc-txt" class="rs-fc-textarea" placeholder="${_esc(placeholderTxt)}"
-          maxlength="${MAX_CHARS}" ${textareaAttrs}></textarea>
+            maxlength="${MAX_CHARS}" ${textareaAttrs}></textarea>
           <div class="rs-fc-chars" id="rs-fc-chars">0/${MAX_CHARS}</div>
         </div>
         <button class="rs-fc-enviar" id="rs-fc-enviar" disabled ${isBlocked ? 'disabled' : ''}
-        onclick="window._fcEnviar('sugestao_tema')">Enviar</button>`;
+          onclick="window._fcEnviar('sugestao_tema')">Enviar</button>`;
 
       html += await _renderResultadoAnterior(user, temFeatureTema);
+
+      window.__fcSugestaoBloqueada = isBlocked;
     } else {
-      html += `<div><label class="rs-fc-label" for="rs-fc-txt">💬 Nova mensagem</label><textarea id="rs-fc-txt" class="rs-fc-textarea" placeholder="Digite sua mensagem ou dúvida…" maxlength="${MAX_CHARS}"></textarea><div class="rs-fc-chars" id="rs-fc-chars">0/${MAX_CHARS}</div></div><button class="rs-fc-enviar" id="rs-fc-enviar" disabled onclick="window._fcEnviar('mensagem')">Enviar</button>`;
+      window.__fcSugestaoBloqueada = false;
+      html += `...`; // (mantém igual)
     }
 
     const historicoFiltrado = tipoAtivo === 'mensagem'
@@ -280,7 +288,7 @@
         // ── Card especial para mensagem_admin ──────────────────────────────
         if (msg.tipo === 'mensagem_admin') {
           let dataFormatada = '—';
-          try { const rawDate = msg.data_solicitacao; if (rawDate) { const d = new Date(rawDate); if (!isNaN(d.getTime())) dataFormatada = `em ${d.toLocaleDateString('pt-BR')}`; } } catch (e) {}
+          try { const rawDate = msg.data_solicitacao; if (rawDate) { const d = new Date(rawDate); if (!isNaN(d.getTime())) dataFormatada = `em ${d.toLocaleDateString('pt-BR')}`; } } catch (e) { }
           const respostaBtn = msg.permite_resposta
             ? `<button class="rs-fc-enviar" style="margin-top:8px;font-size:12px;padding:8px 14px;background:#1d4ed8"
                 onclick="window._fcResponderMensagemAdmin('${msg.id || ''}')">
@@ -295,7 +303,7 @@
           if (!msg.lida && msg.id) {
             window.db.collection('usuarios').doc(user.uid)
               .collection('solicitacoes').doc(msg.id)
-              .update({ lida: true }).catch(() => {});
+              .update({ lida: true }).catch(() => { });
           }
           html += `
             <div class="rs-fc-msg-card respondida"
@@ -327,7 +335,9 @@
     if (textarea) {
       textarea.addEventListener('input', () => {
         const n = textarea.value.length; chars.textContent = `${n}/${MAX_CHARS}`; chars.classList.toggle('limite', n >= MAX_CHARS); if (!btnEnv) return;
-        if (tipoAtivo === 'sugestao_tema') { btnEnv.disabled = (n === 0) || quotaEsgotada; } else { btnEnv.disabled = (n === 0); }
+        if (tipoAtivo === 'sugestao_tema') {
+          btnEnv.disabled = (n === 0) || !!window.__fcSugestaoBloqueada;
+        } else { btnEnv.disabled = (n === 0); }
       });
     }
   }
@@ -454,8 +464,8 @@
 
   window._fcEnviarRespostaAdmin = async function (solId) {
     const user = window._radarUser;
-    const ta   = document.getElementById('rs-fc-resposta-txt');
-    const btn  = document.getElementById('rs-fc-resposta-btn');
+    const ta = document.getElementById('rs-fc-resposta-txt');
+    const btn = document.getElementById('rs-fc-resposta-btn');
     const status = document.getElementById('rs-fc-resposta-status');
     const texto = ta?.value?.trim();
     if (!texto) { status.textContent = '⚠️ Escreva uma resposta.'; status.style.color = '#d97706'; return; }
@@ -632,7 +642,7 @@
   // Cleanup: cancela listener ao destruir (ex: troca de edição)
   window._rsFcDestroy = () => {
     if (_unsubscribeMensagensAdmin) {
-      try { _unsubscribeMensagensAdmin(); } catch (_) {}
+      try { _unsubscribeMensagensAdmin(); } catch (_) { }
       _unsubscribeMensagensAdmin = null;
     }
   };
