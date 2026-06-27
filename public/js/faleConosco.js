@@ -313,7 +313,7 @@
                 <span class="rs-fc-msg-data">${dataFormatada}</span>
               </div>
               ${msg.titulo ? `<div style="font-size:13px;font-weight:700;color:var(--rs-text,#f8fafc);margin-bottom:2px">${_esc(msg.titulo)}</div>` : ''}
-              <div class="rs-fc-msg-texto">${_esc(msg.descricao || '')}</div>
+              <div class= "rs-fc-msg-texto " style= "word-break:break-word; " >${_formatarDescricaoAdmin(msg.descricao || '')} </div >
               ${respostaAssinante}
               ${!msg.resposta_assinante ? respostaBtn : ''}
             </div>`;
