@@ -373,6 +373,12 @@ async function _renderResumo() {
             " style="font-size:11px;padding:3px 10px;border-radius:6px;border:1px solid #cbd5e1;background:#fff;cursor:pointer;color:#0A3D62;font-weight:600">
               ⚙️ Editar features
             </button>
+            ${a.status === 'ativa' || a.status === 'ativo' ? `
+            <button onclick="_gerarEnviarLinkProativo('${uid}','${assinId}',this)"
+              style="font-size:11px;padding:3px 10px;border-radius:6px;border:1px solid #0284c7;
+                     background:#e0f2fe;cursor:pointer;color:#0284c7;font-weight:600;margin-left:6px">
+              🔗 Gerar e enviar link
+            </button>` : ''}
             <div style="display:none;margin-top:8px" id="feat-panel-${assinId}">
               <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px">
                 ${featChecks}
@@ -1459,15 +1465,16 @@ async function _revogarTodasSessoes() {
 }
 
 // ─── Admin: Enviar link de acesso por e-mail ──────────────────────────────────
+// Retorna o link gerado (string) em caso de sucesso, ou null em caso de erro/cancelamento.
 async function _enviarLinkAcessoAdmin(uid, solId, assinaturaId, resetarContador) {
   const acao = resetarContador
     ? 'Resetar contador (self-service volta a 0) e enviar novo link'
     : 'Gerar e enviar novo link (contador permanece em 3)';
 
-  if (!confirm(`${acao}?\n\nUm e-mail com o link de ativação será enviado ao assinante.`)) return;
+  if (!confirm(`${acao}?\n\nUm e-mail com o link de ativação será enviado ao assinante.`)) return null;
 
-  // Desabilita os botões do card durante a operação
-  const card = document.getElementById(`sol-card-${solId}`);
+  // Desabilita os botões do card de solicitação (apenas se veio de um card existente)
+  const card = solId ? document.getElementById(`sol-card-${solId}`) : null;
   const btns = card?.querySelectorAll('button');
   btns?.forEach(b => { b.disabled = true; });
 
@@ -1481,33 +1488,70 @@ async function _enviarLinkAcessoAdmin(uid, solId, assinaturaId, resetarContador)
     const data = await resp.json().catch(() => ({}));
     if (!resp.ok || !data.ok) throw new Error(data.message || 'Erro ao processar.');
 
-    // Atualiza a solicitação como atendida
-    await db.collection('usuarios').doc(uid).collection('solicitacoes').doc(solId).update({
-      status: 'atendida',
-      resposta: resetarContador
-        ? 'Contador resetado e novo link de acesso enviado por e-mail pelo administrador.'
-        : 'Novo link de acesso enviado por e-mail pelo administrador.',
-      data_resposta: new Date().toISOString(),
-      atualizadoEm: new Date().toISOString(),
-    });
-
-    // Decrementa o contador de pendências
-    await _incrementarContador('solicitacoes', -1);
-    await atualizarBadgeUsuarios();
+    // Atualiza a solicitação como atendida (apenas quando veio de uma solicitação)
+    if (solId) {
+      await db.collection('usuarios').doc(uid).collection('solicitacoes').doc(solId).update({
+        status: 'atendida',
+        resposta: resetarContador
+          ? 'Contador resetado e novo link de acesso enviado por e-mail pelo administrador.'
+          : 'Novo link de acesso enviado por e-mail pelo administrador.',
+        data_resposta: new Date().toISOString(),
+        atualizadoEm: new Date().toISOString(),
+      });
+      await _incrementarContador('solicitacoes', -1);
+      await atualizarBadgeUsuarios();
+      _ativarDrawerTab('solicitacoes');
+    }
 
     const msg = resetarContador
       ? '✅ Contador zerado e link enviado por e-mail!'
       : '✅ Link enviado por e-mail com sucesso!';
     mostrarMensagem(msg);
 
-    // Recarrega a aba para refletir o novo status
-    _ativarDrawerTab('solicitacoes');
+    return data.link || null;
 
   } catch (err) {
     mostrarMensagem('❌ Erro: ' + err.message);
     btns?.forEach(b => { b.disabled = false; });
+    return null;
   }
 }
+
+// ─── Admin: Gerar e enviar link proativamente (aba Resumo) ───────────────────
+// Gera o link, envia por e-mail E entrega via mensagem_admin no app do assinante.
+async function _gerarEnviarLinkProativo(uid, assinaturaId, btnEl) {
+  if (btnEl) { btnEl.disabled = true; btnEl.textContent = '⏳ Gerando...'; }
+
+  try {
+    // 1. Gera + envia por e-mail (reutiliza função existente, solId = null)
+    const link = await _enviarLinkAcessoAdmin(uid, null, assinaturaId, false);
+    if (!link) {
+      // Usuário cancelou no confirm ou ocorreu erro (já exibido por _enviarLinkAcessoAdmin)
+      return;
+    }
+
+    // 2. Envia também via mensagem_admin no app
+    const admin = JSON.parse(localStorage.getItem('usuarioLogado') || '{}');
+    await db.collection('usuarios').doc(uid).collection('solicitacoes').add({
+      tipo: 'mensagem_admin',
+      titulo: '🔗 Seu novo link de acesso ao Radar SIOPE',
+      descricao: `Seu novo link de acesso foi gerado e enviado também por e-mail.\n\nClique para acessar o app:\n${link}\n\n⏰ Válido por 72 horas.`,
+      status: 'atendida',
+      permite_resposta: false,
+      lida: false,
+      enviado_por: admin.nome || admin.email || 'Admin',
+      data_solicitacao: new Date().toISOString(),
+    });
+
+    mostrarMensagem('✅ Link enviado por e-mail e notificação enviada no app!');
+
+  } catch (err) {
+    mostrarMensagem('❌ Erro: ' + err.message);
+  } finally {
+    if (btnEl) { btnEl.disabled = false; btnEl.textContent = '🔗 Gerar e enviar link'; }
+  }
+}
+window._gerarEnviarLinkProativo = _gerarEnviarLinkProativo;
 
 // ─── Reset de feedback por envio ─────────────────────────────────────────────
 async function _resetarFeedbackEnvio(assinId, envioId) {
