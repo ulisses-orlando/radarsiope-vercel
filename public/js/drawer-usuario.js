@@ -1535,7 +1535,7 @@ async function _gerarEnviarLinkProativo(uid, assinaturaId, btnEl) {
     await db.collection('usuarios').doc(uid).collection('solicitacoes').add({
       tipo: 'mensagem_admin',
       titulo: '🔗 Seu novo link de acesso ao Radar SIOPE',
-      descricao: `Seu novo link de acesso foi gerado e enviado também por e-mail.\n\nClique para acessar o app:\n${link}\n\n⏰ Válido por 72 horas.`,
+      descricao: `Seu novo link de acesso foi gerado e enviado também por e-mail.\n\n${link}\n\n⏰ Válido por 72 horas.`,
       status: 'atendida',
       permite_resposta: false,
       lida: false,
