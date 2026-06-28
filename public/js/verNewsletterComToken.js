@@ -3285,7 +3285,7 @@ function _cardEdicaoAssinante(ed, isAtual, temAcesso, uid) {
         <div class="rs-drawer-ed-titulo">${titulo}${ed.formato === 'extra' ? ' <span style="font-size:9px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;background:rgba(245,158,11,.15);color:#d97706;border:1px solid rgba(245,158,11,.3);border-radius:4px;padding:1px 5px;margin-left:6px;vertical-align:middle">⚡ extra</span>' : ''}</div>
         <div class="rs-drawer-ed-data">${data}${num ? ` · Ed. ${num}` : ''}</div>
       </div>
-      ${isAtual ? '<span class="rs-drawer-ed-badge-atual">👁 lendo agora</span>' : '<span class="rs-drawer-chevron">›</span>'}}
+      ${isAtual ? '<span class="rs-drawer-ed-badge-atual">👁 lendo agora</span>' : '<span class="rs-drawer-chevron">›</span>'}
     </button>
     ${favHtml}
   </div>`;
