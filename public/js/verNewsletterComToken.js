@@ -3279,16 +3279,16 @@ function _cardEdicaoAssinante(ed, isAtual, temAcesso, uid) {
 
   // 🔑 Retorno consolidado: garante injeção segura de ${favHtml}
   return `<div class="rs-drawer-ed-card-wrap" style="display:flex;align-items:center;gap:4px;padding:2px 4px;overflow:visible;">
-    ${dotHtml}
-    <button class="rs-drawer-ed-card ${classeAtual}" style="flex:1;margin:0;min-width:0;" onclick="navegarParaEdicao('${_esc(ed.id)}')" type="button">
-      <div class="rs-drawer-ed-info">
-        <div class="rs-drawer-ed-titulo">${titulo}${ed.formato === 'extra' ? ' <span style="font-size:9px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;background:rgba(245,158,11,.15);color:#d97706;border:1px solid rgba(245,158,11,.3);border-radius:4px;padding:1px 5px;margin-left:6px;vertical-align:middle">⚡ extra</span>' : ''}</div>
-        <div class="rs-drawer-ed-data">${data}${num ? ` · Ed. ${num}` : ''}</div>
-      </div>
-      ${isAtual ? '<span class="rs-drawer-ed-badge-atual">👁 lendo agora</span>' : '<span class="rs-drawer-chevron">›</span>'}
-    </button>
-    ${favHtml}
-  </div>`;
+  ${dotHtml}
+  <button class="rs-drawer-ed-card ${classeAtual}" style="flex:1;margin:0;min-width:0;" onclick="navegarParaEdicao('${_esc(ed.id)}')" type="button">
+    <div class="rs-drawer-ed-info">
+      <div class="rs-drawer-ed-titulo">${titulo}${ed.formato && String(ed.formato).toLowerCase() === 'extra' ? ' <span style="font-size:9px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;background:rgba(245,158,11,.15);color:#d97706;border:1px solid rgba(245,158,11,.3);border-radius:4px;padding:1px 5px;margin-left:6px;vertical-align:middle">⚡ extra</span>' : ''}</div>
+      <div class="rs-drawer-ed-data">${data}${num ? ` · Ed. ${num}` : ''}</div>
+    </div>
+    ${isAtual ? '<span class="rs-drawer-ed-badge-atual">👁 lendo agora</span>' : '<span class="rs-drawer-chevron">›</span>'}
+  </button>
+  ${favHtml}
+</div>`;
 }
 
 // ─── FILTRO no drawer de edições ────────────────────────────────────────────
