@@ -28,6 +28,28 @@ function logCompleto() {
   return process.env.MP_LOG_COMPLETO === 'true';
 }
 
+// Resolve tipos_selecionados (array de IDs) → tiposInclusos (array de {id, nome, icone})
+// Usado em ativar-sessao, criar-sessao e validar-sessao para manter rs_pwa_session
+// sincronizado sem exigir query extra no client a cada abertura do drawer.
+async function _resolverTiposInclusos(tiposSelecionados) {
+  const tiposIds = Array.isArray(tiposSelecionados) ? tiposSelecionados.map(String) : [];
+  if (!tiposIds.length) return [];
+  try {
+    // Firestore limita 'in' a 10 itens — ok por ora (4 tipos existentes)
+    const tiposSnap = await db.collection('tipo_newsletters')
+      .where(admin.firestore.FieldPath.documentId(), 'in', tiposIds.slice(0, 10))
+      .get();
+    return tiposSnap.docs.map(t => ({
+      id: t.id,
+      nome: t.data().nome || t.id,
+      icone: t.data().icone || '📰',
+    }));
+  } catch (e) {
+    console.warn('[tiposInclusos] Não foi possível resolver tipos:', e.message);
+    return [];
+  }
+}
+
 // fetch com timeout — usado tanto para MP quanto para e-mail (fix #7)
 async function fetchWithTimeout(url, opts = {}, ms = 10000) {
   const controller = new AbortController();
@@ -504,6 +526,8 @@ async function _handleAtivarSessao(req, res) {
     // Marca token como usado (uso único) — fora da transaction pois não é crítico para atomicidade
     await usuarioRef.update({ 'pending_session_token.usado': true });
 
+    const tiposInclusos = await _resolverTiposInclusos(assinaturaData.tipos_selecionados);
+
     return json(res, 200, {
       ok: true,
       session_id: sessionId,
@@ -513,6 +537,7 @@ async function _handleAtivarSessao(req, res) {
       segmento: 'assinante',
       plano_slug: assinaturaData.plano_slug || null,
       features: usuarioData.features || assinaturaData.features_snapshot || {},
+      tiposInclusos,
       nome: usuarioData.nome || '',
       email: usuarioData.email || '',
       cod_uf: usuarioData.cod_uf || '',
@@ -792,6 +817,7 @@ async function _handleValidarSessao(req, res) {
     const assinaturaId = sessaoData.assinaturaId;
     let plano_slug = null;
     let features = {};
+    let tiposInclusos = [];
     let statusAss = null;
 
     if (assinaturaId) {
@@ -808,6 +834,7 @@ async function _handleValidarSessao(req, res) {
           features = userData.features || d.features_snapshot || {}; // ← USUÁRIO PRIMEIRO
           statusAss = d.status || null;
           municipiosPlano = d.municipios_plano || [];
+          tiposInclusos = await _resolverTiposInclusos(d.tipos_selecionados);
         }
       } catch (e) { /* não fatal */ }
     }
@@ -827,6 +854,7 @@ async function _handleValidarSessao(req, res) {
       valido: true,
       plano_slug,
       features,
+      tiposInclusos,
       assinaturaId,
       municipios_plano: municipiosPlano,
     });
@@ -920,6 +948,8 @@ async function _handleCriarSessao(req, res) {
       });
     });
 
+    const tiposInclusos = await _resolverTiposInclusos(assinaturaData.tipos_selecionados);
+
     return json(res, 200, {
       ok: true,
       session_id: sessionId,
@@ -929,6 +959,7 @@ async function _handleCriarSessao(req, res) {
       segmento: 'assinante',
       plano_slug: assinaturaData.plano_slug || null,
       features: usuarioData.features || assinaturaData.features_snapshot || {},
+      tiposInclusos,
       municipios_plano: assinaturaData.municipios_plano || [],
       nome: usuarioData.nome || '',
       email: usuarioData.email || '',
