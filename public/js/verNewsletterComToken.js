@@ -1454,6 +1454,7 @@ function publicarRadarUser(destinatario, segmento, assinaturaId) {
     segmento: isAssinante ? 'assinante' : 'lead',
     plano_slug: destinatario.plano_slug || null,
     features: destinatario.features || {},
+    tiposInclusos: destinatario.tiposInclusos || [], // [{id, nome, icone}] — tipos de newsletter da assinatura
     uf: destinatario.cod_uf || '',
     municipio_cod: destinatario.cod_municipio || '',
     municipio_nome: destinatario.nome_municipio || '',
@@ -1474,6 +1475,7 @@ function publicarRadarUser(destinatario, segmento, assinaturaId) {
       // Atualiza apenas os campos que realmente mudaram
       ...(destinatario.plano_slug && { plano_slug: destinatario.plano_slug }),
       ...(destinatario.features && { features: destinatario.features }),
+      ...(destinatario.tiposInclusos && { tiposInclusos: destinatario.tiposInclusos }),
       ...(destinatario.cod_uf && { cod_uf: destinatario.cod_uf }),
       ...(destinatario.cod_municipio && { cod_municipio: destinatario.cod_municipio }),
       ...(destinatario.nome_municipio && { nome_municipio: destinatario.nome_municipio }),
@@ -1764,6 +1766,7 @@ async function _tentarModoAssinante(dadosSessao) {
       email: sessao.email || '',
       plano_slug: sessao.plano_slug || null,
       features: sessao.features || {},
+      tiposInclusos: sessao.tiposInclusos || [],
       cod_uf: sessao.cod_uf || '',
       cod_municipio: sessao.cod_municipio || '',
       nome_municipio: sessao.nome_municipio || '',
@@ -2468,6 +2471,31 @@ async function VerNewsletterComToken() {
               console.warn('[acesso] Não foi possível ler plano:', e);
             }
           }
+          
+          // Resolve tipos_selecionados → tiposInclusos (id+nome+icone), gravado no localStorage
+          // pra evitar query a cada abertura do drawer de edições (ver iniciarDrawer)
+          const tiposIds = Array.isArray(assinaturaData.tipos_selecionados)
+            ? assinaturaData.tipos_selecionados.map(String)
+            : [];
+
+          if (tiposIds.length) {
+            try {
+              // Firestore limita 'in' a 10 itens — ok por ora (4 tipos existentes)
+              const tiposSnap = await db.collection('tipo_newsletters')
+                .where(firebase.firestore.FieldPath.documentId(), 'in', tiposIds.slice(0, 10))
+                .get();
+              destinatario.tiposInclusos = tiposSnap.docs.map(d => ({
+                id: d.id,
+                nome: d.data().nome || d.id,
+                icone: d.data().icone || '📰',
+              }));
+            } catch (e) {
+              console.warn('[acesso] Não foi possível resolver tipos da assinatura:', e);
+              destinatario.tiposInclusos = [];
+            }
+          } else {
+            destinatario.tiposInclusos = [];
+          }
         }
       } catch (e) {
         console.warn('[acesso] Não foi possível ler features_snapshot da assinatura:', e);
@@ -2912,50 +2940,11 @@ async function iniciarDrawer(newsletter) {
   _drawer.edicaoAtual = newsletter.id;
   _drawer.tipoAtual = newsletter.Tipo || newsletter.tipo || null;
 
-  // Carregar tipos_selecionados da assinatura do usuário
-  // (fonte de verdade: o que o assinante efetivamente contratou)
+  // Tipos inclusos: lidos do contexto já resolvido no boot (publicarRadarUser),
+  // sem query ao Firestore a cada abertura do drawer.
   const ctx = _getCtx();
-  if (ctx && ctx.segmento === 'assinante' && ctx.uid) {
-    try {
-      let tiposCarregados = false;
-
-      // 1ª tentativa: assinaturaId direto (mais rápido)
-      if (ctx.assinaturaId) {
-        const assSnap = await db.collection('usuarios')
-          .doc(ctx.uid)
-          .collection('assinaturas')
-          .doc(ctx.assinaturaId)
-          .get();
-        if (assSnap.exists) {
-          const d = assSnap.data();
-          _drawer.tiposInclusos = Array.isArray(d.tipos_selecionados)
-            ? d.tipos_selecionados.map(String)
-            : [];
-          tiposCarregados = true;
-        }
-      }
-
-      // 2ª tentativa: busca a assinatura ativa (fallback)
-      if (!tiposCarregados) {
-        const assSnap = await db.collection('usuarios')
-          .doc(ctx.uid)
-          .collection('assinaturas')
-          .where('status', 'in', ['ativa', 'aprovada'])
-          .limit(1)
-          .get();
-        if (!assSnap.empty) {
-          const d = assSnap.docs[0].data();
-          _drawer.tiposInclusos = Array.isArray(d.tipos_selecionados)
-            ? d.tipos_selecionados.map(String)
-            : [];
-        } else {
-          _drawer.tiposInclusos = [];
-        }
-      }
-    } catch (e) {
-      console.warn('[drawer] Falha ao carregar tipos da assinatura:', e);
-      _drawer.tiposInclusos = [];
-    }
+  if (ctx && ctx.segmento === 'assinante') {
+    _drawer.tiposInclusos = (ctx.tiposInclusos || []).map(t => String(t.id));
   }
 
   // Registrar event listeners
@@ -3634,6 +3623,7 @@ async function navegarParaEdicao(edicaoId) {
       nome: ctx.nome || '',
       plano_slug: ctx.plano_slug || '',
       features: ctx.features || {},
+      tiposInclusos: ctx.tiposInclusos || [],
       cod_uf: ctx.uf || '',
       cod_municipio: ctx.municipio_cod || '',
       nome_municipio: ctx.municipio_nome || '',
