@@ -289,8 +289,11 @@ function _montarHTMLRelatorio(d) {
 <div class="pagina">
   <div class="cabecalho">
     <div class="cabecalho-logo">
-      <img src="/icons/icon-192x192-transparent.png" class="rs-logo" alt="Radar SIOPE"
-        onerror="this.style.display='none'">
+      <img src="/icons/icon-192x192-transparent.png" 
+          class="rs-logo" 
+          alt="Radar SIOPE"
+          style="width: 40px; height: 40px; object-fit: contain;"
+          onerror="this.style.display='none'">
       <div class="logo-texto">
         <div class="marca">Radar SIOPE</div>
         <div class="sub">radarsiope.com.br</div>
