@@ -2551,9 +2551,6 @@ async function VerNewsletterComToken() {
     renderModoRapido(newsletter, acesso);
     await renderModoCompleto(newsletter, dados, segmento, acesso);
 
-    // Avaliação por seção (sem dependência de drawer)
-    //await renderSecaoFeedbacks(newsletter);
-
     // Município em paralelo — não bloqueia o conteúdo principal
     renderMunicipio(destinatario, acesso, newsletter);
 
@@ -3285,41 +3282,6 @@ function _cardEdicaoAssinante(ed, isAtual, temAcesso, uid) {
 </div>`;
 }
 
-// ─── FILTRO no drawer de edições ────────────────────────────────────────────
-// Adicionar tabs "Todas | Não lidas | Lidas" no topo do corpo do drawer
-// quando o usuário for assinante. Inserir este HTML no início de body.innerHTML
-// em abrirTipo(), logo após o upSellBanner e antes da listaOuVazio.
-// O estado do filtro ativo fica em _drawer.filtroLidas.
-
-// Adicionar ao objeto _drawer (onde está definido no código original):
-//   filtroLidas: 'todas',   // 'todas' | 'nao_lidas' | 'lidas'
-
-// HTML dos tabs (inserir em abrirTipo antes de renderizar os cards):
-function _htmlFiltroLidas(filtroAtivo) {
-  const tabs = [
-    { key: 'todas', label: 'Todas' },
-    { key: 'nao_lidas', label: 'Não lidas' },
-    { key: 'lidas', label: 'Lidas' },
-  ];
-  const tabsHtml = tabs.map(t => `
-    <button onclick="_setFiltroLidas('${t.key}')"
-            style="
-              flex:1; padding:6px 0; font-size:11px; font-weight:${t.key === filtroAtivo ? '700' : '500'};
-              border:none; cursor:pointer; border-radius:6px;
-              background:${t.key === filtroAtivo ? 'var(--azul,#0A3D62)' : 'transparent'};
-              color:${t.key === filtroAtivo ? '#fff' : 'var(--rs-muted,#64748b)'};
-              transition:all .15s;
-            "
-            type="button">${t.label}</button>
-  `).join('');
-
-  return `
-    <div style="display:flex;gap:4px;padding:8px 12px 4px;background:var(--rs-card);
-                position:sticky;top:0;z-index:1;border-bottom:1px solid var(--rs-borda,#e2e8f0)">
-      ${tabsHtml}
-    </div>`;
-}
-
 function _setFiltroLidas(filtro) {
   _drawer.filtroLidas = filtro;
   // Re-renderiza o nível 2 com o novo filtro
@@ -3362,7 +3324,6 @@ function toggleFavorito(uid, nid) {
 window.toggleFavorito = toggleFavorito;
 
 // ─── CABEÇALHO COMBINADO (busca + filtro lidas) ──────────────────────────────
-// Substitui _htmlFiltroLidas no nível 2 para assinantes.
 // Sticky único evita sobreposição entre dois elementos posicionados.
 
 function _htmlCabecalhoAssinante(filtroAtivo) {
@@ -3667,7 +3628,6 @@ async function navegarParaEdicao(edicaoId) {
     trocarModo(modoPadrao);
     renderModoRapido(newsletter, acesso);
     await renderModoCompleto(newsletter, dados, segmento, acesso);
-    //await renderSecaoFeedbacks(newsletter);
     renderMunicipio(destinatario, acesso, newsletter);
     renderMidia(newsletter, acesso);
     renderFAQ(newsletter, acesso);
@@ -3859,179 +3819,6 @@ async function enviarFeedback(nid) {
 }
 
 window.enviarFeedback = enviarFeedback;
-
-// ─── Avaliação por seção (👍 / 👎) ───────────────────────────────────────────
-
-function _secaoFeedbackLocalKey(nid, secao) {
-  return `rs_secao_feedback_${nid}_${secao}`;
-}
-
-function _getSecaoFeedbackLocal(nid, secao) {
-  return localStorage.getItem(_secaoFeedbackLocalKey(nid, secao));
-}
-
-function _setSecaoFeedbackLocal(nid, secao, voto) {
-  const key = _secaoFeedbackLocalKey(nid, secao);
-  if (!voto) {
-    localStorage.removeItem(key);
-  } else {
-    localStorage.setItem(key, voto);
-  }
-}
-
-async function carregarSecaoFeedbacks(nid) {
-  window._secaoFeedbackCurrentNid = nid;
-  window._secaoFeedbackData = {};
-
-  if (!nid) return {};
-  try {
-    const doc = await db.collection('newsletters').doc(nid).get();
-    if (!doc.exists) return {};
-    const data = doc.data().feedback_secoes || {};
-    window._secaoFeedbackData = data;
-    return data;
-  } catch (err) {
-    console.warn('[secao-feedback] erro ao carregar:', err);
-    return {};
-  }
-}
-
-function _formatarSecaoTipo(tipo) {
-  if (!tipo) return 'Conteúdo';
-  const labels = {
-    video: 'Vídeo',
-    audio: 'Áudio',
-    infografico: 'Infográfico',
-    dados: 'Dados',
-    resumo: 'Resumo',
-    conteudo: 'Conteúdo completo',
-    noticia: 'Notícia',
-    geral: 'Geral'
-  };
-  return labels[tipo] || tipo.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
-}
-
-async function votarSecao(nid, secao, voto) {
-  if (!nid || !secao || !['like', 'dislike'].includes(voto)) return;
-
-  const atual = _getSecaoFeedbackLocal(nid, secao);
-  const mesma = atual === voto;
-  const proxima = mesma ? null : voto;
-
-  // Ajuste local
-  _setSecaoFeedbackLocal(nid, secao, proxima);
-
-  const delta = { like: 0, dislike: 0 };
-  if (mesma) {
-    // remover voto
-    delta[atual] = -1;
-  } else {
-    if (atual) delta[atual] = -1;
-    delta[voto] = 1;
-  }
-
-  // Atualiza em memória para UI imediata
-  const cache = window._secaoFeedbackData || {};
-  cache[secao] = cache[secao] || { like: 0, dislike: 0 };
-  cache[secao].like = Math.max(0, (cache[secao].like || 0) + delta.like);
-  cache[secao].dislike = Math.max(0, (cache[secao].dislike || 0) + delta.dislike);
-  window._secaoFeedbackData = cache;
-
-  // Atualiza UI instantânea
-  const buttonLike = document.querySelector(`#secao-feedback-${secao} .btn-like`);
-  const buttonDislike = document.querySelector(`#secao-feedback-${secao} .btn-dislike`);
-
-  if (buttonLike) buttonLike.classList.toggle('ativo', proxima === 'like');
-  if (buttonDislike) buttonDislike.classList.toggle('ativo', proxima === 'dislike');
-
-  // Persistência Firestore (incremento atômico)
-  try {
-    const update = {};
-    if (delta.like !== 0) update[`feedback_secoes.${secao}.like`] = firebase.firestore.FieldValue.increment(delta.like);
-    if (delta.dislike !== 0) update[`feedback_secoes.${secao}.dislike`] = firebase.firestore.FieldValue.increment(delta.dislike);
-    if (Object.keys(update).length > 0) {
-      await db.collection('newsletters').doc(nid).set(update, { merge: true });
-    }
-  } catch (err) {
-    console.warn('[secao-feedback] erro ao gravar voto:', err);
-  }
-
-  // Re-renderiza o resumo geral
-  //await renderSecaoFeedbacks({ id: nid, blocos: (window._secaoFeedbackCurrentNewsletter?.blocos || []) });
-}
-
-async function renderSecaoFeedbacks(newsletter) {
-  let wrap = document.getElementById('secao-feedback-secoes');
-  let body = document.getElementById('secao-feedback-secoes-conteudo');
-
-  if (!wrap || !body) {
-    const app = document.getElementById('rs-app');
-    if (app) {
-      wrap = document.createElement('section');
-      wrap.id = 'secao-feedback-secoes';
-      wrap.className = 'rs-section';
-      wrap.style.display = 'none';
-      wrap.innerHTML = `
-        <div class="rs-section-header">
-          <span>🧾</span>
-          <h2>Avaliação por seção</h2>
-        </div>
-        <div class="rs-section-body" id="secao-feedback-secoes-conteudo">
-          <p style="color:#999; margin:0;">Aguardando carregamento de avaliações...</p>
-        </div>`;
-
-      const mediaSection = document.getElementById('secao-midia');
-      if (mediaSection && mediaSection.parentElement) {
-        mediaSection.parentElement.insertBefore(wrap, mediaSection);
-      } else {
-        app.appendChild(wrap);
-      }
-
-      body = document.getElementById('secao-feedback-secoes-conteudo');
-    }
-  }
-
-  if (!wrap || !body) return;
-  wrap.style.display = 'block';
-
-  const nid = typeof newsletter === 'string' ? newsletter : (newsletter?.id || window._secaoFeedbackCurrentNid);
-  const blocos = (newsletter?.blocos || []) || (window._secaoFeedbackCurrentNewsletter?.blocos || []);
-
-  await carregarSecaoFeedbacks(nid);
-
-  const dados = window._secaoFeedbackData || {};
-  const tipos = Array.from(new Set([
-    ...Object.keys(dados),
-    ...blocos.map(b => (b.tipo || 'conteudo'))
-  ]));
-
-  if (!tipos.length) {
-    body.innerHTML = '<p style="color:#999;margin:0;">Nenhuma seção disponível para avaliação.</p>';
-    return;
-  }
-
-  body.innerHTML = tipos.map(tipo => {
-    const counts = dados[tipo] || { like: 0, dislike: 0 };
-    const usuario = _getSecaoFeedbackLocal(nid, tipo);
-    const total = (counts.like || 0) + (counts.dislike || 0);
-    const score = total > 0 ? `${Math.round((counts.like / total) * 100)}% 👍` : 'Sem votos';
-
-    return `
-      <div id="secao-feedback-${tipo}" style="margin-bottom:12px;padding:8px;border:1px solid #d4d4d4;border-radius:8px;">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
-          <strong>${_formatarSecaoTipo(tipo)}</strong>
-          <small style="color:#666;font-size:12px;">${score}</small>
-        </div>
-        <div style="display:flex;gap:8px;align-items:center;">
-          <button class="rs-btn-secao-feedback btn-like" style="border:1px solid #0e7490;background:${usuario === 'like' ? '#0e7490' : 'transparent'};color:${usuario === 'like' ? '#fff' : '#0e7490'};padding:4px 8px;border-radius:6px;cursor:pointer;" onclick="votarSecao('${_esc(nid)}','${_esc(tipo)}','like')">👍 ${counts.like || 0}</button>
-          <button class="rs-btn-secao-feedback btn-dislike" style="border:1px solid #c026d3;background:${usuario === 'dislike' ? '#c026d3' : 'transparent'};color:${usuario === 'dislike' ? '#fff' : '#c026d3'};padding:4px 8px;border-radius:6px;cursor:pointer;" onclick="votarSecao('${_esc(nid)}','${_esc(tipo)}','dislike')">👎 ${counts.dislike || 0}</button>
-          <span style="color:#555;font-size:12px;">${total} voto${total === 1 ? '' : 's'}</span>
-        </div>
-      </div>`;
-  }).join('');
-
-  window._secaoFeedbackCurrentNewsletter = newsletter;
-}
 
 // ─── Chat FAB — Pergunte ao Radar ────────────────────────────────────────────
 
@@ -4467,4 +4254,3 @@ window._mostrarSheetSessaoBloqueada = _mostrarSheetSessaoBloqueada;
 
 // ─── Inicia ───────────────────────────────────────────────────────────────────
 VerNewsletterComToken();
-
