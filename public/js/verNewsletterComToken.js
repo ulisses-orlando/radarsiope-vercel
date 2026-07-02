@@ -3096,7 +3096,7 @@ async function abrirTipo(tipoId, tipoNome, tipoIcone) {
   const upSellBanner = (!isAssinante || temAcesso) ? '' : `
     <div class="rs-drawer-upsell">
       🔒 Este tipo não está no seu plano atual.<br>
-      <a href="/contato.html" style="color:var(--azul);font-weight:700">
+      <a href="/capturaLead.html" style="color:var(--azul);font-weight:700">
         Entre em contato para fazer upgrade →
       </a>
     </div>`;

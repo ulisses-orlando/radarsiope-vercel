@@ -698,7 +698,7 @@ function _renderCardNovoLink(uid, assinaturaId, count) {
             <div class="card-link-titulo">Precisa de um novo link de acesso?</div>
             <div class="card-link-sub">
               Você atingiu o limite de ${LIMITE_SELF_LINK} gerações automáticas.
-              Para obter um novo link, solicite pelo <strong>Suporte</strong> abaixo.
+              Para obter um novo link, solicite pelo <strong>Suporte</strong> na Central.
             </div>
           </div>
         </div>
