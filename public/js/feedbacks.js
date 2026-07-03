@@ -225,6 +225,11 @@ const notaHtml = fb.nota_interna
         border-radius:6px;cursor:pointer;font-size:12px;font-weight:700">
         📧 Responder por e-mail
       </button>
+      ${fb.usuario_id ? `<button onclick="fbResponderApp('${fb.nid}','${fb.id}')"
+        style="padding:5px 12px;background:#7c3aed;color:#fff;border:none;
+        border-radius:6px;cursor:pointer;font-size:12px;font-weight:700">
+        💬 Responder no app
+      </button>` : ''}
       <button onclick="fbMarcarTratado('${fb.nid}','${fb.id}')"
         style="padding:5px 12px;background:#22c55e;color:#fff;border:none;
         border-radius:6px;cursor:pointer;font-size:12px;font-weight:700">
@@ -394,6 +399,112 @@ async function fbExcluirNota(nid, fbId) {
   } catch(e) { mostrarMensagem('Erro: ' + e.message); }
 }
 
+// ─── Responder feedback diretamente no app ───────────────────────────────────
+async function fbResponderApp(nid, fbId) {
+  const fbDoc = await db.collection('newsletters').doc(nid)
+    .collection('feedbacks').doc(fbId).get();
+  if (!fbDoc.exists) return;
+  const fb = fbDoc.data();
+  if (!fb.usuario_id) { mostrarMensagem('Este feedback não possui usuário vinculado.'); return; }
+
+  const nl = _fbNewsletters[nid];
+  const edicaoLabel = nl ? `${nl.titulo}${nl.edicao ? ` (Ed. ${nl.edicao})` : ''}` : '';
+
+  document.getElementById('fb-modal-resposta')?.remove();
+  const overlay = document.createElement('div');
+  overlay.id = 'fb-modal-resposta';
+  overlay.style.cssText = `position:fixed;inset:0;background:rgba(15,23,42,.5);
+    display:flex;align-items:center;justify-content:center;z-index:9999;padding:16px`;
+  overlay.innerHTML = `
+    <div style="background:#fff;border-radius:12px;padding:20px;max-width:440px;width:100%;
+      box-shadow:0 10px 40px rgba(0,0,0,.2)">
+      <h3 style="margin:0 0 4px;font-size:15px">💬 Responder no app</h3>
+      <p style="margin:0 0 14px;font-size:12px;color:#64748b">
+        Para: ${fb.nome || fb.email || 'Assinante'} · ${edicaoLabel}
+      </p>
+      <label style="font-size:12px;font-weight:700;color:#334155">Título</label>
+      <input id="fb-resp-titulo" type="text" maxlength="80"
+        placeholder="Ex: Sobre seu feedback"
+        style="width:100%;padding:8px 10px;margin:4px 0 12px;border:1px solid #e2e8f0;
+        border-radius:6px;font-size:13px;box-sizing:border-box">
+      <label style="font-size:12px;font-weight:700;color:#334155">Mensagem</label>
+      <textarea id="fb-resp-corpo" maxlength="500" rows="5"
+        placeholder="Escreva sua resposta ao assinante..."
+        style="width:100%;padding:8px 10px;margin:4px 0 4px;border:1px solid #e2e8f0;
+        border-radius:6px;font-size:13px;box-sizing:border-box;resize:vertical"></textarea>
+      <div id="fb-resp-chars" style="text-align:right;font-size:11px;color:#94a3b8;margin-bottom:12px">0/500</div>
+      <div id="fb-resp-status" style="font-size:12px;margin-bottom:8px"></div>
+      <div style="display:flex;gap:8px;justify-content:flex-end">
+        <button onclick="document.getElementById('fb-modal-resposta').remove()"
+          style="padding:8px 14px;background:#f1f5f9;border:1px solid #e2e8f0;
+          border-radius:6px;cursor:pointer;font-size:12px">Cancelar</button>
+        <button id="fb-resp-enviar" onclick="fbEnviarRespostaApp('${nid}','${fbId}')"
+          style="padding:8px 16px;background:#7c3aed;color:#fff;border:none;
+          border-radius:6px;cursor:pointer;font-size:12px;font-weight:700">Enviar</button>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+
+  const textarea = document.getElementById('fb-resp-corpo');
+  const chars = document.getElementById('fb-resp-chars');
+  textarea.addEventListener('input', () => { chars.textContent = `${textarea.value.length}/500`; });
+  document.getElementById('fb-resp-titulo').focus();
+}
+
+async function fbEnviarRespostaApp(nid, fbId) {
+  const titulo = document.getElementById('fb-resp-titulo')?.value?.trim();
+  const corpo  = document.getElementById('fb-resp-corpo')?.value?.trim();
+  const status = document.getElementById('fb-resp-status');
+  const btn    = document.getElementById('fb-resp-enviar');
+
+  if (!titulo) { status.textContent = '⚠️ Informe um título.'; status.style.color = '#d97706'; return; }
+  if (!corpo)  { status.textContent = '⚠️ Informe a mensagem.'; status.style.color = '#d97706'; return; }
+
+  try {
+    const fbDoc = await db.collection('newsletters').doc(nid)
+      .collection('feedbacks').doc(fbId).get();
+    if (!fbDoc.exists) throw new Error('Feedback não encontrado.');
+    const fb = fbDoc.data();
+    if (!fb.usuario_id) throw new Error('Feedback sem usuário vinculado.');
+
+    const nl = _fbNewsletters[nid];
+    const edicaoLabel = nl ? `${nl.titulo}${nl.edicao ? ` (Ed. ${nl.edicao})` : ''}` : '';
+    const admin = JSON.parse(localStorage.getItem('usuarioLogado') || '{}');
+
+    btn.disabled = true; btn.textContent = '⏳ Enviando...'; status.textContent = '';
+
+    await db.collection('usuarios').doc(fb.usuario_id).collection('solicitacoes').add({
+      tipo: 'resposta_feedback',
+      titulo,
+      descricao: corpo,
+      status: 'atendida',
+      permite_resposta: false,
+      lida: false,
+      enviado_por: admin.nome || admin.email || 'Admin',
+      data_solicitacao: new Date().toISOString(),
+      origem_nid: nid,
+      origem_fb_id: fbId,
+      origem_edicao_label: edicaoLabel,
+    });
+
+    await db.collection('newsletters').doc(nid)
+      .collection('feedbacks').doc(fbId)
+      .update({ respondido: true, resposta_admin: corpo, data_resposta: new Date() });
+
+    if (typeof _incrementarContador === 'function') {
+      await _incrementarContador('feedbacks', -1);
+    }
+
+    document.getElementById('fb-modal-resposta')?.remove();
+    mostrarMensagem('✅ Resposta enviada no app e feedback marcado como tratado.');
+    atualizarBadgeUsuarios?.();
+    carregarSecaoFeedbacks(); // recarrega pra refletir resposta_admin no card
+  } catch (e) {
+    status.textContent = '❌ Erro: ' + e.message; status.style.color = '#dc2626';
+    btn.disabled = false; btn.textContent = 'Enviar';
+  }
+}
+
 // ─── Exportar CSV ─────────────────────────────────────────────────────────────
 async function fbExportarCSV() {
   try {
@@ -476,3 +587,5 @@ window.fbMarcarTratado = fbMarcarTratado;
 window.fbResponder = fbResponder;
 window.fbAdicionarNota = fbAdicionarNota;
 window.fbExportarCSV = fbExportarCSV;
+window.fbResponderApp = fbResponderApp;
+window.fbEnviarRespostaApp = fbEnviarRespostaApp;

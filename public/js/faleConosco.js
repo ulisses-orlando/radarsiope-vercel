@@ -125,7 +125,7 @@
       _unsubscribeMensagensAdmin = window.db
         .collection('usuarios').doc(uid)
         .collection('solicitacoes')
-        .where('tipo', '==', 'mensagem_admin')
+        .where('tipo', 'in', ['mensagem_admin', 'resposta_feedback'])
         .where('lida', '==', false)
         .onSnapshot(snap => {
           const badge = document.getElementById('rs-fc-badge');
@@ -286,9 +286,12 @@
       html += `<div class="rs-fc-sep">Histórico</div>`;
       historicoFiltrado.forEach(msg => {
         // ── Card especial para mensagem_admin ──────────────────────────────
-        if (msg.tipo === 'mensagem_admin') {
+        if (msg.tipo === 'mensagem_admin' || msg.tipo === 'resposta_feedback') {
           let dataFormatada = '—';
           try { const rawDate = msg.data_solicitacao; if (rawDate) { const d = new Date(rawDate); if (!isNaN(d.getTime())) dataFormatada = `em ${d.toLocaleDateString('pt-BR')}`; } } catch (e) { }
+          const tipoLabel = msg.tipo === 'resposta_feedback'
+            ? `📰 Resposta ao seu feedback${msg.origem_edicao_label ? ` · ${_esc(msg.origem_edicao_label)}` : ''}`
+            : '📣 Equipe Radar SIOPE';
           const respostaBtn = msg.permite_resposta
             ? `<button class="rs-fc-enviar" style="margin-top:8px;font-size:12px;padding:8px 14px;background:#1d4ed8"
                 onclick="window._fcResponderMensagemAdmin('${msg.id || ''}')">
@@ -309,7 +312,7 @@
             <div class="rs-fc-msg-card respondida"
               style="border-color:#3b82f6;background:rgba(59,130,246,.08)">
               <div class="rs-fc-msg-topo">
-                <span class="rs-fc-msg-tipo" style="color:#3b82f6">📣 Equipe Radar SIOPE</span>
+                <span class="rs-fc-msg-tipo" style="color:#3b82f6">${tipoLabel}</span>
                 <span class="rs-fc-msg-data">${dataFormatada}</span>
               </div>
               ${msg.titulo ? `<div style="font-size:13px;font-weight:700;color:var(--rs-text,#f8fafc);margin-bottom:2px">${_esc(msg.titulo)}</div>` : ''}
@@ -509,7 +512,7 @@
     try {
       if (user.segmento === 'assinante') {
         const dataCorte = user._assinaturaCreatedAt || null;
-        const snap = await window.db.collection('usuarios').doc(user.uid).collection('solicitacoes').where('tipo', 'in', ['mensagem', 'sugestao_tema', 'mensagem_admin']).orderBy('data_solicitacao', 'desc').limit(20).get();
+        const snap = await window.db.collection('usuarios').doc(user.uid).collection('solicitacoes').where('tipo', 'in', ['mensagem', 'sugestao_tema', 'mensagem_admin', 'resposta_feedback']).orderBy('data_solicitacao', 'desc').limit(20).get();
         const docs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
         const resultado = !dataCorte ? docs : docs.filter(d => { const ds = d.data_solicitacao; return ds && new Date(ds) >= dataCorte; });
         _historicoCache = resultado; _historicoCacheTs = Date.now(); return resultado;
@@ -535,7 +538,7 @@
       // Conta: respostas da equipe não vistas + mensagens_admin não lidas
       const novas = historico.filter(m => {
         const key = String(m.id || m.data_solicitacao);
-        if (m.tipo === 'mensagem_admin') return !m.lida && !vistas.has(key);
+        if (m.tipo === 'mensagem_admin' || m.tipo === 'resposta_feedback') return !m.lida && !vistas.has(key);
         return m.resposta && !vistas.has(key);
       });
       badge.textContent = novas.length > 9 ? '9+' : String(novas.length);
@@ -550,7 +553,7 @@
       const vistas = _getVistas();
       historico.forEach(m => {
         // Marca como vista: respostas da equipe + mensagens_admin (lida no Firestore, mas também no Set local)
-        if (m.resposta || m.tipo === 'mensagem_admin') vistas.add(String(m.id || m.data_solicitacao));
+        if (m.resposta || m.tipo === 'mensagem_admin' || m.tipo === 'resposta_feedback') vistas.add(String(m.id || m.data_solicitacao));
       });
       localStorage.setItem(STORAGE_KEY_BADGE, JSON.stringify([...vistas]));
     } catch { }
