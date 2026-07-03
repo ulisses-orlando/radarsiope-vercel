@@ -1,886 +1,3038 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
+
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gerenciador RadarSiope</title>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <style>
-        :root {
-            --primary: #007bff;
-            --primary-dark: #0056b3;
-            --sidebar-bg: #0056b3;
-            --sidebar-text: #ffffff;
-            --bg-color: #f4f6f9;
-            --text-color: #333;
-            --border-color: #dee2e6;
-            --success: #28a745;
-            --danger: #dc3545;
-            --warning: #ffc107;
-        }
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gerenciador RadarSiope</title>
+  <link rel="stylesheet" href="/css/style.css">
 
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: var(--bg-color); color: var(--text-color); }
-        a { text-decoration: none; color: inherit; }
-        ul { list-style: none; }
+  <style>
+    :root {
+      --accent: #007acc;
+      --accent-dark: #005fa3;
+      --bg: #f4f4f4
+    }
 
-        /* Menu Toggle Mobile */
-        .mobile-menu-toggle {
-            display: none;
-            position: fixed;
-            top: 15px;
-            left: 15px;
-            z-index: 1001;
-            background: var(--primary);
-            border: none;
-            padding: 10px 12px;
-            border-radius: 5px;
-            cursor: pointer;
-            flex-direction: column;
-            gap: 5px;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
-        }
-        .mobile-menu-toggle span {
-            display: block;
-            width: 25px;
-            height: 3px;
-            background: white;
-            border-radius: 3px;
-            transition: 0.3s;
-        }
-        .sidebar-overlay {
-            display: none;
-            position: fixed;
-            top: 0; left: 0;
-            width: 100%; height: 100%;
-            background: rgba(0,0,0,0.5);
-            z-index: 998;
-        }
+    * {
+      box-sizing: border-box
+    }
 
-        /* Sidebar */
-        .sidebar {
+    body {
+      font-family: sans-serif;
+      margin: 0;
+      padding: 0;
+      background: var(--bg);
+      display: flex;
+      min-height: 100vh
+    }
+
+    aside#sidebar {
+      width: 220px;
+      background: var(--accent);
+      color: #fff;
+      padding: 18px;
+      flex: 0 0 220px
+    }
+
+    aside#sidebar h2 {
+      margin: 0 0 12px;
+      font-size: 16px
+    }
+
+    aside#sidebar button {
+      display: block;
+      width: 100%;
+      text-align: left;
+      padding: 10px;
+      border: 0;
+      background: transparent;
+      color: #fff;
+      border-radius: 6px;
+      cursor: pointer;
+      margin-bottom: 6px
+    }
+
+    aside#sidebar button:hover {
+      background: rgba(255, 255, 255, 0.05)
+    }
+
+    aside#sidebar button.active {
+      background: var(--accent-dark)
+    }
+
+    main#conteudo {
+      flex: 1;
+      padding: 18px;
+      overflow: auto
+    }
+
+    section {
+      display: none
+    }
+
+    .card {
+      background: #fff;
+      border-radius: 8px;
+      padding: 12px;
+      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+      margin-bottom: 12px
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: #fff
+    }
+
+    th,
+    td {
+      border: 1px solid #ddd;
+      padding: .5em;
+      text-align: left;
+      vertical-align: top
+    }
+
+    .icon-btn {
+      cursor: pointer;
+      margin-right: .3em
+    }
+
+    input[type="text"] {
+      padding: .4em;
+      width: 100%;
+      max-width: 420px;
+      margin: 8px 0;
+      display: inline-block
+    }
+
+    .modal-overlay.show {
+      display: flex
+    }
+
+    .field {
+      margin-bottom: .6em
+    }
+
+    .field label {
+      display: block;
+      font-weight: 600;
+      margin-bottom: .25em
+    }
+
+    .field input,
+    .field select,
+    .field textarea {
+      width: 100%;
+      padding: .45em;
+      border: 1px solid #ccc;
+      border-radius: 4px
+    }
+
+    .modal-buttons {
+      text-align: right;
+      margin-top: 12px
+    }
+
+    .modal-buttons button {
+      padding: .5em 1em;
+      margin-left: .4em
+    }
+
+    /* small responsive */
+    #btn-abrir-menu {
+      display: none;
+    }
+
+    #sidebar-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, .4);
+      z-index: 9999;
+    }
+
+    @media (max-width:760px) {
+      #btn-abrir-menu {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        position: sticky;
+        top: 0;
+        z-index: 100;
+        margin-bottom: 12px;
+        padding: 10px 16px;
+        background: var(--accent);
+        color: #fff;
+        border: 0;
+        border-radius: 6px;
+        font-weight: 700;
+        font-size: 14px;
+        cursor: pointer;
+      }
+
+      aside#sidebar {
+        display: block;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 260px;
+        max-width: 80vw;
+        height: 100vh;
+        overflow-y: auto;
+        z-index: 10000;
+        transform: translateX(-100%);
+        transition: transform .25s ease;
+        box-shadow: 4px 0 16px rgba(0, 0, 0, .25);
+      }
+
+      aside#sidebar.aberto {
+        transform: translateX(0);
+      }
+
+      #sidebar-overlay.aberto {
+        display: block;
+      }
+    }
+
+    .lead-Emcontato {
+      background-color: #e6ffe6;
+
+      td:has(.preferencia-email) {
+        background-color: #f0f8ff;
+      }
+
+      td:has(.preferencia-whatsapp) {
+        background-color: #e6ffe6;
+      }
+
+      td:has(.preferencia-ligacao) {
+        background-color: #fff0f0;
+      }
+    }
+
+    #btn-toggle-filtro {
+      background-color: #eaf1ff;
+      color: #2c3e50;
+      border: 1px solid #b0c4de;
+      padding: 8px 14px;
+      border-radius: 6px;
+      font-weight: bold;
+      cursor: pointer;
+      transition: background 0.3s ease;
+    }
+
+    #btn-toggle-filtro.filtro-ativo {
+      background-color: #007acc;
+      color: white;
+      border-color: #005fa3;
+    }
+
+    .modal-overlay.hidden {
+      display: none;
+    }
+
+    .modal-overlay.visible {
+      display: flex;
+    }
+
+    #modal-importacao-leads {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      background: rgba(0, 0, 0, 0.5);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+    }
+
+    #modal-importacao-leads .modal-conteudo {
+      background: white;
+      padding: 30px;
+      border-radius: 8px;
+      max-width: 90vw;
+      max-height: 90vh;
+      overflow-y: auto;
+      box-shadow: 0 0 20px rgba(0, 0, 0, 0.3);
+    }
+
+    .painel-container {
+      padding: 20px;
+      background-color: #f4f4f4;
+    }
+
+    .graficos-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 30px;
+    }
+
+    .grafico-card {
+      background: #fff;
+      border-radius: 8px;
+      padding: 15px;
+      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+    }
+
+    .abas-navegacao {
+      margin-bottom: 20px;
+    }
+
+    .abas-navegacao button {
+      margin-right: 10px;
+      padding: 8px 12px;
+      cursor: pointer;
+    }
+
+    .modal-overlay {
+      position: fixed;
+      top: 0;
+      right: 0;
+      bottom: 0;
+      width: 480px;
+      max-width: 100%;
+      height: 100%;
+      background: #fff;
+      box-shadow: -4px 0 12px rgba(0, 0, 0, 0.2);
+      z-index: 9999;
+      overflow-y: auto;
+      transform: translateX(100%);
+      transition: transform 0.3s ease, visibility 0.3s ease, opacity 0.3s ease;
+      visibility: hidden;
+      opacity: 0;
+    }
+
+    .modal-overlay-conf {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.5);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 999;
+    }
+
+    .modal-box {
+      background: white;
+      padding: 20px;
+      border-radius: 8px;
+      width: 90%;
+      max-width: 350px;
+      box-shadow: 0 0 10px rgba(0, 0, 0, 0.3);
+      text-align: center;
+    }
+
+    .modal-botoes {
+      margin-top: 20px;
+      display: flex;
+      justify-content: space-around;
+    }
+
+    .modal-overlay.aberto {
+      transform: translateX(0);
+      visibility: visible;
+      opacity: 1;
+    }
+
+    .modal {
+      width: 100%;
+      height: 100%;
+      padding: 20px;
+      box-sizing: border-box;
+    }
+
+    .modal-preview-overlay {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      background-color: rgba(0, 0, 0, 0.6);
+      z-index: 9999;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .modal-preview-overlay.show {
+      display: flex;
+    }
+
+    .modal-confirm-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      background-color: rgba(0, 0, 0, 0.5);
+      z-index: 10000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .modal-confirm-overlay .modal {
+      background: white;
+      padding: 20px 24px;
+      border-radius: 8px;
+      max-width: 360px;
+      width: 90%;
+      box-shadow: 0 0 20px rgba(0, 0, 0, 0.3);
+      text-align: center;
+      max-height: none;
+      height: auto;
+    }
+
+    .tr-enviado {
+      background-color: #f0f0f0;
+      opacity: 0.6;
+    }
+
+    .barra-progresso {
+      width: 100px;
+      background: #eee;
+      border-radius: 4px;
+      overflow: hidden;
+      height: 18px;
+      font-size: 12px;
+      text-align: center;
+      color: white;
+    }
+
+    .barra-progresso .preenchimento {
+      background: #4caf50;
+      height: 100%;
+      line-height: 18px;
+    }
+
+    .linha-vencida {
+      background-color: #ffe5e5;
+      /* vermelho claro para inadimplentes */
+    }
+
+    #alert-modal {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.5);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 9999;
+    }
+
+    #alert-box {
+      background: #fff;
+      padding: 20px;
+      border-radius: 8px;
+      max-width: 400px;
+      text-align: left;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    }
+
+    #alert-box h3 {
+      margin-top: 0;
+      color: #d32f2f;
+    }
+
+    #alert-box ul {
+      padding-left: 20px;
+      color: #d32f2f;
+    }
+
+    #alert-box button {
+      margin-top: 15px;
+      padding: 6px 12px;
+      background: #d32f2f;
+      color: #fff;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+
+    .bloco-newsletter textarea {
+      font-family: monospace;
+    }
+
+    /* === SOMENTE o modal de newsletter === */
+
+    /*     #modal-edit-overlay {
+      position: fixed !important;
+      top: 0 !important;
+      left: 0 !important;
+      width: 100vw !important;
+      height: 100vh !important;
+      background: rgba(0, 0, 0, 0.5) !important;
+      display: flex !important;
+      justify-content: center !important;
+      align-items: flex-start !important;
+      z-index: 9999 !important;
+    }
+ */
+    #modal-edit-overlay {
+      position: fixed !important;
+      top: 0 !important;
+      left: 0 !important;
+      width: 100vw !important;
+      height: 100vh !important;
+      background: rgba(0, 0, 0, 0.5) !important;
+      justify-content: center !important;
+      align-items: flex-start !important;
+      z-index: 9999 !important;
+      overflow-y: auto !important;
+    }
+
+    #modal-edit-overlay.aberto {
+      display: flex !important;
+    }
+
+    #modal-edit-overlay .modal {
+      width: 95% !important;
+      max-width: 1400px !important;
+      background: white !important;
+      border-radius: 10px !important;
+      padding: 40px 20px 20px 20px !important;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3) !important;
+      /* margin: 40px auto 0 auto !important; */
+      margin: 40px auto !important;
+      position: relative !important;
+      /* max-height: 100vh !important; */
+      max-height: calc(100vh - 80px) !important;
+      overflow-y: auto !important;
+      padding-bottom: 30px !important;
+    }
+
+    /* newsletter-grid agora é exclusivo do modal-newsletter-overlay */
+
+    .placeholder-box {
+      background: #eef;
+      border-left: 4px solid #88f;
+      padding: 10px;
+      margin-bottom: 15px;
+      border-radius: 4px;
+    }
+
+    .placeholder-header {
+      display: flex;
+      justify-content: space-between;
+      cursor: pointer;
+      font-size: 15px;
+    }
+
+    .placeholder-header .toggle-icon {
+      transition: transform 0.2s ease;
+    }
+
+    .placeholder-box .placeholder-content {
+      margin-top: 10px;
+      display: none;
+    }
+
+    .placeholder-box.open .placeholder-content {
+      display: block;
+    }
+
+    .placeholder-box.open .toggle-icon {
+      transform: rotate(180deg);
+    }
+
+    .placeholder-content ul {
+      margin-top: 5px;
+      font-size: 14px;
+      padding-left: 20px;
+    }
+
+    /* Lead com mensagem pendente */
+    tr.tr-pendente {
+      background: #fff5f5;
+    }
+
+    tr.tr-pendente:hover {
+      background: #fee2e2;
+    }
+  </style>
+</head>
+
+<body>
+  <!-- Configuração e inicialização -->
+  <script>
+    const usuario = JSON.parse(localStorage.getItem("usuarioLogado") || "{}");
+    const perfil = (usuario.tipo_perfil || "").toLowerCase();
+
+    if (perfil !== "admin") {
+      window.mostrarMensagem("Acesso restrito. Redirecionando...");
+      window.location.href = "login.html";
+    }
+  </script>
+
+  <!-- Firebase SDKs -->
+  <script src="https://www.gstatic.com/firebasejs/10.0.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.0.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.0.0/firebase-firestore-compat.js"></script>
+
+  <!-- Inicialização do Firebase -->
+  <script src="js/firebase-init.js"></script>
+  <script src="js/verificarLotesPendentes.js" defer></script>
+
+  <button id="btn-abrir-menu" onclick="toggleSidebarMobile()">☰ Menu</button>
+  <div id="sidebar-overlay" onclick="toggleSidebarMobile(false)"></div>
+
+  <aside id="sidebar" aria-label="Menu">
+    <hr style="margin: 30px 0;">
+    <h4>🔐 Admin RadarSiope</h4>
+    <div id="usuario-logado-topo" style="padding: 10px; background: #007acc; font-size: 1em; font-weight: bold;">
+      <!-- Nome do usuário será inserido aqui -->
+    </div>
+
+    <hr style="margin: 30px 0;">
+
+    <button onclick="abrirTab('usuarios')" id="btn-tab-usuarios" class="active">
+      👥 Usuários
+      <span id="badge-usuarios" style="display:none;background:#e53e3e;color:#fff;
+        border-radius:10px;padding:1px 7px;font-size:11px;font-weight:700;margin-left:6px">0</span>
+    </button>
+    <button onclick="abrirTab('relatorio-avaliacoes')">🗳️ Relatório de Avaliações</button>
+    <button onclick="abrirTab('feedbacks')" id="btn-tab-feedbacks">
+      💬 Feedbacks
+      <span id="badge-feedbacks" style="display:none;background:#e53e3e;color:#fff;
+        border-radius:10px;padding:1px 7px;font-size:11px;font-weight:700;margin-left:6px">0</span>
+    </button>
+    <button onclick="abrirTab('leads')" id="btn-tab-leads">
+      📥 Leads Capturados
+      <span id="badge-leads" style="display:none;background:#e53e3e;color:#fff;
+        border-radius:10px;padding:1px 7px;font-size:11px;font-weight:700;margin-left:6px">0</span>
+    </button>
+    <button onclick="abrirTab('auditoria')">🕵️ Auditoria Leads</button>
+    <!-- <button onclick="abrirEnvioNewsletterLeads()">📮 Enviar Newsletters</button> -->
+    <button id="botaoEnvioNewsletterLeads">📮Enviar Newsletter</button>
+    <button onclick="abrirTab('alertas-push')">🔔 Enviar Alertas</button>
+    <button onclick="abrirModalVerificarLotes(event)">📮 Verificar lotes pendentes - atualizar status</button>
+    <button onclick="recalcularContadores()"
+      title="Recalcula os contadores de solicitações, feedbacks e parcelas vencidas">🔄 Recalcular contadores</button>
+    <button onclick="abrirTab('votacoes-temas')">🏆 Votações de Temas</button>
+    <button onclick="abrirPainelGestao()">🗞️ Painel</button>
+    <button onclick="abrirTab('calendario')">📅 Calendário</button>
+
+    <div style="margin-top:12px">
+      <h2 style="font-size:14px;margin-bottom:6px">Relatório de Preferências</h2>
+      <button onclick="abrirTab('relatorio-por-tipo')">📊 Por Tipo de Newsletters</button>
+      <button onclick="abrirTab('relatorio-por-usuario')">👤 Por Usuário</button>
+    </div>
+    <div style="margin-top:12px">
+      <h2 style="font-size:14px;margin-bottom:6px">Tabelas</h2>
+      <button onclick="abrirTab('newsletters')">📰 Newsletters</button>
+      <button onclick="abrirTab('template_newsletters')">📰 Templates de Newsletters</button>
+      <button onclick="abrirTab('tipo-newsletters')">📂 Tipo de Newsletters</button>
+      <button onclick="abrirTab('planos')">📑 Planos</button>
+      <button onclick="abrirTab('cupons')">📑 Cupons</button>
+      <button onclick="abrirTab('respostas_automaticas')">✉️ Respostas Automáticas</button>
+      <button onclick="abrirTab('aba-temas')">🗞️ Notícias</button>
+    </div>
+
+    <hr style="margin: 30px 0;">
+
+    <div id="status-migracao" style="margin-top: 10px; font-weight: bold;"></div>
+
+    <button onclick="abrirAbaBacklog('secao-backlog')">📋 Backlog (Kanban)</button>
+
+    <button onclick="fazerLogoff()">🚪 Sair da Área Administrativa</button>
+    <div id="status-logoff" style="margin-top: 10px; font-weight: bold;"></div>
+  </aside>
+
+  <main id="conteudo">
+    <!-- Enviar Newsletters para Leads -->
+    <section id="secao-envio-newsletters" class="card">
+      <!-- Supabase -->
+      <script type="module" src="/exposeSupabaseAdmin.js"></script>
+      <!-- Scripts específicos do admin -->
+      <script type="module" src="js/EnvioLeads.js"></script>
+
+      <div class="abas-navegacao">
+        <button onclick="mostrarAba('secao-newsletters-envio')">📰 Newsletters Disponíveis</button>
+        <button onclick="abrirAbaDescadastramentos()">📉 Descadastramentos</button>
+        <button onclick="abrirTelaTodosOsLotes()">📂 Ver Todos os Lotes</button>
+      </div>
+
+      <!-- Seletor de público-alvo -->
+      <div style="margin: 20px 0; display: flex; align-items: center; gap: 20px; flex-wrap: wrap;">
+        <!-- Combo "Enviar para:" -->
+        <label for="tipo-destinatario"><strong>Enviar para:</strong></label>
+        <select id="tipo-destinatario">
+          <option value="" selected>Selecione</option>
+          <option value="leads">Leads</option>
+          <option value="usuarios">Usuários</option>
+        </select>
+
+        <!-- Campo "Tamanho do lote" -->
+        <label for="tamanho-lote"><strong>Tamanho do lote:</strong></label>
+        <input type="number" id="tamanho-lote" value="100" min="1" max="200" style="width: 80px;"
+          title="Máx. recomendado: 100" />
+
+        <!-- Info da newsletter -->
+        <div id="dados-newsletter-selecionada" class="info-box"
+          style="background:#eef; padding:10px; border-left:4px solid #88f; min-width: 250px; flex: 1;">
+          <!-- preenchido via JS -->
+        </div>
+      </div>
+
+
+      <!-- Newsletters disponíveis -->
+      <section id="secao-newsletters-envio" style="margin-top:30px">
+        <h2>📰 Newsletters Disponíveis</h2>
+        <table id="tabela-newsletters-envio" class="tabela-padrao">
+          <thead>
+            <tr>
+              <th>Título</th>
+              <th>Edição</th>
+              <th>tipo</th>
+              <th>Classificação</th>
+              <th>Data</th>
+              <th>Ação</th>
+            </tr>
+          </thead>
+          <tbody>
+            <!-- conteúdo gerado dinamicamente via JavaScript -->
+          </tbody>
+        </table>
+      </section>
+
+      <!-- Verificação de lotes pendentes de atualização de status -->
+      <section id="secao-lotes_pendentes" style="margin-top:30px">
+        <div id="modal-verificar-lotes" class="modal" style="display:none;">
+          <div class="modal-content">
+            <header class="modal-header">
+              <h3>Verificar lotes pendentes</h3>
+              <button class="modal-close" id="fechar-modal-verificar">×</button>
+            </header>
+
+            <form id="form-verificar-lotes" class="crud-form" onsubmit="return false;">
+              <div class="form-row">
+                <label for="verificar-hours">Horas (corte)</label>
+                <input id="verificar-hours" name="hours" type="number" min="1" value="24" />
+              </div>
+
+              <div class="form-row">
+                <label for="verificar-limit">Limite de lotes</label>
+                <input id="verificar-limit" name="limit" type="number" min="1" value="50" />
+              </div>
+
+              <div class="form-row">
+                <label for="verificar-token">Token admin (opcional)</label>
+                <input id="verificar-token" name="token" type="text" placeholder="x-admin-token (se configurado)" />
+                <small class="hint">Se a rota exigir token, cole-o aqui. Caso contrário, deixe vazio.</small>
+              </div>
+
+              <div class="form-actions">
+                <button type="button" id="btn-executar-verificacao">Executar verificação</button>
+                <button type="button" class="btn-secondary" id="btn-fechar-modal">Fechar</button>
+              </div>
+            </form>
+
+            <section id="verificar-resultados" class="modal-results" style="margin-top:12px;">
+              <div id="verificar-status" style="margin-bottom:8px;"></div>
+              <div id="verificar-lista"></div>
+            </section>
+          </div>
+        </div>
+
+        <!-- estilos mínimos (ajuste conforme seu CSS) -->
+        <style>
+          .modal {
             position: fixed;
-            left: 0; top: 0;
-            width: 260px;
-            height: 100vh;
-            background: var(--sidebar-bg);
-            color: var(--sidebar-text);
-            overflow-y: auto;
-            z-index: 999;
-            transition: transform 0.3s ease;
-            padding: 20px 0;
-        }
-        .sidebar-header { padding: 0 20px 20px; border-bottom: 1px solid rgba(255,255,255,0.1); margin-bottom: 15px; }
-        .sidebar-header h2 { font-size: 1.2rem; }
-        .sidebar-header p { font-size: 0.85rem; opacity: 0.8; margin-top: 5px; }
-        
-        .sidebar-menu li a {
+            inset: 0;
             display: flex;
             align-items: center;
-            padding: 12px 20px;
-            color: rgba(255,255,255,0.8);
-            transition: 0.2s;
-            font-size: 0.95rem;
-        }
-        .sidebar-menu li a:hover, .sidebar-menu li a.active {
-            background: rgba(255,255,255,0.1);
-            color: white;
-            border-left: 4px solid white;
-        }
-        .sidebar-menu li a i { width: 25px; margin-right: 10px; text-align: center; }
-        .badge { background: var(--danger); color: white; padding: 2px 8px; border-radius: 10px; font-size: 0.75rem; margin-left: auto; }
-
-        /* Main Content */
-        .main-content {
-            margin-left: 260px;
-            padding: 30px;
-            transition: margin-left 0.3s ease;
-            min-height: 100vh;
-        }
-        .page-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; flex-wrap: wrap; gap: 15px; }
-        .page-header h1 { font-size: 1.8rem; color: var(--primary); }
-        
-        .btn { padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; font-size: 0.9rem; transition: 0.2s; display: inline-flex; align-items: center; gap: 8px; }
-        .btn-primary { background: var(--primary); color: white; }
-        .btn-primary:hover { background: var(--primary-dark); }
-        .btn-secondary { background: #6c757d; color: white; }
-        .btn-danger { background: var(--danger); color: white; }
-        .btn-success { background: var(--success); color: white; }
-
-        /* Filters Bar */
-        .filters-bar {
-            background: white;
-            padding: 20px;
-            border-radius: 8px;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
-            margin-bottom: 20px;
-            display: flex;
-            flex-wrap: wrap;
-            gap: 15px;
-            align-items: center;
-        }
-        .filters-bar input, .filters-bar select {
-            padding: 8px 12px;
-            border: 1px solid var(--border-color);
-            border-radius: 5px;
-            font-size: 0.9rem;
-        }
-
-        /* Tables */
-        .table-responsive {
-            overflow-x: auto;
-            -webkit-overflow-scrolling: touch;
-            background: white;
-            border-radius: 8px;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
-            margin-bottom: 20px;
-        }
-        table { width: 100%; border-collapse: collapse; min-width: 800px; }
-        th, td { padding: 12px 15px; text-align: left; border-bottom: 1px solid var(--border-color); }
-        th { background: var(--primary); color: white; font-weight: 600; white-space: nowrap; }
-        tr:hover { background: #f8f9fa; }
-        
-        .status-ativo { color: var(--success); font-weight: bold; }
-        .status-inativo { color: var(--danger); font-weight: bold; }
-
-        /* Modals */
-        .modal-overlay {
-            display: none;
-            position: fixed;
-            top: 0; left: 0;
-            width: 100%; height: 100%;
-            background: rgba(0,0,0,0.6);
-            z-index: 1000;
             justify-content: center;
-            align-items: flex-start;
-            padding: 40px 20px;
-            overflow-y: auto;
-        }
-        .modal-overlay.active { display: flex; }
-        
-        .modal-content {
-            background: white;
-            width: 95%;
-            max-width: 1000px;
-            border-radius: 10px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
-            animation: slideDown 0.3s ease;
-        }
-        @keyframes slideDown { from { transform: translateY(-30px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
-        
-        .modal-header {
-            padding: 20px 25px;
-            border-bottom: 1px solid var(--border-color);
+            background: rgba(0, 0, 0, 0.4);
+            z-index: 9999;
+          }
+
+          .modal-content {
+            background: #fff;
+            padding: 18px;
+            width: 820px;
+            max-width: 98%;
+            border-radius: 6px;
+            box-shadow: 0 6px 24px rgba(0, 0, 0, 0.2);
+          }
+
+          .modal-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
-        }
-        .modal-header h2 { font-size: 1.4rem; color: var(--primary); }
-        .modal-close { background: none; border: none; font-size: 1.5rem; cursor: pointer; color: #666; }
-        
-        .modal-body { padding: 25px; }
-        .modal-footer {
-            padding: 20px 25px;
-            border-top: 1px solid var(--border-color);
-            display: flex;
-            justify-content: flex-end;
-            gap: 10px;
-        }
+            margin-bottom: 12px;
+          }
 
-        /* Form Grid */
-        .form-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 20px;
-        }
-        .form-group { display: flex; flex-direction: column; gap: 8px; }
-        .form-group.full-width { grid-column: 1 / -1; }
-        .form-group label { font-weight: 600; font-size: 0.9rem; color: #555; }
-        .form-control {
-            width: 100%;
-            padding: 12px 15px;
-            border: 1px solid var(--border-color);
-            border-radius: 5px;
-            font-size: 0.95rem;
-            transition: border-color 0.2s;
-        }
-        .form-control:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(0,123,255,0.1); }
-        textarea.form-control { min-height: 100px; resize: vertical; }
+          .modal-close {
+            background: transparent;
+            border: 0;
+            font-size: 20px;
+            cursor: pointer;
+          }
 
-        /* Sections */
-        .content-section { display: none; }
-        .content-section.active { display: block; }
-
-        /* Stats Cards */
-        .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 20px;
-            margin-bottom: 30px;
-        }
-        .stat-card {
-            background: white;
-            padding: 20px;
-            border-radius: 8px;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
-        }
-        .stat-card h3 { font-size: 2rem; color: var(--primary); margin-bottom: 5px; }
-        .stat-card p { color: #666; font-size: 0.9rem; }
-
-        /* Kanban Board */
-        .kanban-board {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 20px;
-        }
-        .kanban-column {
-            background: #f8f9fa;
-            border-radius: 8px;
-            padding: 15px;
-        }
-        .kanban-column h3 { margin-bottom: 15px; padding-bottom: 10px; border-bottom: 2px solid var(--border-color); }
-        .kanban-item {
-            background: white;
-            padding: 15px;
-            border-radius: 5px;
+          .form-row {
             margin-bottom: 10px;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-        }
+            display: flex;
+            flex-direction: column;
+          }
 
-        /* Responsive */
-        @media (max-width: 768px) {
-            .mobile-menu-toggle { display: flex; }
-            
-            .sidebar { transform: translateX(-100%); }
-            .sidebar.active { transform: translateX(0); }
-            .sidebar-overlay.active { display: block; }
-            
-            .main-content { margin-left: 0; padding: 80px 15px 15px; }
-            
-            .page-header { flex-direction: column; align-items: flex-start; }
-            .filters-bar { flex-direction: column; align-items: stretch; }
-            .filters-bar input, .filters-bar select { width: 100%; }
-            
-            .form-grid { grid-template-columns: 1fr; }
-            .modal-content { width: 100%; margin: 10px; }
-            
-            .stats-grid { grid-template-columns: 1fr; }
-            .kanban-board { grid-template-columns: 1fr; }
-            
-            table { font-size: 0.85rem; }
-            th, td { padding: 8px 10px; }
-        }
-    </style>
-</head>
-<body>
+          .form-row label {
+            font-weight: 600;
+            margin-bottom: 6px;
+          }
 
-    <!-- Mobile Menu Toggle -->
-    <button class="mobile-menu-toggle" id="mobileMenuToggle" aria-label="Menu">
-        <span></span><span></span><span></span>
-    </button>
-    <div class="sidebar-overlay" id="sidebarOverlay"></div>
+          .form-actions {
+            display: flex;
+            gap: 8px;
+            margin-top: 8px;
+          }
 
-    <!-- Sidebar -->
-    <aside class="sidebar" id="sidebar">
-        <div class="sidebar-header">
-            <h2><i class="fas fa-shield-alt"></i> Admin RadarSiope</h2>
-            <p>🔐 Administrador</p>
+          .btn-secondary {
+            background: #eee;
+            border: 1px solid #ccc;
+            padding: 8px 12px;
+            cursor: pointer;
+          }
+
+          #verificar-lista {
+            max-height: 420px;
+            overflow: auto;
+            border-top: 1px solid #eee;
+            padding-top: 8px;
+            margin-top: 8px;
+          }
+
+          .lote-card {
+            border: 1px solid #ddd;
+            padding: 8px;
+            margin-bottom: 8px;
+            border-radius: 4px;
+            background: #fafafa;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+          }
+
+          .lote-meta {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+          }
+
+          .lote-actions {
+            display: flex;
+            gap: 8px;
+          }
+
+          .lote-card pre {
+            white-space: pre-wrap;
+            word-break: break-word;
+            font-size: 13px;
+            margin: 0;
+          }
+
+          .small-muted {
+            color: #666;
+            font-size: 13px;
+          }
+        </style>
+
+      </section>
+
+
+      <!-- Seção de envio para Leads -->
+      <section id="secao-envio-leads" style="display:none; margin-top:30px">
+        <h2>📮 Envio de Newsletters para Leads</h2>
+
+        <!-- Filtros -->
+        <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 15px;">
+          <input type="text" id="filtro-nome" placeholder="🔍 Filtrar por nome" />
+          <input type="text" id="filtro-email" placeholder="📧 Filtrar por e-mail" />
+
+          <label for="filtro-perfil">Perfil:</label>
+          <select id="filtro-perfil">
+            <option value="">Todos perfis</option>
+            <option value="prefeito">Prefeito</option>
+            <option value="secretario">Secretário</option>
+            <option value="tecnico">Técnico</option>
+            <option value="contador">Contador</option>
+            <option value="pesquisador">Pesquisador</option>
+            <option value="cacs">CACS</option>
+            <option value="cidadao">Cidadão</option>
+          </select>
+
+          <label for="filtro-status-lead">Status:</label>
+          <select id="filtro-status-lead">
+            <option value="">Todos os status</option>
+            <option value="Novo">Novo</option>
+            <option value="Em contato">Em contato</option>
+            <option value="Negociando">Negociando</option>
+            <option value="Convertido">Convertido</option>
+            <option value="Descartado">Descartado</option>
+          </select>
+
+          <label for="filtro-tipo-news-envio">Interesse:</label>
+          <select id="filtro-tipo-news-envio">
+            <option value="">Todos os interesses</option>
+          </select>
+
+          <label for="filtro-uf-lead">UF:</label>
+          <select id="filtro-uf-lead">
+            <option value="">Todas as UFs</option>
+            <option value="AC">AC</option>
+            <option value="AL">AL</option>
+            <option value="AP">AP</option>
+            <option value="AM">AM</option>
+            <option value="BA">BA</option>
+            <option value="CE">CE</option>
+            <option value="DF">DF</option>
+            <option value="ES">ES</option>
+            <option value="GO">GO</option>
+            <option value="MA">MA</option>
+            <option value="MT">MT</option>
+            <option value="MS">MS</option>
+            <option value="MG">MG</option>
+            <option value="PA">PA</option>
+            <option value="PB">PB</option>
+            <option value="PR">PR</option>
+            <option value="PE">PE</option>
+            <option value="PI">PI</option>
+            <option value="RJ">RJ</option>
+            <option value="RN">RN</option>
+            <option value="RS">RS</option>
+            <option value="RO">RO</option>
+            <option value="RR">RR</option>
+            <option value="SC">SC</option>
+            <option value="SP">SP</option>
+            <option value="SE">SE</option>
+            <option value="TO">TO</option>
+          </select>
+
+          <label for="filtro-status-envio-lead">Envio da edição:</label>
+          <select id="filtro-status-envio-lead">
+            <option value="nao-enviado">Não enviado (padrão)</option>
+            <option value="">Todos</option>
+            <option value="enviado">Já enviado</option>
+            <option value="erro">Com erro</option>
+          </select>
+
+          <button onclick="buscarLeadsFiltrados()"
+            style="background:#007acc;color:#fff;padding:8px 14px;border:none;border-radius:4px;cursor:pointer;font-weight:600">🔎
+            Buscar Leads</button>
         </div>
-        <ul class="sidebar-menu">
-            <li><a href="#" class="active" data-section="section-usuarios"><i class="fas fa-users"></i> Usuários <span class="badge">36</span></a></li>
-            <li><a href="#" data-section="section-relatorio-avaliacoes"><i class="fas fa-poll"></i> Relatório de Avaliações</a></li>
-            <li><a href="#" data-section="section-feedbacks"><i class="fas fa-comments"></i> Feedbacks <span class="badge">6</span></a></li>
-            <li><a href="#" data-section="section-leads"><i class="fas fa-download"></i> Leads Capturados <span class="badge">8</span></a></li>
-            <li><a href="#" data-section="section-auditoria"><i class="fas fa-user-secret"></i> Auditoria Leads</a></li>
-            <li><a href="#" data-section="section-newsletter-envio"><i class="fas fa-envelope"></i> Enviar Newsletter</a></li>
-            <li><a href="#" data-section="section-alertas"><i class="fas fa-bell"></i> Enviar Alertas</a></li>
-            <li><a href="#" data-section="section-lotes-pendentes"><i class="fas fa-check-circle"></i> Verificar lotes pendentes</a></li>
-            <li><a href="#" data-section="section-recalcular"><i class="fas fa-sync"></i> Recalcular contadores</a></li>
-            <li><a href="#" data-section="section-votacoes"><i class="fas fa-trophy"></i> Votações de Temas</a></li>
-            <li><a href="#" data-section="section-painel"><i class="fas fa-tachometer-alt"></i> Painel</a></li>
-            <li><a href="#" data-section="section-calendario"><i class="fas fa-calendar-alt"></i> Calendário</a></li>
-            <li><a href="#" data-section="section-newsletters"><i class="fas fa-newspaper"></i> Newsletters</a></li>
-            <li><a href="#" data-section="section-planos"><i class="fas fa-credit-card"></i> Planos</a></li>
-            <li><a href="#" data-section="section-cupons"><i class="fas fa-ticket-alt"></i> Cupons</a></li>
-            <li><a href="#" data-section="section-backlog"><i class="fas fa-clipboard-list"></i> Backlog (Kanban)</a></li>
-            <li style="margin-top: 20px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 10px;">
-                <a href="#"><i class="fas fa-sign-out-alt"></i> Sair da Área Administrativa</a>
-            </li>
-        </ul>
-    </aside>
 
-    <!-- Main Content -->
-    <main class="main-content">
-        
-        <!-- Seção Usuários -->
-        <section id="section-usuarios" class="content-section active">
-            <div class="page-header">
-                <h1><i class="fas fa-users"></i> Usuários</h1>
-                <button class="btn btn-primary" onclick="openModal('modalNovoUsuario')"><i class="fas fa-plus"></i> Novo Usuário</button>
-            </div>
+        <!-- Contador de resultados -->
+        <div id="contador-leads-buscados" style="font-size:13px;color:#555;margin:6px 0;min-height:18px"></div>
 
-            <div class="filters-bar">
-                <input type="text" placeholder="🔎 Buscar usuários..." style="flex: 1; min-width: 200px;">
-                <select>
-                    <option>Status: Todos</option>
-                    <option>Ativos</option>
-                    <option>Inativos</option>
-                </select>
-                <label><input type="checkbox"> Parcelas vencidas</label>
-                <label><input type="checkbox"> Parcelas a gerar</label>
-                <label><input type="checkbox"> Solicitações pendentes</label>
-                <button class="btn btn-primary"><i class="fas fa-search"></i> Listar</button>
-            </div>
-
-            <div class="table-responsive">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Nome</th>
-                            <th>Email</th>
-                            <th>UF</th>
-                            <th>Município</th>
-                            <th>Perfil</th>
-                            <th>Ativo</th>
-                            <th>Alerta</th>
-                            <th>Ações</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr>
-                            <td>Administrador</td>
-                            <td>admin@radarsiope.com.br</td>
-                            <td>-</td>
-                            <td>-</td>
-                            <td>Admin</td>
-                            <td class="status-ativo">Sim</td>
-                            <td>-</td>
-                            <td>
-                                <button class="btn btn-secondary" style="padding: 5px 10px;"><i class="fas fa-edit"></i></button>
-                                <button class="btn btn-danger" style="padding: 5px 10px;"><i class="fas fa-trash"></i></button>
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
-
-            <div style="display: flex; gap: 10px; justify-content: center; margin-top: 20px;">
-                <button class="btn btn-secondary">◀ Anterior</button>
-                <button class="btn btn-primary">1</button>
-                <button class="btn btn-secondary">2</button>
-                <button class="btn btn-secondary">3</button>
-                <button class="btn btn-secondary">Próxima ▶</button>
-            </div>
-        </section>
-
-        <!-- Seção Leads -->
-        <section id="section-leads" class="content-section">
-            <div class="page-header">
-                <h1><i class="fas fa-download"></i> Leads Capturados</h1>
-                <div style="display: flex; gap: 10px;">
-                    <button class="btn btn-success" onclick="openModal('modalImportarLeads')"><i class="fas fa-file-import"></i> Importar</button>
-                    <button class="btn btn-primary"><i class="fas fa-file-csv"></i> Exportar CSV</button>
-                </div>
-            </div>
-
-            <div class="filters-bar">
-                <input type="text" placeholder="Buscar por nome ou e-mail..." style="flex: 1; min-width: 200px;">
-                <select>
-                    <option>Todos os perfis</option>
-                    <option>Prefeito</option>
-                    <option>Secretário</option>
-                    <option>Técnico</option>
-                    <option>Contador</option>
-                    <option>CACS</option>
-                    <option>Cidadão</option>
-                </select>
-                <select>
-                    <option>Todos os status</option>
-                    <option>Novo</option>
-                    <option>Em contato</option>
-                    <option>Convertido</option>
-                    <option>Descartado</option>
-                </select>
-                <button class="btn btn-primary"><i class="fas fa-search"></i> Buscar</button>
-            </div>
-
-            <div class="table-responsive">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Nome</th>
-                            <th>E-mail</th>
-                            <th>Telefone</th>
-                            <th>Perfil</th>
-                            <th>Interesses</th>
-                            <th>Data</th>
-                            <th>Status</th>
-                            <th>Ações</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr>
-                            <td>João Silva</td>
-                            <td>joao@email.com</td>
-                            <td>(11) 99999-9999</td>
-                            <td>Contador</td>
-                            <td>Orçamento</td>
-                            <td>01/07/2026</td>
-                            <td class="status-ativo">Novo</td>
-                            <td>
-                                <button class="btn btn-primary" style="padding: 5px 10px;"><i class="fas fa-eye"></i></button>
-                                <button class="btn btn-secondary" style="padding: 5px 10px;"><i class="fas fa-edit"></i></button>
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
-        </section>
-
-        <!-- Seção Newsletters -->
-        <section id="section-newsletters" class="content-section">
-            <div class="page-header">
-                <h1><i class="fas fa-newspaper"></i> Newsletters</h1>
-                <button class="btn btn-primary" onclick="openModal('modalNovaNewsletter')"><i class="fas fa-plus"></i> Nova Newsletter</button>
-            </div>
-
-            <div class="filters-bar">
-                <select>
-                    <option>Todos os tipos</option>
-                    <option>SIOPE</option>
-                    <option>FUNDEB</option>
-                    <option>Salário-Educação</option>
-                </select>
-                <select>
-                    <option>Todas classificações</option>
-                    <option>Básica</option>
-                    <option>Premium</option>
-                </select>
-                <input type="text" placeholder="Busca..." style="flex: 1; min-width: 200px;">
-                <button class="btn btn-primary"><i class="fas fa-search"></i> Filtrar</button>
-            </div>
-
-            <div class="table-responsive">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Data</th>
-                            <th>Edição</th>
-                            <th>Título</th>
-                            <th>Tipo</th>
-                            <th>Classificação</th>
-                            <th>Enviada</th>
-                            <th>Ações</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr>
-                            <td>01/07/2026</td>
-                            <td>245</td>
-                            <td>Atualizações SIOPE 2026</td>
-                            <td>SIOPE</td>
-                            <td>Premium</td>
-                            <td class="status-ativo">Sim</td>
-                            <td>
-                                <button class="btn btn-primary" style="padding: 5px 10px;"><i class="fas fa-paper-plane"></i> Enviar</button>
-                                <button class="btn btn-secondary" style="padding: 5px 10px;"><i class="fas fa-edit"></i></button>
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
-        </section>
-
-        <!-- Seção Painel -->
-        <section id="section-painel" class="content-section">
-            <div class="page-header">
-                <h1><i class="fas fa-tachometer-alt"></i> Painel de Gestão Geral</h1>
-            </div>
-
-            <div class="stats-grid">
-                <div class="stat-card">
-                    <h3>36</h3>
-                    <p>Usuários Ativos</p>
-                </div>
-                <div class="stat-card">
-                    <h3>8</h3>
-                    <p>Leads Capturados</p>
-                </div>
-                <div class="stat-card">
-                    <h3>245</h3>
-                    <p>Newsletters Enviadas</p>
-                </div>
-                <div class="stat-card">
-                    <h3>98%</h3>
-                    <p>Taxa de Entrega</p>
-                </div>
-            </div>
-
-            <div class="stats-grid">
-                <div class="stat-card">
-                    <h3><i class="fas fa-users"></i> Usuários (Ativos vs Inativos)</h3>
-                    <p>Gráfico de distribuição</p>
-                </div>
-                <div class="stat-card">
-                    <h3><i class="fas fa-chart-line"></i> Leads por Status</h3>
-                    <p>Funil de conversão</p>
-                </div>
-                <div class="stat-card">
-                    <h3><i class="fas fa-dollar-sign"></i> Pagamentos</h3>
-                    <p>Receita mensal</p>
-                </div>
-                <div class="stat-card">
-                    <h3><i class="fas fa-newspaper"></i> Assinaturas por Tipo</h3>
-                    <p>Distribuição por plano</p>
-                </div>
-            </div>
-        </section>
-
-        <!-- Seção Backlog (Kanban) -->
-        <section id="section-backlog" class="content-section">
-            <div class="page-header">
-                <h1><i class="fas fa-clipboard-list"></i> Backlog do Projeto</h1>
-                <button class="btn btn-primary" onclick="openModal('modalNovoItemBacklog')"><i class="fas fa-plus"></i> Novo Item</button>
-            </div>
-
-            <div class="kanban-board">
-                <div class="kanban-column">
-                    <h3>📝 A Fazer</h3>
-                    <div class="kanban-item">
-                        <h4>Implementar nova feature</h4>
-                        <p>Prioridade: Alta</p>
-                    </div>
-                    <div class="kanban-item">
-                        <h4>Corrigir bugs relatados</h4>
-                        <p>Prioridade: Média</p>
-                    </div>
-                </div>
-                <div class="kanban-column">
-                    <h3>⚙️ Em Andamento</h3>
-                    <div class="kanban-item">
-                        <h4>Desenvolver relatório avançado</h4>
-                        <p>Responsável: João</p>
-                    </div>
-                </div>
-                <div class="kanban-column">
-                    <h3>✅ Concluído</h3>
-                    <div class="kanban-item">
-                        <h4>Integração API</h4>
-                        <p>Concluído em: 01/07/2026</p>
-                    </div>
-                </div>
-            </div>
-        </section>
-
-        <!-- Outras seções (placeholders) -->
-        <section id="section-relatorio-avaliacoes" class="content-section">
-            <div class="page-header"><h1><i class="fas fa-poll"></i> Relatório de Avaliações</h1></div>
-            <p>Conteúdo do relatório de avaliações...</p>
-        </section>
-
-        <section id="section-feedbacks" class="content-section">
-            <div class="page-header"><h1><i class="fas fa-comments"></i> Feedbacks</h1></div>
-            <p>Lista de feedbacks dos usuários...</p>
-        </section>
-
-        <section id="section-auditoria" class="content-section">
-            <div class="page-header"><h1><i class="fas fa-user-secret"></i> Auditoria Leads</h1></div>
-            <p>Painel de auditoria...</p>
-        </section>
-
-        <section id="section-newsletter-envio" class="content-section">
-            <div class="page-header"><h1><i class="fas fa-envelope"></i> Enviar Newsletter</h1></div>
-            <p>Selecione a newsletter e os destinatários...</p>
-        </section>
-
-        <section id="section-alertas" class="content-section">
-            <div class="page-header"><h1><i class="fas fa-bell"></i> Enviar Alertas</h1></div>
-            <p>Envio de alertas automáticos...</p>
-        </section>
-
-        <section id="section-lotes-pendentes" class="content-section">
-            <div class="page-header"><h1><i class="fas fa-check-circle"></i> Verificar Lotes Pendentes</h1></div>
-            <p>Verificação de lotes de envio...</p>
-        </section>
-
-        <section id="section-recalcular" class="content-section">
-            <div class="page-header"><h1><i class="fas fa-sync"></i> Recalcular Contadores</h1></div>
-            <p>Recálculo de estatísticas...</p>
-        </section>
-
-        <section id="section-votacoes" class="content-section">
-            <div class="page-header"><h1><i class="fas fa-trophy"></i> Votações de Temas</h1></div>
-            <p>Gerenciamento de votações...</p>
-        </section>
-
-        <section id="section-calendario" class="content-section">
-            <div class="page-header"><h1><i class="fas fa-calendar-alt"></i> Calendário</h1></div>
-            <p>Calendário de eventos e prazos...</p>
-        </section>
-
-        <section id="section-planos" class="content-section">
-            <div class="page-header"><h1><i class="fas fa-credit-card"></i> Planos</h1></div>
-            <p>Gerenciamento de planos...</p>
-        </section>
-
-        <section id="section-cupons" class="content-section">
-            <div class="page-header"><h1><i class="fas fa-ticket-alt"></i> Cupons</h1></div>
-            <p>Gerenciamento de cupons de desconto...</p>
-        </section>
-
-    </main>
-
-    <!-- Modal: Novo Usuário -->
-    <div class="modal-overlay" id="modalNovoUsuario">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2><i class="fas fa-user-plus"></i> Novo Usuário</h2>
-                <button class="modal-close" onclick="closeModal('modalNovoUsuario')">&times;</button>
-            </div>
-            <div class="modal-body">
-                <form class="form-grid">
-                    <div class="form-group">
-                        <label>Nome Completo *</label>
-                        <input type="text" class="form-control" placeholder="Digite o nome completo">
-                    </div>
-                    <div class="form-group">
-                        <label>E-mail *</label>
-                        <input type="email" class="form-control" placeholder="exemplo@email.com">
-                    </div>
-                    <div class="form-group">
-                        <label>Telefone / WhatsApp</label>
-                        <input type="tel" class="form-control" placeholder="(00) 00000-0000">
-                    </div>
-                    <div class="form-group">
-                        <label>Perfil *</label>
-                        <select class="form-control">
-                            <option>Selecione...</option>
-                            <option>Prefeito</option>
-                            <option>Secretário</option>
-                            <option>Técnico</option>
-                            <option>Contador</option>
-                            <option>CACS</option>
-                            <option>Cidadão</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label>UF</label>
-                        <select class="form-control">
-                            <option>Todas</option>
-                            <option>AC</option><option>AL</option><option>AP</option><option>AM</option>
-                            <option>BA</option><option>CE</option><option>DF</option><option>ES</option>
-                            <option>GO</option><option>MA</option><option>MT</option><option>MS</option>
-                            <option>MG</option><option>PA</option><option>PB</option><option>PR</option>
-                            <option>PE</option><option>PI</option><option>RJ</option><option>RN</option>
-                            <option>RS</option><option>RO</option><option>RR</option><option>SC</option>
-                            <option>SP</option><option>SE</option><option>TO</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label>Município</label>
-                        <input type="text" class="form-control" placeholder="Nome do município">
-                    </div>
-                    <div class="form-group">
-                        <label>Senha *</label>
-                        <input type="password" class="form-control" placeholder="Mínimo 8 caracteres">
-                    </div>
-                    <div class="form-group">
-                        <label>Confirmar Senha *</label>
-                        <input type="password" class="form-control" placeholder="Repita a senha">
-                    </div>
-                    <div class="form-group full-width">
-                        <label>Observações</label>
-                        <textarea class="form-control" placeholder="Informações adicionais..."></textarea>
-                    </div>
-                    <div class="form-group" style="flex-direction: row; align-items: center; gap: 10px;">
-                        <input type="checkbox" id="ativo" checked style="width: auto;">
-                        <label for="ativo" style="margin:0; cursor:pointer;">Usuário Ativo</label>
-                    </div>
-                </form>
-            </div>
-            <div class="modal-footer">
-                <button class="btn btn-secondary" onclick="closeModal('modalNovoUsuario')">Cancelar</button>
-                <button class="btn btn-primary"><i class="fas fa-save"></i> Salvar</button>
-            </div>
+        <!-- Ações -->
+        <div style="margin-top: 10px; display:flex; gap:8px; flex-wrap:wrap;">
+          <button onclick="gerarPreviaEnvio()">📬 Gerar Prévia</button>
+          <button onclick="mostrarAba('secao-newsletters-envio')">⬅️ Voltar para Newsletters</button>
         </div>
-    </div>
 
-    <!-- Modal: Importar Leads -->
-    <div class="modal-overlay" id="modalImportarLeads">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2><i class="fas fa-file-import"></i> Importar Leads</h2>
-                <button class="modal-close" onclick="closeModal('modalImportarLeads')">&times;</button>
-            </div>
-            <div class="modal-body">
-                <div class="form-group full-width">
-                    <label>Selecione o arquivo CSV</label>
-                    <input type="file" class="form-control" accept=".csv">
-                    <small style="color: #666; margin-top: 5px; display: block;">
-                        O arquivo deve conter: nome, email, telefone, perfil, preferencia_contato, interesses, mensagem, origem, Sigla_UF, codigo_UF, Nome_Municipio, codigo_municipio
-                    </small>
-                </div>
-                <div class="form-group full-width">
-                    <label>Origem dos leads</label>
-                    <input type="text" class="form-control" placeholder="Ex: Evento XPTO, Site, etc.">
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button class="btn btn-secondary" onclick="closeModal('modalImportarLeads')">Cancelar</button>
-                <button class="btn btn-primary"><i class="fas fa-upload"></i> Importar</button>
-            </div>
+        <!-- Tabela de leads -->
+        <table id="tabela-leads-envio" class="tabela-padrao">
+          <thead>
+            <tr>
+              <th><input type="checkbox" id="chk-todos-leads" onchange="selecionarTodosLeads(this)" /></th>
+              <th>Nome</th>
+              <th>Email</th>
+              <th>Perfil</th>
+              <th>Interesses</th>
+              <th>Status</th>
+              <th>Envio</th>
+            </tr>
+          </thead>
+          <tbody>
+            <!-- preenchido dinamicamente -->
+          </tbody>
+        </table>
+      </section>
+
+      <!-- Seção de envio para Usuários -->
+      <section id="secao-envio-usuarios" style="display:none; margin-top:30px">
+        <h2>📮 Envio de Newsletters para Usuários</h2>
+
+        <!-- Filtros -->
+        <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 15px;">
+          <input type="text" id="filtro-usuario-nome" placeholder="🔍 Filtrar por nome" />
+          <input type="text" id="filtro-usuario-email" placeholder="📧 Filtrar por e-mail" />
+
+          <label for="filtro-assinatura">Assinatura:</label>
+          <select id="filtro-assinatura">
+            <option value="">Todas</option>
+            <option value="ativa">Ativa</option>
+            <option value="expirada">Expirada</option>
+            <option value="cancelada">Cancelada</option>
+          </select>
+
+          <label for="filtro-uf-usuario">UF:</label>
+          <select id="filtro-uf-usuario">
+            <option value="">Todas as UFs</option>
+            <option value="AC">AC</option>
+            <option value="AL">AL</option>
+            <option value="AP">AP</option>
+            <option value="AM">AM</option>
+            <option value="BA">BA</option>
+            <option value="CE">CE</option>
+            <option value="DF">DF</option>
+            <option value="ES">ES</option>
+            <option value="GO">GO</option>
+            <option value="MA">MA</option>
+            <option value="MT">MT</option>
+            <option value="MS">MS</option>
+            <option value="MG">MG</option>
+            <option value="PA">PA</option>
+            <option value="PB">PB</option>
+            <option value="PR">PR</option>
+            <option value="PE">PE</option>
+            <option value="PI">PI</option>
+            <option value="RJ">RJ</option>
+            <option value="RN">RN</option>
+            <option value="RS">RS</option>
+            <option value="RO">RO</option>
+            <option value="RR">RR</option>
+            <option value="SC">SC</option>
+            <option value="SP">SP</option>
+            <option value="SE">SE</option>
+            <option value="TO">TO</option>
+          </select>
+
+          <label for="filtro-status-envio-usuario">Envio da edição:</label>
+          <select id="filtro-status-envio-usuario">
+            <option value="nao-enviado">Não enviado (padrão)</option>
+            <option value="">Todos</option>
+            <option value="enviado">Já enviado</option>
+            <option value="erro">Com erro</option>
+          </select>
+
+          <button onclick="filtrarUsuariosEnvio()"
+            style="background:#007acc;color:#fff;padding:8px 14px;border:none;border-radius:4px;cursor:pointer;font-weight:600">🔎
+            Buscar Usuários</button>
         </div>
-    </div>
 
-    <!-- Modal: Nova Newsletter -->
-    <div class="modal-overlay" id="modalNovaNewsletter">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2><i class="fas fa-newspaper"></i> Nova Newsletter</h2>
-                <button class="modal-close" onclick="closeModal('modalNovaNewsletter')">&times;</button>
-            </div>
-            <div class="modal-body">
-                <form class="form-grid">
-                    <div class="form-group">
-                        <label>Título *</label>
-                        <input type="text" class="form-control" placeholder="Título da newsletter">
-                    </div>
-                    <div class="form-group">
-                        <label>Edição</label>
-                        <input type="number" class="form-control" placeholder="Número da edição">
-                    </div>
-                    <div class="form-group">
-                        <label>Tipo *</label>
-                        <select class="form-control">
-                            <option>Selecione...</option>
-                            <option>SIOPE</option>
-                            <option>FUNDEB</option>
-                            <option>Salário-Educação</option>
-                            <option>SISCACS</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label>Classificação</label>
-                        <select class="form-control">
-                            <option>Básica</option>
-                            <option>Premium</option>
-                        </select>
-                    </div>
-                    <div class="form-group full-width">
-                        <label>Conteúdo *</label>
-                        <textarea class="form-control" rows="8" placeholder="Conteúdo da newsletter..."></textarea>
-                    </div>
-                </form>
-            </div>
-            <div class="modal-footer">
-                <button class="btn btn-secondary" onclick="closeModal('modalNovaNewsletter')">Cancelar</button>
-                <button class="btn btn-primary"><i class="fas fa-save"></i> Salvar</button>
-            </div>
+        <!-- Ações -->
+        <div style="margin-top: 10px; display:flex; gap:8px; flex-wrap:wrap;">
+          <button onclick="gerarPreviaEnvioUsuarios()">📬 Gerar Prévia</button>
+          <button onclick="mostrarAba('secao-newsletters-envio')">⬅️ Voltar para Newsletters</button>
         </div>
-    </div>
 
-    <!-- Modal: Novo Item Backlog -->
-    <div class="modal-overlay" id="modalNovoItemBacklog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2><i class="fas fa-plus"></i> Novo Item</h2>
-                <button class="modal-close" onclick="closeModal('modalNovoItemBacklog')">&times;</button>
+        <!-- Tabela de usuários -->
+        <table id="tabela-usuarios-envio" class="tabela-padrao">
+          <thead>
+            <tr>
+              <th><input type="checkbox" id="chk-master" onchange="selecionarTodosUsuarios(this)" /></th>
+              <th>Nome</th>
+              <th>Perfil</th>
+              <th>Email</th>
+              <th>Assinatura</th>
+              <th>Envio</th>
+            </tr>
+          </thead>
+          <tbody>
+            <!-- preenchido dinamicamente -->
+          </tbody>
+        </table>
+
+      </section>
+
+      <section id="secao-preview-envio" style="display:none; margin-top:30px">
+        <div style="display: flex; align-items: center; gap: 20px; justify-content: space-between;">
+          <h2 style="margin: 0;">📬 Prévia do Envio</h2>
+          <div id="barra-progresso"
+            style="flex: 1; max-width: 300px; height: 20px; background: #eee; border-radius: 5px; overflow: hidden;">
+            <div id="progresso-envio"
+              style="width: 0%; height: 100%; background: #4caf50; text-align: center; color: white; font-size: 12px;">
+              0%
             </div>
-            <div class="modal-body">
-                <form class="form-grid">
-                    <div class="form-group full-width">
-                        <label>Título *</label>
-                        <input type="text" class="form-control" placeholder="Título da tarefa">
-                    </div>
-                    <div class="form-group full-width">
-                        <label>Descrição</label>
-                        <textarea class="form-control" rows="4" placeholder="Descrição detalhada..."></textarea>
-                    </div>
-                    <div class="form-group">
-                        <label>Prioridade</label>
-                        <select class="form-control">
-                            <option>Baixa</option>
-                            <option selected>Média</option>
-                            <option>Alta</option>
-                            <option>Urgente</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label>Status</label>
-                        <select class="form-control">
-                            <option>A Fazer</option>
-                            <option>Em Andamento</option>
-                            <option>Concluído</option>
-                        </select>
-                    </div>
-                </form>
-            </div>
-            <div class="modal-footer">
-                <button class="btn btn-secondary" onclick="closeModal('modalNovoItemBacklog')">Cancelar</button>
-                <button class="btn btn-primary"><i class="fas fa-save"></i> Salvar</button>
-            </div>
+          </div>
         </div>
-    </div>
+        <div style="margin-top: 20px">
+          <div style="display: flex; gap: 10px; margin-bottom: 15px;">
+            <!-- Botões com visibilidade condicional -->
+            <div id="botoes-envio-padrao" style="display: flex; gap: 10px;">
+              <button id="btn-gerar-lotes">📦 Gerar Lotes</button>
+              <button onclick="abrirLotesGerados()">📂 Ver Lotes Gerados</button>
+              <button onclick="mostrarAba('secao-newsletters-envio')">🔙 Voltar para Newsletters disponiveis</button>
+            </div>
 
-    <!-- Scripts -->
-    <script>
-        // Menu Mobile Toggle
-        const menuToggle = document.getElementById('mobileMenuToggle');
-        const sidebar = document.getElementById('sidebar');
-        const overlay = document.getElementById('sidebarOverlay');
+            <!-- Botão sempre visível -->
+            <div>
+              <button onclick="exportarCSV()">📤 Exportar CSV</button>
+            </div>
+          </div>
 
-        menuToggle.addEventListener('click', () => {
-            sidebar.classList.toggle('active');
-            overlay.classList.toggle('active');
+          <div style="margin-top: 10px; display: flex; align-items: flex-start; gap: 20px; flex-wrap: wrap;">
+            <!-- Filtros -->
+            <div id="filtros-preview" style="display: flex; gap: 15px; flex-wrap: wrap;
+            background: #f9f9f9; border: 1px solid #ccc;
+            padding: 10px 15px; border-radius: 8px; align-items: center;">
+
+              <!-- Filtro por perfil -->
+              <div>
+                <label for="filtro-perfil-lead">Perfil:</label>
+                <select id="filtro-perfil-lead">
+                  <option value="">Todos</option>
+                  <option value="prefeito">Prefeito</option>
+                  <option value="secretario">Secretário</option>
+                  <option value="tecnico">Técnico</option>
+                  <option value="contador">Contador</option>
+                  <option value="pesquisador">Pesquisador</option>
+                  <option value="cacs">CACS</option>
+                  <option value="cidadao">Cidadão</option>
+                </select>
+              </div>
+              <label><input type="checkbox" class="filtro-preview" value="compativeis" /> Compatíveis</label>
+              <label><input type="checkbox" class="filtro-preview" value="nao-compativeis" /> Não compatíveis</label>
+              <label><input type="checkbox" class="filtro-preview" value="enviados" /> Enviados</label>
+              <label><input type="checkbox" class="filtro-preview" value="nao-enviados" /> Não enviados</label>
+              <label><input type="checkbox" class="filtro-preview" value="erro-envio" /> Com erro</label>
+              <button onclick="limparFiltrosPreview()" style="margin-left: 10px;">🧹 Limpar filtros</button>
+            </div>
+
+            <!-- Contadores -->
+            <div
+              style="background: #f9f9f9; border: 1px solid #ccc; padding: 10px 15px; border-radius: 8px; display: flex; gap: 15px; flex-wrap: wrap;">
+              <span>Compatíveis: <strong id="contador-compativeis">0</strong></span>
+              <span>Não compatíveis: <strong id="contador-nao-compativeis">0</strong></span>
+              <span>Enviados: <strong id="contador-enviados">0</strong></span>
+              <span>Não enviados: <strong id="contador-nao-enviados">0</strong></span>
+              <span>Com erro: <strong id="contador-erro-envio">0</strong></span>
+              <span>Exibindo: <strong id="contador-visiveis">0</strong></span>
+            </div>
+          </div>
+        </div>
+        <table id="tabela-preview-envio" class="tabela-padrao">
+          <thead>
+            <tr>
+              <th><input type="checkbox" id="chk-todos-envios" onchange="selecionarTodosEnvios(this)" /></th>
+              <th>Lead</th>
+              <th>Perfil</th>
+              <th>Email</th>
+              <th>Newsletter</th>
+              <th>Interesses</th>
+              <th>Compatível</th>
+              <th>Newsletter enviada?</th>
+            </tr>
+          </thead>
+          <tbody>
+            <!-- preenchido dinamicamente pela função gerarPreviaEnvio() -->
+          </tbody>
+        </table>
+        <div id="cabecalho-newsletter-destinatario"></div>
+        <table id="tabela-preview-envio-destinatario">
+          <thead>
+            <tr>
+              <th>Nome</th>
+              <th>Perfil</th>
+              <th>Email</th>
+              <th>Newsletter enviada?</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </section>
+
+      <div id="modal-confirmacao" class="modal-overlay-conf" style="display:none;">
+        <div class="modal-box">
+          <h3>📦 Confirmar Geração de Lotes</h3>
+          <p id="info-campanha"></p>
+          <div class="modal-botoes">
+            <button onclick="prosseguirGeracao()">✅ Confirmar</button>
+            <button type="button" onclick="fecharModal()">❌ Cancelar</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- <script>
+        let dadosCampanha = null;
+
+        document.getElementById("btn-gerar-lotes").addEventListener("click", function () {
+          const newsletterId = newsletterSelecionada.id;
+          const filtros = window.coletarFiltros();
+          const linhasSelecionadas = Array.from(document.querySelectorAll(".chk-envio-final:checked"));
+          const totalSelecionados = linhasSelecionadas.length;
+
+          if (totalSelecionados === 0) {
+            window.mostrarMensagem("Nenhum destinatário selecionado para envio.");
+            return;
+          }
+
+          dadosCampanha = { newsletterId, filtros };
+
+          const tipo = filtros.tipo === "leads" ? "Leads" : "Usuários";
+          const titulo = newsletterSelecionada.titulo;
+          const edicao = newsletterSelecionada.edicao || newsletterSelecionada.id;
+
+          document.getElementById("info-campanha").innerText =
+            `📰 Newsletter: ${titulo} (${edicao})\n` +
+            `👥 Tipo: ${tipo}\n` +
+            `📬 Destinatários selecionados: ${totalSelecionados}`;
+
+          document.getElementById("modal-confirmacao").style.display = "flex";
         });
 
-        overlay.addEventListener('click', () => {
-            sidebar.classList.remove('active');
-            overlay.classList.remove('active');
-        });
-
-        // Navegação entre seções
-        document.querySelectorAll('.sidebar-menu a[data-section]').forEach(link => {
-            link.addEventListener('click', (e) => {
-                e.preventDefault();
-                
-                // Remove active de todos os links e seções
-                document.querySelectorAll('.sidebar-menu a').forEach(l => l.classList.remove('active'));
-                document.querySelectorAll('.content-section').forEach(s => s.classList.remove('active'));
-                
-                // Adiciona active no link clicado
-                link.classList.add('active');
-                
-                // Mostra a seção correspondente
-                const sectionId = link.getAttribute('data-section');
-                document.getElementById(sectionId).classList.add('active');
-                
-                // Fecha menu mobile se estiver aberto
-                sidebar.classList.remove('active');
-                overlay.classList.remove('active');
-            });
-        });
-
-        // Modais
-        function openModal(modalId) {
-            document.getElementById(modalId).classList.add('active');
-            document.body.style.overflow = 'hidden';
+        function fecharModal() {
+          document.getElementById("modal-confirmacao").style.display = "none";
+          dadosCampanha = null;
         }
 
-        function closeModal(modalId) {
-            document.getElementById(modalId).classList.remove('active');
-            document.body.style.overflow = 'auto';
+        function fecharModalErrosEncontrados() {
+          document.getElementById("alert-modal").style.display = "none";
+          dadosCampanha = null;
         }
 
-        // Fechar modal ao clicar fora
-        document.querySelectorAll('.modal-overlay').forEach(modal => {
-            modal.addEventListener('click', (e) => {
-                if (e.target === modal) {
-                    modal.classList.remove('active');
-                    document.body.style.overflow = 'auto';
-                }
-            });
-        });
-    </script>
+        async function prosseguirGeracao() {
+          document.getElementById("modal-confirmacao").style.display = "none";
+          if (dadosCampanha) {
+            await window.confirmarPrevia(dadosCampanha.newsletterId, dadosCampanha.filtros);
+            dadosCampanha = null;
+          }
+        }
+
+        document.querySelector("#modal-confirmacao button[onclick='fecharModal()']")
+          .addEventListener("click", fecharModal);
+
+      </script> -->
+
+      <section id="secao-lotes-envio" style="display:none; margin-top:30px">
+        <h2>📦 Lotes de Envio</h2>
+
+        <div style="margin-top: 20px; display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+          <button onclick="voltarParaPrevia()">⬅️ Voltar para prévia</button>
+        </div>
+
+        <!-- Área de log de progresso do envio -->
+        <div id="area-log-envio" style="margin-top:12px; background:#1e1e1e; color:#d4d4d4; font-family:monospace;
+                 font-size:12px; padding:10px 14px; border-radius:6px;
+                 max-height:160px; overflow-y:auto; display:flex; flex-direction:column;
+                 gap:2px; min-height:40px;">
+          <span style="color:#666;font-style:italic">Aguardando envio...</span>
+        </div>
+
+        <!-- Tabela de lotes -->
+        <table class="tabela-lotes">
+          <thead id="cabecalho-lotes-envio">
+            <tr>
+              <th>Nº Lote</th>
+              <th>Status</th>
+              <th>Qtd</th>
+              <th>Enviados</th>
+              <th>Erros</th>
+              <th>Abertos</th>
+              <th>Data de Geração</th>
+              <th>Data de Envio</th>
+              <th>Último Envio/Reenvio</th>
+              <th>Ações</th>
+            </tr>
+          </thead>
+          <tbody id="corpo-lotes-envio">
+            <!-- Linhas preenchidas dinamicamente pela função listarLotesEnvio -->
+          </tbody>
+        </table>
+
+      </section>
+
+      <section id="secao-todos-os-lotes" style="display:none">
+        <h2>📦 Todos os Lotes Gerados</h2>
+
+        <div class="filtros-lotes">
+          <select id="filtro-newsletter">
+            <option value="">Todas as newsletters</option>
+            <!-- preenchido dinamicamente -->
+          </select>
+
+          <select id="filtro-tipo">
+            <option value="">Todos os tipos</option>
+            <option value="leads">Leads</option>
+            <option value="usuarios">Usuários</option>
+          </select>
+
+          <label for="filtro-data-tipo">Filtrar por:</label>
+          <select id="filtro-data-tipo">
+            <option value="geracao">Data de Geração</option>
+            <option value="envio">Data de Envio</option>
+          </select>
+
+          <label for="filtro-data-inicio">Data Início:</label>
+          <input type="date" id="filtro-data-inicio">
+
+          <label for="filtro-data-fim">Data Fim:</label>
+          <input type="date" id="filtro-data-fim">
+
+          <button onclick="listarTodosOsLotes()">🔄 Aplicar Filtros</button>
+        </div>
+
+        <table class="tabela-padrao">
+          <thead>
+            <tr>
+              <th>Título</th>
+              <th>Edição</th>
+              <th>Data de Geração</th>
+              <th>Data de Envio</th>
+              <th>Nº Lote</th>
+              <th>Tipo</th>
+              <th>Status</th>
+              <th>Progresso</th>
+              <th>Qtd</th>
+              <th>Tamanho Lote</th>
+              <th>🕒 Último Envio/Reenvio</th>
+              <th>Ações</th>
+            </tr>
+          </thead>
+          <thead>
+          <tbody id="corpo-todos-os-lotes">
+            <!-- preenchido dinamicamente -->
+          </tbody>
+        </table>
+      </section>
+
+      <section id="secao-relatorio-envios" style="display:none; margin-top:30px">
+        <h2>📊 Relatório de Envios</h2>
+
+        <!-- Filtro por e-mail -->
+        <div style="margin-bottom:15px">
+          <input type="text" id="filtro-relatorio-email" placeholder="📧 Filtrar por e-mail"
+            style="margin-right:10px" />
+          <button onclick="carregarRelatorioEnvios()">🔎 Buscar</button>
+        </div>
+
+        <!-- Tabela de envios -->
+        <table id="tabela-relatorio-envios" class="tabela-padrao">
+          <thead>
+            <tr>
+              <th>Lead</th>
+              <th>Email</th>
+              <th>Newsletter</th>
+              <th>Data de Envio</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            <!-- preenchido dinamicamente -->
+          </tbody>
+        </table>
+      </section>
+
+      <section id="secao-historico-reenvios" style="display:none;">
+        <h3>📜 Histórico de Reenvios</h3>
+        <table>
+          <thead>
+            <tr>
+              <th>Data</th>
+              <th>Destinatários</th>
+              <th>Enviados</th>
+              <th>Status</th>
+              <th>Operador</th>
+            </tr>
+          </thead>
+          <tbody id="corpo-historico-reenvios"></tbody>
+        </table>
+        <button onclick="mostrarAba('secao-todos-os-lotes')">🔙 Voltar</button>
+      </section>
+
+      <section id="secao-descadastramentos" style="display:none; margin-top:30px">
+        <h2>📉 Descadastramentos</h2>
+
+        <table id="tabela-descadastramentos" class="tabela-padrao">
+          <thead>
+            <tr>
+              <th>Nome</th>
+              <th>Email</th>
+              <th>Newsletter</th>
+              <th>Data</th>
+              <th>Motivo</th>
+            </tr>
+          </thead>
+          <tbody>
+            <!-- preenchido dinamicamente -->
+          </tbody>
+        </table>
+      </section>
+    </section>
+
+    <!-- USUÁRIOS -->
+    <section id="usuarios" class="card">
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <h3 style="margin:0">👥 Usuários</h3>
+        <button onclick="abrirModalCriarUsuario()">➕ Novo Usuário</button>
+      </div>
+
+      <!-- Filtros e busca -->
+      <div style="margin-top:10px; display:flex; flex-wrap:wrap; gap:10px; align-items:center;">
+
+        <input type="text" id="busca-usuarios" placeholder="Buscar usuário..." onkeyup="filtrarUsuarios()"
+          style="flex:1; min-width:200px;">
+        <label>Status:
+          <select id="filtro-status">
+            <option value="">Todos</option>
+            <option value="ativo">Ativos</option>
+            <option value="inativo">Inativos</option>
+          </select>
+        </label>
+
+        <label for="filtro-vencidos" style="color:#f44336">
+          <input type="checkbox" id="filtro-vencidos"> Parcelas vencidas
+        </label>
+        <label for="filtro-semvalor" style="color:#2196f3">
+          <input type="checkbox" id="filtro-semvalor"> Parcelas a gerar
+        </label>
+        <label for="filtro-solicitacoes" style="color:#ff9800">
+          <input type="checkbox" id="filtro-solicitacoes"> Solicitações pendentes
+        </label>
+
+        <!-- Botões de ação e navegação -->
+        <div style="display:flex; gap:10px; align-items:center;">
+          <button id="btn-listar" onclick="iniciarConsultaUsuarios()">🔍 Listar</button>
+          <button id="btn-anterior" onclick="irParaPaginaAnterior()" disabled>◀ Anterior</button>
+          <button id="btn-proxima" onclick="carregarUsuariosComFiltro()" disabled>▶ Próxima</button>
+          <button id="btn-primeira" onclick="irParaPrimeiraPagina()" disabled>⏮ Primeira</button>
+
+          <span id="status-consulta" style="font-style:italic; color:#555;"></span>
+          <progress id="barra-progresso" value="0" max="100" style="width:100%; display:none;"></progress>
+        </div>
+      </div>
+
+      <!-- Tabela -->
+      <table style="margin-top:10px; width:100%; border-collapse:collapse;">
+        <thead>
+          <tr>
+            <th>Nome</th>
+            <th>Email</th>
+            <th>UF</th>
+            <th>Município</th>
+            <th>Perfil</th>
+            <th>Ativo</th>
+            <th>Alerta</th>
+            <th>Ações</th>
+          </tr>
+        </thead>
+        <tbody id="lista-usuarios"></tbody>
+      </table>
+    </section>
+
+
+    <!-- Auditoria Leads capturados -->
+    <section id="auditoria" class="card">
+      <div>
+        <h2>🕵️ Painel de Auditoria</h2>
+        <p>Veja todas as interações registradas no sistema.</p>
+        <div id="filtros-auditoria" style="margin-bottom: 20px;">
+          <label>Tipo:
+            <select id="filtro-tipo">
+              <option value="">Todos</option>
+              <option value="vinculacao">Vinculação</option>
+              <option value="reativacao">Reativação</option>
+              <option value="E-mail">E-mail</option>
+            </select>
+          </label>
+
+          <label>Feito por:
+            <input type="text" id="filtro-feito-por" placeholder="Nome ou e-mail">
+          </label>
+
+          <label>Lead:
+            <input type="text" id="filtro-lead" placeholder="Nome do lead">
+          </label>
+
+          <button onclick="carregarInteracoesAuditoria()">🔍 Filtrar</button>
+        </div>
+
+        <div id="tabela-interacoes" style="margin-top: 20px;"></div>
+      </div>
+    </section>
+
+    <!-- CUPONS -->
+    <section id="cupons" class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div>
+          <h3 style="margin:0">📑 Cupons</h3>
+        </div>
+        <div><button onclick="abrirModalCupom()">➕ Novo Plano</button></div>
+      </div>
+      <div style="margin-top:10px">
+        <input type="text" id="busca-cupons" placeholder="Buscar cupom..." onkeyup="filtrarCupons()">
+      </div>
+      <table style="margin-top:10px">
+        <thead>
+          <tr>
+            <th>Codigo</th>
+            <th>Tipo</th>
+            <th>Valor</th>
+            <th>Status</th>
+            <th>Expira em</th>
+            <th>Uso</th>
+            <th>Ações</th>
+          </tr>
+        </thead>
+        <tbody id="lista-cupom"></tbody>
+      </table>
+    </section>
+
+    <!-- PLANOS -->
+    <section id="planos" class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div>
+          <h3 style="margin:0">📑 Planos</h3>
+        </div>
+        <div style="display:flex;gap:8px">
+          <button
+            onclick="if(window.FeaturesManager) window.FeaturesManager.abrirModalFeatures(); else alert('FeaturesManager não carregado')">⚙️
+            Gerenciar Features</button>
+          <button onclick="abrirModalPlano()">➕ Novo Plano</button>
+        </div>
+      </div>
+      <div style="margin-top:10px">
+        <input type="text" id="busca-planos" placeholder="Buscar plano..." onkeyup="filtrarPlanos()">
+      </div>
+      <table style="margin-top:10px">
+        <thead>
+          <tr>
+            <th>Nome</th>
+            <th>Descrição</th>
+            <th>Qtde Parcelas</th>
+            <th>Tipo</th>
+            <th>Valor</th>
+            <th>Status</th>
+            <th>Ações</th>
+          </tr>
+        </thead>
+        <tbody id="lista-planos"></tbody>
+      </table>
+    </section>
+
+
+    <section id="secao-backlog" class="card">
+      <div style="display:flex; justify-content:space-between; align-items:center">
+        <div>
+          <h3 style="margin:0">📑 Backlog do Projeto</h3>
+        </div>
+        <div><button onclick="adicionarItemBacklog()">➕ Novo Item</button></div>
+      </div>
+      <div id="kanban" style="display:flex; gap:20px; margin-top:20px;">
+        <div class="kanban-col" data-status="afazer"
+          style="flex:1; background:#f5f5f5; padding:10px; border:1px solid #ccc;">
+          <h3>📝 A Fazer</h3>
+          <div class="kanban-list" id="kanban-afazer"></div>
+        </div>
+
+        <div class="kanban-col" data-status="andamento"
+          style="flex:1; background:#e3f2fd; padding:10px; border:1px solid #ccc;">
+          <h3>⚙️ Em andamento</h3>
+          <div class="kanban-list" id="kanban-andamento"></div>
+        </div>
+
+        <div class="kanban-col" data-status="concluido"
+          style="flex:1; background:#e8f5e9; padding:10px; border:1px solid #ccc;">
+          <h3>✅ Concluído</h3>
+          <div class="kanban-list" id="kanban-concluido"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- NEWSLETTERS -->
+    <section id="newsletters" class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div>
+          <h3 style="margin:0">📰 Newsletters</h3>
+        </div>
+        <div><button onclick="abrirModalNewsletter()">➕ Nova Newsletter</button></div>
+      </div>
+
+      <div class="filtros-newsletters" style="margin: 20px 0;">
+        <label for="filtro-tipo-news">Tipo:</label>
+        <select id="filtro-tipo-news">
+          <option value="">Todos os tipos</option>
+        </select>
+
+        <label for="filtro-classificacao">Classificação:</label>
+        <select id="filtro-classificacao">
+          <option value="">Todas</option>
+          <option value="Básica">Básica</option>
+          <option value="Premium">Premium</option>
+        </select>
+
+        <label for="filtro-busca">Busca:</label>
+        <input type="text" id="filtro-busca" placeholder="Buscar por título ou edição">
+
+        <button onclick="carregarNewsletters()">Filtrar</button>
+      </div>
+
+      <table style="margin-top:10px; width: 100%; border-collapse: collapse;">
+        <thead>
+          <tr>
+            <th>Data</th>
+            <th>Edição</th>
+            <th>Título</th>
+            <th>Tipo</th>
+            <th>Classificação</th>
+            <th>Enviada</th>
+            <th>Ações</th>
+          </tr>
+        </thead>
+        <tbody id="lista-newsletters"></tbody>
+      </table>
+      <div id="alert-modal">
+        <div id="alert-box">
+          <h3>⚠️ Erros encontrados</h3>
+          <ul id="alert-list"></ul>
+          <button onclick="fecharModalErrosEncontrados()">Fechar</button>
+        </div>
+      </div>
+    </section>
+
+
+    <!-- preview da newsletter -->
+    <div id="modal-html-preview" class="modal-overlay" aria-hidden="true" style="
+          display:none;
+          position:fixed;
+          top:0; left:0;
+          width:100vw; height:100vh;
+          background-color:rgba(0,0,0,0.6);
+          z-index:999999; /* ✅ garante que fica acima de tudo */
+          display:flex;
+          align-items:center;
+          justify-content:center;
+        ">
+
+      <div class="modal-content" style="
+          background:#fff;
+          padding:20px;
+          width: min(70vw, 640px);
+          min-width: min(94vw, 340px);
+          height:90vh;      
+          border-radius:8px;
+          box-shadow:0 0 20px rgba(0,0,0,0.3);
+          position:relative;
+          overflow:hidden;
+        ">
+        <span class="modal-close" onclick="closeModal('modal-html-preview')"
+          style="position:absolute; top:10px; right:15px; font-size:24px; cursor:pointer;">❌ Fechar</span>
+
+        <iframe id="iframe-html-preview"
+          style="width:100%; height:100%; border:1px solid #ccc; border-radius:4px;"></iframe>
+
+      </div>
+    </div>
+
+
+    <!-- TIPO NEWSLETTERS -->
+    <section id="tipo-newsletters" class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div>
+          <h3 style="margin:0">📂 Tipos de NewsLetters</h3>
+        </div>
+        <div><button onclick="abrirModalTipoNewsletter()">➕ Novo Tipo</button></div>
+      </div>
+      <div style="margin-top:10px">
+        <input type="text" id="busca-tipo-newsletters" placeholder="Buscar tipo..." onkeyup="filtrarTipoNewsletters()">
+      </div>
+      <table style="margin-top:10px">
+        <thead>
+          <tr>
+            <th>Nome</th>
+            <th>É Newsletter?</th>
+            <th>Ações</th>
+          </tr>
+        </thead>
+        <tbody id="lista-tipo-newsletters"></tbody>
+      </table>
+    </section>
+
+    <section id="template_newsletters" class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div>
+          <h3 style="margin:0">🧩 Templates de Newsletter</h3>
+        </div>
+        <div><button onclick="abrirModalTemplateNewsletter()">➕ Novo Template</button></div>
+      </div>
+
+      <div style="margin-top:10px">
+        <input type="text" id="busca-templates-newsletter" placeholder="Buscar template..."
+          onkeyup="filtrarTemplatesNewsletter()">
+      </div>
+
+      <table style="margin-top:10px">
+        <thead>
+          <tr>
+            <th>Nome</th>
+            <th>Descrição</th>
+            <th>Tipo</th>
+            <th>Classificação</th>
+            <th>Ativo</th>
+            <th>Criado em</th>
+            <th>Ações</th>
+          </tr>
+        </thead>
+        <tbody id="lista-templates-newsletter"></tbody>
+      </table>
+    </section>
+
+
+    <!-- RELATÓRIO DE PREFERÊNCIAS -->
+    <section id="relatorio-preferencias" class="card">
+      <div>
+        <h3 style="margin:0">📊 Relatório de Preferências por Newsletter</h3>
+      </div>
+      <table style="margin-top:10px">
+        <thead>
+          <tr>
+            <th>Tipo de Newsletter</th>
+            <th>Usuários</th>
+          </tr>
+        </thead>
+        <tbody id="tabela-relatorio-preferencias"></tbody>
+      </table>
+    </section>
+
+    <!-- RELATÓRIO POR USUÁRIO -->
+    <section id="relatorio-por-usuario" class="card">
+      <div>
+        <h3 style="margin:0">👤 Preferências por Usuário</h3>
+      </div>
+      <div style="margin-top:10px">
+        <input type="text" id="busca-relatorio-usuario" placeholder="Buscar usuário por nome, ID ou email..."
+          style="width:100%;max-width:400px" onkeyup="filtrarRelatorioUsuarios()">
+      </div>
+
+      <!-- 🔄 Layout em duas colunas -->
+      <div style="display:flex; gap:20px; margin-top:10px;">
+        <!-- Coluna esquerda: tabela -->
+        <div style="flex:1;">
+          <table style="width:100%;">
+            <thead>
+              <tr>
+                <th>Nome</th>
+                <th>Email</th>
+                <th>Ações</th>
+              </tr>
+            </thead>
+            <tbody id="tabela-relatorio-usuarios"></tbody>
+          </table>
+        </div>
+
+        <!-- Coluna direita: detalhes -->
+        <div id="detalhes-relatorio-usuario"
+          style="display:none; margin-top:20px; background:#fff; padding:12px; border:1px solid #ccc; border-radius:6px;">
+        </div>
+
+      </div>
+    </section>
+
+
+    <!-- RELATÓRIO POR TIPO -->
+    <section id="relatorio-por-tipo" class="card">
+      <div>
+        <h3 style="margin:0">📊 Preferências por Tipo de Newsletter</h3>
+      </div>
+
+      <div style="margin-top:10px">
+        <label for="filtro-cad-tipo-newsletter"><strong>Filtrar por tipo:</strong></label>
+        <select id="filtro-cad-tipo-newsletter">
+          <option value="">Todos</option>
+        </select>
+        <button onclick="gerarRelatorioPreferencias()" style="margin-left:10px">🔍 Gerar Relatório</button>
+      </div>
+      <table style="margin-top:10px">
+        <thead>
+          <tr>
+            <th>Tipo</th>
+            <th>Usuários</th>
+          </tr>
+        </thead>
+        <tbody id="tabela-relatorio-por-tipo"></tbody>
+      </table>
+    </section>
+
+    <!-- Respostas automaticas -->
+    <section id="respostas_automaticas" style="display:none"></section>
+
+    <div id="modalrespostaauto" style="
+          display:none;
+          position:fixed;
+          top:0;
+          left:0;
+          width:100%;
+          height:100%;
+          background:rgba(0,0,0,0.5);
+          z-index:9999;
+          justify-content:center;
+          align-items:center;
+        ">
+      <div class="modal-content" style="
+            background:#fff;
+            padding:20px;
+            border-radius:8px;
+            max-width:700px;
+            width:90%;
+            position:relative;
+            box-shadow:0 0 20px rgba(0,0,0,0.3);
+          ">
+        <button onclick="fecharModalRespostaAuto()" style="
+              position:absolute;
+              top:10px;
+              right:10px;
+              font-size:18px;
+              background:none;
+              border:none;
+              cursor:pointer;
+            ">❌ Fechar</button>
+        <div id="modalrespostaauto-body"></div>
+      </div>
+    </div>
+
+
+    <div id="modal-preview-html" style="
+          display:none;
+          position:fixed;
+          top:0;
+          left:0;
+          width:100%;
+          height:100%;
+          background:rgba(0,0,0,0.6);
+          z-index:9999;
+          justify-content:center;
+          align-items:center;
+        ">
+      <div style="
+            background:#fff;
+            padding:20px;
+            border-radius:8px;
+            max-width:800px;
+            width:90%;
+            overflow:auto;
+            max-height:90vh;
+            position:relative;
+          ">
+        <button onclick="fecharModalPreview()" style="
+              position:absolute;
+              top:10px;
+              right:10px;
+              font-size:18px;
+              background:none;
+              border:none;
+              cursor:pointer;
+            ">❌ Fechar</button>
+        <div id="preview-html-content"></div>
+      </div>
+    </div>
+
+    </section>
+
+
+    <!-- 🔖 Aba de Temas de Notícias -->
+    <section id="aba-temas" class="card">
+      <div>
+        <h2>🗞️ Temas de Notícias</h2>
+        <button onclick="editarTema()">➕ Novo Tema</button>
+        <table style="margin-top:10px">
+          <thead>
+            <tr>
+              <th>Nome</th>
+              <th>Palavras-chave</th>
+              <th>Prioridade</th>
+              <th>Cor</th>
+              <th>Ativo</th>
+              <th>Ação</th>
+            </tr>
+          </thead>
+          <!-- Conteúdo gerado dinamicamente pela função carregarTemas_noticias() -->
+          <tbody id="tabela-temas"></tbody>
+        </table>
+      </div>
+
+      <!-- 🧾 Modal de edição de tema -->
+      <div id="modal-tema" style="
+        display:none;
+        position:fixed;
+        top:0;
+        left:0;
+        width:100%;
+        height:100%;
+        background:rgba(0,0,0,0.5);
+        z-index:9999;
+        justify-content:center;
+        align-items:center;
+      ">
+        <div style="
+          background:#fff;
+          padding:20px;
+          border-radius:8px;
+          max-width:600px;
+          width:90%;
+          position:relative;
+          box-shadow:0 0 20px rgba(0,0,0,0.3);
+        ">
+          <button onclick="fecharModalTema()" style="
+            position:absolute;
+            top:10px;
+            right:10px;
+            font-size:18px;
+            background:none;
+            border:none;
+            cursor:pointer;
+          ">❌ Fechar</button>
+          <div id="modal-tema-body"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- VOTAÇÕES DE TEMAS -->
+    <section id="votacoes-temas" class="card">
+      <div>
+        <h2>🏆 Votações de Temas</h2>
+        <div id="votacoes-temas-content">
+          <div style="text-align: center; padding: 40px; color: #999;">Carregando...</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- LEADS -->
+    <section id="leads" class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin:10px 0">
+        <h3 style="margin:0">📥 Leads Capturados</h3>
+        <div style="display:flex;align-items:center;gap:20px">
+          <div id="resumo-leads" style="font-weight:bold;font-size:16px;text-align:right"></div>
+          <button onclick="exportarLeadsCSV()"
+            style="padding:8px 16px;background:#007acc;color:#fff;border:none;border-radius:6px">
+            📤 Exportar para CSV
+          </button>
+          <button onclick="abrirModalImportacaoLeads()">📥 Importar Leads via Planilha</button>
+
+        </div>
+      </div>
+
+      <div style="display:flex;gap:20px;align-items:flex-end;flex-wrap:wrap;margin:10px 0">
+        <div style="flex:1;min-width:250px">
+          <label for="busca-leads">Buscar por nome ou e-mail:</label>
+          <input type="text" id="busca-leads" placeholder="Buscar..." style="width:100%">
+        </div>
+
+        <div>
+          <label for="filtro-perfil-lead">Filtrar por perfil:</label>
+          <select id="filtro-perfil-lead">
+            <option value="">Todos</option>
+            <option value="secretario">Secretário</option>
+            <option value="tecnico">Técnico</option>
+            <option value="contador">Contador</option>
+            <option value="pesquisador">Pesquisador</option>
+            <option value="cacs">CACS</option>
+            <option value="cidadao">Cidadão</option>
+          </select>
+        </div>
+
+        <div>
+          <label for="filtro-preferencia">Filtrar por preferência de contato:</label>
+          <select id="filtro-preferencia">
+            <option value="">Todos</option>
+            <option value="E-mail">📧 E-mail</option>
+            <option value="WhatsApp">💬 WhatsApp</option>
+            <option value="Ligação">📞 Ligação</option>
+          </select>
+        </div>
+        <div>
+          <label for="filtro-status-lead-consulta">Status:</label>
+          <select id="filtro-status-lead-consulta">
+            <option value="">Todos</option>
+            <option value="Novo">Novo</option>
+            <option value="Em contato">Em contato</option>
+            <option value="Convertido">Convertido</option>
+            <option value="Descartado">Descartado</option>
+          </select>
+          </label>
+        </div>
+        <button onclick="carregarLeads(true)">🔍 Buscar Leads</button>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>Nome</th>
+            <th>E-mail</th>
+            <th>Telefone</th>
+            <th>Perfil</th>
+            <th>Interesses</th>
+            <th>Data</th>
+            <th>Preferência</th>
+            <th>Mensagem</th>
+            <th>Município</th>
+            <th>Status</th>
+            <th>Ações</th>
+          </tr>
+        </thead>
+        <tbody id="tabela-leads"></tbody>
+      </table>
+
+      <!-- ── Modal unificado de Mensagens do Lead ──────────────────────── -->
+      <div id="modal-mensagens-lead" style="
+        display:none; position:fixed; top:0; left:0;
+        width:100%; height:100%;
+        background:rgba(0,0,0,0.5);
+        z-index:9999; justify-content:center; align-items:center;">
+        <div style="
+          background:#fff; padding:24px; border-radius:10px;
+          max-width:620px; width:92%; position:relative;
+          box-shadow:0 4px 32px rgba(0,0,0,0.25);
+          max-height:85vh; display:flex; flex-direction:column;">
+          <button onclick="fecharModalMensagensLead()" style="
+            position:absolute; top:12px; right:12px;
+            font-size:18px; background:none; border:none; cursor:pointer;">❌</button>
+          <h3 id="modal-mensagens-lead-titulo" style="margin:0 0 16px;font-size:16px">
+            💬 Mensagens do Lead
+          </h3>
+          <!-- Timeline de mensagens -->
+          <div id="conteudo-mensagens-lead" style="
+            flex:1; overflow-y:auto; display:flex; flex-direction:column; gap:12px;
+            padding-right:4px; margin-bottom:16px;">
+          </div>
+          <!-- Campo para nova resposta (aparece ao clicar em Responder) -->
+          <div id="form-resposta-lead" style="display:none; border-top:1px solid #e2e8f0; padding-top:14px">
+            <input type="hidden" id="resposta-lead-msg-id">
+            <input type="hidden" id="resposta-lead-msg-tipo">
+            <label style="font-size:12px;font-weight:600;color:#475569;display:block;margin-bottom:6px">
+              ✍️ Resposta:
+            </label>
+            <textarea id="resposta-lead-txt" rows="3" style="width:100%;padding:8px;border:1px solid #cbd5e1;border-radius:6px;
+                     font-size:13px;resize:vertical" placeholder="Digite a resposta…" maxlength="500"></textarea>
+            <div style="display:flex;gap:8px;margin-top:8px">
+              <button onclick="enviarRespostaLeadMensagem()" style="padding:8px 18px;background:#0A3D62;color:#fff;border:none;
+                       border-radius:6px;font-size:13px;font-weight:600;cursor:pointer">
+                ✅ Enviar resposta
+              </button>
+              <button onclick="document.getElementById('form-resposta-lead').style.display='none'" style="padding:8px 14px;background:#f1f5f9;color:#475569;border:none;
+                       border-radius:6px;font-size:13px;cursor:pointer">
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Mantém modais legados ocultos para compatibilidade com funções existentes -->
+      <div id="modal-contato-lead" style="display:none"></div>
+      <div id="modal-historico-lead" style="display:none">
+        <div>
+          <div id="conteudo-historico-lead"></div>
+        </div>
+      </div>
+      <div id="modal-vincular-lead" style="
+        display:none;
+        position:fixed;
+        top:0;
+        left:0;
+        width:100%;
+        height:100%;
+        background:rgba(0,0,0,0.5);
+        z-index:9999;
+        justify-content:center;
+        align-items:center;
+      ">
+        <div style="
+          background:#fff;
+          padding:20px;
+          border-radius:8px;
+          max-width:600px;
+          width:90%;
+          position:relative;
+          box-shadow:0 0 20px rgba(0,0,0,0.3);
+          max-height:80%;
+          overflow-y:auto;
+        ">
+          <button onclick="document.getElementById('modal-vincular-lead').style.display='none'" style="
+            position:absolute;
+            top:10px;
+            right:10px;
+            font-size:18px;
+            background:none;
+            border:none;
+            cursor:pointer;
+          ">❌ Fechar</button>
+          <h3>👤 Vincular Lead a Usuário</h3>
+          <div id="conteudo-vincular-lead" style="margin-top:10px"></div>
+        </div>
+      </div>
+      <!-- Modal fora da tabela -->
+      <div id="modal-importacao-leads" style="display:none;" class="modal">
+        <div class="modal-conteudo">
+          <h3>📥 Importar Leads</h3>
+          <p>Selecione um arquivo <strong>.csv</strong> com os campos abaixo, separados por <code>;</code>:</p>
+
+          <div style="overflow-x: auto; margin-bottom: 20px;">
+            <table style="min-width: 1000px; border-collapse: collapse;">
+              <thead>
+                <tr>
+                  <th>nome</th>
+                  <th>email</th>
+                  <th>telefone</th>
+                  <th>perfil</th>
+                  <th>preferencia_contato</th>
+                  <th>interesses</th>
+                  <th>mensagem</th>
+                  <th>origem</th>
+                  <th>Sigla_UF</th>
+                  <th>codigo_UF</th>
+                  <th>Nome_Municipio</th>
+                  <th>codigo_municipio</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>João Silva</td>
+                  <td><a href="/cdn-cgi/l/email-protection" class="__cf_email__"
+                      data-cfemail="e78d888688a7828a868e8bc984888a">[email&#160;protected]</a></td>
+                  <td>11999999999</td>
+                  <td>contador</td>
+                  <td>WhatsApp</td>
+                  <td>orçamento, dúvidas</td>
+                  <td>Quero mais informações</td>
+                  <td>Evento XPTO</td>
+                  <td>SP</td>
+                  <td>35</td>
+                  <td>São Paulo</td>
+                  <td>3550308</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div id="progresso-importacao" style="margin-top: 20px; font-weight: bold;">
+            ⏳ Processando: 0 / 0
+          </div>
+          <label for="origem-importacao">Origem dos leads:</label>
+          <input type="text" id="origem-importacao" placeholder="Ex: Evento, Landing Page, Indicação" required
+            style="margin-bottom: 10px; width: 100%;">
+          <input type="file" id="arquivo-leads" accept=".csv">
+          <button onclick="processarImportacaoLeads()">🚀 Importar</button>
+          <button onclick="fecharModalImportacaoLeads()">Fechar</button>
+        </div>
+      </div>
+      <script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script>
+      <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+      <!-- Modal: Responder mensagem do lead -->
+      <div id="modal-responder-mensagem" style="display:none;position:fixed;inset:0;
+          background:rgba(0,0,0,.5);z-index:9999;justify-content:center;align-items:center">
+        <div style="background:#fff;padding:24px;border-radius:10px;max-width:520px;
+            width:90%;position:relative;box-shadow:0 4px 30px rgba(0,0,0,.2)">
+          <button onclick="document.getElementById('modal-responder-mensagem').style.display='none'" style="position:absolute;top:10px;right:10px;background:none;border:none;
+              font-size:18px;cursor:pointer">❌</button>
+          <h3>💬 Responder mensagem do lead</h3>
+          <div style="background:#f5f5f5;border-radius:6px;padding:12px;margin:12px 0;
+              font-size:13px;color:#555;border-left:4px solid #007acc">
+            <strong>Mensagem recebida:</strong><br>
+            <span id="modal-mensagem-original"></span>
+          </div>
+          <input type="hidden" id="modal-responder-lead-id">
+          <div class="field">
+            <label>Sua resposta:</label>
+            <textarea id="modal-resposta-texto" rows="5"
+              style="width:100%;border:1px solid #ccc;border-radius:6px;padding:8px;font-size:13px"
+              placeholder="Digite sua resposta para o lead..."></textarea>
+          </div>
+          <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:14px">
+            <button onclick="document.getElementById('modal-responder-mensagem').style.display='none'"
+              style="padding:8px 16px;border-radius:6px;border:1px solid #ccc;cursor:pointer">
+              Cancelar
+            </button>
+            <button onclick="enviarRespostaMensagemLead()" style="padding:8px 16px;background:#007acc;color:#fff;border:none;
+                border-radius:6px;cursor:pointer;font-weight:700">
+              📧 Enviar resposta por e-mail
+            </button>
+          </div>
+        </div>
+      </div>
+
+    </section>
+
+    <section id="relatorio-avaliacoes" class="card">
+      <h3>🗳️ Relatório de Avaliações de Atendimento</h3>
+
+      <div style="margin-bottom:10px;">
+        <div style="margin-bottom:6px;">
+          <strong>Filtrar por avaliação:</strong><br>
+          <button onclick="filtrarAvaliacoes('todos')">Todos</button>
+          <button onclick="filtrarAvaliacoes('positivo')">👍 Positiva</button>
+          <button onclick="filtrarAvaliacoes('negativo')">👎 Negativa</button>
+        </div>
+
+        <div style="margin-top:10px;">
+          <strong>Filtrar por tipo:</strong><br>
+          <button onclick="filtrarTipoSolicitacao('todos')">Todos</button>
+          <button onclick="filtrarTipoSolicitacao('consultoria')">Consultoria</button>
+          <button onclick="filtrarTipoSolicitacao('treinamento')">Treinamento</button>
+          <button onclick="filtrarTipoSolicitacao('newsletters')">Newsletters</button>
+          <button onclick="filtrarTipoSolicitacao('outros')">Outros</button>
+        </div>
+        <div style="margin-top:10px;">
+          <strong>Filtrar por período:</strong><br>
+          <button onclick="filtrarPeriodoAvaliacoes('todos')">Todos</button>
+          <button onclick="filtrarPeriodoAvaliacoes('7')">Últimos 7 dias</button>
+          <button onclick="filtrarPeriodoAvaliacoes('30')">Últimos 30 dias</button>
+          <button onclick="filtrarPeriodoAvaliacoes('90')">Últimos 90 dias</button>
+        </div>
+      </div>
+      <div style="margin-top:10px;">
+        <strong>Filtrar por perfil:</strong><br>
+        <button onclick="filtrarPerfilAvaliacoes('todos')">Todos</button>
+        <button onclick="filtrarPerfilAvaliacoes('secretario')">Secretário</button>
+        <button onclick="filtrarPerfilAvaliacoes('tecnico')">Técnico</button>
+        <button onclick="filtrarPerfilAvaliacoes('contador')">Contador</button>
+        <button onclick="filtrarPerfilAvaliacoes('pesquisador')">Pesquisador</button>
+        <button onclick="filtrarPerfilAvaliacoes('cacs')">CACS</button>
+        <button onclick="filtrarPerfilAvaliacoes('cidadao')">Cidadão</button>
+      </div>
+
+      <table style="margin-top:10px">
+        <thead>
+          <tr>
+            <th>Usuário</th>
+            <th>Perfil</th>
+            <th>Tipo</th>
+            <th>Status</th>
+            <th>Avaliação</th>
+            <th>Data</th>
+          </tr>
+        </thead>
+        <tbody id="tabela-avaliacoes"></tbody>
+      </table>
+    </section>
+
+    <!-- Painel  -->
+    <section id="painel-gestao" class="painel-container">
+      <h2>Painel de Gestão Geral</h2>
+      <select id="filtro-periodo" onchange="atualizarGraficosPorPeriodo()">
+        <option value="7">Últimos 7 dias</option>
+        <option value="30" selected>Últimos 30 dias</option>
+        <option value="90">Últimos 90 dias</option>
+        <option value="365">Últimos 12 meses</option>
+      </select>
+
+      <div class="graficos-grid">
+        <div class="grafico-card">
+          <h3>👥 Usuários (Ativos vs Inativos)</h3>
+          <canvas id="grafico-usuarios"></canvas>
+        </div>
+        <div class="grafico-card">
+          <h3>📈 Leads por Status</h3>
+          <canvas id="grafico-leads"></canvas>
+        </div>
+        <div class="grafico-card">
+          <h3>💰 Pagamentos</h3>
+          <canvas id="grafico-pagamentos"></canvas>
+        </div>
+        <div class="grafico-card">
+          <h3>📰 Assinaturas por Tipo</h3>
+          <canvas id="grafico-assinaturas"></canvas>
+        </div>
+        <div style="margin-top: 40px">
+          <h3>📊 Comparativo: Preferências vs Assinaturas</h3>
+          <canvas id="grafico-comparativo" height="100"></canvas>
+        </div>
+        <div id="alertas-baixa-conversao"
+          style="margin-top: 20px; padding: 12px; background: #fff3cd; border: 1px solid #ffeeba; border-radius: 6px;">
+          <!-- Alertas serão inseridos aqui -->
+        </div>
+        <div id="sugestoes-acoes"
+          style="margin-top: 20px; padding: 12px; background: #e8f5e9; border: 1px solid #c8e6c9; border-radius: 6px;">
+          <!-- Sugestões serão inseridas aqui -->
+        </div>
+      </div>
+    </section>
+
+    <!-- ── SEÇÃO: ALERTAS PUSH ──────────────────────────────────── -->
+    <section id="alertas-push" class="card" style="display:none">
+      <!-- preenchido inteiramente por carregarSecaoAlertasPush() em alertas_push.js -->
+    </section>
+
+    <!-- ── SEÇÃO: FEEDBACKS ───────────────────────────────────────── -->
+    <section id="feedbacks" class="card" style="display:none">
+      <!-- preenchido inteiramente por carregarSecaoFeedbacks() em feedbacks.js -->
+    </section>
+    <section id="calendario">
+      <div id="cal-admin-root"></div>
+    </section>
+  </main>
+
+
+
+  <!-- Modal CRUD (reaproveitado) -->
+  <div class="modal-overlay" id="modal-edit-overlay" aria-hidden="true">
+    <div class="modal">
+      <h2 id="modal-edit-title"></h2>
+      <div id="modal-edit-body"></div>
+      <div class="modal-buttons">
+        <button onclick="closeModal('modal-edit-overlay')">Cancelar</button>
+        <button id="modal-edit-save">💾 Salvar</button>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- Modal de resposta para solicitações -->
+  <div class="modal-overlay" id="modal-resposta-overlay" aria-hidden="true">
+    <div class="modal">
+      <h2 id="modal-resposta-titulo">💬 Responder Solicitação</h2>
+      <div>
+        <label for="campo-resposta"><strong>Mensagem de resposta:</strong></label>
+        <textarea id="campo-resposta" rows="5"
+          style="width:100%; padding:8px; margin-top:6px; border:1px solid #ccc; border-radius:4px;"></textarea>
+      </div>
+      <div class="modal-buttons">
+        <button onclick="fecharModalResposta()">Cancelar</button>
+        <button onclick="confirmarRespostaSolicitacao()">Salvar</button>
+      </div>
+    </div>
+  </div>
+
+
+  <div id="visaoGeralContainer"
+    style="margin-top:30px; background:#fff; padding:20px; border-radius:8px; border:1px solid #ccc;"></div>
+
+  <!-- ── DRAWER: USUÁRIO ────────────────────────────────────────── -->
+  <style>
+    #drawer-usuario-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, .45);
+      z-index: 8000;
+      justify-content: flex-end;
+    }
+
+    #drawer-usuario {
+      width: 780px;
+      max-width: 98vw;
+      height: 100vh;
+      background: #fff;
+      box-shadow: -4px 0 30px rgba(0, 0, 0, .18);
+      display: flex;
+      flex-direction: column;
+      transform: translateX(110%);
+      transition: transform .28s cubic-bezier(.4, 0, .2, 1);
+      overflow: hidden;
+    }
+
+    #drawer-usuario.open {
+      transform: translateX(0);
+    }
+
+    #drawer-usuario-header {
+      background: linear-gradient(135deg, #0A3D62, #1A5276);
+      color: #fff;
+      padding: 16px 20px;
+      flex-shrink: 0;
+    }
+
+    #drawer-usuario-tabs {
+      display: flex;
+      gap: 4px;
+      margin-top: 12px;
+      flex-wrap: wrap;
+    }
+
+    .drawer-tab-btn {
+      padding: 5px 13px;
+      border-radius: 20px;
+      border: none;
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 700;
+      background: rgba(255, 255, 255, .2);
+      color: #fff;
+      transition: .15s;
+    }
+
+    .drawer-tab-btn.ativo {
+      background: rgba(255, 255, 255, .92);
+      color: #0A3D62;
+    }
+
+    #drawer-usuario-body {
+      flex: 1;
+      overflow-y: auto;
+      padding: 18px 20px;
+      background: #f8fafc;
+      font-size: 13px;
+    }
+
+    .drawer-loading {
+      text-align: center;
+      padding: 30px;
+      color: #94a3b8;
+    }
+
+    .drawer-secao {
+      background: #fff;
+      border: 1px solid #e2e8f0;
+      border-radius: 10px;
+      padding: 14px 16px;
+      margin-bottom: 14px;
+    }
+
+    .drawer-secao-titulo {
+      font-weight: 800;
+      font-size: 13px;
+      color: #0A3D62;
+      margin-bottom: 10px;
+    }
+
+    .drawer-alerta {
+      border-radius: 8px;
+      padding: 8px 12px;
+      margin-bottom: 10px;
+      font-size: 13px;
+    }
+
+    .drawer-alerta.vermelho {
+      background: #fff1f2;
+      color: #ef4444;
+      border: 1px solid #fecaca;
+    }
+
+    .drawer-alerta.amarelo {
+      background: #fffbeb;
+      color: #d97706;
+      border: 1px solid #fde68a;
+    }
+
+    .btn-drawer-sm {
+      padding: 5px 12px;
+      border: 1px solid #e2e8f0;
+      border-radius: 6px;
+      background: #fff;
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    .btn-drawer-sm.btn-verde {
+      background: #22c55e;
+      color: #fff;
+      border-color: #22c55e;
+    }
+
+    .btn-drawer-sm.btn-vermelho {
+      background: #ef4444;
+      color: #fff;
+      border-color: #ef4444;
+    }
+  </style>
+
+  <div id="drawer-usuario-overlay" onclick="if(event.target===this)fecharDrawerUsuario()">
+    <div id="drawer-usuario">
+      <div id="drawer-usuario-header">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start">
+          <div>
+            <div id="drawer-usuario-nome" style="font-size:17px;font-weight:800;letter-spacing:.3px"></div>
+            <div id="drawer-usuario-sub" style="font-size:12px;opacity:.8;margin-top:2px"></div>
+          </div>
+          <button onclick="fecharDrawerUsuario()" style="background:rgba(255,255,255,.15);border:none;color:#fff;
+            border-radius:8px;padding:6px 12px;cursor:pointer;font-size:13px;font-weight:700">
+            ✕ Fechar
+          </button>
+        </div>
+        <div id="drawer-usuario-tabs">
+          <button class="drawer-tab-btn" data-tab="resumo" onclick="_ativarDrawerTab('resumo')">📋 Resumo</button>
+          <button class="drawer-tab-btn" data-tab="pagamentos" onclick="_ativarDrawerTab('pagamentos')">💳
+            Pagamentos</button>
+          <button class="drawer-tab-btn" data-tab="solicitacoes" onclick="_ativarDrawerTab('solicitacoes')">📬
+            Solicitações</button>
+          <button class="drawer-tab-btn" data-tab="envios" onclick="_ativarDrawerTab('envios')">📨 Envios</button>
+          <button class="drawer-tab-btn" data-tab="interacoes" onclick="_ativarDrawerTab('interacoes')">💬
+            Interações</button>
+          <button class="drawer-tab-btn" data-tab="acesso" onclick="_ativarDrawerTab('acesso')">⏰ Acesso</button>
+        </div>
+      </div>
+      <div id="drawer-usuario-body">
+        <div class="drawer-loading">⏳ Carregando...</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- seus scripts (main.js deve conter firebase.initializeApp e db) -->
+  <script src="js/planos.js"></script>
+  <script src="js/features.js"></script>
+  <script src="js/cupons.js"></script>
+  <script src="js/vitrine.js"></script>
+  <script src="js/main.js"></script>
+  <script src="js/subcollections.js"></script>
+  <script src="js/drawer-usuario.js"></script>
+  <script src="js/admin-votacoes.js"></script>
+  <script src="js/feedbacks.js"></script>
+  <script src="js/alertasPush.js"></script>
+  <script src="js/site.js"></script>
+  <script src="js/functions.js"></script>
+  <script src="js/mailer.js"></script>
+  <script src="js/calendarioAdmin.js"></script>
+
+
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/2.4.0/purify.min.js"></script>
+  <script src="js/TemplatesNewsletter.js"></script>
+
+  <script>
+    //    function closeModal(id) { document.getElementById(id).classList.remove('show'); document.getElementById(id).setAttribute('aria-hidden', 'true'); }
+    //function openModal(id) { document.getElementById(id).classList.add('show'); document.getElementById(id).setAttribute('aria-hidden', 'false'); }
+
+    function openModal(id) {
+      const modal = document.getElementById(id);
+      if (modal) {
+        modal.style.display = "block"; // garante que não está oculto
+        modal.classList.add("aberto");
+        modal.setAttribute("aria-hidden", "false");
+      } else {
+        console.warn("Modal não encontrado:", id);
+      }
+    }
+
+
+    function closeModal(id) {
+      const modal = document.getElementById(id);
+      if (modal) {
+        modal.classList.remove("aberto");
+        modal.setAttribute("aria-hidden", "true");
+        modal.style.display = "none"; // oculta novamente
+      }
+    }
+
+    function mostrarSecaoPrincipal(id) {
+      const secoesPrincipais = [
+        "secao-dashboard",
+        "secao-newsletters-envio",
+        "secao-orientacoes",
+        "secao-backlog"
+      ];
+
+      secoesPrincipais.forEach(secaoId => {
+        const el = document.getElementById(secaoId);
+        if (el) {
+          el.style.display = (secaoId === id ? "block" : "none");
+        }
+      });
+
+
+      const secoes = document.querySelectorAll("section.card");
+      secoes.forEach(secao => {
+        secao.style.display = "none";
+      });
+
+      secoes.forEach(secaoId => {
+        const el = document.getElementById(secaoId);
+        if (el) {
+          el.style.display = "none";
+        }
+      });
+
+      const el = document.getElementById("painel-gestao");
+      if (el) {
+        el.style.display = "none";
+      }
+
+
+      const ativa = document.getElementById(id);
+      if (ativa) {
+        ativa.style.display = "block";
+      }
+    }
+
+    function toggleSidebarMobile(forcarAberto) {
+      const sidebar = document.getElementById('sidebar');
+      const overlay = document.getElementById('sidebar-overlay');
+      const abrir = typeof forcarAberto === 'boolean' ? forcarAberto : !sidebar.classList.contains('aberto');
+      sidebar.classList.toggle('aberto', abrir);
+      overlay.classList.toggle('aberto', abrir);
+    }
+
+    async function abrirTab(tabId) {
+      // fecha o drawer do menu ao trocar de aba no mobile
+      if (window.innerWidth <= 760) toggleSidebarMobile(false);
+      document.querySelectorAll('main section').forEach(sec => sec.style.display = 'none');
+      document.querySelectorAll('aside#sidebar button').forEach(btn => btn.classList.remove('active'));
+      const btn = document.querySelector(`aside#sidebar button[onclick="abrirTab('${tabId}')"]`);
+      if (btn) btn.classList.add('active');
+      const el = document.getElementById(tabId);
+      if (el) el.style.display = 'block';
+
+      // carrega conteúdo da aba
+      //      if (tabId === 'usuarios') carregarUsuariosComFiltro();
+      if (tabId === 'planos') {
+        carregarPlanos();
+        atualizarHeaderTabelaPlanos();
+      }
+      else if (tabId === 'cupons') carregarCupons();
+      else if (tabId === 'newsletters') {
+        preencherFiltroTipoNewsletter(document.getElementById("filtro-tipo-news"));
+        carregarNewsletters();
+      }
+      else if (tabId === 'template_newsletters') carregarTemplatesNewsletter();
+      else if (tabId === 'tipo-newsletters') carregarTipoNewsLetters();
+      else if (tabId === 'leads') { carregarLeads(true); }
+      else if (tabId === 'feedbacks') carregarSecaoFeedbacks();
+      else if (tabId === 'auditoria') carregarInteracoesAuditoria();
+      else if (tabId === 'respostas_automaticas') carregarrespostas_automaticas();
+      else if (tabId === 'aba-temas') carregarTemas_noticias();
+      else if (tabId === 'alertas-push') iniciarPainelAlertasPush();
+      else if (tabId === 'relatorio-por-tipo') {
+        await montarComboTiposNewsletter();
+        gerarRelatorioPreferencias();
+      }
+      else if (tabId === 'relatorio-por-usuario') {
+        document.getElementById("detalhes-relatorio-usuario").innerHTML = "";
+        gerarRelatorioPorUsuario();
+      }
+      else if (tabId === 'relatorio-avaliacoes') {
+        carregarRelatorioAvaliacoes();
+      }
+      else if (tabId === 'votacoes-temas') {
+        carregarPainelVotacoesTemas();
+      }
+      else if (tabId === 'calendario') renderCalendarioAdmin(document.getElementById('cal-admin-root'));
+    }
+
+    // inicializa com usuários visível
+    abrirTab('usuarios');
+
+    // Aguarda o supabase estar disponível (module script é assíncrono)
+    function _aguardarSupabaseEVerificar(tentativas = 0) {
+      if (window.supabase) {
+        verificarPendenciasLeads();
+      } else if (tentativas < 20) {
+        setTimeout(() => _aguardarSupabaseEVerificar(tentativas + 1), 150);
+      } else {
+        console.warn('[admin] supabase não disponível para verificar pendências');
+      }
+    }
+    _aguardarSupabaseEVerificar();
+
+    // Badge usuários — aguarda drawer-usuario.js carregar
+    setTimeout(() => {
+      if (typeof atualizarBadgeUsuarios === 'function') atualizarBadgeUsuarios();
+      if (typeof atualizarBadgeFeedbacks === 'function') atualizarBadgeFeedbacks();
+    }, 1000);
+  </script>
+  <script>
+    document.addEventListener("DOMContentLoaded", () => {
+      const dados = JSON.parse(localStorage.getItem("usuarioLogado"));
+      if (dados) {
+        const nome = dados.nome || dados.email || "Usuário";
+        const perfil = dados.tipo_perfil || "indefinido";
+
+        const topo = document.getElementById("usuario-logado-topo");
+        if (topo) {
+          topo.innerText = `👤${nome} (${perfil})`;
+        }
+      }
+    });
+  </script>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script>
+    // Usuários
+    const ctxUsuarios = document.getElementById('grafico-usuarios').getContext('2d');
+    window.graficoUsuarios = new Chart(ctxUsuarios, {
+      type: 'doughnut',
+      data: {
+        labels: ['Ativos', 'Inativos'],
+        datasets: [{
+          data: [0, 0], // inicial vazio
+          backgroundColor: ['#4caf50', '#f44336']
+        }]
+      },
+      options: {
+        responsive: true,
+        plugins: {
+          legend: { position: 'bottom' }
+        }
+      }
+    });
+
+
+    // Leads
+    const ctxLeads = document.getElementById('grafico-leads').getContext('2d');
+    window.graficoLeads = new Chart(ctxLeads, {
+      type: 'bar',
+      data: {
+        labels: ['Novo', 'Em contato', 'Negociando', 'Convertido', 'Descartado'],
+        datasets: [{
+          label: 'Leads',
+          data: [0, 0, 0, 0, 0],
+          backgroundColor: ['#2196f3', '#03a9f4', '#ffc107', '#4caf50', '#9e9e9e']
+        }]
+      },
+      options: {
+        indexAxis: 'y',
+        responsive: true,
+        plugins: {
+          legend: { display: false }
+        }
+      }
+    });
+
+    // Pagamentos
+    const ctxPagamentos = document.getElementById('grafico-pagamentos').getContext('2d');
+    window.graficoPagamentos = new Chart(ctxPagamentos, {
+      type: 'doughnut',
+      data: {
+        labels: ['pago', 'pendente', 'cancelado'],
+        datasets: [{
+          data: [],
+          backgroundColor: ['#4caf50', '#ff9800', '#9e9e9e']
+        }]
+      },
+      options: {
+        responsive: true,
+        plugins: {
+          legend: { position: 'bottom' }
+        }
+      }
+    });
+
+    // Assinaturas
+    const ctxAssinaturas = document.getElementById('grafico-assinaturas').getContext('2d');
+    window.graficoAssinaturas = new Chart(ctxAssinaturas, {
+      type: 'bar',
+      data: {
+        labels: [], // será preenchido dinamicamente
+        datasets: [{
+          label: 'Assinaturas por Tipo',
+          data: [],
+          backgroundColor: [], // será preenchido dinamicamente
+        }]
+      },
+      options: {
+        responsive: true,
+        plugins: {
+          legend: { display: false }
+        },
+        scales: {
+          y: { beginAtZero: true }
+        }
+      }
+    });
+
+    // comparativo preferencias/assinaturas
+    const ctxComparativo = document.getElementById('grafico-comparativo').getContext('2d');
+    window.graficoComparativo = new Chart(ctxComparativo, {
+      type: 'bar',
+      data: {
+        labels: [],
+        datasets: [
+          {
+            label: 'Preferências',
+            data: [],
+            backgroundColor: '#2196f3'
+          },
+          {
+            label: 'Assinaturas',
+            data: [],
+            backgroundColor: '#4caf50'
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        plugins: {
+          legend: { position: 'bottom' }
+        },
+        scales: {
+          y: { beginAtZero: true }
+        }
+      }
+    });
+
+  </script>
+
+
+  <!-- ── Modal específico da Newsletter (3 colunas) ───────────────────────── -->
+  <style>
+    #modal-newsletter-overlay {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      background: rgba(0, 0, 0, 0.5);
+      z-index: 9999;
+      overflow-y: auto;
+    }
+
+    #modal-newsletter-overlay.aberto {
+      display: block;
+    }
+
+    #modal-newsletter-overlay .modal-nw {
+      width: 95%;
+      max-width: 1400px;
+      background: #fff;
+      border-radius: 10px;
+      padding: 32px 24px 24px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+      margin: 40px auto 40px;
+      position: relative;
+      box-sizing: border-box;
+    }
+
+    #modal-newsletter-overlay h2 {
+      margin: 0 0 20px;
+      font-size: 18px;
+      color: #0A3D62;
+    }
+
+    #modal-newsletter-overlay .newsletter-grid {
+      display: grid;
+      grid-template-columns: 300px 1fr 360px;
+      gap: 24px;
+      width: 100%;
+      align-items: start;
+    }
+
+    #modal-newsletter-overlay .modal-buttons {
+      text-align: right;
+      margin-top: 16px;
+      padding-top: 12px;
+      border-top: 1px solid #e2e8f0;
+    }
+
+    #modal-newsletter-overlay .modal-buttons button {
+      padding: .5em 1.2em;
+      margin-left: .4em;
+    }
+
+    /* ─── Estilos para o painel de votações ────────────────────────────── */
+    #votacoes-temas {
+      background: #fafafa;
+    }
+
+    #votacoes-temas h2 {
+      margin-top: 0;
+      color: #0a3d62;
+      font-size: 22px;
+    }
+
+    #votacoes-temas h3 {
+      margin-top: 0;
+      margin-bottom: 16px;
+      font-size: 16px;
+      font-weight: 700;
+    }
+
+    @media (max-width: 768px) {
+      #votacoes-temas-content {
+        font-size: 13px;
+      }
+    }
+
+    @media (max-width: 900px) {
+      #modal-newsletter-overlay .newsletter-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+
+  <div id="modal-newsletter-overlay" aria-hidden="true">
+    <div class="modal-nw">
+      <h2 id="modal-newsletter-title"></h2>
+      <div id="modal-newsletter-body"></div>
+      <div class="modal-buttons">
+        <button onclick="closeModal('modal-newsletter-overlay')">Cancelar</button>
+        <button id="modal-newsletter-save">💾 Salvar</button>
+      </div>
+    </div>
+  </div>
+
+  <style>
+    /* Layout Vertical do Formulário do Calendário */
+    #cad-form-template {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    #cad-form-template .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    #cad-form-template label {
+      display: block;
+      font-size: 11px;
+      font-weight: 700;
+      color: #475569;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 0;
+    }
+
+    #cad-form-template input,
+    #cad-form-template select,
+    #cad-form-template textarea {
+      width: 100%;
+      padding: 10px 12px;
+      background: #f8fafc;
+      border: 1px solid #cbd5e1;
+      border-radius: 8px;
+      color: #0f172a;
+      font-size: 14px;
+      font-family: inherit;
+      box-sizing: border-box;
+      /* Garante que o padding não estoure a largura */
+    }
+
+    /* Linha para Data e Status ficarem lado a lado */
+    #cad-form-template .row-dupla {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+
+    /* Checkboxes dos avisos */
+    #cad-form-template .check-group {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    #cad-form-template .check-group label {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-weight: normal;
+      text-transform: none;
+      cursor: pointer;
+      color: #475569;
+    }
+
+    #cad-form-template .check-group input {
+      width: auto;
+      margin: 0;
+    }
+
+    /* Botão Salvar */
+    #cad-form-template button#cf-salvar {
+      width: 100%;
+      background: #0A3D62;
+      color: white;
+      border: none;
+      padding: 12px;
+      border-radius: 8px;
+      font-weight: 700;
+      cursor: pointer;
+      margin-top: 10px;
+    }
+
+    /* Cabeçalho do Painel */
+    .cad-panel-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+      padding-bottom: 15px;
+      border-bottom: 1px solid #e2e8f0;
+    }
+
+    .cad-panel-header h3 {
+      margin: 0;
+      font-size: 18px;
+      color: #0f172a;
+    }
+
+    .cad-panel-header button {
+      background: none;
+      border: none;
+      font-size: 20px;
+      cursor: pointer;
+      color: #64748b;
+    }
+  </style>
+
+  <!-- Template Oculto do Formulário de Calendário -->
+  <div id="cad-form-template" style="display:none;">
+
+    <div class="cad-panel-header">
+      <h3 id="cad-form-title">Novo evento</h3>
+      <button onclick="window._cadFecharPainel()">✕</button>
+    </div>
+
+    <form id="cad-event-form">
+      <div class="form-group">
+        <label>Sistema</label>
+        <select id="cf-sistema">
+          <option value="fundeb">FUNDEB</option>
+          <option value="siope">SIOPE</option>
+          <option value="salario_educacao">Salário-Educação</option>
+          <option value="siscacs">SISCACS</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label>Tipo</label>
+        <select id="cf-tipo">
+          <option value="repasse">Repasse</option>
+          <option value="prazo">Prazo</option>
+          <option value="reuniao">Reunião</option>
+          <option value="mandato">Mandato</option>
+          <option value="outro">Outro</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label>Título</label>
+        <input type="text" id="cf-titulo" placeholder="Ex: Repasse FUNDEB – Jun/2026">
+      </div>
+
+      <div class="form-group">
+        <label>Descrição <span style="font-weight:400; text-transform:none; font-size:10px">(opcional)</span></label>
+        <textarea id="cf-descricao" rows="3"></textarea>
+      </div>
+
+      <div class="row-dupla">
+        <div class="form-group">
+          <label>Data</label>
+          <input type="date" id="cf-data">
+        </div>
+        <div class="form-group">
+          <label>Status</label>
+          <select id="cf-status">
+            <option value="previsto">Previsto</option>
+            <option value="confirmado">Confirmado</option>
+            <option value="realizado">Realizado</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>Avisos antecipados (dias antes)</label>
+        <div class="check-group">
+          <label><input type="checkbox" class="cf-aviso" value="3"> 3d</label>
+          <label><input type="checkbox" class="cf-aviso" value="7"> 7d</label>
+          <label><input type="checkbox" class="cf-aviso" value="15"> 15d</label>
+          <label><input type="checkbox" class="cf-aviso" value="30"> 30d</label>
+        </div>
+      </div>
+
+      <div class="form-group" style="flex-direction: row; align-items: center; gap: 16px; margin-top: 10px;">
+        <label style="display:flex; align-items:center; gap:6px; font-weight:normal; text-transform:none;">
+          <input type="checkbox" id="cf-free" style="width:auto; margin:0;"> Visível no plano free
+        </label>
+
+        <!-- Checkbox 'Ativo' só aparece na edição -->
+        <label id="wrap-cf-ativo"
+          style="display:none; display:flex; align-items:center; gap:6px; font-weight:normal; text-transform:none;">
+          <input type="checkbox" id="cf-ativo" style="width:auto; margin:0;"> Ativo
+        </label>
+      </div>
+
+      <button type="button" id="cf-salvar">Criar evento</button>
+    </form>
+  </div>
+
 </body>
+
 </html>
