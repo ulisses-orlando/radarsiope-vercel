@@ -2316,7 +2316,75 @@
         });
     </script>
 
+    <style>
+        /* ===== CORREÇÃO: Botão "Começar Agora" com melhor contraste ===== */
 
+        /* Botão no header/menu de navegação */
+        .header a[href*="assinatura.html"],
+        nav a[href*="assinatura.html"],
+        .nav-cta {
+            background: #007bff !important;
+            color: #ffffff !important;
+            padding: 10px 20px;
+            border-radius: 5px;
+            text-decoration: none;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            display: inline-block;
+        }
+
+        .header a[href*="assinatura.html"]:hover,
+        nav a[href*="assinatura.html"]:hover {
+            background: #0056b3 !important;
+            color: #ffffff !important;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 123, 255, 0.3);
+        }
+
+        /* Botão na seção hero (principal) */
+        .hero a[href*="assinatura.html"],
+        .hero-section a[href*="assinatura.html"],
+        .main-cta {
+            background: #007bff !important;
+            color: #ffffff !important;
+            padding: 15px 30px;
+            border-radius: 8px;
+            text-decoration: none;
+            font-weight: 700;
+            font-size: 1.1rem;
+            transition: all 0.3s ease;
+            display: inline-block;
+        }
+
+        .hero a[href*="assinatura.html"]:hover,
+        .hero-section a[href*="assinatura.html"]:hover {
+            background: #0056b3 !important;
+            color: #ffffff !important;
+            transform: translateY(-3px);
+            box-shadow: 0 6px 20px rgba(0, 123, 255, 0.4);
+        }
+
+        /* Se houver classe .cta-button ou .btn-primary */
+        .cta-button,
+        .btn-primary {
+            background: #007bff !important;
+            color: #ffffff !important;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 5px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .cta-button:hover,
+        .btn-primary:hover {
+            background: #0056b3 !important;
+            color: #ffffff !important;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 123, 255, 0.3);
+        }
+    </style>
 
 </body>
 
