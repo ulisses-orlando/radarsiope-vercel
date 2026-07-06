@@ -2820,16 +2820,22 @@ const _drawer = {
   termoBusca: '',
 };
 
+let _tiposCache = null;
+
 async function _getTipos() {
+  if (_tiposCache) return _tiposCache;
+
   const snap = await db.collection('tipo_newsletters')
     .where('is_newsletter', '==', true)
     .get();
 
-  return snap.docs.map(d => ({
+  _tiposCache = snap.docs.map(d => ({
     id: d.id,
     nome: d.data().nome || d.id,
     icone: d.data().icone || '📰',
   }));
+
+  return _tiposCache;
 }
 
 // ─── Verificar acesso do assinante a um tipo ─────────────────────────────────
