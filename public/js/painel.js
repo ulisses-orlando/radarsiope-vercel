@@ -206,6 +206,20 @@ async function carregarAssinaturas(uid) {
   }
 }
 
+// ─── Drip: reutiliza a mesma lógica do verNewsletterComToken ─────────────────
+function _edicaoLiberadaParaAssinante(edicao, dataAtivacao) {
+  if (edicao.formato === 'extra') return true;
+  const numero = parseInt(edicao.numero, 10);
+  if (!numero || isNaN(numero)) return true;
+  const msAtivacao = dataAtivacao instanceof Date
+    ? dataAtivacao.getTime()
+    : new Date(dataAtivacao).getTime();
+  const semanasDesdeAtivacao = Math.floor(
+    (Date.now() - msAtivacao) / (7 * 24 * 60 * 60 * 1000)
+  );
+  return numero <= semanasDesdeAtivacao + 1;
+}
+
 // ─── Biblioteca de Newsletters ────────────────────────────────────────────────
 async function carregarBibliotecaNewsletters(uid) {
   const container = document.getElementById('biblioteca-tecnica');
@@ -254,11 +268,18 @@ async function carregarBibliotecaNewsletters(uid) {
 
     const _noIframe = window.parent !== window;
 
+    // Recupera data_ativacao da sessão para o drip
+    const _sessao = (() => { try { return JSON.parse(localStorage.getItem('rs_pwa_session') || '{}'); } catch { return {}; } })();
+    const _dataAtivacao = _sessao.data_ativacao ? new Date(_sessao.data_ativacao) : null;
+
     const cards = nlSnap.docs
       .filter(doc => {
+        const nl = doc.data();
+        // Drip semanal
+        if (_dataAtivacao && !_edicaoLiberadaParaAssinante(nl, _dataAtivacao)) return false;
         // Filtra por tipo se a assinatura tem tipos_selecionados
         if (!tiposSel.length) return true;
-        const tipo = doc.data().tipo || doc.data().Tipo;
+        const tipo = nl.tipo || nl.Tipo;
         return !tipo || tiposSel.includes(String(tipo));
       })
       .map(doc => {
@@ -267,6 +288,9 @@ async function carregarBibliotecaNewsletters(uid) {
         const titulo = nl.titulo || `Edição ${nl.numero || '—'}`;
         const numero = nl.numero || '—';
         const data = fmtData(nl.data_publicacao);
+        const badgeExtra = nl.formato === 'extra'
+          ? '<span style="font-size:9px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;background:rgba(245,158,11,.15);color:#d97706;border:1px solid rgba(245,158,11,.3);border-radius:4px;padding:1px 5px;margin-left:6px;vertical-align:middle">⚡ extra</span>'
+          : '';
 
         // URL sem token e sem envioId — assinante usa sessão
         const qs = [`nid=${nid}`, `uid=${uid}`, `assinaturaId=${assinaturaId}`].join('&');
@@ -284,7 +308,7 @@ async function carregarBibliotecaNewsletters(uid) {
             <div class="nl-card-header">
               <div>
                 <div class="nl-card-edicao">Edição ${numero}</div>
-                <div class="nl-card-titulo">${titulo}</div>
+                <div class="nl-card-titulo">${titulo}${badgeExtra}</div>
                 <div class="nl-card-data">📅 ${data}</div>
               </div>
             </div>
