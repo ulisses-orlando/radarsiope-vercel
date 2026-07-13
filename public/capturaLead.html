@@ -12,8 +12,7 @@
 
   <div class="container">
     <h2>🔒 Radar SIOPE</h2>
-    <p>Preencha o formulário abaixo para receber informações sobre nossas newsletters, planos, capacitação ou
-      consultoria.</p>
+    <p>Preencha o formulário abaixo para receber informações sobre nosso projeto.</p>
 
     <form id="form-interesse">
       <label>Nome:</label>
@@ -77,6 +76,18 @@
   <script src="js/mailer.js"></script>
   <script type="module" src="/exposeSupabase.js"></script>
   <script type="module" src="js/capturaLead.js"></script>
+
+  <!-- Pré-preenchimento via parâmetro de URL (ex: vindo do CTA "Conheça o App" do site) -->
+  <script>
+    document.addEventListener('DOMContentLoaded', function () {
+      const params = new URLSearchParams(window.location.search);
+      const mensagem = params.get('mensagem');
+      if (mensagem) {
+        const campoMensagem = document.getElementById('mensagem');
+        if (campoMensagem) campoMensagem.value = mensagem;
+      }
+    });
+  </script>
 
 </body>
 
