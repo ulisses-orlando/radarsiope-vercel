@@ -26,7 +26,7 @@ async function salvarFeature(id, data) {
   try {
     const docData = {
       nome: data.nome, descricao: data.descricao, tipo: data.tipo,
-      unidade: data.unidade || '', icone: data.icone || '⚙️',
+      unidade: data.unidade || '', icone: data.icone || '⚙️', destaque: data.destaque || false,
       ordem: Number(data.ordem) || 99, ativo: data.ativo !== false,
       criado_em: data.criado_em || new Date(), atualizado_em: new Date()
     };
@@ -66,10 +66,10 @@ function renderCampoFeature(feature, valor) {
   }
   if (feature.tipo === 'number') {
     const unidade = feature.unidade ? ` ${feature.unidade}` : '';
-    return `<div style="display:flex;align-items:center;justify-content:space-between;gap:8px"><span style="font-size:13px">${escapeHtml(label)}</span><div style="display:flex;align-items:center;gap:4px"><input type="number" id="${id}" value="${Number(valor)||0}" min="0" max="999" style="width:70px;padding:4px 6px;border:1px solid #ccc;border-radius:4px;font-size:13px"><span style="font-size:12px;color:#666">${unidade}</span></div></div>`;
+    return `<div style="display:flex;align-items:center;justify-content:space-between;gap:8px"><span style="font-size:13px">${escapeHtml(label)}</span><div style="display:flex;align-items:center;gap:4px"><input type="number" id="${id}" value="${Number(valor) || 0}" min="0" max="999" style="width:70px;padding:4px 6px;border:1px solid #ccc;border-radius:4px;font-size:13px"><span style="font-size:12px;color:#666">${unidade}</span></div></div>`;
   }
   if (feature.tipo === 'text') {
-    return `<div><label for="${id}" style="font-size:13px;display:block;margin-bottom:4px">${escapeHtml(label)}</label><input type="text" id="${id}" value="${escapeHtml(valor||'')}" style="width:100%;padding:6px;border:1px solid #ccc;border-radius:4px;font-size:13px"></div>`;
+    return `<div><label for="${id}" style="font-size:13px;display:block;margin-bottom:4px">${escapeHtml(label)}</label><input type="text" id="${id}" value="${escapeHtml(valor || '')}" style="width:100%;padding:6px;border:1px solid #ccc;border-radius:4px;font-size:13px"></div>`;
   }
   return '';
 }
@@ -196,6 +196,10 @@ async function abrirModalFeature(id = null) {
             <input type="checkbox" id="feat-ativo" ${d.ativo ? 'checked' : ''}>
             <span style="font-size:13px">Ativo</span>
           </label>
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
+            <input type="checkbox" id="feat-destaque" ${d.destaque ? 'checked' : ''}>
+            <span style="font-size:13px">👑 Destaque</span>
+          </label>
         </div>
       </div>
     </div>
@@ -224,6 +228,7 @@ async function _salvarFeatureModal(id) {
     tipo: document.getElementById('feat-tipo').value,
     unidade: document.getElementById('feat-unidade').value.trim(),
     icone: document.getElementById('feat-icone').value.trim(),
+    destaque: document.getElementById('feat-destaque').checked,
     ordem: document.getElementById('feat-ordem').value,
     ativo: document.getElementById('feat-ativo').checked
   };
