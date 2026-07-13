@@ -511,12 +511,12 @@ function _criarCardPlano(plano, ciclo, allFeatures) {
     }
     const isDestaque = f.destaque === true;
 
-    return isDestaque
-      ? `<span style="display:inline-flex;align-items:center;gap:4px">
-         <span style="color:#FFD700;font-size:14px" title="Feature destacada"></span>
+    return isDestaque 
+    ? `<span style="display:inline-flex;align-items:center;gap:4px">
+         <span style="color:#FFD700;font-size:14px" title="Feature destacada">👑</span>
          <span>${label}</span>
        </span>`
-      : label;
+    : label;
   };
 
   const ativos = allFeatures.filter(f => !!features[f.id]);
