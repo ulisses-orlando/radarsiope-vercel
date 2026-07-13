@@ -48,7 +48,7 @@ function mostrarModalAgradecimento(nome) {
 function fecharModalAgradecimento() {
   document.getElementById("modalAgradecimento").style.display = "none";
   setTimeout(() => {
-    window.location.href = "newsletters.html";
+    window.location.href = "index.html";
   }, 200);
 }
 
