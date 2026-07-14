@@ -215,7 +215,9 @@ async function processarEnvioInteresse(e) {
 
         if (origem === "trial") {
             try {
+                console.log('[capturaLead] Gerando acesso trial para lead', novoLeadRef.id);
                 linkAcesso = await gerarLinkAcessoTrial(novoLeadRef.id);
+                console.log('[capturaLead] Link de acesso trial gerado:', linkAcesso);
                 tipoMensagem = "acesso_trial";
 
                 // Já foi resolvido automaticamente — tira do backlog de "Novo"
@@ -227,7 +229,7 @@ async function processarEnvioInteresse(e) {
                 console.error('[capturaLead] Falha ao gerar acesso trial, mantendo primeiro_contato:', e);
             }
         }
-
+console.log('[capturaLead] tipoMensagem:', tipoMensagem, 'linkAcesso:', linkAcesso);
         // Disparo automático de boas-vindas (ou acesso trial)
         await dispararMensagemAutomatica(tipoMensagem, {
             id: novoLeadRef.id,
@@ -240,6 +242,7 @@ async function processarEnvioInteresse(e) {
             perfil: perfil,
             link_acesso: linkAcesso
         }, "lead");
+        console.log('[capturaLead] Mensagem automática disparada para lead', novoLeadRef.id);
         // Incrementa contadores no admin_contadores
         try {
           const _db = window.db;
