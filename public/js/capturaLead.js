@@ -67,15 +67,32 @@ document.addEventListener("DOMContentLoaded", () => {
 // grava em leads_envios — sem depender daquela função. O acesso "pro" de 72h em
 // si é resolvido pelo detectarAcesso() em verNewsletterComToken.js a partir dos
 // campos acesso_pro_temporario/acesso_pro_horas já configurados na edição.
+
+// Token autocontido: usa gerarTokenAcesso() se ela já estiver carregada na página
+// (ex: reaproveitada de outro script), senão gera localmente. Evita depender de
+// um script que talvez só exista em admin.html.
+function _gerarTokenTrial() {
+    if (typeof gerarTokenAcesso === 'function') return gerarTokenAcesso();
+    if (window.crypto?.randomUUID) return crypto.randomUUID().replace(/-/g, '');
+    return Array.from({ length: 32 }, () => Math.floor(Math.random() * 16).toString(16)).join('');
+}
+
+// Busca a edição 001 tolerando o campo "numero" salvo como string ou como número.
+async function _buscarNewsletterVitrine() {
+    let snap = await db.collection('newsletters').where('numero', '==', '001').limit(1).get();
+    if (snap.empty) {
+        snap = await db.collection('newsletters').where('numero', '==', 1).limit(1).get();
+    }
+    if (snap.empty) {
+        throw new Error("Edição 001 não encontrada (testado numero='001' e numero=1).");
+    }
+    return snap.docs[0].id;
+}
+
 async function gerarLinkAcessoTrial(leadId) {
-    // Edição 001 = primeira edição, liberada a todos os assinantes — usada como vitrine.
-    const snap = await db.collection('newsletters')
-        .where('numero', '==', '001').limit(1).get();
+    const newsletterId = await _buscarNewsletterVitrine();
 
-    if (snap.empty) throw new Error('Edição 001 não encontrada.');
-    const newsletterId = snap.docs[0].id;
-
-    const token = gerarTokenAcesso();
+    const token = _gerarTokenTrial();
     const expiraEm = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000); // validade do link: 3 dias
 
     const { data, error } = await window.supabase
@@ -91,7 +108,7 @@ async function gerarLinkAcessoTrial(leadId) {
         .select('id')
         .single();
 
-    if (error) throw new Error(`Erro ao gerar acesso trial: ${error.message}`);
+    if (error) throw new Error(`Erro ao inserir em leads_envios: ${error.message || JSON.stringify(error)}`);
 
     const partes = [`nid=${newsletterId}`, `env=${data.id}`, `uid=${leadId}`, `token=${token}`];
     const b64 = btoa(partes.join('&'));
@@ -215,7 +232,7 @@ async function processarEnvioInteresse(e) {
                     .update({ status: "Trial enviado" })
                     .eq("id", novoLeadRef.id);
             } catch (e) {
-                console.warn('[capturaLead] Falha ao gerar acesso trial, mantendo primeiro_contato:', e.message);
+                console.error('[capturaLead] Falha ao gerar acesso trial, mantendo primeiro_contato:', e);
             }
         }
 
