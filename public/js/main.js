@@ -2393,7 +2393,7 @@ async function carregarLeads(resetar = false) {
       return;
     }
 
-    const contadores = { "Novo": 0, "Em contato": 0, "Negociando": 0, "Convertido": 0, "Descartado": 0 };
+    const contadores = { "Novo": 0, "Em contato": 0, "Negociando": 0, "Convertido": 0, "Descartado": 0, "Trial enviado": 0 };
     let linhas = "";
 
     for (const d of leads) {
@@ -2428,7 +2428,7 @@ async function carregarLeads(resetar = false) {
           <td style="font-size:11px">${d.nome_municipio || ""}${d.cod_uf ? ` / ${d.cod_uf}` : ""}</td>
           <td>
             <select onchange="atualizarStatusLeadSupabase('${d.id}', this.value)">
-              ${["Novo", "Em contato", "Negociando", "Convertido", "Descartado"].map(op =>
+              ${["Novo", "Em contato", "Negociando", "Convertido", "Descartado", "Trial enviado"].map(op =>
         `<option value="${op}" ${op === statusAtual ? "selected" : ""}>${op}</option>`
       ).join("")}
             </select>
@@ -2456,6 +2456,7 @@ async function carregarLeads(resetar = false) {
       <span style="color:orange">🟡 ${contadores["Negociando"]} negociando</span> |
       <span style="color:blue">🔵 ${contadores["Em contato"]} em contato</span> |
       <span style="color:gray">⚪ ${contadores["Novo"]} novos</span>
+      <span style="color:gray">🔍 ${contadores["Trial enviado"]} trial enviado</span>
       ${mostrando < total
         ? `&nbsp;|&nbsp;<span style="cursor:pointer;text-decoration:underline;color:#007acc"
              onclick="_leadsOffset+=${_LEADS_LIMIT};carregarLeads()">▶ Próxima página</span>`
@@ -4179,7 +4180,8 @@ async function carregarResumoLeads(periodoDias = 30) {
     "Em contato": 0,
     "Negociando": 0,
     "Convertido": 0,
-    "Descartado": 0
+    "Descartado": 0,
+    "Trial enviado": 0
   };
 
   leadsSnap.forEach(doc => {
@@ -4195,7 +4197,8 @@ async function carregarResumoLeads(periodoDias = 30) {
       contagem["Em contato"],
       contagem["Negociando"],
       contagem["Convertido"],
-      contagem["Descartado"]
+      contagem["Descartado"],
+      contagem["Trial enviado"]
     ];
     graficoLeads.update();
   }
