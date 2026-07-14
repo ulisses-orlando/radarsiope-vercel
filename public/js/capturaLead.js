@@ -183,6 +183,9 @@ async function processarEnvioInteresse(e) {
     botao.disabled = true;
 
     try {
+        // 1. Define o status inicial com base na origem (evita necessidade de UPDATE posterior)
+        const statusInicial = (origem === "trial") ? "Trial enviado" : "Novo";
+
         const { data, error } = await window.supabase
             .from("leads")
             .insert([{
@@ -195,19 +198,18 @@ async function processarEnvioInteresse(e) {
                 interesses,
                 preferencia_contato: preferencia,
                 origem: origem,
-                status: "Novo",
-
-                // 🔹 Campos novos
+                status: statusInicial, // <-- "Trial enviado" já é salvo aqui no INSERT
                 cod_uf: dadosUf.cod_uf,
                 cod_municipio: dadosUf.cod_municipio,
                 nome_municipio: dadosUf.nome_municipio,
-
                 data_criacao: new Date().toISOString()
             }])
             .select();
 
         if (error) throw error;
-        const novoLeadRef = { id: data[0].id };
+
+        const novoLeadId = data[0].id;
+        console.log('[capturaLead] Lead criado com sucesso, ID:', novoLeadId);
 
         // ── Acesso trial (leads vindos do CTA "Conheça o App") ───────────────
         let tipoMensagem = "primeiro_contato";
@@ -215,61 +217,63 @@ async function processarEnvioInteresse(e) {
 
         if (origem === "trial") {
             try {
-                console.log('[capturaLead] Gerando acesso trial para lead', novoLeadRef.id);
-                linkAcesso = await gerarLinkAcessoTrial(novoLeadRef.id);
+                console.log('[capturaLead] Gerando acesso trial para lead', novoLeadId);
+                linkAcesso = await gerarLinkAcessoTrial(novoLeadId);
                 console.log('[capturaLead] Link de acesso trial gerado:', linkAcesso);
                 tipoMensagem = "acesso_trial";
-
-                // Já foi resolvido automaticamente — tira do backlog de "Novo"
-                await window.supabase
-                    .from("leads")
-                    .update({ status: "Trial enviado" })
-                    .eq("id", novoLeadRef.id);
-    console.log('[capturaLead] Status do lead atualizado para "Trial enviado"');
             } catch (e) {
                 console.error('[capturaLead] Falha ao gerar acesso trial, mantendo primeiro_contato:', e);
             }
         }
-console.log('[capturaLead] tipoMensagem:', tipoMensagem, 'linkAcesso:', linkAcesso);
+
+        console.log('[capturaLead] tipoMensagem:', tipoMensagem, 'linkAcesso:', linkAcesso);
+
         // Disparo automático de boas-vindas (ou acesso trial)
-        await dispararMensagemAutomatica(tipoMensagem, {
-            id: novoLeadRef.id,
-            nome: nome,
-            email: email,
-            interesse: interesses,
-            preferencia_contato: preferencia,
-            uf: dadosUf.cod_uf,
-            municipio: dadosUf.nome_municipio,
-            perfil: perfil,
-            link_acesso: linkAcesso
-        }, "lead");
-        console.log('[capturaLead] Mensagem automática disparada para lead', novoLeadRef.id);
+        try {
+            await dispararMensagemAutomatica(tipoMensagem, {
+                id: novoLeadId,
+                nome: nome,
+                email: email,
+                interesse: interesses,
+                preferencia_contato: preferencia,
+                uf: dadosUf.cod_uf,
+                municipio: dadosUf.nome_municipio,
+                perfil: perfil,
+                link_acesso: linkAcesso
+            }, "lead");
+            console.log('[capturaLead] Mensagem automática disparada para lead', novoLeadId);
+        } catch (emailError) {
+            // ✅ ADICIONADO: Agora, se o e-mail falhar, o erro real aparecerá no console
+            console.error('[capturaLead] Erro ao disparar mensagem automática:', emailError);
+        }
+
         // Incrementa contadores no admin_contadores
         try {
-          const _db = window.db;
-          if (_db) {
-            const incrementos = {};
-            // Trial já foi resolvido automaticamente: não conta como pendência de "Novo"
-            if (tipoMensagem !== "acesso_trial") {
-              incrementos.leads_novos = firebase.firestore.FieldValue.increment(1);
+            const _db = window.db;
+            if (_db) {
+                const incrementos = {};
+                // Trial já foi resolvido automaticamente: não conta como pendência de "Novo"
+                if (tipoMensagem !== "acesso_trial") {
+                    incrementos.leads_novos = firebase.firestore.FieldValue.increment(1);
+                }
+                if (mensagem) incrementos.leads_mensagens = firebase.firestore.FieldValue.increment(1);
+                
+                if (Object.keys(incrementos).length) {
+                    await _db.collection('admin_contadores').doc('pendencias')
+                        .set(incrementos, { merge: true });
+                }
             }
-            if (mensagem) incrementos.leads_mensagens = firebase.firestore.FieldValue.increment(1);
-            if (Object.keys(incrementos).length) {
-              await _db.collection('admin_contadores').doc('pendencias')
-                .set(incrementos, { merge: true });
-            }
-          }
-        } catch(e) { console.warn('[capturaLead] contador:', e.message); }
+        } catch(e) { 
+            console.warn('[capturaLead] erro no contador:', e.message); 
+        }
 
         status.innerText = "Enviado com sucesso!";
         status.style.color = "green";
-
         mostrarModalAgradecimento(nome);
-
         e.target.reset();
 
     } catch (err) {
-        console.error(err);
+        console.error("Erro principal no processamento:", err);
         status.innerText = "Erro ao enviar. Tente novamente.";
         status.style.color = "red";
     } finally {
