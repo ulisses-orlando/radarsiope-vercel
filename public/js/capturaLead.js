@@ -77,20 +77,12 @@ function _gerarTokenTrial() {
     return Array.from({ length: 32 }, () => Math.floor(Math.random() * 16).toString(16)).join('');
 }
 
-// Busca a edição 001 tolerando o campo "numero" salvo como string ou como número.
-async function _buscarNewsletterVitrine() {
-    let snap = await db.collection('newsletters').where('numero', '==', '001').limit(1).get();
-    if (snap.empty) {
-        snap = await db.collection('newsletters').where('numero', '==', 1).limit(1).get();
-    }
-    if (snap.empty) {
-        throw new Error("Edição 001 não encontrada (testado numero='001' e numero=1).");
-    }
-    return snap.docs[0].id;
-}
+// ID fixo da edição 001 — usada como vitrine do trial. Mantido em sincronia
+// com a policy de INSERT em leads_envios no Supabase ("newsletter_id = ...").
+const NEWSLETTER_VITRINE_ID = '2PxBgOfhOuM6ERAVjdam';
 
 async function gerarLinkAcessoTrial(leadId) {
-    const newsletterId = await _buscarNewsletterVitrine();
+    const newsletterId = NEWSLETTER_VITRINE_ID;
 
     const token = _gerarTokenTrial();
     const expiraEm = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000); // validade do link: 3 dias
@@ -101,7 +93,7 @@ async function gerarLinkAcessoTrial(leadId) {
             lead_id: leadId,
             newsletter_id: newsletterId,
             data_envio: new Date().toISOString(),
-            status: 'pendente',
+            status: 'enviado',
             token_acesso: token,
             expira_em: expiraEm.toISOString(),
         })
