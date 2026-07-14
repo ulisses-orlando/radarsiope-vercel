@@ -60,6 +60,44 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 });
 
+// ============================
+// 2b. Acesso trial (leads vindos do CTA "Conheça o App")
+// ============================
+// Reaproveita o mesmo formato de registro que enviarLoteEmMassa (EnvioLeads.js)
+// grava em leads_envios — sem depender daquela função. O acesso "pro" de 72h em
+// si é resolvido pelo detectarAcesso() em verNewsletterComToken.js a partir dos
+// campos acesso_pro_temporario/acesso_pro_horas já configurados na edição.
+async function gerarLinkAcessoTrial(leadId) {
+    // Edição 001 = primeira edição, liberada a todos os assinantes — usada como vitrine.
+    const snap = await db.collection('newsletters')
+        .where('numero', '==', '001').limit(1).get();
+
+    if (snap.empty) throw new Error('Edição 001 não encontrada.');
+    const newsletterId = snap.docs[0].id;
+
+    const token = gerarTokenAcesso();
+    const expiraEm = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000); // validade do link: 3 dias
+
+    const { data, error } = await window.supabase
+        .from('leads_envios')
+        .insert({
+            lead_id: leadId,
+            newsletter_id: newsletterId,
+            data_envio: new Date().toISOString(),
+            status: 'pendente',
+            token_acesso: token,
+            expira_em: expiraEm.toISOString(),
+        })
+        .select('id')
+        .single();
+
+    if (error) throw new Error(`Erro ao gerar acesso trial: ${error.message}`);
+
+    const partes = [`nid=${newsletterId}`, `env=${data.id}`, `uid=${leadId}`, `token=${token}`];
+    const b64 = btoa(partes.join('&'));
+    return `https://app.radarsiope.com.br/verNewsletterComToken.html?d=${encodeURIComponent(b64)}`;
+}
+
 
 // ============================
 // 3. Envio do formulário
@@ -162,8 +200,27 @@ async function processarEnvioInteresse(e) {
         if (error) throw error;
         const novoLeadRef = { id: data[0].id };
 
-        // Disparo automático de boas-vindas 
-        await dispararMensagemAutomatica("primeiro_contato", {
+        // ── Acesso trial (leads vindos do CTA "Conheça o App") ───────────────
+        let tipoMensagem = "primeiro_contato";
+        let linkAcesso = null;
+
+        if (origem === "trial") {
+            try {
+                linkAcesso = await gerarLinkAcessoTrial(novoLeadRef.id);
+                tipoMensagem = "acesso_trial";
+
+                // Já foi resolvido automaticamente — tira do backlog de "Novo"
+                await window.supabase
+                    .from("leads")
+                    .update({ status: "Trial enviado" })
+                    .eq("id", novoLeadRef.id);
+            } catch (e) {
+                console.warn('[capturaLead] Falha ao gerar acesso trial, mantendo primeiro_contato:', e.message);
+            }
+        }
+
+        // Disparo automático de boas-vindas (ou acesso trial)
+        await dispararMensagemAutomatica(tipoMensagem, {
             id: novoLeadRef.id,
             nome: nome,
             email: email,
@@ -171,16 +228,23 @@ async function processarEnvioInteresse(e) {
             preferencia_contato: preferencia,
             uf: dadosUf.cod_uf,
             municipio: dadosUf.nome_municipio,
-            perfil: perfil
+            perfil: perfil,
+            link_acesso: linkAcesso
         }, "lead");
         // Incrementa contadores no admin_contadores
         try {
           const _db = window.db;
           if (_db) {
-            const incrementos = { leads_novos: firebase.firestore.FieldValue.increment(1) };
+            const incrementos = {};
+            // Trial já foi resolvido automaticamente: não conta como pendência de "Novo"
+            if (tipoMensagem !== "acesso_trial") {
+              incrementos.leads_novos = firebase.firestore.FieldValue.increment(1);
+            }
             if (mensagem) incrementos.leads_mensagens = firebase.firestore.FieldValue.increment(1);
-            await _db.collection('admin_contadores').doc('pendencias')
-              .set(incrementos, { merge: true });
+            if (Object.keys(incrementos).length) {
+              await _db.collection('admin_contadores').doc('pendencias')
+                .set(incrementos, { merge: true });
+            }
           }
         } catch(e) { console.warn('[capturaLead] contador:', e.message); }
 

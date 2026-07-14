@@ -48,7 +48,10 @@ const momentosEnvio = [
 
   // ——— Uso manual/padrão ———
   { valor: "resposta_personalizada_manual", descricao: "✍️ Resposta manual personalizada" },
-  { valor: "padrao", descricao: "📌 Resposta padrão para envio manual" }
+  { valor: "padrao", descricao: "📌 Resposta padrão para envio manual" },
+
+  // ——— Solicitação de acesso trial ———
+  { valor: "acesso_trial", descricao: "✍️ Solicitação de acesso trial" }
 ];
 
 function filtrarPerfilAvaliacoes(perfil) {
