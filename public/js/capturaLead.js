@@ -209,7 +209,6 @@ async function processarEnvioInteresse(e) {
         if (error) throw error;
 
         const novoLeadId = data[0].id;
-        console.log('[capturaLead] Lead criado com sucesso, ID:', novoLeadId);
 
         // ── Acesso trial (leads vindos do CTA "Conheça o App") ───────────────
         let tipoMensagem = "primeiro_contato";
@@ -217,16 +216,13 @@ async function processarEnvioInteresse(e) {
 
         if (origem === "trial") {
             try {
-                console.log('[capturaLead] Gerando acesso trial para lead', novoLeadId);
                 linkAcesso = await gerarLinkAcessoTrial(novoLeadId);
-                console.log('[capturaLead] Link de acesso trial gerado:', linkAcesso);
                 tipoMensagem = "acesso_trial";
             } catch (e) {
                 console.error('[capturaLead] Falha ao gerar acesso trial, mantendo primeiro_contato:', e);
             }
         }
 
-        console.log('[capturaLead] tipoMensagem:', tipoMensagem, 'linkAcesso:', linkAcesso);
 
         // Disparo automático de boas-vindas (ou acesso trial)
         try {
@@ -239,9 +235,8 @@ async function processarEnvioInteresse(e) {
                 uf: dadosUf.cod_uf,
                 municipio: dadosUf.nome_municipio,
                 perfil: perfil,
-                link_acesso: linkAcesso
+                link_ativacao: linkAcesso
             }, "lead");
-            console.log('[capturaLead] Mensagem automática disparada para lead', novoLeadId);
         } catch (emailError) {
             // ✅ ADICIONADO: Agora, se o e-mail falhar, o erro real aparecerá no console
             console.error('[capturaLead] Erro ao disparar mensagem automática:', emailError);
