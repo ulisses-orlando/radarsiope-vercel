@@ -79,7 +79,7 @@ function _gerarTokenTrial() {
 
 // ID fixo da edição 001 — usada como vitrine do trial. Mantido em sincronia
 // com a policy de INSERT em leads_envios no Supabase ("newsletter_id = ...").
-const NEWSLETTER_VITRINE_ID = '2PxBgOfhOuM6ERAVjdam';
+const NEWSLETTER_VITRINE_ID = 'ahFzl1kSoGyjb7L6mGJx';
 
 async function gerarLinkAcessoTrial(leadId) {
     const newsletterId = NEWSLETTER_VITRINE_ID;
