@@ -504,7 +504,7 @@ async function dispararMensagemAutomatica(momento, dados, tipo) {
       // 5. Gravar log de envio automático
       if (tipo === "lead") {
         // Gravar log de envio automático no Supabase 
-        const log = { 
+/*         const log = { 
           momento, 
           titulo: msg.titulo, 
           email: dados.email, 
@@ -516,7 +516,7 @@ async function dispararMensagemAutomatica(momento, dados, tipo) {
           .insert([log]); 
         if (errorLog) { 
           console.error("❌ Erro ao gravar log no Supabase:", errorLog); 
-        }
+        } */
       } else {
         // log dentro de usuarios/{userId}/assinaturas/{assinaturaId}/log_envio_automatico
         const assinRef = db.collection("usuarios").doc(dados.userId)
