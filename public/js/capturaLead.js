@@ -225,6 +225,7 @@ async function processarEnvioInteresse(e) {
                     .from("leads")
                     .update({ status: "Trial enviado" })
                     .eq("id", novoLeadRef.id);
+    console.log('[capturaLead] Status do lead atualizado para "Trial enviado"');
             } catch (e) {
                 console.error('[capturaLead] Falha ao gerar acesso trial, mantendo primeiro_contato:', e);
             }
