@@ -1422,6 +1422,7 @@ async function enviarLoteEmMassa(newsletterId, envioId, loteId) {
                                     status: 'pendente',
                                     token_acesso: token,
                                     expira_em: expiraEm.toISOString(),
+                                    origem: 'newsletter',
                                 })
                                 .select('id')
                                 .single();

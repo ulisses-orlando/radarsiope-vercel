@@ -2391,8 +2391,9 @@ async function VerNewsletterComToken() {
         .then(() => { })
         .catch(() => { });
 
-      // Verificar compartilhamento excessivo
-      if (novoTotal > 5) {
+      // Verificar compartilhamento excessivo (não se aplica a acessos trial —
+      // é esperado que um lead explorando o app recarregue/navegue bastante)
+      if (leRow.origem !== 'trial' && novoTotal > 5) {
         window.supabase
           .from('leads_envios')
           .update({ sinalizacao_compartilhamento: true })
