@@ -482,6 +482,22 @@ function renderModoRapido(newsletter, acesso) {
     return;
   }
 
+  // Resumo da edição (texto livre, sem HTML) — aparece antes dos bullets
+  if (lista) {
+    let resumoEl = document.getElementById('rs-resumo-edicao');
+    if (newsletter.resumo) {
+      if (!resumoEl) {
+        lista.insertAdjacentHTML('beforebegin',
+          `<p id="rs-resumo-edicao" style="font-size:14px;line-height:1.7;color:var(--rs-texto,#0f172a);margin:0 0 16px">${_esc(newsletter.resumo)}</p>`);
+      } else {
+        resumoEl.textContent = newsletter.resumo;
+        resumoEl.style.display = '';
+      }
+    } else if (resumoEl) {
+      resumoEl.style.display = 'none';
+    }
+  }
+
   const visiveis = (acesso.isAssinante || acesso.acessoProTemp) ? bullets : bullets.slice(0, 2);
   const temRestante = !acesso.isAssinante && !acesso.acessoProTemp && bullets.length > 2;
   const temAcesso = acesso.isAssinante || acesso.acessoProTemp;
