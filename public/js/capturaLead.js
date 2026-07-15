@@ -242,7 +242,7 @@ async function processarEnvioInteresse(e) {
             uf: dadosUf.cod_uf,
             municipio: dadosUf.nome_municipio,
             perfil: perfil,
-            link_acesso: linkAcesso
+            link_ativacao: linkAcesso
         }, "lead");
         // Incrementa contadores no admin_contadores
         try {
