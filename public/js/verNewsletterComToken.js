@@ -479,22 +479,26 @@ function renderModoRapido(newsletter, acesso) {
   if (!bullets.length) {
     document.getElementById('rs-toggle-modo')?.style.setProperty('display', 'none');
     trocarModo('completo');
-    return;
+    return; 
   }
 
   // Resumo da edição (texto livre, sem HTML) — aparece antes dos bullets
   if (lista) {
-    let resumoEl = document.getElementById('rs-resumo-edicao');
+    let wrap = document.getElementById('rs-resumo-edicao-wrap');
     if (newsletter.resumo) {
-      if (!resumoEl) {
-        lista.insertAdjacentHTML('beforebegin',
-          `<p id="rs-resumo-edicao" style="font-size:14px;line-height:1.7;color:var(--rs-texto,#0f172a);margin:0 0 16px">${_esc(newsletter.resumo)}</p>`);
+      if (!wrap) {
+        lista.insertAdjacentHTML('beforebegin', `
+          <div id="rs-resumo-edicao-wrap" style="margin:0 0 16px">
+            <p style="font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--azul,#0A3D62);margin:0 0 6px">📝 Resumo</p>
+            <p id="rs-resumo-edicao" style="font-size:14px;line-height:1.7;color:var(--rs-texto,#0f172a);margin:0">${_esc(newsletter.resumo)}</p>
+          </div>`);
       } else {
-        resumoEl.textContent = newsletter.resumo;
-        resumoEl.style.display = '';
+        const txt = document.getElementById('rs-resumo-edicao');
+        if (txt) txt.textContent = newsletter.resumo;
+        wrap.style.display = '';
       }
-    } else if (resumoEl) {
-      resumoEl.style.display = 'none';
+    } else if (wrap) {
+      wrap.style.display = 'none';
     }
   }
 
