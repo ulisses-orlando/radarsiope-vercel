@@ -106,6 +106,7 @@ async function gerarLinkAcessoTrial(leadId) {
             status: 'enviado',
             token_acesso: token,
             expira_em: expiraEm.toISOString(),
+            origem: 'trial',
         })
         .select('id')
         .single();
@@ -192,9 +193,6 @@ async function processarEnvioInteresse(e) {
     status.innerText = "Enviando...";
     botao.disabled = true;
 
-    // 1. Define o status inicial com base na origem (evita necessidade de UPDATE posterior)
-    const statusInicial = (origem === "trial") ? "Trial enviado" : "Novo";
-
     try {
         const { data, error } = await window.supabase
             .from("leads")
@@ -208,7 +206,7 @@ async function processarEnvioInteresse(e) {
                 interesses,
                 preferencia_contato: preferencia,
                 origem: origem,
-                status: statusInicial,
+                status: "Novo",
                 cod_uf: dadosUf.cod_uf,
                 cod_municipio: _cod6(dadosUf.cod_municipio),
                 nome_municipio: dadosUf.nome_municipio,
@@ -227,6 +225,7 @@ async function processarEnvioInteresse(e) {
             try {
                 linkAcesso = await gerarLinkAcessoTrial(novoLeadRef.id);
                 tipoMensagem = "acesso_trial";
+                await window.supabase.from("leads").update({ status: "Trial enviado" }).eq("id", novoLeadRef.id);
             } catch (e) {
                 console.error('[capturaLead] Falha ao gerar acesso trial, mantendo primeiro_contato:', e);
             }
