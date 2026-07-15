@@ -6,6 +6,16 @@ function getParametro(nome) {
     return url.searchParams.get(nome);
 }
 
+// Normaliza o código IBGE do município para 6 dígitos (padrão Supabase).
+// O componente de UF/Município normalmente retorna o código IBGE completo (7 dígitos,
+// padrão Firestore); aqui removemos o dígito verificador, igual ao cod6() já usado
+// em outras partes do projeto.
+function _cod6(codigo) {
+    if (!codigo) return codigo;
+    const str = String(codigo).trim();
+    return str.length === 7 ? str.slice(0, 6) : str;
+}
+
 const origem = getParametro("origem") || "origem_nao_informada";
 
 // ============================
@@ -79,7 +89,7 @@ function _gerarTokenTrial() {
 
 // ID fixo da edição 001 — usada como vitrine do trial. Mantido em sincronia
 // com a policy de INSERT em leads_envios no Supabase ("newsletter_id = ...").
-const NEWSLETTER_VITRINE_ID = 'ahFzl1kSoGyjb7L6mGJx';
+const NEWSLETTER_VITRINE_ID = '2PxBgOfhOuM6ERAVjdam';
 
 async function gerarLinkAcessoTrial(leadId) {
     const newsletterId = NEWSLETTER_VITRINE_ID;
@@ -183,9 +193,6 @@ async function processarEnvioInteresse(e) {
     botao.disabled = true;
 
     try {
-        // 1. Define o status inicial com base na origem (evita necessidade de UPDATE posterior)
-        const statusInicial = (origem === "trial") ? "Trial enviado" : "Novo";
-
         const { data, error } = await window.supabase
             .from("leads")
             .insert([{
@@ -198,17 +205,19 @@ async function processarEnvioInteresse(e) {
                 interesses,
                 preferencia_contato: preferencia,
                 origem: origem,
-                status: statusInicial, // <-- "Trial enviado" já é salvo aqui no INSERT
+                status: "Novo",
+
+                // 🔹 Campos novos
                 cod_uf: dadosUf.cod_uf,
-                cod_municipio: dadosUf.cod_municipio,
+                cod_municipio: _cod6(dadosUf.cod_municipio),
                 nome_municipio: dadosUf.nome_municipio,
+
                 data_criacao: new Date().toISOString()
             }])
             .select();
 
         if (error) throw error;
-
-        const novoLeadId = data[0].id;
+        const novoLeadRef = { id: data[0].id };
 
         // ── Acesso trial (leads vindos do CTA "Conheça o App") ───────────────
         let tipoMensagem = "primeiro_contato";
@@ -216,59 +225,57 @@ async function processarEnvioInteresse(e) {
 
         if (origem === "trial") {
             try {
-                linkAcesso = await gerarLinkAcessoTrial(novoLeadId);
+                linkAcesso = await gerarLinkAcessoTrial(novoLeadRef.id);
                 tipoMensagem = "acesso_trial";
+
+                // Já foi resolvido automaticamente — tira do backlog de "Novo"
+                await window.supabase
+                    .from("leads")
+                    .update({ status: "Trial enviado" })
+                    .eq("id", novoLeadRef.id);
             } catch (e) {
                 console.error('[capturaLead] Falha ao gerar acesso trial, mantendo primeiro_contato:', e);
             }
         }
 
-
         // Disparo automático de boas-vindas (ou acesso trial)
-        try {
-            await dispararMensagemAutomatica(tipoMensagem, {
-                id: novoLeadId,
-                nome: nome,
-                email: email,
-                interesse: interesses,
-                preferencia_contato: preferencia,
-                uf: dadosUf.cod_uf,
-                municipio: dadosUf.nome_municipio,
-                perfil: perfil,
-                link_ativacao: linkAcesso
-            }, "lead");
-        } catch (emailError) {
-            // ✅ ADICIONADO: Agora, se o e-mail falhar, o erro real aparecerá no console
-            console.error('[capturaLead] Erro ao disparar mensagem automática:', emailError);
-        }
-
+        await dispararMensagemAutomatica(tipoMensagem, {
+            id: novoLeadRef.id,
+            nome: nome,
+            email: email,
+            interesse: interesses,
+            preferencia_contato: preferencia,
+            uf: dadosUf.cod_uf,
+            municipio: dadosUf.nome_municipio,
+            perfil: perfil,
+            link_acesso: linkAcesso
+        }, "lead");
         // Incrementa contadores no admin_contadores
         try {
-            const _db = window.db;
-            if (_db) {
-                const incrementos = {};
-                // Trial já foi resolvido automaticamente: não conta como pendência de "Novo"
-                if (tipoMensagem !== "acesso_trial") {
-                    incrementos.leads_novos = firebase.firestore.FieldValue.increment(1);
-                }
-                if (mensagem) incrementos.leads_mensagens = firebase.firestore.FieldValue.increment(1);
-                
-                if (Object.keys(incrementos).length) {
-                    await _db.collection('admin_contadores').doc('pendencias')
-                        .set(incrementos, { merge: true });
-                }
+          const _db = window.db;
+          if (_db) {
+            const incrementos = {};
+            // Trial já foi resolvido automaticamente: não conta como pendência de "Novo"
+            if (tipoMensagem !== "acesso_trial") {
+              incrementos.leads_novos = firebase.firestore.FieldValue.increment(1);
             }
-        } catch(e) { 
-            console.warn('[capturaLead] erro no contador:', e.message); 
-        }
+            if (mensagem) incrementos.leads_mensagens = firebase.firestore.FieldValue.increment(1);
+            if (Object.keys(incrementos).length) {
+              await _db.collection('admin_contadores').doc('pendencias')
+                .set(incrementos, { merge: true });
+            }
+          }
+        } catch(e) { console.warn('[capturaLead] contador:', e.message); }
 
         status.innerText = "Enviado com sucesso!";
         status.style.color = "green";
+
         mostrarModalAgradecimento(nome);
+
         e.target.reset();
 
     } catch (err) {
-        console.error("Erro principal no processamento:", err);
+        console.error(err);
         status.innerText = "Erro ao enviar. Tente novamente.";
         status.style.color = "red";
     } finally {
