@@ -89,7 +89,7 @@ function _gerarTokenTrial() {
 
 // ID fixo da edição 001 — usada como vitrine do trial. Mantido em sincronia
 // com a policy de INSERT em leads_envios no Supabase ("newsletter_id = ...").
-const NEWSLETTER_VITRINE_ID = '2PxBgOfhOuM6ERAVjdam';
+const NEWSLETTER_VITRINE_ID = 'ahFzl1kSoGyjb7L6mGJx';
 
 async function gerarLinkAcessoTrial(leadId) {
     const newsletterId = NEWSLETTER_VITRINE_ID;
@@ -192,6 +192,9 @@ async function processarEnvioInteresse(e) {
     status.innerText = "Enviando...";
     botao.disabled = true;
 
+    // 1. Define o status inicial com base na origem (evita necessidade de UPDATE posterior)
+    const statusInicial = (origem === "trial") ? "Trial enviado" : "Novo";
+
     try {
         const { data, error } = await window.supabase
             .from("leads")
@@ -205,13 +208,10 @@ async function processarEnvioInteresse(e) {
                 interesses,
                 preferencia_contato: preferencia,
                 origem: origem,
-                status: "Novo",
-
-                // 🔹 Campos novos
+                status: statusInicial,
                 cod_uf: dadosUf.cod_uf,
                 cod_municipio: _cod6(dadosUf.cod_municipio),
                 nome_municipio: dadosUf.nome_municipio,
-
                 data_criacao: new Date().toISOString()
             }])
             .select();
@@ -227,12 +227,6 @@ async function processarEnvioInteresse(e) {
             try {
                 linkAcesso = await gerarLinkAcessoTrial(novoLeadRef.id);
                 tipoMensagem = "acesso_trial";
-
-                // Já foi resolvido automaticamente — tira do backlog de "Novo"
-                await window.supabase
-                    .from("leads")
-                    .update({ status: "Trial enviado" })
-                    .eq("id", novoLeadRef.id);
             } catch (e) {
                 console.error('[capturaLead] Falha ao gerar acesso trial, mantendo primeiro_contato:', e);
             }
