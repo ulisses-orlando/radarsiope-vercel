@@ -482,26 +482,32 @@ function renderModoRapido(newsletter, acesso) {
     return; 
   }
 
-  // Resumo da edição (texto livre, sem HTML) — aparece antes dos bullets
-  if (lista) {
-    let wrap = document.getElementById('rs-resumo-edicao-wrap');
-    if (newsletter.resumo) {
-      if (!wrap) {
-        lista.insertAdjacentHTML('beforebegin', `
-          <div id="rs-resumo-edicao-wrap" style="margin:0 0 16px">
-            <p style="font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--azul,#0A3D62);margin:0 0 6px">📝 Resumo</p>
-            <p id="rs-resumo-edicao" style="font-size:14px;line-height:1.7;color:var(--rs-texto,#0f172a);margin:0">${_esc(newsletter.resumo)}</p>
-          </div>`);
-      } else {
-        const txt = document.getElementById('rs-resumo-edicao');
-        if (txt) txt.textContent = newsletter.resumo;
-        wrap.style.display = '';
+  // Resumo da edição (texto livre, sem HTML) — aparece antes do título "Pontos-chave"
+  const secaoRapido = document.getElementById('modo-rapido');
+  if (secaoRapido) {
+      let wrap = document.getElementById('rs-resumo-edicao-wrap');
+      if (newsletter.resumo) {
+        if (!wrap) {
+          secaoRapido.insertAdjacentHTML('afterbegin', `
+            <div id="rs-resumo-edicao-wrap">
+              <div class="rs-section-header">
+                <span>📝</span>
+                <h2>Resumo</h2>
+              </div>
+              <div class="rs-section-body">
+                <p id="rs-resumo-edicao" style="font-size:15px;line-height:1.6;color:var(--rs-text);margin:0">${_esc(newsletter.resumo)}</p>
+              </div>
+            </div>`);
+        } else {
+          const txt = document.getElementById('rs-resumo-edicao');
+          if (txt) txt.textContent = newsletter.resumo;
+          wrap.style.display = '';
+        }
+      } else if (wrap) {
+        wrap.style.display = 'none';
       }
-    } else if (wrap) {
-      wrap.style.display = 'none';
-    }
   }
-
+  
   const visiveis = (acesso.isAssinante || acesso.acessoProTemp) ? bullets : bullets.slice(0, 2);
   const temRestante = !acesso.isAssinante && !acesso.acessoProTemp && bullets.length > 2;
   const temAcesso = acesso.isAssinante || acesso.acessoProTemp;
