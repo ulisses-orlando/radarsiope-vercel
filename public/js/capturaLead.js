@@ -225,7 +225,12 @@ async function processarEnvioInteresse(e) {
             try {
                 linkAcesso = await gerarLinkAcessoTrial(novoLeadRef.id);
                 tipoMensagem = "acesso_trial";
-                await window.supabase.from("leads").update({ status: "Trial enviado" }).eq("id", novoLeadRef.id);
+                await window.supabase.from("leads").update({
+                        status: "Trial enviado",
+                        mensagem_respondida: true,
+                        mensagem_respondida_em: new Date().toISOString(),
+                        mensagem_resposta: "Acesso de demonstração (72h) enviado automaticamente por e-mail.",
+                    }).eq("id", novoLeadRef.id);
             } catch (e) {
                 console.error('[capturaLead] Falha ao gerar acesso trial, mantendo primeiro_contato:', e);
             }
