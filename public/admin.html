@@ -894,6 +894,7 @@
             <option value="Negociando">Negociando</option>
             <option value="Convertido">Convertido</option>
             <option value="Descartado">Descartado</option>
+            <option value="Trial enviado">Trial enviado</option>
           </select>
 
           <label for="filtro-tipo-news-envio">Interesse:</label>
@@ -2676,11 +2677,11 @@
     window.graficoLeads = new Chart(ctxLeads, {
       type: 'bar',
       data: {
-        labels: ['Novo', 'Em contato', 'Negociando', 'Convertido', 'Descartado'],
+        labels: ['Novo', 'Em contato', 'Negociando', 'Convertido', 'Descartado', 'Trial enviado'],
         datasets: [{
           label: 'Leads',
-          data: [0, 0, 0, 0, 0],
-          backgroundColor: ['#2196f3', '#03a9f4', '#ffc107', '#4caf50', '#9e9e9e']
+          data: [0, 0, 0, 0, 0, 0],
+          backgroundColor: ['#2196f3', '#03a9f4', '#ffc107', '#4caf50', '#9e9e9e', '#ff5722']
         }]
       },
       options: {
