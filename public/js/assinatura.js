@@ -953,7 +953,7 @@ async function upsertUsuario(dados) {
       const ref = await db.collection('usuarios').add({
         ...base, email: email.toLowerCase(), plano_status: 'pendente_pagamento',
         plano_slug: plano_slug || null, plano_ciclo: ciclo || '3', features: features || null,
-        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+        data_cadastro: firebase.firestore.FieldValue.serverTimestamp(),
       });
       return ref.id;
     }
@@ -998,7 +998,7 @@ async function registrarAssinatura(userId, payload, preview) {
     data_proxima_renovacao: firebase.firestore.Timestamp.fromDate(renovacao),
     status: 'pendente_pagamento', paymentProvider: 'mercadopago', orderId: payload.orderId || null,
     pedidoId: null, origem: _origem,
-    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+    data_cadastro: firebase.firestore.FieldValue.serverTimestamp(),
     updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
   };
 
