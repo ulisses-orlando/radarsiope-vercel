@@ -527,33 +527,14 @@ async function _relatorioConformidade(req, res) {
       }));
   } catch (e) { console.warn('[relatorio] alertas:', e.message); }
 
-  // ── Firestore: quiz do assinante ──────────────────────────────────────────
-  let quizResultados = [];
+  // ── Firestore: resumo geral de quiz do assinante (via resumo_quiz denormalizado) ──
+  let resumoQuiz = { edicoes: {}, total_edicoes_feitas: 0, total_edicoes_aprovadas: 0, media_geral: 0 };
   try {
-    const quizSnap = await db.collection('usuarios').doc(uid)
-      .collection('quiz_resultados')
-      .orderBy('criado_em', 'desc')
-      .limit(24)
-      .get();
-    quizResultados = quizSnap.docs.map(d => {
-      const data = d.data();
-      const tentativas = Array.isArray(data.tentativas) ? data.tentativas : [];
-      const melhorPontuacao = tentativas.length > 0
-        ? Math.max(...tentativas.map(t => t.pontuacao || 0))
-        : (data.pontuacao || 0);
-      return {
-        newsletter_id: d.id,
-        newsletter_numero: data.newsletter_numero || null,
-        newsletter_titulo: data.newsletter_titulo || '',
-        melhor_pontuacao: melhorPontuacao,
-        tentativas_total: data.tentativas_total || tentativas.length || 0,
-        aprovado: tentativas.some(t => t.aprovado) || data.aprovado || false,
-        criado_em: data.criado_em?.toDate?.()?.toISOString() || null,
-      };
-    });
-  } catch (e) { console.warn('[relatorio] quiz:', e.message); }
+    const userQuizDoc = await db.collection('usuarios').doc(uid).get();
+    resumoQuiz = userQuizDoc.data()?.resumo_quiz || resumoQuiz;
+  } catch (e) { console.warn('[relatorio] resumo_quiz:', e.message); }
 
-  // ── Firestore: total de edições com quiz ──────────────────────────────────
+  // ── Firestore: total de edições com quiz disponível (para taxa de participação) ─────────────────────────────────
   let edicoesPublicadas = 0;
   try {
     const edSnap = await db.collection('newsletters')
@@ -561,12 +542,11 @@ async function _relatorioConformidade(req, res) {
       .where('quiz.ativo', '==', true)
       .get();
     edicoesPublicadas = edSnap.size;
-  } catch { edicoesPublicadas = quizResultados.length; }
+  } catch { edicoesPublicadas = resumoQuiz.total_edicoes_feitas; }
 
-  const quizComDados = quizResultados.filter(q => q.tentativas_total > 0);
-  const mediaPontuacao = quizComDados.length > 0
-    ? Math.round(quizComDados.reduce((s, q) => s + q.melhor_pontuacao, 0) / quizComDados.length)
-    : null;
+  const edicoesRespondidas = resumoQuiz.total_edicoes_feitas || 0;
+  const edicoesAprovadas = resumoQuiz.total_edicoes_aprovadas || 0;
+  const mediaPontuacao = edicoesRespondidas > 0 ? resumoQuiz.media_geral : null;
 
   // ── CAUC: situação nos itens de educação ──────────────────────────────────
   let caucResult;
@@ -599,11 +579,11 @@ async function _relatorioConformidade(req, res) {
     alertas,
     quiz: {
       edicoes_com_quiz: edicoesPublicadas,
-      edicoes_respondidas: quizComDados.length,
+      edicoes_respondidas: edicoesRespondidas,
       taxa_participacao: edicoesPublicadas > 0
-        ? Math.round((quizComDados.length / edicoesPublicadas) * 100) : 0,
+        ? Math.round((edicoesRespondidas / edicoesPublicadas) * 100) : 0,
       media_pontuacao: mediaPontuacao,
-      resultados: quizResultados,
+      edicoes_aprovadas: edicoesAprovadas,
     },
     cauc: caucResult,
     gerado_em: new Date().toISOString(),

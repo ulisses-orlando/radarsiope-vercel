@@ -1256,6 +1256,9 @@ async function _handleSalvarResultadoQuiz(req, res) {
         criado_em: d.data().criado_em?.toDate?.()?.toISOString() ?? null
       }))
       .sort((a, b) => (b.criado_em || '').localeCompare(a.criado_em || '')); // Mais recente primeiro
+    
+      // Atualiza o resumo geral (todas as edições) — best-effort, não bloqueia a resposta em caso de falha
+    await _atualizarResumoQuiz(uid);
 
     return json(res, 200, {
       ok: true, message: 'Resultado salvo com sucesso.',
@@ -1299,6 +1302,101 @@ async function _handleQuizHistorico(req, res) {
   }
 }
 
+// ─── Resumo geral de quiz (todas as edições de um uid) ───────────────────────
+// Recalcula do zero a partir de quiz_resultados (fonte de verdade) — mesmo
+// padrão de "recompute em memória" já usado em _handleSalvarResultadoQuiz.
+// Evita drift entre um contador incremental e os documentos reais.
+async function _computarResumoQuiz(uid) {
+  const snap = await db.collection('usuarios').doc(uid).collection('quiz_resultados').get();
+ 
+  const porEdicao = {}; // newsletter_id -> { melhor_pontuacao, aprovado, tentativas_usadas }
+  snap.docs.forEach(d => {
+    const data = d.data();
+    const nid = String(data.newsletter_id);
+    const atual = porEdicao[nid] || { melhor_pontuacao: 0, aprovado: false, tentativas_usadas: 0 };
+    atual.tentativas_usadas += 1;
+    if (typeof data.pontuacao === 'number' && data.pontuacao > atual.melhor_pontuacao) {
+      atual.melhor_pontuacao = data.pontuacao;
+    }
+    if (data.aprovado) atual.aprovado = true;
+    porEdicao[nid] = atual;
+  });
+ 
+  const nids = Object.keys(porEdicao);
+  const total_edicoes_feitas = nids.length;
+  const total_edicoes_aprovadas = nids.filter(nid => porEdicao[nid].aprovado).length;
+  const media_geral = total_edicoes_feitas
+    ? Math.round(nids.reduce((soma, nid) => soma + porEdicao[nid].melhor_pontuacao, 0) / total_edicoes_feitas)
+    : 0;
+ 
+  return { edicoes: porEdicao, total_edicoes_feitas, total_edicoes_aprovadas, media_geral };
+}
+ 
+// Persiste o resumo denormalizado em usuarios/{uid}.resumo_quiz — melhor esforço,
+// nunca deve derrubar a resposta principal de salvar-quiz se falhar.
+async function _atualizarResumoQuiz(uid) {
+  try {
+    const resumo = await _computarResumoQuiz(uid);
+    await db.collection('usuarios').doc(uid).set({
+      resumo_quiz: { ...resumo, atualizado_em: admin.firestore.FieldValue.serverTimestamp() }
+    }, { merge: true });
+  } catch (e) {
+    console.warn('[resumo_quiz] Falha ao atualizar resumo geral:', e.message);
+  }
+}
+ 
+// ─── GET: resumo geral de quiz (todas as edições) ────────────────────────────
+async function _handleQuizResumoGeral(req, res) {
+  if (req.method !== 'GET') return json(res, 405, { ok: false, message: 'Método não permitido.' });
+  const { uid } = req.query || {};
+  if (!uid) return json(res, 400, { ok: false, message: 'uid é obrigatório.' });
+ 
+  try {
+    const userDoc = await db.collection('usuarios').doc(uid).get();
+    let resumo = userDoc.exists ? userDoc.data()?.resumo_quiz : null;
+ 
+    // Fallback: usuário sem resumo_quiz denormalizado ainda (ex.: nunca salvou
+    // após esta mudança, ou dados legados) — computa na hora e tenta persistir.
+    if (!resumo) {
+      resumo = await _computarResumoQuiz(uid);
+      db.collection('usuarios').doc(uid)
+        .set({ resumo_quiz: { ...resumo, atualizado_em: admin.firestore.FieldValue.serverTimestamp() } }, { merge: true })
+        .catch(() => {});
+    }
+ 
+    const nids = Object.keys(resumo.edicoes || {});
+    const titulos = {};
+    if (nids.length) {
+      // Firestore 'in' limita a 10 — busca em lotes (mesmo padrão de _resolverTiposInclusos)
+      const lotes = [];
+      for (let i = 0; i < nids.length; i += 10) lotes.push(nids.slice(i, i + 10));
+      const snaps = await Promise.all(lotes.map(lote =>
+        db.collection('newsletters')
+          .where(admin.firestore.FieldPath.documentId(), 'in', lote)
+          .get()
+      ));
+      snaps.forEach(snap => snap.docs.forEach(d => { titulos[d.id] = d.data().titulo || d.id; }));
+    }
+ 
+    const edicoes = nids.map(nid => ({
+      newsletter_id: nid,
+      titulo: titulos[nid] || nid,
+      ...resumo.edicoes[nid]
+    }));
+ 
+    return json(res, 200, {
+      ok: true,
+      edicoes,
+      total_edicoes_feitas: resumo.total_edicoes_feitas || 0,
+      total_edicoes_aprovadas: resumo.total_edicoes_aprovadas || 0,
+      media_geral: resumo.media_geral || 0
+    });
+  } catch (err) {
+    console.error('[quiz-resumo-geral] Erro:', err.message);
+    return json(res, 500, { ok: false, message: 'Erro interno ao buscar resumo geral.' });
+  }
+}
+
 // ─── Handler principal ────────────────────────────────────────────────────────
 export default async function handler(req, res) {
   try {
@@ -1316,7 +1414,7 @@ export default async function handler(req, res) {
 
     // Validar assinatura apenas para webhooks (não para criar-pedido / status-pedido)
     const acao = (req.query && req.query.acao) ? String(req.query.acao) : null;
-    const acoesPublicas = ['criar-pedido', 'status-pedido', 'ativar-sessao', 'validar-sessao', 'criar-sessao', 'encerrar-sessao', 'cancelar-assinatura', 'gerar-cobranca-cancelamento', 'salvar-quiz', 'quiz-historico', 'regenerar-token-ativacao', 'admin-enviar-link-acesso'];
+    const acoesPublicas = ['criar-pedido', 'status-pedido', 'ativar-sessao', 'validar-sessao', 'criar-sessao', 'encerrar-sessao', 'cancelar-assinatura', 'gerar-cobranca-cancelamento', 'salvar-quiz', 'quiz-historico', 'quiz-resumo-geral', 'regenerar-token-ativacao', 'admin-enviar-link-acesso'];
 
     if (!acao || !acoesPublicas.includes(acao)) {
       const sigCheck = validateMpWebhookSignature(rawBody, req);
@@ -1365,6 +1463,11 @@ export default async function handler(req, res) {
 
     if (req.method === 'GET' && acao === 'quiz-historico') {
       return _handleQuizHistorico(req, res);
+    }
+
+    // ── GET ?acao=quiz-resumo-geral ───────────────────────────────────────
+    if (req.method === 'GET' && acao === 'quiz-resumo-geral') {
+      return _handleQuizResumoGeral(req, res);
     }
 
     // ── POST ?acao=salvar-quiz ────────────────────────────────────────────
@@ -1489,7 +1592,7 @@ export default async function handler(req, res) {
           ativadoEm: admin.firestore.FieldValue.serverTimestamp(),
           atualizadoEm: admin.firestore.FieldValue.serverTimestamp()
         }, { merge: true });
-        
+
         await db.collection('usuarios').doc(userId).update({ ativo: true });
 
         const _sessionToken = crypto.randomBytes(32).toString('hex');
