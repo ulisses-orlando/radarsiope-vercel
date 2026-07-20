@@ -5,29 +5,28 @@ Reaproveita as classes CSS já injetadas por quizApp.js quando disponíveis
 (rs-quiz-hist-*, rs-quiz-score-circle) e injeta apenas o que falta.
 
 MELHORIAS IMPLEMENTADAS:
-- Ordenação por data_publicacao_app (mais recentes primeiro)
+- Ordenação: mais recentes primeiro (baseado na ordem de inserção do backend)
 - Limite de 10 edições visíveis com scroll
 - Botão "Ver todas" para expandir lista completa
 - Scrollbar personalizada
-- Cores ajustadas para contraste no tema dark
+- Cores ajustadas para contraste no tema dark (texto do círculo em azul escuro)
 ========================================================================== */
 (function () {
 'use strict';
 
-// ────────────────────────────────────────────────────────────────────────
-// CONFIGURAÇÕES
-// ────────────────────────────────────────────────────────────────────────
 const MAX_EDICOES_VISIVEIS = 10;
 
-// ───────────────────────────────────────────────────────────────────────
+// ────────────────────────────────────────────────────────────────────────
 // PÚBLICO
 // ────────────────────────────────────────────────────────────────────────
 async function renderizar(containerId, uid) {
     const container = document.getElementById(containerId);
     if (!container) return;
     if (!uid) { container.innerHTML = ''; return; }
+    
     injetarEstilosCSS();
     _renderizarSkeleton(container);
+    
     let resumo;
     try {
         resumo = await _buscarResumoGeral(uid);
@@ -41,23 +40,23 @@ async function renderizar(containerId, uid) {
 
 // ────────────────────────────────────────────────────────────────────────
 // RENDER
-// ───────────────────────────────────────────────────────────────────────
+// ────────────────────────────────────────────────────────────────────────
 function _renderizarSkeleton(container) {
     container.innerHTML = `<div class="rs-quiz-skeleton"> <div class="rs-quiz-sk-line w60"></div> <div class="rs-quiz-sk-line w40"></div> </div>`;
 }
 
 function _renderizarResumo(container, resumo) {
     const {
-    edicoes = [],
-    total_edicoes_feitas = 0,
-    total_edicoes_aprovadas = 0,
-    media_geral = 0
+        edicoes = [],
+        total_edicoes_feitas = 0,
+        total_edicoes_aprovadas = 0,
+        media_geral = 0
     } = resumo;
 
     if (total_edicoes_feitas === 0) {
         container.innerHTML = `
             <div class="rs-quiz-resumo-vazio">
-                <div class="rs-quiz-cta-icon"></div>
+                <div class="rs-quiz-cta-icon">🧠</div>
                 <p>Você ainda não respondeu nenhum quiz. Responda aos quizzes das edições para acompanhar seu desempenho aqui.</p>
             </div>
         `;
@@ -66,24 +65,28 @@ function _renderizarResumo(container, resumo) {
 
     const percentualAprovacao = Math.round((total_edicoes_aprovadas / total_edicoes_feitas) * 100);
 
-    // ✅ NOVO: Ordenar por data_publicacao_app (mais recente primeiro)
-    const edicoesOrdenadas = edicoes
-        .slice()
-        .sort((a, b) => {
-            const dateA = a.data_publicacao_app ? new Date(a.data_publicacao_app) : new Date(0);
-            const dateB = b.data_publicacao_app ? new Date(b.data_publicacao_app) : new Date(0);
-            return dateB - dateA; // Decrescente: mais recente primeiro
-        });
+    // ✅ CORREÇÃO DE ORDENAÇÃO:
+    // O backend retorna Object.keys() que preserva a ordem de inserção (mais antigo primeiro).
+    // Usamos .reverse() para colocar o mais recente no topo.
+    // Se houver campo de data no futuro (data_publicacao_app ou data_resposta), priorizamos ele.
+    const edicoesOrdenadas = edicoes.slice().sort((a, b) => {
+        const dateA = a.data_publicacao_app || a.data_resposta || a.ultima_tentativa || 0;
+        const dateB = b.data_publicacao_app || b.data_resposta || b.ultima_tentativa || 0;
+        
+        if (dateA && dateB) {
+            return new Date(dateB) - new Date(dateA); // Decrescente
+        }
+        return 0; // Mantém a ordem do backend (que será invertida pelo .reverse() abaixo)
+    }).reverse(); // Garante que o mais recente fique em primeiro lugar
 
-    // ✅ NOVO: Limita a 10 edições visíveis inicialmente
     const haMaisEdicoes = edicoesOrdenadas.length > MAX_EDICOES_VISIVEIS;
     const edicoesVisiveis = haMaisEdicoes 
         ? edicoesOrdenadas.slice(0, MAX_EDICOES_VISIVEIS) 
         : edicoesOrdenadas;
 
     const linhas = edicoesVisiveis.map(e => {
-        const dataFormatada = e.data_publicacao_app 
-            ? new Date(e.data_publicacao_app).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit' })
+        const dataFormatada = e.data_publicacao_app || e.data_resposta 
+            ? new Date(e.data_publicacao_app || e.data_resposta).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit' })
             : '';
         
         return `
@@ -91,12 +94,11 @@ function _renderizarResumo(container, resumo) {
                 <span class="rs-quiz-hist-status">${e.aprovado ? '✅' : '❌'}</span>
                 <span class="rs-quiz-hist-score ${e.aprovado ? 'aprovado' : 'reprovado'}">${e.melhor_pontuacao}%</span>
                 <span class="rs-quiz-resumo-titulo-edicao" title="${e.titulo}">${e.titulo}</span>
-                <span class="rs-quiz-hist-data">${dataFormatada} · ${e.tentativas_usadas}× tentativa${e.tentativas_usadas > 1 ? 's' : ''}</span>
+                <span class="rs-quiz-hist-data">${dataFormatada ? dataFormatada + ' · ' : ''}${e.tentativas_usadas}× tentativa${e.tentativas_usadas > 1 ? 's' : ''}</span>
             </div>
         `;
     }).join('');
 
-    // ✅ NOVO: Botão "Ver todas" se houver mais edições
     const botaoVerTodas = haMaisEdicoes ? `
         <button class="rs-quiz-ver-todas-btn" onclick="QuizResumoManager.mostrarTodas('${container.id}')">
             Ver todas as ${edicoesOrdenadas.length} edições ↓
@@ -123,47 +125,36 @@ function _renderizarResumo(container, resumo) {
     `;
 }
 
-// ✅ NOVO: Função para mostrar todas as edições
+// ────────────────────────────────────────────────────────────────────────
+// EXPANDIR LISTA
+// ────────────────────────────────────────────────────────────────────────
 function _mostrarTodas(containerId) {
     const container = document.getElementById(containerId);
     if (!container) return;
 
-    // Busca os dados novamente e renderiza sem limite
     const uid = container.dataset.uid;
     if (!uid) {
         console.warn('[QuizResumo] UID não encontrado no container');
         return;
     }
 
-    // Re-renderiza sem limite
     const btn = container.querySelector('.rs-quiz-ver-todas-btn');
     if (btn) btn.disabled = true;
 
-    // Busca os dados novamente (ou poderia armazenar em cache)
     _buscarResumoGeral(uid)
         .then(resumo => {
-            const {
-                edicoes = [],
-                total_edicoes_feitas = 0,
-                total_edicoes_aprovadas = 0,
-                media_geral = 0
-            } = resumo;
+            const { edicoes = [] } = resumo;
+            
+            const edicoesOrdenadas = edicoes.slice().sort((a, b) => {
+                const dateA = a.data_publicacao_app || a.data_resposta || a.ultima_tentativa || 0;
+                const dateB = b.data_publicacao_app || b.data_resposta || b.ultima_tentativa || 0;
+                if (dateA && dateB) return new Date(dateB) - new Date(dateA);
+                return 0;
+            }).reverse();
 
-            const percentualAprovacao = Math.round((total_edicoes_aprovadas / total_edicoes_feitas) * 100);
-
-            // Ordena por data_publicacao_app (mais recente primeiro)
-            const edicoesOrdenadas = edicoes
-                .slice()
-                .sort((a, b) => {
-                    const dateA = a.data_publicacao_app ? new Date(a.data_publicacao_app) : new Date(0);
-                    const dateB = b.data_publicacao_app ? new Date(b.data_publicacao_app) : new Date(0);
-                    return dateB - dateA;
-                });
-
-            // Renderiza TODAS as edições (sem limite)
             const linhas = edicoesOrdenadas.map(e => {
-                const dataFormatada = e.data_publicacao_app 
-                    ? new Date(e.data_publicacao_app).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit' })
+                const dataFormatada = e.data_publicacao_app || e.data_resposta 
+                    ? new Date(e.data_publicacao_app || e.data_resposta).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit' })
                     : '';
                 
                 return `
@@ -171,19 +162,17 @@ function _mostrarTodas(containerId) {
                         <span class="rs-quiz-hist-status">${e.aprovado ? '✅' : '❌'}</span>
                         <span class="rs-quiz-hist-score ${e.aprovado ? 'aprovado' : 'reprovado'}">${e.melhor_pontuacao}%</span>
                         <span class="rs-quiz-resumo-titulo-edicao" title="${e.titulo}">${e.titulo}</span>
-                        <span class="rs-quiz-hist-data">${dataFormatada} · ${e.tentativas_usadas}× tentativa${e.tentativas_usadas > 1 ? 's' : ''}</span>
+                        <span class="rs-quiz-hist-data">${dataFormatada ? dataFormatada + ' · ' : ''}${e.tentativas_usadas}× tentativa${e.tentativas_usadas > 1 ? 's' : ''}</span>
                     </div>
                 `;
             }).join('');
 
-            // Atualiza apenas a lista (mantém o card de resumo)
             const lista = container.querySelector('.rs-quiz-resumo-lista');
             if (lista) {
                 lista.innerHTML = linhas;
                 lista.classList.add('rs-quiz-lista-expandida');
             }
 
-            // Remove o botão "Ver todas"
             const btnAtual = container.querySelector('.rs-quiz-ver-todas-btn');
             if (btnAtual) btnAtual.remove();
         })
@@ -193,7 +182,7 @@ function _mostrarTodas(containerId) {
         });
 }
 
-// ───────────────────────────────────────────────────────────────────────
+// ────────────────────────────────────────────────────────────────────────
 // API
 // ────────────────────────────────────────────────────────────────────────
 async function _buscarResumoGeral(uid) {
@@ -206,14 +195,13 @@ async function _buscarResumoGeral(uid) {
 }
 
 // ────────────────────────────────────────────────────────────────────────
-// CSS (complementar — reaproveita variáveis e classes de quizApp.js)
+// CSS
 // ────────────────────────────────────────────────────────────────────────
 function injetarEstilosCSS() {
     if (document.getElementById('rs-quiz-resumo-style')) return;
     const style = document.createElement('style');
     style.id = 'rs-quiz-resumo-style';
     style.textContent = `
-        /* ── Skeleton (fallback caso quizApp.js não tenha injetado ainda) ── */
         .rs-quiz-skeleton {
             padding: 20px; margin: 24px 0;
             background: var(--rs-card2, #162032);
@@ -229,7 +217,6 @@ function injetarEstilosCSS() {
         .rs-quiz-sk-line.w40 { width: 40%; }
         @keyframes rsPulseResumo { 0%,100% { opacity:.4 } 50% { opacity:.9 } }
         
-        /* ── Estado vazio / erro ── */
         .rs-quiz-resumo-vazio {
             text-align: center; padding: 32px 16px;
             color: var(--rs-muted, #94a3b8);
@@ -237,7 +224,6 @@ function injetarEstilosCSS() {
         .rs-quiz-resumo-vazio .rs-quiz-cta-icon { font-size: 36px; margin-bottom: 8px; }
         .rs-quiz-resumo-erro { color: var(--rs-muted, #94a3b8); font-size: 13px; padding: 16px 0; }
         
-        /* ─ Card resumo ── */
         .rs-quiz-resumo-card {
             display: flex; align-items: center; gap: 20px;
             background: var(--rs-card2, #162032);
@@ -248,45 +234,37 @@ function injetarEstilosCSS() {
         .rs-quiz-resumo-media { font-size: 13px; color: var(--rs-muted, #94a3b8); margin: 0 0 6px; }
         .rs-quiz-resumo-aprovacao { font-size: 15px; color: var(--rs-text, #f1f5f9); margin: 0; }
         
-        /* ── Lista por edição ── */
         .rs-quiz-resumo-row {
+            display: grid;
             grid-template-columns: 24px 52px 1fr auto;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
         }
         .rs-quiz-resumo-titulo-edicao {
             font-size: 13px; color: var(--rs-text, #f1f5f9);
             overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
         }
         
-        /* ✅ NOVO: Lista com scroll limitado */
+        /* ✅ Lista com scroll limitado */
         .rs-quiz-hist-lista {
             max-height: 320px;
             overflow-y: auto;
             padding-right: 4px;
         }
-        
-        /* Lista expandida (sem limite de altura) */
         .rs-quiz-lista-expandida {
             max-height: none;
             overflow-y: visible;
         }
         
         /* Scrollbar personalizada */
-        .rs-quiz-hist-lista::-webkit-scrollbar {
-            width: 6px;
-        }
-        .rs-quiz-hist-lista::-webkit-scrollbar-track {
-            background: rgba(255,255,255,0.05);
-            border-radius: 3px;
-        }
-        .rs-quiz-hist-lista::-webkit-scrollbar-thumb {
-            background: rgba(255,255,255,0.2);
-            border-radius: 3px;
-        }
-        .rs-quiz-hist-lista::-webkit-scrollbar-thumb:hover {
-            background: rgba(255,255,255,0.3);
-        }
+        .rs-quiz-hist-lista::-webkit-scrollbar { width: 6px; }
+        .rs-quiz-hist-lista::-webkit-scrollbar-track { background: rgba(255,255,255,0.05); border-radius: 3px; }
+        .rs-quiz-hist-lista::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 3px; }
+        .rs-quiz-hist-lista::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.3); }
         
-        /* ✅ NOVO: Botão "Ver todas" */
+        /* ✅ Botão "Ver todas" */
         .rs-quiz-ver-todas-btn {
             width: 100%;
             padding: 10px;
@@ -300,35 +278,20 @@ function injetarEstilosCSS() {
             cursor: pointer;
             transition: all 0.2s;
         }
-        .rs-quiz-ver-todas-btn:hover {
-            background: rgba(255,255,255,0.12);
-            color: #f1f5f9;
-        }
-        .rs-quiz-ver-todas-btn:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-        }
+        .rs-quiz-ver-todas-btn:hover { background: rgba(255,255,255,0.12); color: #f1f5f9; }
+        .rs-quiz-ver-todas-btn:disabled { opacity: 0.5; cursor: not-allowed; }
         
-        /* ✅ CORREÇÃO: Texto dentro do círculo de score - azul escuro para contraste */
+        /* ✅ Texto dentro do círculo de score - azul escuro para contraste */
         .rs-quiz-score-circle span {
             color: #0A3D62 !important;
             font-weight: 700;
         }
         
-        /* ✅ CORREÇÃO: Forçar cores claras nos elementos herdados do quizApp */
-        .rs-quiz-resumo-lista .rs-quiz-hist-row {
-            color: #f1f5f9 !important;
-        }
-        .rs-quiz-resumo-lista .rs-quiz-resumo-titulo-edicao {
-            color: #f1f5f9 !important;
-            font-weight: 500;
-        }
-        .rs-quiz-resumo-lista .rs-quiz-hist-data {
-            color: #94a3b8 !important;
-            font-size: 12px;
-        }
+        /* ✅ Forçar cores claras nos elementos herdados do quizApp */
+        .rs-quiz-resumo-lista .rs-quiz-hist-row { color: #f1f5f9 !important; }
+        .rs-quiz-resumo-lista .rs-quiz-resumo-titulo-edicao { color: #f1f5f9 !important; font-weight: 500; }
+        .rs-quiz-resumo-lista .rs-quiz-hist-data { color: #94a3b8 !important; font-size: 12px; }
         
-        /* ─ Mobile ── */
         @media (max-width: 480px) {
             .rs-quiz-resumo-card { flex-direction: column; text-align: center; }
             .rs-quiz-resumo-row { grid-template-columns: 20px 44px 1fr; }
