@@ -1504,7 +1504,8 @@ style="flex:1;padding:6px 12px;background:#059669;color:#fff;border:none;border-
       const motivo = prompt('Motivo (opcional):', 'Publicação manual no app') || '';
       await db.collection('newsletters').doc(docId).update({
         enviada: true,
-        data_publicacao_app: firebase.firestore.Timestamp.now()
+        data_publicacao_app: firebase.firestore.Timestamp.now(),
+        data_publicacao: firebase.firestore.Timestamp.now()
       });
       await _registrarAlteracaoStatus(docId, 'Marcada como Publicada', motivo);
       mostrarMensagem('✅ Edição marcada como publicada no app.');
