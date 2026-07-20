@@ -377,7 +377,7 @@ async function _renderResumo() {
             <button onclick="_gerarEnviarLinkProativo('${uid}','${assinId}',this)"
               style="font-size:11px;padding:3px 10px;border-radius:6px;border:1px solid #0284c7;
                      background:#e0f2fe;cursor:pointer;color:#0284c7;font-weight:600;margin-left:6px">
-              🔗 Gerar e enviar link
+              🔗 Gerar e enviar link (e-mail e app)
             </button>` : ''}
             <div style="display:none;margin-top:8px" id="feat-panel-${assinId}">
               <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px">
