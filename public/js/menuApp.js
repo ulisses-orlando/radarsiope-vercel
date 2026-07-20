@@ -135,6 +135,7 @@
       #rs-menu-dropdown.open .rs-menu-item:nth-child(3) { transition: opacity .16s ease .10s, transform .16s ease .10s, filter .15s; }
       #rs-menu-dropdown.open .rs-menu-item:nth-child(4) { transition: opacity .16s ease .14s, transform .16s ease .14s, filter .15s; }
       #rs-menu-dropdown.open .rs-menu-item:nth-child(5) { transition: opacity .16s ease .18s, transform .16s ease .18s, filter .15s; }
+      #rs-menu-dropdown.open .rs-menu-item:nth-child(6) { transition: opacity .16s ease .22s, transform .16s ease .22s, filter .15s; }
       .rs-menu-item:hover { filter: brightness(1.15); }
       .rs-menu-item:active { transform: scale(.97); }
 
@@ -217,6 +218,12 @@
           <span class="rs-menu-item-badge verde" id="rs-menu-badge-fc" style="display:none">0</span>
         </button>
         ${isAssinante ? `
+        <button class="rs-menu-item" id="rs-menu-desempenho"
+          style="background:#0f6b52" role="menuitem">
+          <span class="rs-menu-item-icon">🧠</span>
+          <span class="rs-menu-item-label">Meu Desempenho</span>
+        </button>` : ''}
+        ${isAssinante ? `
         <button class="rs-menu-item" id="rs-menu-area"
           style="background:#5b21b6" role="menuitem">
           <span class="rs-menu-item-icon">👤</span>
@@ -274,7 +281,12 @@
         }
         window._rsFcAbrir?.();
       });
-
+    // 🧠 Meu Desempenho — abre modal com resumo geral do quiz
+    document.getElementById('rs-menu-desempenho')
+      ?.addEventListener('click', () => {
+        _fecharMenu();
+        _abrirModalDesempenho();
+      });
     // 👤 Minha Área — abre modal com iframe
     document.getElementById('rs-menu-area')
       ?.addEventListener('click', () => {
@@ -431,6 +443,87 @@
   }
 
   window._rsFecharLogin = _fecharModalLogin;
+
+   // ── Modal de Meu Desempenho (resumo geral do quiz) ─────────────────────────
+  function _abrirModalDesempenho() {
+    const uid = window._radarUser?.uid;
+    if (!uid) return;
+
+    if (!document.getElementById('rs-quiz-resumo-modal')) {
+      const modal = document.createElement('div');
+      modal.id = 'rs-quiz-resumo-modal';
+      modal.style.cssText = `
+        position: fixed; inset: 0; z-index: 9000;
+        background: rgba(0,0,0,.7);
+        display: flex; align-items: center; justify-content: center;
+        backdrop-filter: blur(3px);
+        animation: rsFadeIn .2s ease;
+        padding: 16px;
+      `;
+      modal.innerHTML = `
+        <style>
+          @keyframes rsFadeIn { from { opacity:0 } to { opacity:1 } }
+          @keyframes rsSlideUp { from { opacity:0; transform:translateY(20px) } to { opacity:1; transform:translateY(0) } }
+          #rs-quiz-resumo-wrap {
+            background: linear-gradient(180deg, #13233a, #0f1b2e);
+            border: 1px solid rgba(255,255,255,.08);
+            border-radius: 16px;
+            width: min(440px, 94vw); max-height: min(600px, 90vh);
+            overflow-y: auto; -webkit-overflow-scrolling: touch;
+            position: relative; padding: 24px 20px 20px;
+            box-shadow: 0 8px 40px rgba(0,0,0,.5);
+            animation: rsSlideUp .25s ease;
+          }
+          #rs-quiz-resumo-fechar {
+            position: absolute; top: 12px; right: 12px;
+            background: rgba(255,255,255,.1); border: none;
+            border-radius: 50%; width: 28px; height: 28px;
+            color: #fff; font-size: 16px; cursor: pointer;
+            display: flex; align-items: center; justify-content: center;
+            z-index: 1; transition: background .15s;
+            -webkit-tap-highlight-color: transparent;
+          }
+          #rs-quiz-resumo-fechar:hover { background: rgba(255,255,255,.22); }
+          .rs-quiz-resumo-titulo {
+            font-family: 'Syne', system-ui, sans-serif;
+            font-size: 15px; font-weight: 800; color: #fff;
+            margin: 0 0 16px; padding-right: 24px;
+          }
+        </style>
+        <div id="rs-quiz-resumo-wrap">
+          <button id="rs-quiz-resumo-fechar" type="button" aria-label="Fechar">×</button>
+          <h3 class="rs-quiz-resumo-titulo">🧠 Meu Desempenho no Quiz</h3>
+          <div id="quiz-resumo-container"></div>
+        </div>
+      `;
+
+      modal.addEventListener('click', e => {
+        if (e.target === modal) _fecharModalDesempenho();
+      });
+      document.body.appendChild(modal);
+      document.getElementById('rs-quiz-resumo-fechar')
+        .addEventListener('click', _fecharModalDesempenho);
+    } else {
+      document.getElementById('rs-quiz-resumo-modal').style.display = 'flex';
+    }
+
+    if (window.QuizResumoManager?.renderizar) {
+      window.QuizResumoManager.renderizar('quiz-resumo-container', uid);
+    } else {
+      console.warn('[menuApp] QuizResumoManager não encontrado — confira se quizResumo.js foi incluído na página.');
+    }
+  }
+
+  function _fecharModalDesempenho() {
+    const modal = document.getElementById('rs-quiz-resumo-modal');
+    if (modal) {
+      modal.style.opacity = '0';
+      modal.style.transition = 'opacity .2s';
+      setTimeout(() => modal.remove(), 200);
+    }
+  }
+
+  window._rsFecharDesempenho = _fecharModalDesempenho;
 
   // ── Recebe mensagens do iframe de login ──────────────────────────────────────
   window.addEventListener('message', function (e) {
