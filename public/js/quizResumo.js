@@ -114,7 +114,6 @@ async function _buscarResumoGeral(uid) {
 
 function injetarEstilosCSS() {
     if (document.getElementById('rs-quiz-resumo-style')) return;
-
     const style = document.createElement('style');
     style.id = 'rs-quiz-resumo-style';
     style.textContent = `
@@ -133,7 +132,6 @@ function injetarEstilosCSS() {
         .rs-quiz-sk-line.w60 { width: 60%; }
         .rs-quiz-sk-line.w40 { width: 40%; }
         @keyframes rsPulseResumo { 0%,100% { opacity:.4 } 50% { opacity:.9 } }
-
         /* ── Estado vazio / erro ── */
         .rs-quiz-resumo-vazio {
             text-align: center; padding: 32px 16px;
@@ -141,7 +139,6 @@ function injetarEstilosCSS() {
         }
         .rs-quiz-resumo-vazio .rs-quiz-cta-icon { font-size: 36px; margin-bottom: 8px; }
         .rs-quiz-resumo-erro { color: var(--rs-muted, #94a3b8); font-size: 13px; padding: 16px 0; }
-
         /* ── Card resumo ── */
         .rs-quiz-resumo-card {
             display: flex; align-items: center; gap: 20px;
@@ -152,7 +149,6 @@ function injetarEstilosCSS() {
         .rs-quiz-resumo-stats { flex: 1; min-width: 0; }
         .rs-quiz-resumo-media { font-size: 13px; color: var(--rs-muted, #94a3b8); margin: 0 0 6px; }
         .rs-quiz-resumo-aprovacao { font-size: 15px; color: var(--rs-text, #f1f5f9); margin: 0; }
-
         /* ── Lista por edição ── */
         .rs-quiz-resumo-row {
             grid-template-columns: 24px 52px 1fr auto;
@@ -161,7 +157,18 @@ function injetarEstilosCSS() {
             font-size: 13px; color: var(--rs-text, #f1f5f9);
             overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
         }
-
+        /* ✅ CORREÇÃO: Forçar cores claras nos elementos herdados do quizApp */
+        .rs-quiz-resumo-lista .rs-quiz-hist-row {
+            color: #f1f5f9 !important;
+        }
+        .rs-quiz-resumo-lista .rs-quiz-resumo-titulo-edicao {
+            color: #f1f5f9 !important;
+            font-weight: 500;
+        }
+        .rs-quiz-resumo-lista .rs-quiz-hist-data {
+            color: #94a3b8 !important;
+            font-size: 12px;
+        }
         /* ── Mobile ── */
         @media (max-width: 480px) {
             .rs-quiz-resumo-card { flex-direction: column; text-align: center; }

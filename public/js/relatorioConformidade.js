@@ -160,12 +160,12 @@ function _montarHTMLRelatorio(d) {
     ? alertas.map(a => `<div class="alerta-item"><span class="alerta-icone">${_iconeAlerta(a.tipo)}</span><span class="alerta-txt">${_escHtml(a.titulo)}</span><span class="alerta-data">${_dataAbrev(a.disparado_em)}</span></div>`).join('')
     : '<p class="sem-dados">Nenhum alerta registrado nos últimos 12 meses.</p>';
 
-  const qTotal = quiz?.edicoes_com_quiz || 0;
   const qRespondidas = quiz?.edicoes_respondidas || 0;
-  const qTaxa = quiz?.taxa_participacao || 0;
+  const qAprovadas = quiz?.edicoes_aprovadas || 0;
+  const qTaxaAprovacao = qRespondidas > 0 ? Math.round((qAprovadas / qRespondidas) * 100) : 0;
   const qMedia = quiz?.media_pontuacao;
-  const qPct = Math.min(100, qTaxa);
-  const qCorBarra = qTaxa >= 80 ? '#16a34a' : qTaxa >= 50 ? '#d97706' : '#dc2626';
+  const qPct = Math.min(100, qTaxaAprovacao);
+  const qCorBarra = qTaxaAprovacao >= 80 ? '#16a34a' : qTaxaAprovacao >= 50 ? '#d97706' : '#dc2626';
   const qMediaTxt = qMedia !== null ? `${qMedia}%` : '—';
   const qCorMedia = qMedia !== null && qMedia >= 70 ? '#16a34a' : qMedia !== null && qMedia >= 50 ? '#d97706' : '#dc2626';
 
@@ -384,12 +384,11 @@ function _montarHTMLRelatorio(d) {
         <div class="secao-titulo">🧠 Jornada de Conhecimento</div>
         <div class="quiz-bloco">
           <div class="quiz-metricas">
-            <div class="quiz-met"><span class="quiz-met-label">Edições respondidas</span><span class="quiz-met-valor" style="color:#0A3D62">${qRespondidas}/${qTotal}</span></div>
-            <div class="quiz-met"><span class="quiz-met-label">Taxa de participação</span><span class="quiz-met-valor" style="color:${qCorBarra}">${qTaxa}%</span></div>
-            <div class="quiz-met"><span class="quiz-met-label">Média de aproveitamento</span><span class="quiz-met-valor" style="color:${qCorMedia}">${qMediaTxt}</span></div>
+          <div class="quiz-met"><span class="quiz-met-label">Edições aprovadas</span><span class="quiz-met-valor" style="color:#0A3D62">${qAprovadas} de ${qRespondidas}</span></div>
+          <div class="quiz-met"><span class="quiz-met-label">Taxa de aprovação</span><span class="quiz-met-valor" style="color:${qCorBarra}">${qTaxaAprovacao}%</span></div>            <div class="quiz-met"><span class="quiz-met-label">Média de aproveitamento</span><span class="quiz-met-valor" style="color:${qCorMedia}">${qMediaTxt}</span></div>
           </div>
           <div class="barra-wrap"><div class="barra-fill" style="width:${qPct}%;background:${qCorBarra}"></div></div>
-          <div class="quiz-legenda">${qTaxa >= 80 ? '✅ Excelente engajamento.' : qTaxa >= 50 ? '📌 Engajamento moderado.' : qTotal === 0 ? '—' : '⚠️ Baixa participação.'}</div>
+          <div class="quiz-legenda">${qTaxaAprovacao >= 80 ? '✅ Excelente desempenho.' : qTaxaAprovacao >= 50 ? '📌 Desempenho moderado.' : qRespondidas === 0 ? '—' : '⚠️ Desempenho abaixo do esperado.'}</div>
         </div>
       </div>
     </div>
