@@ -157,6 +157,11 @@ function injetarEstilosCSS() {
             font-size: 13px; color: var(--rs-text, #f1f5f9);
             overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
         }
+        /* ✅ CORREÇÃO: Texto dentro do círculo de score - azul escuro para contraste */
+        .rs-quiz-score-circle span {
+            color: #0A3D62 !important;
+            font-weight: 700;
+        }
         /* ✅ CORREÇÃO: Forçar cores claras nos elementos herdados do quizApp */
         .rs-quiz-resumo-lista .rs-quiz-hist-row {
             color: #f1f5f9 !important;
@@ -178,7 +183,6 @@ function injetarEstilosCSS() {
     `;
     document.head.appendChild(style);
 }
-
 // ────────────────────────────────────────────────────────────────────────
 // EXPORTAÇÃO GLOBAL
 // ────────────────────────────────────────────────────────────────────────
