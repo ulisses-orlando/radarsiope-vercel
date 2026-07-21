@@ -559,13 +559,19 @@ function filtrarSolicitacoes(status) {
 // Helper: transforma URLs longas em links clicáveis com texto encurtado
 function _formatarMensagemComLinks(texto) {
   if (!texto) return '';
-  const urlRegex = /(https?:\/\/[^\s<]+)/g;
+  // Regex mais robusta: pega https://, http:// ou www.
+  const urlRegex = /((https?:\/\/|www\.)[^\s<]+)/g;
+  
   return texto.replace(urlRegex, (url) => {
+    // Garante que o href tenha protocolo
+    const href = url.startsWith('http') ? url : 'https://' + url;
+    
     if (url.length > 60) {
       const display = url.substring(0, 40) + '…' + url.substring(url.length - 15);
-      return `<a href="${url}" target="_blank" rel="noopener" title="${url}" style="word-break:break-all;overflow-wrap:anywhere;display:inline-block;max-width:100%;color:#0A3D62;text-decoration:underline">${display}</a>`;
+      // Note os !important nos estilos inline para vencer qualquer CSS global
+      return `<a href="${href}" target="_blank" rel="noopener" title="${url}" style="word-break:break-all !important; overflow-wrap:anywhere !important; display:inline-block !important; max-width:100% !important; color:#0A3D62; text-decoration:underline;">${display}</a>`;
     }
-    return `<a href="${url}" target="_blank" rel="noopener" style="word-break:break-all;overflow-wrap:anywhere;color:#0A3D62;text-decoration:underline">${url}</a>`;
+    return `<a href="${href}" target="_blank" rel="noopener" style="word-break:break-all !important; overflow-wrap:anywhere !important; color:#0A3D62; text-decoration:underline;">${url}</a>`;
   }).replace(/\n/g, '<br>');
 }
 
