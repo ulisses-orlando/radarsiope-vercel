@@ -51,7 +51,8 @@ const momentosEnvio = [
   { valor: "padrao", descricao: "📌 Resposta padrão para envio manual" },
 
   // ——— Solicitação de acesso trial ———
-  { valor: "acesso_trial", descricao: "✍️ Solicitação de acesso trial" }
+  { valor: "acesso_trial", descricao: "✍️ Solicitação de acesso trial" },
+  { valor: "limite_acesso_trial", descricao: "✍️ Solicitação de acesso trial excedido" }
 ];
 
 function filtrarPerfilAvaliacoes(perfil) {
