@@ -1107,27 +1107,29 @@
       color: #fff;
     }
 
-    /* Força quebra inteligente de URLs longas */
-    .solicitacao-desc {
-      word-break: break-word;
-      overflow-wrap: anywhere;
-      min-width: 0;
+    /* Força quebra de URLs longas em qualquer lugar */
+    .solicitacao-desc,
+    .solicitacao-desc a,
+    .msg-truncada,
+    .msg-truncada a {
+      word-break: break-word !important;
+      overflow-wrap: break-word !important;
+      max-width: 100% !important;
+      min-width: 0 !important;
     }
 
     /* Links dentro de mensagens */
-    .solicitacao-desc a {
-      color: #0A3D62;
-      text-decoration: underline;
-      word-break: break-all;
-      overflow-wrap: anywhere;
-      display: inline-block;
-      max-width: 100%;
+    .solicitacao-desc a,
+    .msg-truncada a {
+      color: #0A3D62 !important;
+      text-decoration: underline !important;
+      display: inline-block !important;
     }
 
     /* Container do link no modal */
     #link-acesso-gerado {
-      word-break: break-all;
-      overflow-wrap: anywhere;
+      word-break: break-all !important;
+      overflow-wrap: anywhere !important;
       background: #f1f5f9;
       padding: 10px;
       border-radius: 6px;
