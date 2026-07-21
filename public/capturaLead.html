@@ -62,6 +62,10 @@
     <div class="box">
       <h3>Obrigado, <span id="nomeModal"></span>!</h3>
       <p>Recebemos seu interesse e entraremos em contato.</p>
+      <!-- Mensagem extra, usada nos cenários de trial repetido (novo link
+           enviado / limite de solicitações atingido). Fica oculta quando
+           não há texto (mostrarModalAgradecimento controla isso via JS). -->
+      <p id="mensagemModal" style="display:none"></p>
       <button id="btnFecharModal">Fechar</button>
     </div>
   </div>
