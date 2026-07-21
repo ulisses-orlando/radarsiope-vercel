@@ -465,15 +465,15 @@ async function _processarSolicitacaoLinkAcesso(uid, descricao) {
     }
 
     const assinaturaId = snap.docs[0].id;
-    const selfCount    = snap.docs[0].data().self_link_gerado_count || 0;
+    const selfCount = snap.docs[0].data().self_link_gerado_count || 0;
 
     await db.collection('usuarios').doc(uid).collection('solicitacoes').add({
-      tipo:              'solicitar_link_acesso',
-      descricao:         descricao || 'Solicitação de novo link de acesso ao app.',
-      status:            'aberta',
+      tipo: 'solicitar_link_acesso',
+      descricao: descricao || 'Solicitação de novo link de acesso ao app.',
+      status: 'aberta',
       assinaturaId,
       self_count_no_momento: selfCount,   // informativo para o admin
-      data_solicitacao:  new Date().toISOString(),
+      data_solicitacao: new Date().toISOString(),
     });
 
     await db.collection('admin_contadores').doc('pendencias').set(
@@ -556,6 +556,21 @@ function filtrarSolicitacoes(status) {
   carregarHistoricoSolicitacoes(usuario.id);
 }
 
+// ─── Helper: transforma URLs longas em links clicáveis com texto encurtado ───
+function _formatarMensagemComLinks(texto) {
+  if (!texto) return '';
+  // Regex para detectar URLs
+  const urlRegex = /(https?:\/\/[^\s<]+)/g;
+  return texto.replace(urlRegex, (url) => {
+    // Se a URL for muito longa (>60 chars), encurta visualmente
+    if (url.length > 60) {
+      const display = url.substring(0, 40) + '…' + url.substring(url.length - 15);
+      return `<a href="${url}" target="_blank" rel="noopener" title="${url}" style="word-break:break-all;overflow-wrap:anywhere;display:inline-block;max-width:100%">${display}</a>`;
+    }
+    return `<a href="${url}" target="_blank" rel="noopener" style="word-break:break-all;overflow-wrap:anywhere">${url}</a>`;
+  }).replace(/\n/g, '<br>');
+}
+
 function carregarHistoricoSolicitacoes(uid) {
   const container = document.getElementById('historico-solicitacoes');
   if (!container) return;
@@ -585,21 +600,26 @@ function carregarHistoricoSolicitacoes(uid) {
 
         // Mensagem administrativa
         if (s.tipo === 'envio_manual_admin') {
+          const mensagemCompleta = s.mensagem || s.resposta_html_enviada || '';
+          const mensagemCurta = mensagemCompleta.substring(0, 200);
+
           html += `
-            <div class="solicitacao-item" style="--st-cor:#3b82f6">
-              <div class="solicitacao-tipo">📧 Mensagem da equipe Radar SIOPE</div>
-              <div class="solicitacao-desc">
-                ${s.assunto ? `<strong>${s.assunto}</strong><br>` : ''}
-                <div class="msg-truncada" id="msg-${doc.id}">
-                  ${(s.mensagem || s.resposta_html_enviada || '').substring(0, 200)}...
+              <div class="solicitacao-item" style="--st-cor:#3b82f6">
+                <div class="solicitacao-tipo"> Mensagem da equipe Radar SIOPE</div>
+                <div class="solicitacao-desc" style="word-break:break-word;overflow-wrap:anywhere;min-width:0">
+                  ${s.assunto ? `<strong>${s.assunto}</strong><br>` : ''}
+                  <div class="msg-truncada" id="msg-${doc.id}" style="word-break:break-word;overflow-wrap:anywhere">
+                    ${_formatarMensagemComLinks(mensagemCurta)}${mensagemCompleta.length > 200 ? '…' : ''}
+                  </div>
+                  ${mensagemCompleta.length > 200 ? `
+                    <button class="btn-expandir" id="btn-exp-${doc.id}"
+                      onclick="expandirMensagem('${doc.id}', '${encodeURIComponent(mensagemCompleta)}')">
+                      Ver mensagem completa
+                    </button>
+                  ` : ''}
                 </div>
-                <button class="btn-expandir" id="btn-exp-${doc.id}"
-                  onclick="expandirMensagem('${doc.id}', '${encodeURIComponent(s.mensagem || s.resposta_html_enviada || '')}')">
-                  Ver mensagem completa
-                </button>
-              </div>
-              <div class="solicitacao-meta">${fmtData(s.data_envio || s.data_solicitacao)}</div>
-            </div>`;
+                <div class="solicitacao-meta">${fmtData(s.data_envio || s.data_solicitacao)}</div>
+              </div>`;
           return;
         }
 
@@ -692,12 +712,17 @@ function expandirMensagem(id, mensagemEncoded) {
   if (!div || !btn) return;
 
   if (div.dataset.expandido === 'true') {
-    div.innerHTML = div.dataset.curta;
+    // Recolhe: volta para versão curta (200 chars)
+    const mensagemCompleta = decodeURIComponent(mensagemEncoded);
+    const mensagemCurta = mensagemCompleta.substring(0, 200);
+    div.innerHTML = _formatarMensagemComLinks(mensagemCurta) +
+      (mensagemCompleta.length > 200 ? '…' : '');
     div.dataset.expandido = 'false';
     btn.textContent = 'Ver mensagem completa';
   } else {
-    div.dataset.curta = div.innerHTML;
-    div.innerHTML = decodeURIComponent(mensagemEncoded);
+    // Expande: mostra mensagem completa com links formatados
+    const mensagemCompleta = decodeURIComponent(mensagemEncoded);
+    div.innerHTML = _formatarMensagemComLinks(mensagemCompleta);
     div.dataset.expandido = 'true';
     btn.textContent = 'Recolher';
   }
@@ -711,7 +736,7 @@ function _renderCardNovoLink(uid, assinaturaId, count) {
   if (!card) return;
 
   const restantes = LIMITE_SELF_LINK - count;
-  const esgotado  = restantes <= 0;
+  const esgotado = restantes <= 0;
 
   if (esgotado) {
     card.innerHTML = `
