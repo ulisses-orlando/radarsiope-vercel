@@ -556,18 +556,16 @@ function filtrarSolicitacoes(status) {
   carregarHistoricoSolicitacoes(usuario.id);
 }
 
-// ─── Helper: transforma URLs longas em links clicáveis com texto encurtado ───
+// Helper: transforma URLs longas em links clicáveis com texto encurtado
 function _formatarMensagemComLinks(texto) {
   if (!texto) return '';
-  // Regex para detectar URLs
   const urlRegex = /(https?:\/\/[^\s<]+)/g;
   return texto.replace(urlRegex, (url) => {
-    // Se a URL for muito longa (>60 chars), encurta visualmente
     if (url.length > 60) {
       const display = url.substring(0, 40) + '…' + url.substring(url.length - 15);
-      return `<a href="${url}" target="_blank" rel="noopener" title="${url}" style="word-break:break-all;overflow-wrap:anywhere;display:inline-block;max-width:100%">${display}</a>`;
+      return `<a href="${url}" target="_blank" rel="noopener" title="${url}" style="word-break:break-all;overflow-wrap:anywhere;display:inline-block;max-width:100%;color:#0A3D62;text-decoration:underline">${display}</a>`;
     }
-    return `<a href="${url}" target="_blank" rel="noopener" style="word-break:break-all;overflow-wrap:anywhere">${url}</a>`;
+    return `<a href="${url}" target="_blank" rel="noopener" style="word-break:break-all;overflow-wrap:anywhere;color:#0A3D62;text-decoration:underline">${url}</a>`;
   }).replace(/\n/g, '<br>');
 }
 
@@ -599,31 +597,17 @@ function carregarHistoricoSolicitacoes(uid) {
         const st = fmtStatus(status);
 
         // Mensagem administrativa
-        // Mensagem administrativa
         if (s.tipo === 'envio_manual_admin') {
           const mensagemCompleta = s.mensagem || s.resposta_html_enviada || '';
           const mensagemCurta = mensagemCompleta.substring(0, 200);
 
-          // Helper para formatar URLs como links clicáveis
-          const formatarLinks = (texto) => {
-            if (!texto) return '';
-            const urlRegex = /(https?:\/\/[^\s<]+)/g;
-            return texto.replace(urlRegex, (url) => {
-              if (url.length > 60) {
-                const display = url.substring(0, 40) + '…' + url.substring(url.length - 15);
-                return `<a href="${url}" target="_blank" rel="noopener" title="${url}" style="word-break:break-all;overflow-wrap:anywhere;display:inline-block;max-width:100%;color:#0A3D62;text-decoration:underline">${display}</a>`;
-              }
-              return `<a href="${url}" target="_blank" rel="noopener" style="word-break:break-all;overflow-wrap:anywhere;color:#0A3D62;text-decoration:underline">${url}</a>`;
-            }).replace(/\n/g, '<br>');
-          };
-
           html += `
             <div class="solicitacao-item" style="--st-cor:#3b82f6">
-              <div class="solicitacao-tipo"> Mensagem da equipe Radar SIOPE</div>
+              <div class="solicitacao-tipo">📧 Mensagem da equipe Radar SIOPE</div>
               <div class="solicitacao-desc" style="word-break:break-word;overflow-wrap:anywhere;min-width:0">
                 ${s.assunto ? `<strong>${s.assunto}</strong><br>` : ''}
                 <div class="msg-truncada" id="msg-${doc.id}" style="word-break:break-word;overflow-wrap:anywhere">
-                  ${formatarLinks(mensagemCurta)}${mensagemCompleta.length > 200 ? '…' : ''}
+                  ${_formatarMensagemComLinks(mensagemCurta)}${mensagemCompleta.length > 200 ? '…' : ''}
                 </div>
                 ${mensagemCompleta.length > 200 ? `
                   <button class="btn-expandir" id="btn-exp-${doc.id}"
@@ -725,30 +709,17 @@ function expandirMensagem(id, mensagemEncoded) {
   const btn = document.getElementById('btn-exp-' + id);
   if (!div || !btn) return;
 
-  // Helper para formatar URLs
-  const formatarLinks = (texto) => {
-    if (!texto) return '';
-    const urlRegex = /(https?:\/\/[^\s<]+)/g;
-    return texto.replace(urlRegex, (url) => {
-      if (url.length > 60) {
-        const display = url.substring(0, 40) + '…' + url.substring(url.length - 15);
-        return `<a href="${url}" target="_blank" rel="noopener" title="${url}" style="word-break:break-all;overflow-wrap:anywhere;display:inline-block;max-width:100%;color:#0A3D62;text-decoration:underline">${display}</a>`;
-      }
-      return `<a href="${url}" target="_blank" rel="noopener" style="word-break:break-all;overflow-wrap:anywhere;color:#0A3D62;text-decoration:underline">${url}</a>`;
-    }).replace(/\n/g, '<br>');
-  };
-
   if (div.dataset.expandido === 'true') {
     // Recolhe
     const mensagemCompleta = decodeURIComponent(mensagemEncoded);
     const mensagemCurta = mensagemCompleta.substring(0, 200);
-    div.innerHTML = formatarLinks(mensagemCurta) + (mensagemCompleta.length > 200 ? '…' : '');
+    div.innerHTML = _formatarMensagemComLinks(mensagemCurta) + (mensagemCompleta.length > 200 ? '…' : '');
     div.dataset.expandido = 'false';
     btn.textContent = 'Ver mensagem completa';
   } else {
     // Expande
     const mensagemCompleta = decodeURIComponent(mensagemEncoded);
-    div.innerHTML = formatarLinks(mensagemCompleta);
+    div.innerHTML = _formatarMensagemComLinks(mensagemCompleta);
     div.dataset.expandido = 'true';
     btn.textContent = 'Recolher';
   }
