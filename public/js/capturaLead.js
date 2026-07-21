@@ -18,6 +18,11 @@ function _cod6(codigo) {
 
 const origem = getParametro("origem") || "origem_nao_informada";
 
+// Limite de solicitações de acesso trial por lead (contagem em leads_envios,
+// origem='trial', medida ANTES do envio atual — ou seja, não inclui a tentativa
+// em curso). Igual ou acima disso, bloqueia novos links.
+const LIMITE_ACESSO_TRIAL = 3;
+
 // ============================
 // 1. Monta checkboxes de tipos
 // ============================
@@ -49,8 +54,19 @@ async function carregarTiposNewsletter() {
 // ============================
 // 2. Modal de agradecimento
 // ============================
-function mostrarModalAgradecimento(nome) {
+// mensagem (opcional): texto extra exibido no modal, usado nos cenários de
+// trial repetido (dentro do limite / acima do limite). Se o elemento
+// #mensagemModal não existir no HTML, o texto simplesmente não aparece —
+// precisa adicionar esse elemento no markup do modal para funcionar.
+function mostrarModalAgradecimento(nome, mensagem) {
     document.getElementById("nomeModal").textContent = nome;
+
+    const elMensagem = document.getElementById("mensagemModal");
+    if (elMensagem) {
+        elMensagem.textContent = mensagem || "";
+        elMensagem.style.display = mensagem ? "block" : "none";
+    }
+
     document.getElementById("modalAgradecimento").style.display = "flex";
 }
 
@@ -118,6 +134,35 @@ async function gerarLinkAcessoTrial(leadId) {
     return `https://app.radarsiope.com.br/verNewsletterComToken.html?d=${encodeURIComponent(b64)}`;
 }
 
+// ============================
+// 2c. Unicidade de lead por e-mail
+// ============================
+// Regra geral: nunca criamos mais de um registro em `leads` para o mesmo
+// e-mail (constraint UNIQUE em leads.email no banco). Usado em qualquer
+// origem, não só trial.
+async function buscarLeadPorEmail(email) {
+    const { data, error } = await window.supabase
+        .from("leads")
+        .select("id")
+        .eq("email", email)
+        .maybeSingle();
+
+    if (error) throw new Error(`Erro ao buscar lead por e-mail: ${error.message}`);
+    return data; // null se não existir
+}
+
+// Conta quantos acessos trial já foram emitidos para esse lead (registros já
+// existentes em leads_envios, origem='trial' — não inclui a tentativa atual).
+async function contarAcessosTrial(leadId) {
+    const { count, error } = await window.supabase
+        .from("leads_envios")
+        .select("id", { count: "exact", head: true })
+        .eq("lead_id", leadId)
+        .eq("origem", "trial");
+
+    if (error) throw new Error(`Erro ao contar acessos trial: ${error.message}`);
+    return count || 0;
+}
 
 // ============================
 // 3. Envio do formulário
@@ -188,76 +233,166 @@ async function processarEnvioInteresse(e) {
     if (!dadosUf) return;
 
     // ============================
-    // Gravação no Firestore
+    // Gravação no Supabase
     // ============================
     status.innerText = "Enviando...";
     botao.disabled = true;
 
     try {
-        const { data, error } = await window.supabase
-            .from("leads")
-            .insert([{
-                nome,
-                nome_lowercase: nome.toLowerCase(),
-                email,
-                telefone,
-                perfil,
-                mensagem: mensagem || null,
-                interesses,
-                preferencia_contato: preferencia,
-                origem: origem,
-                status: "Novo",
-                cod_uf: dadosUf.cod_uf,
-                cod_municipio: _cod6(dadosUf.cod_municipio),
-                nome_municipio: dadosUf.nome_municipio,
-                data_criacao: new Date().toISOString()
-            }])
-            .select();
+        // Campos compartilhados entre INSERT (lead novo) e UPDATE (lead existente).
+        // status/data_criacao ficam de fora daqui porque só fazem sentido no INSERT
+        // (não queremos sobrescrever status/data de criação de um lead reaproveitado).
+        const dadosLead = {
+            nome,
+            nome_lowercase: nome.toLowerCase(),
+            email,
+            telefone,
+            perfil,
+            mensagem: mensagem || null,
+            interesses,
+            preferencia_contato: preferencia,
+            origem: origem,
+            cod_uf: dadosUf.cod_uf,
+            cod_municipio: _cod6(dadosUf.cod_municipio),
+            nome_municipio: dadosUf.nome_municipio,
+        };
 
-        if (error) throw error;
-        const novoLeadRef = { id: data[0].id };
+        const leadExistente = await buscarLeadPorEmail(email);
 
-        // ── Acesso trial (leads vindos do CTA "Conheça o App") ───────────────
+        let novoLeadRef;
         let tipoMensagem = "primeiro_contato";
         let linkAcesso = null;
+        let mensagemModal = null;
+        let enviarMensagemAutomatica = true;
 
         if (origem === "trial") {
-            try {
-                linkAcesso = await gerarLinkAcessoTrial(novoLeadRef.id);
-                tipoMensagem = "acesso_trial";
-                await window.supabase.from("leads").update({
-                        status: "Trial enviado",
-                        mensagem_respondida: true,
-                        mensagem_respondida_em: new Date().toISOString(),
-                        mensagem_resposta: "Acesso de demonstração (72h) enviado automaticamente por e-mail.",
-                    }).eq("id", novoLeadRef.id);
-            } catch (e) {
-                console.error('[capturaLead] Falha ao gerar acesso trial, mantendo primeiro_contato:', e);
+            // ── Fluxo trial ────────────────────────────────────────────────
+            if (!leadExistente) {
+                // Lead novo: fluxo atual, sem mudança.
+                const { data, error } = await window.supabase
+                    .from("leads")
+                    .insert([{ ...dadosLead, status: "Novo", data_criacao: new Date().toISOString() }])
+                    .select();
+                if (error) throw error;
+                novoLeadRef = { id: data[0].id };
+
+                try {
+                    linkAcesso = await gerarLinkAcessoTrial(novoLeadRef.id);
+                    tipoMensagem = "acesso_trial";
+                    await window.supabase.from("leads").update({
+                            status: "Trial enviado",
+                            mensagem_respondida: true,
+                            mensagem_respondida_em: new Date().toISOString(),
+                            mensagem_resposta: "Acesso de demonstração (72h) enviado automaticamente por e-mail.",
+                        }).eq("id", novoLeadRef.id);
+                } catch (err) {
+                    console.error('[capturaLead] Falha ao gerar acesso trial, mantendo primeiro_contato:', err);
+                }
+            } else {
+                // Lead existente: contar tentativas anteriores antes de decidir.
+                novoLeadRef = { id: leadExistente.id };
+                const contagemAnterior = await contarAcessosTrial(novoLeadRef.id);
+
+                if (contagemAnterior < LIMITE_ACESSO_TRIAL) {
+                    // Dentro do limite: gera mais um link.
+                    const { error: erroUpdate } = await window.supabase
+                        .from("leads")
+                        .update(dadosLead)
+                        .eq("id", novoLeadRef.id);
+                    if (erroUpdate) throw erroUpdate;
+
+                    try {
+                        linkAcesso = await gerarLinkAcessoTrial(novoLeadRef.id);
+                        tipoMensagem = "acesso_trial";
+                        await window.supabase.from("leads").update({
+                                status: "Trial enviado",
+                                mensagem_respondida: true,
+                                mensagem_respondida_em: new Date().toISOString(),
+                                mensagem_resposta: "Acesso de demonstração (72h) enviado automaticamente por e-mail.",
+                            }).eq("id", novoLeadRef.id);
+
+                        mensagemModal = `Prontinho! Enviamos um novo link de acesso de demonstração para o seu e-mail. Esta foi a solicitação nº ${contagemAnterior + 1} de ${LIMITE_ACESSO_TRIAL} disponíveis.`;
+                    } catch (err) {
+                        console.error('[capturaLead] Falha ao gerar acesso trial, mantendo primeiro_contato:', err);
+                    }
+                } else {
+                    // Acima do limite: não gera link, não envia e-mail.
+                    const tentativaAtual = contagemAnterior + 1;
+                    const { error: erroUpdate } = await window.supabase
+                        .from("leads")
+                        .update({
+                            ...dadosLead,
+                            mensagem: `${tentativaAtual}ª solicitação de acesso trial`,
+                            status: "Limite trial atingido",
+                            mensagem_respondida: false,
+                            mensagem_respondida_em: null,
+                            mensagem_resposta: null,
+                        })
+                        .eq("id", novoLeadRef.id);
+                    if (erroUpdate) throw erroUpdate;
+
+                    tipoMensagem = "limite_acesso_trial";
+                    enviarMensagemAutomatica = false; // sem e-mail nesse cenário
+                    mensagemModal = "Você já utilizou todas as suas solicitações de acesso de demonstração. Nossa equipe vai entrar em contato em breve para apresentar o plano ideal para você.";
+                }
+            }
+        } else {
+            // ── Fluxo contato_pelo_site (ou outra origem) ─────────────────
+            if (!leadExistente) {
+                const { data, error } = await window.supabase
+                    .from("leads")
+                    .insert([{ ...dadosLead, status: "Novo", data_criacao: new Date().toISOString() }])
+                    .select();
+                if (error) throw error;
+                novoLeadRef = { id: data[0].id };
+            } else {
+                novoLeadRef = { id: leadExistente.id };
+                const { error: erroUpdate } = await window.supabase
+                    .from("leads")
+                    .update({
+                        ...dadosLead,
+                        status: "Novo",
+                        mensagem_respondida: false,
+                        mensagem_respondida_em: null,
+                        mensagem_resposta: null,
+                    })
+                    .eq("id", novoLeadRef.id);
+                if (erroUpdate) throw erroUpdate;
             }
         }
 
-        // Disparo automático de boas-vindas (ou acesso trial)
-        await dispararMensagemAutomatica(tipoMensagem, {
-            id: novoLeadRef.id,
-            nome: nome,
-            email: email,
-            interesse: interesses,
-            preferencia_contato: preferencia,
-            uf: dadosUf.cod_uf,
-            municipio: dadosUf.nome_municipio,
-            perfil: perfil,
-            link_ativacao: linkAcesso
-        }, "lead");
+        // Disparo automático de boas-vindas / acesso trial (pulado quando
+        // origem=trial e limite foi atingido — nesse caso não enviamos e-mail).
+        if (enviarMensagemAutomatica) {
+            await dispararMensagemAutomatica(tipoMensagem, {
+                id: novoLeadRef.id,
+                nome: nome,
+                email: email,
+                interesse: interesses,
+                preferencia_contato: preferencia,
+                uf: dadosUf.cod_uf,
+                municipio: dadosUf.nome_municipio,
+                perfil: perfil,
+                link_ativacao: linkAcesso
+            }, "lead");
+        }
+
         // Incrementa contadores no admin_contadores
         try {
           const _db = window.db;
           if (_db) {
             const incrementos = {};
-            // Trial já foi resolvido automaticamente: não conta como pendência de "Novo"
+            // Trial dentro do limite já foi resolvido automaticamente: não conta
+            // como pendência de "Novo". Todo o resto (primeiro contato, contato
+            // pelo site reaberto, limite de trial atingido) é pendência real.
             if (tipoMensagem !== "acesso_trial") {
               incrementos.leads_novos = firebase.firestore.FieldValue.increment(1);
             }
-            if (mensagem) incrementos.leads_mensagens = firebase.firestore.FieldValue.increment(1);
+            // Só conta como "mensagem" se o texto veio de fato do lead (não o
+            // texto de contagem que geramos no cenário de limite atingido).
+            if (mensagem && tipoMensagem !== "limite_acesso_trial") {
+              incrementos.leads_mensagens = firebase.firestore.FieldValue.increment(1);
+            }
             if (Object.keys(incrementos).length) {
               await _db.collection('admin_contadores').doc('pendencias')
                 .set(incrementos, { merge: true });
@@ -268,7 +403,7 @@ async function processarEnvioInteresse(e) {
         status.innerText = "Enviado com sucesso!";
         status.style.color = "green";
 
-        mostrarModalAgradecimento(nome);
+        mostrarModalAgradecimento(nome, mensagemModal);
 
         e.target.reset();
 
