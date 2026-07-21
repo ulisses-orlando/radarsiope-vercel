@@ -1304,13 +1304,16 @@
   </div>
 
   <!-- Modal: link de acesso gerado -->
-  <div id="modal-link-acesso" class="modal-overlay" role="dialog" aria-modal="true">
+  <div id="modal-link-acesso" class="modal">
     <div class="modal-content">
+      <button class="modal-close" onclick="fecharModalLinkAcesso()">×</button>
       <h3>🔗 Novo link de acesso gerado</h3>
-      <p style="font-size:13px;color:var(--muted);margin:8px 0 4px;line-height:1.6">
+      <p style="font-size:13px;color:var(--muted);margin:10px 0 16px">
         Copie o link abaixo e abra-o no dispositivo que deseja usar.<br>
-        <strong>Válido por 72 horas.</strong> Após esse prazo, gere um novo link aqui.
+        Válido por 72 horas. Após esse prazo, gere um novo link aqui.
       </p>
+
+      <!-- ✅ ESTRUTURA ATUALIZADA COM WRAPPER E BOTÃO -->
       <div id="link-acesso-gerado-wrapper" style="position:relative;margin:10px 0">
         <div id="link-acesso-gerado"
           style="word-break:break-all;overflow-wrap:anywhere;background:#f1f5f9;padding:10px;border-radius:6px;font-family:monospace;font-size:12px;max-width:100%;max-height:54px;overflow:hidden;line-height:1.4;transition:max-height .3s ease">
@@ -1321,18 +1324,16 @@
           Ver completo
         </button>
       </div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px">
-        <button class="btn-copiar-link" onclick="copiarLinkAcesso()">📋 Copiar link</button>
-        <span id="feedback-copia" style="font-size:12px;color:#22c55e;align-self:center;display:none">✅ Copiado!</span>
+      <!-- ✅ FIM DA ESTRUTURA ATUALIZADA -->
+
+      <div style="display:flex;gap:8px;margin-top:12px">
+        <button class="btn-primary" onclick="copiarLinkAcesso()">📋 Copiar link</button>
+        <button class="btn-secundario" onclick="fecharModalLinkAcesso()">Fechar</button>
       </div>
-      <p id="card-link-restantes-modal"
-        style="font-size:11px;color:var(--muted);margin-top:12px;font-family:var(--font-head)"></p>
-      <div class="modal-btns">
-        <button onclick="document.getElementById('modal-link-acesso').classList.remove('show')" style="padding:8px 14px;border-radius:8px;border:1px solid var(--border);
-                       background:var(--card2);color:var(--text);cursor:pointer;
-                       font-family:var(--font-head);font-size:13px">
-          Fechar
-        </button>
+
+      <div id="feedback-copia" style="display:none;margin-top:8px;font-size:12px;color:var(--success)">✅ Copiado!</div>
+      <div id="card-link-restantes-modal"
+        style="margin-top:12px;padding:10px;background:#f8fafc;border-radius:6px;font-size:12px;color:var(--muted)">
       </div>
     </div>
   </div>
