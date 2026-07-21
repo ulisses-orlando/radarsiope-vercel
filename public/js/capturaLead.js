@@ -55,9 +55,8 @@ async function carregarTiposNewsletter() {
 // 2. Modal de agradecimento
 // ============================
 // mensagem (opcional): texto extra exibido no modal, usado nos cenários de
-// trial repetido (dentro do limite / acima do limite). Se o elemento
-// #mensagemModal não existir no HTML, o texto simplesmente não aparece —
-// precisa adicionar esse elemento no markup do modal para funcionar.
+// trial repetido (dentro do limite / acima do limite). Requer o elemento
+// #mensagemModal dentro do #modalAgradecimento (ver capturaLead.html).
 function mostrarModalAgradecimento(nome, mensagem) {
     document.getElementById("nomeModal").textContent = nome;
 
@@ -264,6 +263,10 @@ async function processarEnvioInteresse(e) {
         let linkAcesso = null;
         let mensagemModal = null;
         let enviarMensagemAutomatica = true;
+        // Valor final gravado no campo `mensagem` do lead — usado pra decidir se
+        // conta no contador leads_mensagens. Conta independente de o texto ter
+        // sido escrito pelo lead ou gerado pelo sistema (ex. no limite de trial).
+        let mensagemParaContagem = mensagem || null;
 
         if (origem === "trial") {
             // ── Fluxo trial ────────────────────────────────────────────────
@@ -303,7 +306,9 @@ async function processarEnvioInteresse(e) {
 
                     try {
                         linkAcesso = await gerarLinkAcessoTrial(novoLeadRef.id);
-                        tipoMensagem = "acesso_trial";
+                        // Lead recorrente: template de e-mail diferente do trial de
+                        // primeira vez, com saudação de "que bom te ver de novo".
+                        tipoMensagem = "acesso_trial_recorrente";
                         await window.supabase.from("leads").update({
                                 status: "Trial enviado",
                                 mensagem_respondida: true,
@@ -318,11 +323,13 @@ async function processarEnvioInteresse(e) {
                 } else {
                     // Acima do limite: não gera link, não envia e-mail.
                     const tentativaAtual = contagemAnterior + 1;
+                    const mensagemContagem = `${tentativaAtual}ª solicitação de acesso trial`;
+
                     const { error: erroUpdate } = await window.supabase
                         .from("leads")
                         .update({
                             ...dadosLead,
-                            mensagem: `${tentativaAtual}ª solicitação de acesso trial`,
+                            mensagem: mensagemContagem,
                             status: "Limite trial atingido",
                             mensagem_respondida: false,
                             mensagem_respondida_em: null,
@@ -334,6 +341,7 @@ async function processarEnvioInteresse(e) {
                     tipoMensagem = "limite_acesso_trial";
                     enviarMensagemAutomatica = false; // sem e-mail nesse cenário
                     mensagemModal = "Você já utilizou todas as suas solicitações de acesso de demonstração. Nossa equipe vai entrar em contato em breve para apresentar o plano ideal para você.";
+                    mensagemParaContagem = mensagemContagem;
                 }
             }
         } else {
@@ -382,15 +390,17 @@ async function processarEnvioInteresse(e) {
           const _db = window.db;
           if (_db) {
             const incrementos = {};
-            // Trial dentro do limite já foi resolvido automaticamente: não conta
-            // como pendência de "Novo". Todo o resto (primeiro contato, contato
-            // pelo site reaberto, limite de trial atingido) é pendência real.
-            if (tipoMensagem !== "acesso_trial") {
+            // Trial resolvido automaticamente (novo ou recorrente, dentro do
+            // limite) não conta como pendência de "Novo". Todo o resto
+            // (primeiro contato, contato pelo site reaberto, limite de trial
+            // atingido) é pendência real que precisa de atenção do Admin.
+            if (!["acesso_trial", "acesso_trial_recorrente"].includes(tipoMensagem)) {
               incrementos.leads_novos = firebase.firestore.FieldValue.increment(1);
             }
-            // Só conta como "mensagem" se o texto veio de fato do lead (não o
-            // texto de contagem que geramos no cenário de limite atingido).
-            if (mensagem && tipoMensagem !== "limite_acesso_trial") {
+            // Conta como "mensagem" sempre que o campo mensagem do lead foi
+            // preenchido, independente de o texto ter vindo do lead ou ter
+            // sido gerado pelo sistema (ex. contagem de tentativas de trial).
+            if (mensagemParaContagem) {
               incrementos.leads_mensagens = firebase.firestore.FieldValue.increment(1);
             }
             if (Object.keys(incrementos).length) {
