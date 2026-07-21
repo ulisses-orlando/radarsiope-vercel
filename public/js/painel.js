@@ -806,6 +806,17 @@ async function gerarNovoLinkAcesso(uid, assinaturaId, countAtual) {
     // Exibe o link no modal
     document.getElementById('link-acesso-gerado').textContent = data.link;
 
+    // Mostra o botão "Ver completo" se o link for longo (> 80 caracteres)
+    setTimeout(() => {
+      const divLink = document.getElementById('link-acesso-gerado');
+      const btnToggle = document.getElementById('btn-toggle-link');
+      if (divLink && btnToggle && divLink.textContent.length > 80) {
+        btnToggle.style.display = 'block';
+        divLink.dataset.expandido = 'false';
+        divLink.style.maxHeight = '54px';
+      }
+    }, 50);
+
     const novoRestantes = LIMITE_SELF_LINK - data.count;
     const msgRestantes = novoRestantes > 0
       ? `Você ainda pode gerar mais ${novoRestantes} link${novoRestantes !== 1 ? 's' : ''} automaticamente.`
@@ -843,4 +854,23 @@ function copiarLinkAcesso() {
       sel.addRange(range);
       document.execCommand('copy');
     });
+}
+
+// ─── Toggle para expandir/recolher link de acesso no modal ────────────────────
+function toggleLinkCompleto() {
+  const div = document.getElementById('link-acesso-gerado');
+  const btn = document.getElementById('btn-toggle-link');
+  if (!div || !btn) return;
+
+  if (div.dataset.expandido === 'true') {
+    // Recolhe
+    div.style.maxHeight = '54px';
+    div.dataset.expandido = 'false';
+    btn.textContent = 'Ver completo';
+  } else {
+    // Expande
+    div.style.maxHeight = 'none';
+    div.dataset.expandido = 'true';
+    btn.textContent = 'Recolher';
+  }
 }
