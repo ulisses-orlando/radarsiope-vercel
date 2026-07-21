@@ -720,6 +720,34 @@
       cursor: pointer;
     }
 
+    /* Força quebra de palavras longas e URLs dentro das mensagens */
+    .solicitacao-desc,
+    .msg-truncada,
+    .solicitacao-resposta {
+      word-break: break-word;
+      overflow-wrap: anywhere;
+      max-width: 100%;
+      min-width: 0;
+      /* importante em flex containers */
+    }
+
+    /* Quando a mensagem estiver expandida */
+    .msg-truncada[data-expandido="true"] {
+      word-break: break-all;
+      overflow-wrap: break-word;
+      hyphens: auto;
+    }
+
+    /* Estilo para links dentro das mensagens */
+    .solicitacao-desc a,
+    .msg-truncada a {
+      color: #0A3D62;
+      text-decoration: underline;
+      word-break: break-all;
+      overflow-wrap: anywhere;
+      display: inline-block;
+      max-width: 100%;
+    }
     /* ─── FORMULÁRIOS ───────────────────────────────────────────────── */
     input[readonly] {
       opacity: .6;
