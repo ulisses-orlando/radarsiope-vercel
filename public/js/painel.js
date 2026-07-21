@@ -603,7 +603,7 @@ function carregarHistoricoSolicitacoes(uid) {
 
           html += `
             <div class="solicitacao-item" style="--st-cor:#3b82f6">
-              <div class="solicitacao-tipo">📧 Mensagem da equipe Radar SIOPE</div>
+              <div class="solicitacao-tipo"> Mensagem da equipe Radar SIOPE</div>
               <div class="solicitacao-desc" style="word-break:break-word;overflow-wrap:anywhere;min-width:0">
                 ${s.assunto ? `<strong>${s.assunto}</strong><br>` : ''}
                 <div class="msg-truncada" id="msg-${doc.id}" style="word-break:break-word;overflow-wrap:anywhere">
@@ -708,7 +708,7 @@ function expandirMensagem(id, mensagemEncoded) {
   const div = document.getElementById('msg-' + id);
   const btn = document.getElementById('btn-exp-' + id);
   if (!div || !btn) return;
-
+  
   if (div.dataset.expandido === 'true') {
     // Recolhe
     const mensagemCompleta = decodeURIComponent(mensagemEncoded);
