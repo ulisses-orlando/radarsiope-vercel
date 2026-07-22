@@ -1141,7 +1141,47 @@
       line-height: 1.4;
       transition: max-height 0.3s ease;
     }
+
+    /* ═══ CORREÇÃO: Links longos em mensagens admin ═══ */
+    .solicitacao-item {
+      min-width: 0;
+    }
+
+    .msg-truncada {
+      word-break: break-word !important;
+      overflow-wrap: anywhere !important;
+      max-width: 100% !important;
+      min-width: 0 !important;
+    }
+
+    .msg-truncada a,
+    .solicitacao-desc a {
+      word-break: break-all !important;
+      overflow-wrap: anywhere !important;
+      display: inline-block !important;
+      max-width: 100% !important;
+      color: #0A3D62;
+      text-decoration: underline;
+      line-height: 1.6;
+    }
+
+    [data-theme="escuro"] .msg-truncada a,
+    [data-theme="escuro"] .solicitacao-desc a,
+    [data-theme="aurora"] .msg-truncada a,
+    [data-theme="aurora"] .solicitacao-desc a,
+    [data-theme="exito"] .msg-truncada a,
+    [data-theme="exito"] .solicitacao-desc a {
+      color: var(--accent);
+    }
+
+    /* Garante que o container do histórico não estoure */
+    #historico-solicitacoes {
+      min-width: 0;
+      overflow-x: hidden;
+    }
+
   </style>
+<base target="_blank">
 </head>
 
 <body>
