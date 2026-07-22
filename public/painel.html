@@ -720,35 +720,6 @@
       cursor: pointer;
     }
 
-    /* Força quebra de palavras longas e URLs dentro das mensagens */
-    .solicitacao-desc,
-    .msg-truncada,
-    .solicitacao-resposta {
-      word-break: break-word;
-      overflow-wrap: anywhere;
-      max-width: 100%;
-      min-width: 0;
-      /* importante em flex containers */
-    }
-
-    /* Quando a mensagem estiver expandida */
-    .msg-truncada[data-expandido="true"] {
-      word-break: break-all;
-      overflow-wrap: break-word;
-      hyphens: auto;
-    }
-
-    /* Estilo para links dentro das mensagens */
-    .solicitacao-desc a,
-    .msg-truncada a {
-      color: #0A3D62;
-      text-decoration: underline;
-      word-break: break-all;
-      overflow-wrap: anywhere;
-      display: inline-block;
-      max-width: 100%;
-    }
-
     /* ─── FORMULÁRIOS ───────────────────────────────────────────────── */
     input[readonly] {
       opacity: .6;
@@ -1106,82 +1077,7 @@
       background: var(--accent);
       color: #fff;
     }
-
-    /* Força a quebra de texto em qualquer cenário dentro das mensagens */
-    .solicitacao-desc,
-    .msg-truncada {
-      min-width: 0 !important;
-      max-width: 100% !important;
-      word-break: break-word !important;
-      overflow-wrap: break-word !important;
-      white-space: normal !important;
-    }
-
-    /* Garante que os links gerados não estouram o container */
-    .solicitacao-desc a,
-    .msg-truncada a {
-      display: inline-block !important;
-      max-width: 100% !important;
-      word-break: break-all !important;
-      overflow-wrap: anywhere !important;
-    }
-
-    /* Container do link no modal */
-    #link-acesso-gerado {
-      word-break: break-all !important;
-      overflow-wrap: anywhere !important;
-      background: #f1f5f9;
-      padding: 10px;
-      border-radius: 6px;
-      font-family: monospace;
-      font-size: 12px;
-      max-width: 100%;
-      max-height: 54px;
-      overflow: hidden;
-      line-height: 1.4;
-      transition: max-height 0.3s ease;
-    }
-
-    /* ═══ CORREÇÃO: Links longos em mensagens admin ═══ */
-    .solicitacao-item {
-      min-width: 0;
-    }
-
-    .msg-truncada {
-      word-break: break-word !important;
-      overflow-wrap: anywhere !important;
-      max-width: 100% !important;
-      min-width: 0 !important;
-    }
-
-    .msg-truncada a,
-    .solicitacao-desc a {
-      word-break: break-all !important;
-      overflow-wrap: anywhere !important;
-      display: inline-block !important;
-      max-width: 100% !important;
-      color: #0A3D62;
-      text-decoration: underline;
-      line-height: 1.6;
-    }
-
-    [data-theme="escuro"] .msg-truncada a,
-    [data-theme="escuro"] .solicitacao-desc a,
-    [data-theme="aurora"] .msg-truncada a,
-    [data-theme="aurora"] .solicitacao-desc a,
-    [data-theme="exito"] .msg-truncada a,
-    [data-theme="exito"] .solicitacao-desc a {
-      color: var(--accent);
-    }
-
-    /* Garante que o container do histórico não estoure */
-    #historico-solicitacoes {
-      min-width: 0;
-      overflow-x: hidden;
-    }
-
   </style>
-<base target="_blank">
 </head>
 
 <body>
@@ -1344,36 +1240,26 @@
   </div>
 
   <!-- Modal: link de acesso gerado -->
-  <div id="modal-link-acesso" class="modal">
+  <div id="modal-link-acesso" class="modal-overlay" role="dialog" aria-modal="true">
     <div class="modal-content">
-      <button class="modal-close" onclick="fecharModalLinkAcesso()">×</button>
       <h3>🔗 Novo link de acesso gerado</h3>
-      <p style="font-size:13px;color:var(--muted);margin:10px 0 16px">
+      <p style="font-size:13px;color:var(--muted);margin:8px 0 4px;line-height:1.6">
         Copie o link abaixo e abra-o no dispositivo que deseja usar.<br>
-        Válido por 72 horas. Após esse prazo, gere um novo link aqui.
+        <strong>Válido por 72 horas.</strong> Após esse prazo, gere um novo link aqui.
       </p>
-
-      <!-- ✅ ESTRUTURA ATUALIZADA COM WRAPPER E BOTÃO -->
-      <div id="link-acesso-gerado-wrapper" style="position:relative;margin:10px 0">
-        <div id="link-acesso-gerado"
-          style="word-break:break-all;overflow-wrap:anywhere;background:#f1f5f9;padding:10px;border-radius:6px;font-family:monospace;font-size:12px;max-width:100%;max-height:54px;overflow:hidden;line-height:1.4;transition:max-height .3s ease">
-          —
-        </div>
-        <button id="btn-toggle-link" onclick="toggleLinkCompleto()"
-          style="position:absolute;bottom:6px;right:6px;background:#0A3D62;color:#fff;border:none;padding:4px 10px;border-radius:4px;font-size:11px;cursor:pointer;display:none;font-weight:600">
-          Ver completo
+      <div id="link-acesso-gerado" class="link-box">—</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px">
+        <button class="btn-copiar-link" onclick="copiarLinkAcesso()">📋 Copiar link</button>
+        <span id="feedback-copia" style="font-size:12px;color:#22c55e;align-self:center;display:none">✅ Copiado!</span>
+      </div>
+      <p id="card-link-restantes-modal"
+        style="font-size:11px;color:var(--muted);margin-top:12px;font-family:var(--font-head)"></p>
+      <div class="modal-btns">
+        <button onclick="document.getElementById('modal-link-acesso').classList.remove('show')" style="padding:8px 14px;border-radius:8px;border:1px solid var(--border);
+                       background:var(--card2);color:var(--text);cursor:pointer;
+                       font-family:var(--font-head);font-size:13px">
+          Fechar
         </button>
-      </div>
-      <!-- ✅ FIM DA ESTRUTURA ATUALIZADA -->
-
-      <div style="display:flex;gap:8px;margin-top:12px">
-        <button class="btn-primary" onclick="copiarLinkAcesso()">📋 Copiar link</button>
-        <button class="btn-secundario" onclick="fecharModalLinkAcesso()">Fechar</button>
-      </div>
-
-      <div id="feedback-copia" style="display:none;margin-top:8px;font-size:12px;color:var(--success)">✅ Copiado!</div>
-      <div id="card-link-restantes-modal"
-        style="margin-top:12px;padding:10px;background:#f8fafc;border-radius:6px;font-size:12px;color:var(--muted)">
       </div>
     </div>
   </div>
