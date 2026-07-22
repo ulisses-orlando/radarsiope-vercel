@@ -605,19 +605,20 @@ function carregarHistoricoSolicitacoes(uid) {
         // Mensagem administrativa
         if (s.tipo === 'envio_manual_admin') {
           const mensagemCompleta = s.mensagem || s.resposta_html_enviada || '';
-          const mensagemCurta = mensagemCompleta.substring(0, 200);
+          const mensagemCurta = _truncarTextoComLinks(mensagemCompleta, 200);
+          const encodedMsg = encodeURIComponent(mensagemCompleta);
 
           html += `
             <div class="solicitacao-item" style="--st-cor:#3b82f6">
-              <div class="solicitacao-tipo"> Mensagem da equipe Radar SIOPE</div>
+              <div class="solicitacao-tipo">📨 Mensagem da equipe Radar SIOPE</div>
               <div class="solicitacao-desc" style="word-break:break-word;overflow-wrap:anywhere;min-width:0">
                 ${s.assunto ? `<strong>${s.assunto}</strong><br>` : ''}
-                <div class="msg-truncada" id="msg-${doc.id}" style="word-break:break-word;overflow-wrap:anywhere">
-                  ${_formatarMensagemComLinks(mensagemCurta)}${mensagemCompleta.length > 200 ? '…' : ''}
+                <div class="msg-truncada" id="msg-${doc.id}" data-expandido="false">
+                  ${_formatarMensagemComLinks(mensagemCurta)}${mensagemCompleta.length > mensagemCurta.length ? '…' : ''}
                 </div>
-                ${mensagemCompleta.length > 200 ? `
+                ${mensagemCompleta.length > mensagemCurta.length ? `
                   <button class="btn-expandir" id="btn-exp-${doc.id}"
-                    onclick="expandirMensagem('${doc.id}', '${encodeURIComponent(mensagemCompleta)}')">
+                    onclick="expandirMensagem('${doc.id}', ${JSON.stringify(encodedMsg)})">
                     Ver mensagem completa
                   </button>
                 ` : ''}
