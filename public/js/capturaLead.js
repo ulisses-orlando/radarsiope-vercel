@@ -134,33 +134,78 @@ async function gerarLinkAcessoTrial(leadId) {
 }
 
 // ============================
-// 2c. Unicidade de lead por e-mail
+// 2c. Unicidade de lead por e-mail (via RPC — a tabela `leads` não tem
+// SELECT/UPDATE liberado para o cliente anônimo, só INSERT; ver funções
+// lead_buscar_por_email / contar_acessos_trial / lead_atualizar* no Supabase)
 // ============================
-// Regra geral: nunca criamos mais de um registro em `leads` para o mesmo
-// e-mail (constraint UNIQUE em leads.email no banco). Usado em qualquer
-// origem, não só trial.
 async function buscarLeadPorEmail(email) {
     const { data, error } = await window.supabase
-        .from("leads")
-        .select("id")
-        .eq("email", email)
-        .maybeSingle();
+        .rpc("lead_buscar_por_email", { p_email: email });
 
     if (error) throw new Error(`Erro ao buscar lead por e-mail: ${error.message}`);
-    return data; // null se não existir
+    return data; // id (bigint) ou null se não existir
 }
 
 // Conta quantos acessos trial já foram emitidos para esse lead (registros já
 // existentes em leads_envios, origem='trial' — não inclui a tentativa atual).
 async function contarAcessosTrial(leadId) {
-    const { count, error } = await window.supabase
-        .from("leads_envios")
-        .select("id", { count: "exact", head: true })
-        .eq("lead_id", leadId)
-        .eq("origem", "trial");
+    const { data, error } = await window.supabase
+        .rpc("contar_acessos_trial", { p_lead_id: leadId });
 
     if (error) throw new Error(`Erro ao contar acessos trial: ${error.message}`);
-    return count || 0;
+    return data || 0;
+}
+
+// Atualiza só os dados de contato do lead (não mexe em status/mensagem_respondida).
+async function atualizarDadosLead(email, dadosLead) {
+    const { error } = await window.supabase.rpc("lead_atualizar_dados", {
+        p_email: email,
+        p_nome: dadosLead.nome,
+        p_telefone: dadosLead.telefone,
+        p_perfil: dadosLead.perfil,
+        p_mensagem: dadosLead.mensagem,
+        p_interesses: dadosLead.interesses,
+        p_preferencia_contato: dadosLead.preferencia_contato,
+        p_origem: dadosLead.origem,
+        p_cod_uf: dadosLead.cod_uf,
+        p_cod_municipio: dadosLead.cod_municipio,
+        p_nome_municipio: dadosLead.nome_municipio,
+    });
+    if (error) throw new Error(`Erro ao atualizar dados do lead: ${error.message}`);
+}
+
+// Atualiza só status/campos de resposta do lead.
+async function atualizarStatusLead(email, { status, mensagemRespondida, mensagemRespondidaEm, mensagemResposta }) {
+    const { error } = await window.supabase.rpc("lead_atualizar_status", {
+        p_email: email,
+        p_status: status,
+        p_mensagem_respondida: mensagemRespondida,
+        p_mensagem_respondida_em: mensagemRespondidaEm,
+        p_mensagem_resposta: mensagemResposta,
+    });
+    if (error) throw new Error(`Erro ao atualizar status do lead: ${error.message}`);
+}
+
+// Atualiza dados de contato + status/resposta do lead em uma única chamada.
+async function atualizarLeadCompleto(email, dadosLead, { status, mensagemOverride, mensagemRespondida, mensagemRespondidaEm, mensagemResposta }) {
+    const { error } = await window.supabase.rpc("lead_atualizar", {
+        p_email: email,
+        p_nome: dadosLead.nome,
+        p_telefone: dadosLead.telefone,
+        p_perfil: dadosLead.perfil,
+        p_mensagem: mensagemOverride !== undefined ? mensagemOverride : dadosLead.mensagem,
+        p_interesses: dadosLead.interesses,
+        p_preferencia_contato: dadosLead.preferencia_contato,
+        p_origem: dadosLead.origem,
+        p_cod_uf: dadosLead.cod_uf,
+        p_cod_municipio: dadosLead.cod_municipio,
+        p_nome_municipio: dadosLead.nome_municipio,
+        p_status: status,
+        p_mensagem_respondida: mensagemRespondida,
+        p_mensagem_respondida_em: mensagemRespondidaEm,
+        p_mensagem_resposta: mensagemResposta,
+    });
+    if (error) throw new Error(`Erro ao atualizar lead: ${error.message}`);
 }
 
 // ============================
@@ -256,7 +301,8 @@ async function processarEnvioInteresse(e) {
             nome_municipio: dadosUf.nome_municipio,
         };
 
-        const leadExistente = await buscarLeadPorEmail(email);
+        // Busca lead existente por e-mail (RPC — ver nota acima).
+        const leadIdExistente = await buscarLeadPorEmail(email);
 
         let novoLeadRef;
         let tipoMensagem = "primeiro_contato";
@@ -270,8 +316,9 @@ async function processarEnvioInteresse(e) {
 
         if (origem === "trial") {
             // ── Fluxo trial ────────────────────────────────────────────────
-            if (!leadExistente) {
-                // Lead novo: fluxo atual, sem mudança.
+            if (!leadIdExistente) {
+                // Lead novo: fluxo atual, sem mudança (INSERT continua liberado
+                // para o cliente anônimo via policy existente).
                 const { data, error } = await window.supabase
                     .from("leads")
                     .insert([{ ...dadosLead, status: "Novo", data_criacao: new Date().toISOString() }])
@@ -282,61 +329,54 @@ async function processarEnvioInteresse(e) {
                 try {
                     linkAcesso = await gerarLinkAcessoTrial(novoLeadRef.id);
                     tipoMensagem = "acesso_trial";
-                    await window.supabase.from("leads").update({
-                            status: "Trial enviado",
-                            mensagem_respondida: true,
-                            mensagem_respondida_em: new Date().toISOString(),
-                            mensagem_resposta: "Acesso de demonstração (72h) enviado automaticamente por e-mail.",
-                        }).eq("id", novoLeadRef.id);
+                    await atualizarStatusLead(email, {
+                        status: "Trial enviado",
+                        mensagemRespondida: true,
+                        mensagemRespondidaEm: new Date().toISOString(),
+                        mensagemResposta: "Acesso de demonstração (72h) enviado automaticamente por e-mail.",
+                    });
                 } catch (err) {
                     console.error('[capturaLead] Falha ao gerar acesso trial, mantendo primeiro_contato:', err);
                 }
             } else {
                 // Lead existente: contar tentativas anteriores antes de decidir.
-                novoLeadRef = { id: leadExistente.id };
+                novoLeadRef = { id: leadIdExistente };
                 const contagemAnterior = await contarAcessosTrial(novoLeadRef.id);
 
                 if (contagemAnterior < LIMITE_ACESSO_TRIAL) {
-                    // Dentro do limite: gera mais um link.
-                    const { error: erroUpdate } = await window.supabase
-                        .from("leads")
-                        .update(dadosLead)
-                        .eq("id", novoLeadRef.id);
-                    if (erroUpdate) throw erroUpdate;
+                    // Dentro do limite: sempre atualiza os dados de contato...
+                    await atualizarDadosLead(email, dadosLead);
 
+                    // ...e só marca "Trial enviado" se o link for gerado com sucesso.
                     try {
                         linkAcesso = await gerarLinkAcessoTrial(novoLeadRef.id);
                         // Lead recorrente: template de e-mail diferente do trial de
                         // primeira vez, com saudação de "que bom te ver de novo".
                         tipoMensagem = "acesso_trial_recorrente";
-                        await window.supabase.from("leads").update({
-                                status: "Trial enviado",
-                                mensagem_respondida: true,
-                                mensagem_respondida_em: new Date().toISOString(),
-                                mensagem_resposta: "Acesso de demonstração (72h) enviado automaticamente por e-mail.",
-                            }).eq("id", novoLeadRef.id);
+                        await atualizarStatusLead(email, {
+                            status: "Trial enviado",
+                            mensagemRespondida: true,
+                            mensagemRespondidaEm: new Date().toISOString(),
+                            mensagemResposta: "Acesso de demonstração (72h) enviado automaticamente por e-mail.",
+                        });
 
                         mensagemModal = `Prontinho! Enviamos um novo link de acesso de demonstração para o seu e-mail. Esta foi a solicitação nº ${contagemAnterior + 1} de ${LIMITE_ACESSO_TRIAL} disponíveis.`;
                     } catch (err) {
                         console.error('[capturaLead] Falha ao gerar acesso trial, mantendo primeiro_contato:', err);
                     }
                 } else {
-                    // Acima do limite: não gera link, não envia e-mail.
+                    // Acima do limite: não gera link, não envia e-mail. Uma única
+                    // chamada cobre dados de contato + status + mensagem de contagem.
                     const tentativaAtual = contagemAnterior + 1;
                     const mensagemContagem = `${tentativaAtual}ª solicitação de acesso trial`;
 
-                    const { error: erroUpdate } = await window.supabase
-                        .from("leads")
-                        .update({
-                            ...dadosLead,
-                            mensagem: mensagemContagem,
-                            status: "Limite trial atingido",
-                            mensagem_respondida: false,
-                            mensagem_respondida_em: null,
-                            mensagem_resposta: null,
-                        })
-                        .eq("id", novoLeadRef.id);
-                    if (erroUpdate) throw erroUpdate;
+                    await atualizarLeadCompleto(email, dadosLead, {
+                        status: "Limite trial atingido",
+                        mensagemOverride: mensagemContagem,
+                        mensagemRespondida: false,
+                        mensagemRespondidaEm: null,
+                        mensagemResposta: null,
+                    });
 
                     tipoMensagem = "limite_acesso_trial";
                     enviarMensagemAutomatica = false; // sem e-mail nesse cenário
@@ -346,7 +386,7 @@ async function processarEnvioInteresse(e) {
             }
         } else {
             // ── Fluxo contato_pelo_site (ou outra origem) ─────────────────
-            if (!leadExistente) {
+            if (!leadIdExistente) {
                 const { data, error } = await window.supabase
                     .from("leads")
                     .insert([{ ...dadosLead, status: "Novo", data_criacao: new Date().toISOString() }])
@@ -354,18 +394,13 @@ async function processarEnvioInteresse(e) {
                 if (error) throw error;
                 novoLeadRef = { id: data[0].id };
             } else {
-                novoLeadRef = { id: leadExistente.id };
-                const { error: erroUpdate } = await window.supabase
-                    .from("leads")
-                    .update({
-                        ...dadosLead,
-                        status: "Novo",
-                        mensagem_respondida: false,
-                        mensagem_respondida_em: null,
-                        mensagem_resposta: null,
-                    })
-                    .eq("id", novoLeadRef.id);
-                if (erroUpdate) throw erroUpdate;
+                novoLeadRef = { id: leadIdExistente };
+                await atualizarLeadCompleto(email, dadosLead, {
+                    status: "Novo",
+                    mensagemRespondida: false,
+                    mensagemRespondidaEm: null,
+                    mensagemResposta: null,
+                });
             }
         }
 
