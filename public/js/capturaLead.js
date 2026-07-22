@@ -360,7 +360,7 @@ async function processarEnvioInteresse(e) {
                             mensagemResposta: "Acesso de demonstração (72h) enviado automaticamente por e-mail.",
                         });
 
-                        mensagemModal = `Prontinho! Enviamos um novo link de acesso de demonstração para o seu e-mail. Esta foi a solicitação nº ${contagemAnterior + 1} de ${LIMITE_ACESSO_TRIAL} disponíveis.`;
+                        mensagemModal = `Prontinho! Enviamos o link de acesso de demonstração para o seu e-mail. Esta foi a solicitação nº ${contagemAnterior + 1} de ${LIMITE_ACESSO_TRIAL} disponíveis.`;
                     } catch (err) {
                         console.error('[capturaLead] Falha ao gerar acesso trial, mantendo primeiro_contato:', err);
                     }
@@ -371,7 +371,7 @@ async function processarEnvioInteresse(e) {
                     const mensagemContagem = `${tentativaAtual}ª solicitação de acesso trial`;
 
                     await atualizarLeadCompleto(email, dadosLead, {
-                        status: "Limite trial atingido",
+                        status: "Trial esgotado",
                         mensagemOverride: mensagemContagem,
                         mensagemRespondida: false,
                         mensagemRespondidaEm: null,
