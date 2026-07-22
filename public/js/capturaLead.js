@@ -372,7 +372,7 @@ async function processarEnvioInteresse(e) {
 
                     await atualizarLeadCompleto(email, dadosLead, {
                         status: "Trial esgotado",
-                        mensagemOverride: mensagem + ' ' + mensagemContagem,
+                        mensagemOverride: mensagem + ' (' + mensagemContagem + ')',
                         mensagemRespondida: false,
                         mensagemRespondidaEm: null,
                         mensagemResposta: null,
