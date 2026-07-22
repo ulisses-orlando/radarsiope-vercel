@@ -465,15 +465,15 @@ async function _processarSolicitacaoLinkAcesso(uid, descricao) {
     }
 
     const assinaturaId = snap.docs[0].id;
-    const selfCount = snap.docs[0].data().self_link_gerado_count || 0;
+    const selfCount    = snap.docs[0].data().self_link_gerado_count || 0;
 
     await db.collection('usuarios').doc(uid).collection('solicitacoes').add({
-      tipo: 'solicitar_link_acesso',
-      descricao: descricao || 'Solicitação de novo link de acesso ao app.',
-      status: 'aberta',
+      tipo:              'solicitar_link_acesso',
+      descricao:         descricao || 'Solicitação de novo link de acesso ao app.',
+      status:            'aberta',
       assinaturaId,
       self_count_no_momento: selfCount,   // informativo para o admin
-      data_solicitacao: new Date().toISOString(),
+      data_solicitacao:  new Date().toISOString(),
     });
 
     await db.collection('admin_contadores').doc('pendencias').set(
@@ -556,25 +556,6 @@ function filtrarSolicitacoes(status) {
   carregarHistoricoSolicitacoes(usuario.id);
 }
 
-// Helper: transforma URLs longas em links clicáveis com texto encurtado
-function _formatarMensagemComLinks(texto) {
-  if (!texto) return '';
-  // Regex mais robusta: pega https://, http:// ou www.
-  const urlRegex = /((https?:\/\/|www\.)[^\s<]+)/g;
-  
-  return texto.replace(urlRegex, (url) => {
-    // Garante que o href tenha protocolo
-    const href = url.startsWith('http') ? url : 'https://' + url;
-    
-    if (url.length > 60) {
-      const display = url.substring(0, 40) + '…' + url.substring(url.length - 15);
-      // Note os !important nos estilos inline para vencer qualquer CSS global
-      return `<a href="${href}" target="_blank" rel="noopener" title="${url}" style="word-break:break-all !important; overflow-wrap:anywhere !important; display:inline-block !important; max-width:100% !important; color:#0A3D62; text-decoration:underline;">${display}</a>`;
-    }
-    return `<a href="${href}" target="_blank" rel="noopener" style="word-break:break-all !important; overflow-wrap:anywhere !important; color:#0A3D62; text-decoration:underline;">${url}</a>`;
-  }).replace(/\n/g, '<br>');
-}
-
 function carregarHistoricoSolicitacoes(uid) {
   const container = document.getElementById('historico-solicitacoes');
   if (!container) return;
@@ -604,24 +585,18 @@ function carregarHistoricoSolicitacoes(uid) {
 
         // Mensagem administrativa
         if (s.tipo === 'envio_manual_admin') {
-          const mensagemCompleta = s.mensagem || s.resposta_html_enviada || '';
-          const mensagemCurta = _truncarTextoComLinks(mensagemCompleta, 200);
-          const encodedMsg = encodeURIComponent(mensagemCompleta);
-
           html += `
             <div class="solicitacao-item" style="--st-cor:#3b82f6">
-              <div class="solicitacao-tipo">📨 Mensagem da equipe Radar SIOPE</div>
-              <div class="solicitacao-desc" style="word-break:break-word;overflow-wrap:anywhere;min-width:0">
+              <div class="solicitacao-tipo">📧 Mensagem da equipe Radar SIOPE</div>
+              <div class="solicitacao-desc">
                 ${s.assunto ? `<strong>${s.assunto}</strong><br>` : ''}
-                <div class="msg-truncada" id="msg-${doc.id}" data-expandido="false">
-                  ${_formatarMensagemComLinks(mensagemCurta)}${mensagemCompleta.length > mensagemCurta.length ? '…' : ''}
+                <div class="msg-truncada" id="msg-${doc.id}">
+                  ${(s.mensagem || s.resposta_html_enviada || '').substring(0, 200)}...
                 </div>
-                ${mensagemCompleta.length > mensagemCurta.length ? `
-                  <button class="btn-expandir" id="btn-exp-${doc.id}"
-                    onclick="expandirMensagem('${doc.id}', ${JSON.stringify(encodedMsg)})">
-                    Ver mensagem completa
-                  </button>
-                ` : ''}
+                <button class="btn-expandir" id="btn-exp-${doc.id}"
+                  onclick="expandirMensagem('${doc.id}', '${encodeURIComponent(s.mensagem || s.resposta_html_enviada || '')}')">
+                  Ver mensagem completa
+                </button>
               </div>
               <div class="solicitacao-meta">${fmtData(s.data_envio || s.data_solicitacao)}</div>
             </div>`;
@@ -715,18 +690,14 @@ function expandirMensagem(id, mensagemEncoded) {
   const div = document.getElementById('msg-' + id);
   const btn = document.getElementById('btn-exp-' + id);
   if (!div || !btn) return;
-  
+
   if (div.dataset.expandido === 'true') {
-    // Recolhe
-    const mensagemCompleta = decodeURIComponent(mensagemEncoded);
-    const mensagemCurta = mensagemCompleta.substring(0, 200);
-    div.innerHTML = _formatarMensagemComLinks(mensagemCurta) + (mensagemCompleta.length > 200 ? '…' : '');
+    div.innerHTML = div.dataset.curta;
     div.dataset.expandido = 'false';
     btn.textContent = 'Ver mensagem completa';
   } else {
-    // Expande
-    const mensagemCompleta = decodeURIComponent(mensagemEncoded);
-    div.innerHTML = _formatarMensagemComLinks(mensagemCompleta);
+    div.dataset.curta = div.innerHTML;
+    div.innerHTML = decodeURIComponent(mensagemEncoded);
     div.dataset.expandido = 'true';
     btn.textContent = 'Recolher';
   }
@@ -740,7 +711,7 @@ function _renderCardNovoLink(uid, assinaturaId, count) {
   if (!card) return;
 
   const restantes = LIMITE_SELF_LINK - count;
-  const esgotado = restantes <= 0;
+  const esgotado  = restantes <= 0;
 
   if (esgotado) {
     card.innerHTML = `
@@ -810,17 +781,6 @@ async function gerarNovoLinkAcesso(uid, assinaturaId, countAtual) {
     // Exibe o link no modal
     document.getElementById('link-acesso-gerado').textContent = data.link;
 
-    // Mostra o botão "Ver completo" se o link for longo
-    setTimeout(() => {
-      const divLink = document.getElementById('link-acesso-gerado');
-      const btnToggle = document.getElementById('btn-toggle-link');
-      if (divLink && btnToggle && divLink.textContent.length > 80) {
-        btnToggle.style.display = 'block';
-        divLink.dataset.expandido = 'false';
-        divLink.style.maxHeight = '54px';
-      }
-    }, 50);
-
     const novoRestantes = LIMITE_SELF_LINK - data.count;
     const msgRestantes = novoRestantes > 0
       ? `Você ainda pode gerar mais ${novoRestantes} link${novoRestantes !== 1 ? 's' : ''} automaticamente.`
@@ -858,21 +818,4 @@ function copiarLinkAcesso() {
       sel.addRange(range);
       document.execCommand('copy');
     });
-}
-
-// Toggle para expandir/recolher link de acesso no modal
-function toggleLinkCompleto() {
-  const div = document.getElementById('link-acesso-gerado');
-  const btn = document.getElementById('btn-toggle-link');
-  if (!div || !btn) return;
-
-  if (div.dataset.expandido === 'true') {
-    div.style.maxHeight = '54px';
-    div.dataset.expandido = 'false';
-    btn.textContent = 'Ver completo';
-  } else {
-    div.style.maxHeight = 'none';
-    div.dataset.expandido = 'true';
-    btn.textContent = 'Recolher';
-  }
 }
