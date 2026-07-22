@@ -52,7 +52,8 @@ const momentosEnvio = [
 
   // ——— Solicitação de acesso trial ———
   { valor: "acesso_trial", descricao: "✍️ Solicitação de acesso trial" },
-  { valor: "limite_acesso_trial", descricao: "✍️ Solicitação de acesso trial excedido" }
+  { valor: "limite_acesso_trial", descricao: "✍️ Solicitação de acesso trial excedido" },
+  { valor: "acesso_trial_recorrente", descricao: "✍️ Solicitação de acesso trial recorrente" }
 ];
 
 function filtrarPerfilAvaliacoes(perfil) {
