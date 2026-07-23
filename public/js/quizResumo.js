@@ -14,7 +14,7 @@ MELHORIAS IMPLEMENTADAS:
 (function () {
 'use strict';
 
-const MAX_EDICOES_VISIVEIS = 10;
+const MAX_EDICOES_VISIVEIS = 1;
 
 // ────────────────────────────────────────────────────────────────────────
 // PÚBLICO
