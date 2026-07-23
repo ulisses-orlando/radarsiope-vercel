@@ -275,6 +275,7 @@ async function carregarBibliotecaNewsletters(uid) {
       .get();
 
     if (assinSnap.empty) {
+      _bibliotecaNewslettersCache = [];
       container.innerHTML = `
         <div class="empty-state">
           <div style="font-size:32px">📚</div>
@@ -299,6 +300,7 @@ async function carregarBibliotecaNewsletters(uid) {
       .get();
 
     if (nlSnap.empty) {
+      _bibliotecaNewslettersCache = [];
       container.innerHTML = `
         <div class="empty-state">
           <div style="font-size:32px">📭</div>
@@ -313,7 +315,7 @@ async function carregarBibliotecaNewsletters(uid) {
     const _sessao = (() => { try { return JSON.parse(localStorage.getItem('rs_pwa_session') || '{}'); } catch { return {}; } })();
     const _dataAtivacao = _sessao.data_ativacao ? new Date(_sessao.data_ativacao) : null;
 
-    const cards = nlSnap.docs
+    _bibliotecaNewslettersCache = nlSnap.docs
       .filter(doc => {
         const nl = doc.data();
         // Drip semanal
@@ -337,27 +339,19 @@ async function carregarBibliotecaNewsletters(uid) {
         const qs = [`nid=${nid}`, `uid=${uid}`, `assinaturaId=${assinaturaId}`].join('&');
         const url = `https://app.radarsiope.com.br/verNewsletterComToken.html?d=${encodeURIComponent(btoa(qs))}`;
 
-        const _btnAcao = _noIframe
+        const btnAcao = _noIframe
           ? `<button class="btn-ver-nl"
                onclick="window.parent.postMessage({tipo:'rs:abrirEdicao',newsletterId:'${nid}'}, '*')">
                Ler edição →
              </button>`
           : `<a href="${url}" class="btn-ver-nl" target="_blank">Ler edição →</a>`;
 
-        return `
-          <article class="nl-card">
-            <div class="nl-card-header">
-              <div>
-                <div class="nl-card-edicao">Edição ${numero}</div>
-                <div class="nl-card-titulo">${titulo}${badgeExtra}</div>
-                <div class="nl-card-data">📅 ${data}</div>
-              </div>
-            </div>
-            <div class="nl-card-footer">${_btnAcao}</div>
-          </article>`;
-      }).join('');
+        return { nid, titulo, numero, data, badgeExtra, btnAcao };
+      });
 
-    container.innerHTML = `<div class="nl-grid">${cards || '<p class="empty-state">Nenhuma edição disponível.</p>'}</div>`;
+    const campoBusca = document.getElementById('busca-newsletter');
+    if (campoBusca) campoBusca.value = '';
+    filtrarNewsletters('');
 
   } catch (err) {
     console.error('[biblioteca]', err);
