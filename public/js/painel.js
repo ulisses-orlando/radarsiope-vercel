@@ -556,6 +556,24 @@ function filtrarSolicitacoes(status) {
   carregarHistoricoSolicitacoes(usuario.id);
 }
 
+function linkify(texto) {
+  if (!texto) return '';
+  return String(texto).replace(/(https?:\/\/[^\s<]+)/g, (url) => {
+    const id = 'lk-' + Math.random().toString(36).slice(2, 9);
+    return `<span class="link-wrap"><a href="${url}" target="_blank" rel="noopener" class="link-inline" id="txt-${id}">${url}</a><button class="btn-copiar-inline" type="button" onclick="copiarLinkInline('${id}', this)" title="Copiar link">📋</button></span>`;
+  });
+}
+
+function copiarLinkInline(id, btn) {
+  const alvo = document.getElementById('txt-' + id);
+  if (!alvo) return;
+  navigator.clipboard.writeText(alvo.href).then(() => {
+    const original = btn.textContent;
+    btn.textContent = '✅';
+    setTimeout(() => { btn.textContent = original; }, 1500);
+  });
+}
+
 function carregarHistoricoSolicitacoes(uid) {
   const container = document.getElementById('historico-solicitacoes');
   if (!container) return;
@@ -591,7 +609,7 @@ function carregarHistoricoSolicitacoes(uid) {
               <div class="solicitacao-desc">
                 ${s.assunto ? `<strong>${s.assunto}</strong><br>` : ''}
                 <div class="msg-truncada" id="msg-${doc.id}">
-                  ${(s.mensagem || s.resposta_html_enviada || '').substring(0, 200)}...
+                  ${linkify((s.mensagem || s.resposta_html_enviada || '').substring(0, 200))}...
                 </div>
                 <button class="btn-expandir" id="btn-exp-${doc.id}"
                   onclick="expandirMensagem('${doc.id}', '${encodeURIComponent(s.mensagem || s.resposta_html_enviada || '')}')">
@@ -605,7 +623,7 @@ function carregarHistoricoSolicitacoes(uid) {
 
         const respostaHtml = s.resposta && (status === 'atendida' || status === 'cancelada')
           ? `<div class="solicitacao-resposta">
-               💡 <strong>Resposta:</strong> ${s.resposta}
+               💡 <strong>Resposta:</strong> ${linkify(s.resposta)}
              </div>` : '';
 
         html += `
@@ -614,7 +632,7 @@ function carregarHistoricoSolicitacoes(uid) {
               <span class="solicitacao-tipo">${s.tipo || 'Outros'}</span>
               <span class="solicitacao-status" style="color:${st.cor}">${st.icone} ${st.label}</span>
             </div>
-            <div class="solicitacao-desc">${s.descricao || ''}</div>
+            <div class="solicitacao-desc">${linkify(s.descricao || '')}</div>
             ${respostaHtml}
             <div class="solicitacao-footer">
               <span class="solicitacao-meta">${fmtData(s.data_solicitacao)}</span>
@@ -697,7 +715,7 @@ function expandirMensagem(id, mensagemEncoded) {
     btn.textContent = 'Ver mensagem completa';
   } else {
     div.dataset.curta = div.innerHTML;
-    div.innerHTML = decodeURIComponent(mensagemEncoded);
+    div.innerHTML = linkify(decodeURIComponent(mensagemEncoded));
     div.dataset.expandido = 'true';
     btn.textContent = 'Recolher';
   }
