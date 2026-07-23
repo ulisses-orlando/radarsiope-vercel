@@ -14,7 +14,7 @@ MELHORIAS IMPLEMENTADAS:
 (function () {
 'use strict';
 
-const MAX_EDICOES_VISIVEIS = 1;
+const MAX_EDICOES_VISIVEIS = 10;
 
 // ────────────────────────────────────────────────────────────────────────
 // PÚBLICO
@@ -108,7 +108,7 @@ function _renderizarResumo(container, resumo) {
 
     const botaoVerTodas = haMaisEdicoes ? `
         <button class="rs-quiz-ver-todas-btn" onclick="QuizResumoManager.mostrarTodas('${container.id}')">
-            Ver todas as ${edicoesOrdenadas.length} edições ↓
+            Ver meu desempenho em todas as ${edicoesOrdenadas.length} edições ↓
         </button>
     ` : '';
 
