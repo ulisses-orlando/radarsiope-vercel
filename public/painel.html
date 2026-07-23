@@ -534,6 +534,26 @@
     }
 
     /* ─── SUPORTE / SOLICITAÇÕES ────────────────────────────────────── */
+    .nl-busca {
+      max-width: 360px;
+      margin-bottom: 14px;
+      position: relative;
+    }
+
+    .nl-busca input {
+      padding-left: 32px;
+    }
+
+    .nl-busca::before {
+      content: "🔍";
+      position: absolute;
+      left: 10px;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 13px;
+      pointer-events: none;
+    }
+
     .form-row {
       display: flex;
       flex-direction: column;
@@ -1172,7 +1192,11 @@
 
       <!-- NEWSLETTERS -->
       <section id="bloco-biblioteca" class="section">
-        <h2>📚 Minhas edições</h2>
+        <h2>📚 Minhas Edições</h2>
+        <div class="nl-busca">
+          <input type="text" id="busca-newsletter" placeholder="Buscar por título da edição..."
+            oninput="filtrarNewsletters(this.value)" autocomplete="off">
+        </div>
         <div id="biblioteca-tecnica">Carregando...</div>
       </section>
 
@@ -1184,7 +1208,7 @@
           <select id="tipo-suporte">
             <option value="treinamento">Treinamento</option>
             <option value="consultoria">Consultoria</option>
-            <option value="newsletters">Newsletters</option>
+            <option value="newsletters">Edições</option>
             <option value="solicitar_link_acesso">Solicitar novo link de acesso ao app</option>
             <option value="cancelamento">Solicitar cancelamento de assinatura</option>
             <option value="outros">Outros</option>
