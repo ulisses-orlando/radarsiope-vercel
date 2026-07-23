@@ -35,12 +35,31 @@ async function renderizar(containerId, uid) {
         container.innerHTML = `<p class="rs-quiz-resumo-erro">Não foi possível carregar seu desempenho no quiz agora.</p>`;
         return;
     }
+    // cache local: elimina o refetch em "Ver todas"
+    container._rsQuizResumoCache = resumo;
     _renderizarResumo(container, resumo);
 }
 
 // ────────────────────────────────────────────────────────────────────────
 // RENDER
 // ────────────────────────────────────────────────────────────────────────
+function _ordenarEdicoes(edicoes) {
+    // Backend retorna ordem de inserção (mais antigo primeiro).
+    // idx é usado como fallback quando não há data — sem precisar de reverse() no final,
+    // o que evitava a inversão indevida da ordenação por data.
+    return edicoes
+        .map((e, idx) => ({ e, idx }))
+        .sort((a, b) => {
+            const dateA = a.e.data_publicacao_app || a.e.data_resposta || a.e.ultima_tentativa;
+            const dateB = b.e.data_publicacao_app || b.e.data_resposta || b.e.ultima_tentativa;
+            if (dateA && dateB) {
+                return new Date(dateB) - new Date(dateA); // mais recente primeiro
+            }
+            return b.idx - a.idx; // sem data: inverte ordem do backend, item por item
+        })
+        .map(o => o.e);
+}
+
 function _renderizarSkeleton(container) {
     container.innerHTML = `<div class="rs-quiz-skeleton"> <div class="rs-quiz-sk-line w60"></div> <div class="rs-quiz-sk-line w40"></div> </div>`;
 }
@@ -65,19 +84,7 @@ function _renderizarResumo(container, resumo) {
 
     const percentualAprovacao = Math.round((total_edicoes_aprovadas / total_edicoes_feitas) * 100);
 
-    // ✅ CORREÇÃO DE ORDENAÇÃO:
-    // O backend retorna Object.keys() que preserva a ordem de inserção (mais antigo primeiro).
-    // Usamos .reverse() para colocar o mais recente no topo.
-    // Se houver campo de data no futuro (data_publicacao_app ou data_resposta), priorizamos ele.
-    const edicoesOrdenadas = edicoes.slice().sort((a, b) => {
-        const dateA = a.data_publicacao_app || a.data_resposta || a.ultima_tentativa || 0;
-        const dateB = b.data_publicacao_app || b.data_resposta || b.ultima_tentativa || 0;
-        
-        if (dateA && dateB) {
-            return new Date(dateB) - new Date(dateA); // Decrescente
-        }
-        return 0; // Mantém a ordem do backend (que será invertida pelo .reverse() abaixo)
-    }).reverse(); // Garante que o mais recente fique em primeiro lugar
+    const edicoesOrdenadas = _ordenarEdicoes(edicoes);
 
     const haMaisEdicoes = edicoesOrdenadas.length > MAX_EDICOES_VISIVEIS;
     const edicoesVisiveis = haMaisEdicoes 
@@ -132,54 +139,40 @@ function _mostrarTodas(containerId) {
     const container = document.getElementById(containerId);
     if (!container) return;
 
-    const uid = container.dataset.uid;
-    if (!uid) {
-        console.warn('[QuizResumo] UID não encontrado no container');
+    const resumo = container._rsQuizResumoCache;
+    if (!resumo) {
+        console.warn('[QuizResumo] Cache do resumo não encontrado — recarregue o componente.');
         return;
     }
 
     const btn = container.querySelector('.rs-quiz-ver-todas-btn');
     if (btn) btn.disabled = true;
 
-    _buscarResumoGeral(uid)
-        .then(resumo => {
-            const { edicoes = [] } = resumo;
-            
-            const edicoesOrdenadas = edicoes.slice().sort((a, b) => {
-                const dateA = a.data_publicacao_app || a.data_resposta || a.ultima_tentativa || 0;
-                const dateB = b.data_publicacao_app || b.data_resposta || b.ultima_tentativa || 0;
-                if (dateA && dateB) return new Date(dateB) - new Date(dateA);
-                return 0;
-            }).reverse();
+    const edicoesOrdenadas = _ordenarEdicoes(resumo.edicoes || []);
 
-            const linhas = edicoesOrdenadas.map(e => {
-                const dataFormatada = e.data_publicacao_app || e.data_resposta 
-                    ? new Date(e.data_publicacao_app || e.data_resposta).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit' })
-                    : '';
-                
-                return `
-                    <div class="rs-quiz-hist-row rs-quiz-resumo-row">
-                        <span class="rs-quiz-hist-status">${e.aprovado ? '✅' : '❌'}</span>
-                        <span class="rs-quiz-hist-score ${e.aprovado ? 'aprovado' : 'reprovado'}">${e.melhor_pontuacao}%</span>
-                        <span class="rs-quiz-resumo-titulo-edicao" title="${e.titulo}">${e.titulo}</span>
-                        <span class="rs-quiz-hist-data">${dataFormatada ? dataFormatada + ' · ' : ''}${e.tentativas_usadas}× tentativa${e.tentativas_usadas > 1 ? 's' : ''}</span>
-                    </div>
-                `;
-            }).join('');
+    const linhas = edicoesOrdenadas.map(e => {
+        const dataFormatada = e.data_publicacao_app || e.data_resposta 
+            ? new Date(e.data_publicacao_app || e.data_resposta).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit' })
+            : '';
+        
+        return `
+            <div class="rs-quiz-hist-row rs-quiz-resumo-row">
+                <span class="rs-quiz-hist-status">${e.aprovado ? '✅' : '❌'}</span>
+                <span class="rs-quiz-hist-score ${e.aprovado ? 'aprovado' : 'reprovado'}">${e.melhor_pontuacao}%</span>
+                <span class="rs-quiz-resumo-titulo-edicao" title="${e.titulo}">${e.titulo}</span>
+                <span class="rs-quiz-hist-data">${dataFormatada ? dataFormatada + ' · ' : ''}${e.tentativas_usadas}× tentativa${e.tentativas_usadas > 1 ? 's' : ''}</span>
+            </div>
+        `;
+    }).join('');
 
-            const lista = container.querySelector('.rs-quiz-resumo-lista');
-            if (lista) {
-                lista.innerHTML = linhas;
-                lista.classList.add('rs-quiz-lista-expandida');
-            }
+    const lista = container.querySelector('.rs-quiz-resumo-lista');
+    if (lista) {
+        lista.innerHTML = linhas;
+        lista.classList.add('rs-quiz-lista-expandida');
+    }
 
-            const btnAtual = container.querySelector('.rs-quiz-ver-todas-btn');
-            if (btnAtual) btnAtual.remove();
-        })
-        .catch(e => {
-            console.error('[QuizResumo] Erro ao carregar todas as edições:', e);
-            if (btn) btn.disabled = false;
-        });
+    const btnAtual = container.querySelector('.rs-quiz-ver-todas-btn');
+    if (btnAtual) btnAtual.remove();
 }
 
 // ────────────────────────────────────────────────────────────────────────
