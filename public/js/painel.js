@@ -221,6 +221,47 @@ function _edicaoLiberadaParaAssinante(edicao, dataAtivacao) {
 }
 
 // ─── Biblioteca de Newsletters ────────────────────────────────────────────────
+let _bibliotecaNewslettersCache = [];
+
+function _normalizarTexto(txt) {
+  return String(txt || '')
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase().trim();
+}
+
+function _renderCardNewsletter(item) {
+  return `
+    <article class="nl-card">
+      <div class="nl-card-header">
+        <div>
+          <div class="nl-card-edicao">Edição ${item.numero}</div>
+          <div class="nl-card-titulo">${item.titulo}${item.badgeExtra}</div>
+          <div class="nl-card-data">📅 ${item.data}</div>
+        </div>
+      </div>
+      <div class="nl-card-footer">${item.btnAcao}</div>
+    </article>`;
+}
+
+function filtrarNewsletters(termoBusca) {
+  const container = document.getElementById('biblioteca-tecnica');
+  if (!container) return;
+
+  const termo = _normalizarTexto(termoBusca);
+  const lista = termo
+    ? _bibliotecaNewslettersCache.filter(item => _normalizarTexto(item.titulo).includes(termo))
+    : _bibliotecaNewslettersCache;
+
+  if (!lista.length) {
+    container.innerHTML = termo
+      ? `<p class="empty-state">Nenhuma edição encontrada para "${termoBusca}".</p>`
+      : '<p class="empty-state">Nenhuma edição disponível.</p>';
+    return;
+  }
+
+  container.innerHTML = `<div class="nl-grid">${lista.map(_renderCardNewsletter).join('')}</div>`;
+}
+
 async function carregarBibliotecaNewsletters(uid) {
   const container = document.getElementById('biblioteca-tecnica');
   if (!container) return;
