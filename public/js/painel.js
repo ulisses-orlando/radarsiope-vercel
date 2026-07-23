@@ -229,7 +229,23 @@ function _normalizarTexto(txt) {
     .toLowerCase().trim();
 }
 
+function toggleResumoNewsletter(nid) {
+  const el = document.getElementById('resumo-' + nid);
+  const btn = document.getElementById('btn-resumo-' + nid);
+  if (!el || !btn) return;
+  const aberto = el.classList.toggle('show');
+  btn.textContent = aberto ? '▲ Ocultar' : '📝 Resumo';
+}
+
 function _renderCardNewsletter(item) {
+  const resumoHtml = item.resumo
+    ? `<p class="nl-card-resumo" id="resumo-${item.nid}">${item.resumo}</p>`
+    : '';
+  const btnResumo = item.resumo
+    ? `<button class="btn-resumo-nl" type="button" id="btn-resumo-${item.nid}"
+         onclick="toggleResumoNewsletter('${item.nid}')">📝 Resumo</button>`
+    : '';
+
   return `
     <article class="nl-card">
       <div class="nl-card-header">
@@ -239,7 +255,8 @@ function _renderCardNewsletter(item) {
           <div class="nl-card-data">📅 ${item.data}</div>
         </div>
       </div>
-      <div class="nl-card-footer">${item.btnAcao}</div>
+      ${resumoHtml}
+      <div class="nl-card-footer">${item.btnAcao}${btnResumo}</div>
     </article>`;
 }
 
