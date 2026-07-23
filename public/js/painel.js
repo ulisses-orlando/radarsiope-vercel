@@ -249,7 +249,9 @@ function filtrarNewsletters(termoBusca) {
 
   const termo = _normalizarTexto(termoBusca);
   const lista = termo
-    ? _bibliotecaNewslettersCache.filter(item => _normalizarTexto(item.titulo).includes(termo))
+    ? _bibliotecaNewslettersCache.filter(item =>
+        _normalizarTexto(item.titulo).includes(termo) ||
+        _normalizarTexto(item.resumo).includes(termo))
     : _bibliotecaNewslettersCache;
 
   if (!lista.length) {
@@ -329,6 +331,7 @@ async function carregarBibliotecaNewsletters(uid) {
         const nl = doc.data();
         const nid = doc.id;
         const titulo = nl.titulo || `Edição ${nl.numero || '—'}`;
+        const resumo = nl.resumo || '';
         const numero = nl.numero || '—';
         const data = fmtData(nl.data_publicacao);
         const badgeExtra = nl.formato === 'extra'
@@ -346,7 +349,7 @@ async function carregarBibliotecaNewsletters(uid) {
              </button>`
           : `<a href="${url}" class="btn-ver-nl" target="_blank">Ler edição →</a>`;
 
-        return { nid, titulo, numero, data, badgeExtra, btnAcao };
+        return { nid, titulo, resumo, numero, data, badgeExtra, btnAcao };
       });
 
     const campoBusca = document.getElementById('busca-newsletter');
