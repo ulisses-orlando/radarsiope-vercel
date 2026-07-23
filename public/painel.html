@@ -507,6 +507,44 @@
 
     .nl-card-footer {
       margin-top: auto;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .btn-resumo-nl {
+      display: inline-block;
+      padding: 7px 12px;
+      border-radius: 8px;
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text);
+      font-family: var(--font-head);
+      font-weight: 700;
+      font-size: 12px;
+      cursor: pointer;
+      touch-action: manipulation;
+      transition: background .15s, border-color .15s;
+    }
+
+    .btn-resumo-nl:hover {
+      background: var(--card);
+      border-color: var(--accent);
+    }
+
+    .nl-card-resumo {
+      display: none;
+      font-size: 12px;
+      line-height: 1.5;
+      color: var(--muted);
+      border-top: 1px dashed var(--border);
+      padding-top: 8px;
+      margin: 0;
+    }
+
+    .nl-card-resumo.show {
+      display: block;
     }
 
     .btn-ver-nl {
