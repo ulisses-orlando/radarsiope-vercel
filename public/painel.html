@@ -659,6 +659,39 @@
       color: var(--text);
       line-height: 1.5;
       margin-bottom: 6px;
+      overflow-wrap: anywhere;
+    }
+
+    .link-wrap {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+
+    .link-inline {
+      color: var(--accent);
+      text-decoration: underline;
+      overflow-wrap: anywhere;
+    }
+
+    .btn-copiar-inline {
+      border: 1px solid var(--border);
+      background: var(--card);
+      color: var(--text);
+      border-radius: 6px;
+      font-size: 11px;
+      line-height: 1;
+      padding: 3px 6px;
+      cursor: pointer;
+      transition: .15s;
+      flex-shrink: 0;
+    }
+
+    .btn-copiar-inline:hover {
+      background: var(--accent);
+      color: #fff;
+      border-color: transparent;
     }
 
     .solicitacao-resposta {
@@ -669,6 +702,7 @@
       color: var(--muted);
       margin: 6px 0;
       border-left: 3px solid var(--accent);
+      overflow-wrap: anywhere;
     }
 
     .solicitacao-footer {
