@@ -217,6 +217,12 @@
           <span class="rs-menu-item-label">Ações</span>
           <span class="rs-menu-item-badge verde" id="rs-menu-badge-fc" style="display:none">0</span>
         </button>
+        <button class="rs-menu-item" id="rs-menu-parecer-fundeb"
+          style="background:#7c2d12" role="menuitem">
+          <span class="rs-menu-item-icon">⚖️</span>
+          <span class="rs-menu-item-label">Parecer Fundeb</span>
+          <span class="rs-menu-item-tag">pro</span>
+        </button>
         ${isAssinante ? `
         <button class="rs-menu-item" id="rs-menu-desempenho"
           style="background:#0f6b52" role="menuitem">
@@ -280,6 +286,15 @@
           if (!(await window._checarSessaoCritica())) return;
         }
         window._rsFcAbrir?.();
+      });
+    // ⚖️ Parecer Fundeb — COM VALIDAÇÃO DE SESSÃO
+    document.getElementById('rs-menu-parecer-fundeb')
+      ?.addEventListener('click', async () => {
+        _fecharMenu();
+        if (typeof window._checarSessaoCritica === 'function') {
+          if (!(await window._checarSessaoCritica())) return;
+        }
+        window._abrirParecerFundeb?.();
       });
     // 🧠 Meu Desempenho — abre modal com resumo geral do quiz
     document.getElementById('rs-menu-desempenho')
