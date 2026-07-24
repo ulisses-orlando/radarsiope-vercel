@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Parecer do CACS Fundeb — Assis Brasil/AC — Exercício 2026</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700&display=swap">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    font-family: 'Sora', 'Segoe UI', system-ui, sans-serif;
+    font-size: 12px;
+    color: #1e293b;
+    background: #f8fafc;
+    line-height: 1.5;
+  }
+
+  .pagina {
+    width: 210mm;
+    min-height: 297mm;
+    margin: 0 auto;
+    background: #fff;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    box-shadow: 0 4px 32px rgba(0,0,0,.12);
+  }
+
+  /* ---------- Cabeçalho (mesmo padrão do Relatório de Conformidade) ---------- */
+  .cabecalho {
+    background: linear-gradient(135deg, #0A3D62 0%, #1a5c91 100%);
+    color: #fff;
+    padding: 14px 20px 12px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-shrink: 0;
+  }
+  .cabecalho-logo { display: flex; align-items: center; gap: 10px; }
+  .logo-icone {
+    width: 36px; height: 36px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .logo-icone img { width: 36px; height: 36px; object-fit: contain; }
+  .logo-texto { line-height: 1.15; }
+  .logo-texto .marca { font-size: 15px; font-weight: 700; letter-spacing: .3px; }
+  .logo-texto .sub { font-size: 9.5px; opacity: .75; font-weight: 400; }
+  .cabecalho-direita { text-align: right; line-height: 1.3; display: flex; flex-direction: column; gap: 6px; }
+  .cabecalho-titulo { font-size: 13px; font-weight: 700; letter-spacing: .5px; }
+  .cabecalho-data { font-size: 9.5px; opacity: .75; margin-top: 2px; }
+
+  .btn-imprimir {
+    background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.3);
+    color: #fff; padding: 6px 12px; border-radius: 6px; cursor: pointer;
+    font-size: 11px; font-weight: 600; transition: all .2s;
+    display: flex; align-items: center; gap: 6px; width: fit-content; align-self: flex-end;
+  }
+  .btn-imprimir:hover { background: rgba(255,255,255,0.35); }
+
+  /* ---------- Faixa do município (equivalente à .faixa-mun) ---------- */
+  .faixa-mun {
+    background: #e8f0f7; border-bottom: 2px solid #0A3D62;
+    padding: 8px 20px; display: flex; align-items: center; justify-content: space-between;
+    gap: 16px; flex-shrink: 0;
+  }
+  .faixa-mun-esq { display: flex; flex-direction: column; gap: 1px; }
+  .faixa-mun-nome { font-size: 14px; font-weight: 700; color: #0A3D62; }
+  .faixa-mun-cod { font-size: 10px; color: #475569; }
+  .faixa-mun-dir { text-align: right; }
+  .faixa-mun-asin { font-size: 11.5px; font-weight: 600; color: #1e293b; }
+  .faixa-mun-plano { font-size: 10px; color: #64748b; }
+
+  /* ---------- Bloco de título do documento ---------- */
+  .title-block {
+    text-align: center;
+    padding: 20px 20px 16px;
+    border-bottom: 1.5px solid #dbeafe;
+  }
+  .title-eyebrow {
+    font-size: 10px; letter-spacing: .14em; text-transform: uppercase;
+    color: #0A3D62; font-weight: 700; margin-bottom: 8px;
+  }
+  .title-main { font-size: 18px; font-weight: 700; color: #1e293b; margin: 0 0 4px; }
+  .title-sub { font-size: 11px; color: #64748b; }
+  .title-sub strong { color: #1e293b; font-weight: 600; }
+
+  /* ---------- Corpo / seções ---------- */
+  .corpo { flex: 1; padding: 12px 20px 10px; display: flex; flex-direction: column; gap: 14px; }
+  .secao { display: flex; flex-direction: column; gap: 8px; }
+  .secao-titulo {
+    display: flex; align-items: baseline; gap: 8px;
+    font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .8px;
+    color: #0A3D62; border-bottom: 1.5px solid #dbeafe; padding-bottom: 3px;
+  }
+  .secao-num { color: #64748b; font-weight: 700; }
+
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 20px; }
+  .field { font-size: 11px; }
+  .field-label { display: block; font-size: 9.5px; text-transform: uppercase; letter-spacing: .06em; color: #64748b; margin-bottom: 2px; }
+  .field-value { color: #1e293b; font-weight: 600; }
+
+  .source-note {
+    display: flex; gap: 10px; align-items: flex-start;
+    background: #e8f0f7; border: 1px solid #dbeafe; border-radius: 6px;
+    padding: 10px 12px; font-size: 10.5px; color: #475569; line-height: 1.55;
+  }
+  .source-note strong { color: #1e293b; }
+
+  /* ---------- Cartões de limite ---------- */
+  .limite { border: 1px solid #e2e8f0; border-radius: 6px; padding: 10px 12px; }
+  .limite-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; gap: 10px; }
+  .limite-nome { font-size: 11px; font-weight: 600; color: #1e293b; }
+
+  .badge { display: inline-block; padding: 2px 9px; border-radius: 20px; font-size: 10px; font-weight: 600; white-space: nowrap; }
+  .badge.verde { background: #dcfce7; color: #166534; }
+  .badge.vermelho { background: #fee2e2; color: #991b1b; }
+  .badge.amarelo { background: #fef9c3; color: #854d0e; }
+  .badge.cinza { background: #f1f5f9; color: #64748b; }
+  .badge.azul { background: #dbeafe; color: #1e40af; }
+
+  .limite-bar-track { height: 6px; border-radius: 4px; background: #e2e8f0; overflow: hidden; margin-bottom: 6px; }
+  .limite-bar-fill { height: 100%; border-radius: 4px; }
+  .limite-bar-fill.verde { background: #16a34a; }
+  .limite-bar-fill.amarelo { background: #d97706; }
+  .limite-bar-fill.vermelho { background: #dc2626; }
+
+  .limite-nums { display: flex; justify-content: space-between; font-size: 10.5px; color: #64748b; }
+  .limite-nums b { color: #1e293b; }
+
+  /* ---------- Tabela de conciliação (mesmo padrão de table.t-siope) ---------- */
+  table.conc { width: 100%; border-collapse: collapse; font-size: 11px; }
+  table.conc td { padding: 6px 4px; border-bottom: 1px solid #e2e8f0; }
+  table.conc td:first-child { color: #64748b; }
+  table.conc td:last-child { text-align: right; font-weight: 600; color: #1e293b; }
+  table.conc tr.total td { border-top: 2px solid #0A3D62; border-bottom: none; padding-top: 8px; }
+  table.conc tr.total td:last-child { font-size: 12.5px; color: #0A3D62; }
+
+  /* ---------- Pontos de atenção (mesmo padrão de .alerta-item) ---------- */
+  .alert-list { list-style: none; display: flex; flex-direction: column; gap: 6px; }
+  .alert-item { display: flex; gap: 8px; font-size: 11px; padding: 8px 10px; border-radius: 6px; }
+  .alert-item.amarelo { background: #fef9c3; }
+  .alert-item.vermelho { background: #fee2e2; }
+  .alert-dot { flex-shrink: 0; width: 7px; height: 7px; border-radius: 50%; margin-top: 4px; }
+  .alert-item.amarelo .alert-dot { background: #854d0e; }
+  .alert-item.vermelho .alert-dot { background: #991b1b; }
+
+  /* ---------- Checklist ---------- */
+  .checklist { display: flex; flex-direction: column; gap: 10px; }
+  .check-item { display: flex; gap: 10px; padding-bottom: 10px; border-bottom: 1px dashed #e2e8f0; }
+  .check-item:last-child { border-bottom: none; padding-bottom: 0; }
+  .check-box { flex-shrink: 0; width: 16px; height: 16px; margin-top: 1px; border: 1.5px solid #64748b; border-radius: 4px; display: flex; align-items: center; justify-content: center; }
+  .check-box.on { background: #0A3D62; border-color: #0A3D62; }
+  .check-box.on::after { content: "✓"; color: #fff; font-size: 11px; font-weight: 700; }
+  .check-label { font-size: 11px; font-weight: 600; color: #1e293b; margin-bottom: 2px; }
+  .check-obs { font-size: 10px; color: #64748b; }
+
+  /* ---------- Conclusão ---------- */
+  .conclusao-selo {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 6px 14px; border-radius: 20px; font-size: 12px; font-weight: 700; margin-bottom: 10px;
+  }
+  .conclusao-texto { font-size: 11.5px; line-height: 1.7; color: #374151; }
+
+  /* ---------- Assinaturas ---------- */
+  .sign-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px 24px; margin-top: 6px; }
+  .sign-slot { text-align: center; }
+  .sign-line { border-top: 1px solid #1e293b; margin-bottom: 6px; height: 30px; }
+  .sign-name { font-size: 11px; font-weight: 600; color: #1e293b; }
+  .sign-role { font-size: 9.5px; color: #64748b; }
+
+  /* ---------- Rodapé (mesmo padrão do .rodape) ---------- */
+  .rodape {
+    background: #f1f5f9; border-top: 1px solid #e2e8f0;
+    padding: 8px 20px; display: flex; align-items: center; justify-content: space-between;
+    gap: 12px; flex-shrink: 0;
+  }
+  .rodape-aviso { font-size: 9px; color: #64748b; max-width: 72%; line-height: 1.5; }
+  .rodape-aviso strong { color: #475569; }
+  .rodape-verif { text-align: right; }
+  .rodape-verif .cod { font-size: 9px; color: #94a3b8; font-family: monospace; }
+  .rodape-url { font-size: 9px; color: #0A3D62; font-weight: 600; }
+
+  @media print {
+    html, body { background: #fff; }
+    .pagina { width: 100%; min-height: unset; max-height: unset; margin: 0; box-shadow: none; }
+    @page { size: A4 portrait; margin: 0; }
+    .btn-imprimir { display: none !important; }
+    .secao, .limite { page-break-inside: avoid; }
+  }
+
+  @media (max-width: 640px) {
+    .pagina { width: 100%; }
+    .grid-2, .sign-grid { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<div class="pagina">
+
+  <!-- Cabeçalho -->
+  <div class="cabecalho">
+    <div class="cabecalho-logo">
+      <div class="logo-icone">
+        <img src="/icons/icon-192x192-transparent.png" alt="Radar SIOPE" onerror="this.style.display='none'">
+      </div>
+      <div class="logo-texto">
+        <div class="marca">Radar SIOPE</div>
+        <div class="sub">radarsiope.com.br</div>
+      </div>
+    </div>
+    <div class="cabecalho-direita">
+      <button class="btn-imprimir" onclick="window.print()">🖨️ Imprimir / PDF</button>
+      <div class="cabecalho-titulo">PARECER DO CACS FUNDEB 2026</div>
+      <div class="cabecalho-data">Gerado em: 24/07/2026 · Versão 1</div>
+    </div>
+  </div>
+
+  <!-- Faixa do município -->
+  <div class="faixa-mun">
+    <div class="faixa-mun-esq">
+      <div class="faixa-mun-nome">Assis Brasil / AC</div>
+      <div class="faixa-mun-cod">Base: 6º Bimestre/2026 (SIOPE)</div>
+    </div>
+    <div class="faixa-mun-dir">
+      <div class="faixa-mun-asin">Exercício 2026</div>
+      <div class="faixa-mun-plano">Conselho de Acompanhamento e Controle Social do Fundeb</div>
+    </div>
+  </div>
+
+  <!-- Título do documento -->
+  <div class="title-block">
+    <div class="title-eyebrow">Análise das contas do Fundeb</div>
+    <h1 class="title-main">Parecer sobre a Execução dos Recursos do Fundeb</h1>
+    <p class="title-sub">Exercício <strong>2026</strong> · Município de <strong>Assis Brasil — AC</strong></p>
+  </div>
+
+  <div class="corpo">
+
+    <!-- 1. Identificação -->
+    <div class="secao">
+      <div class="secao-titulo"><span class="secao-num">01</span> Identificação</div>
+      <div class="grid-2">
+        <div class="field"><span class="field-label">Município</span><span class="field-value">Assis Brasil — AC</span></div>
+        <div class="field"><span class="field-label">Exercício de referência</span><span class="field-value">2026</span></div>
+        <div class="field"><span class="field-label">Presidente do CACS</span><span class="field-value">Maria da Conceição Lima</span></div>
+        <div class="field"><span class="field-label">E-mail do presidente</span><span class="field-value">presidente.cacs@assisbrasil.ac.gov.br</span></div>
+      </div>
+    </div>
+
+    <!-- 2. Fonte dos dados -->
+    <div class="secao">
+      <div class="secao-titulo"><span class="secao-num">02</span> Fonte dos dados</div>
+      <div class="source-note">
+        <span>📄</span>
+        <span>
+          Os dados deste parecer foram extraídos do <strong>Quadro Demonstrativo das Receitas e Despesas com o Fundeb</strong>,
+          emitido pelo SIOPE/FNDE, arquivo <strong>demonstrativoFundebMunicipal_6bim2026.pdf</strong>, anexado pelo gestor em 24/07/2026.
+        </span>
+      </div>
+    </div>
+
+    <!-- 3. Limites obrigatórios -->
+    <div class="secao">
+      <div class="secao-titulo"><span class="secao-num">03</span> Análise dos limites obrigatórios</div>
+
+      <div class="limite">
+        <div class="limite-top">
+          <span class="limite-nome">Mínimo 70% — Remuneração dos Profissionais da Educação Básica</span>
+          <span class="badge verde">Cumprido</span>
+        </div>
+        <div class="limite-bar-track"><div class="limite-bar-fill verde" style="width:93.58%"></div></div>
+        <div class="limite-nums"><span>Exigido: <b>R$ 3.360.065,72</b></span><span>Aplicado: <b>R$ 4.491.945,46</b> (93,58%)</span></div>
+      </div>
+
+      <div class="limite">
+        <div class="limite-top">
+          <span class="limite-nome">Indicador IEI — Complementação VAAT na Educação Infantil</span>
+          <span class="badge verde">Cumprido</span>
+        </div>
+        <div class="limite-bar-track"><div class="limite-bar-fill verde" style="width:94.23%"></div></div>
+        <div class="limite-nums"><span>Exigido: <b>R$ 0,00</b></span><span>Aplicado: <b>R$ 671.399,44</b> (94,23%)</span></div>
+      </div>
+
+      <div class="limite">
+        <div class="limite-top">
+          <span class="limite-nome">Mínimo 15% — Complementação VAAT em Despesas de Capital</span>
+          <span class="badge vermelho">Não cumprido</span>
+        </div>
+        <div class="limite-bar-track"><div class="limite-bar-fill vermelho" style="width:8.93%"></div></div>
+        <div class="limite-nums"><span>Exigido: <b>R$ 106.874,86</b></span><span>Aplicado: <b>R$ 63.603,20</b> (8,93%)</span></div>
+      </div>
+
+      <div class="limite">
+        <div class="limite-top">
+          <span class="limite-nome">Máximo 10% — Receitas não aplicadas no exercício</span>
+          <span class="badge amarelo">Atenção — próximo ao limite</span>
+        </div>
+        <div class="limite-bar-track"><div class="limite-bar-fill amarelo" style="width:95.4%"></div></div>
+        <div class="limite-nums"><span>Limite: <b>R$ 512.847,10</b></span><span>Não aplicado: <b>R$ 489.403,87</b> (9,54%)</span></div>
+      </div>
+
+      <div class="limite">
+        <div class="limite-top">
+          <span class="limite-nome">Mínimo 4% — Recursos aplicados em Fomento ETI</span>
+          <span class="badge vermelho">Não cumprido</span>
+        </div>
+        <div class="limite-bar-track"><div class="limite-bar-fill vermelho" style="width:0%"></div></div>
+        <div class="limite-nums"><span>Exigido: <b>R$ 205.138,84</b></span><span>Aplicado: <b>R$ 0,00</b> (0,00%)</span></div>
+      </div>
+    </div>
+
+    <!-- 4. Disponibilidade financeira -->
+    <div class="secao">
+      <div class="secao-titulo"><span class="secao-num">04</span> Disponibilidade financeira e conciliação bancária</div>
+      <table class="conc">
+        <tr><td>Disponibilidade financeira em 31/12 do exercício anterior</td><td>R$ 1.257.390,09</td></tr>
+        <tr><td>(+) Ingresso de recursos até o bimestre</td><td>R$ 5.128.470,96</td></tr>
+        <tr><td>(−) Pagamentos efetuados até o bimestre</td><td>R$ 3.747.249,55</td></tr>
+        <tr><td>(+) Ajustes positivos (retenções e outros)</td><td>R$ 247.458,11</td></tr>
+        <tr><td>(−) Ajustes negativos</td><td>R$ 0,00</td></tr>
+        <tr class="total"><td>Saldo financeiro conciliado</td><td>R$ 2.886.069,61</td></tr>
+      </table>
+    </div>
+
+    <!-- 5. Pontos de atenção -->
+    <div class="secao">
+      <div class="secao-titulo"><span class="secao-num">05</span> Pontos de atenção</div>
+      <ul class="alert-list">
+        <li class="alert-item vermelho"><span class="alert-dot"></span><span><strong>Fomento ETI (4%):</strong> nenhum recurso aplicado no período — abaixo do mínimo exigido de R$ 205.138,84.</span></li>
+        <li class="alert-item vermelho"><span class="alert-dot"></span><span><strong>Despesas de capital (15% VAAT):</strong> aplicado 8,93%, abaixo do mínimo de 15% exigido.</span></li>
+        <li class="alert-item amarelo"><span class="alert-dot"></span><span><strong>Receitas não aplicadas:</strong> 9,54% do total, muito próximo do teto de 10% permitido — acompanhar de perto no próximo exercício.</span></li>
+      </ul>
+    </div>
+
+    <!-- 6. Checklist documental -->
+    <div class="secao">
+      <div class="secao-titulo"><span class="secao-num">06</span> Checklist de verificação documental</div>
+      <div class="source-note" style="margin-bottom:8px;">
+        <span>ℹ️</span>
+        <span>Os valores acima têm origem em <strong>dados autodeclarados pelo município ao SIOPE</strong>. Recomenda-se ao CACS confirmar as informações abaixo contra os documentos primários antes de concluir o parecer.</span>
+      </div>
+      <div class="checklist">
+        <div class="check-item">
+          <div class="check-box on"></div>
+          <div><div class="check-label">Extrato bancário da conta do Fundeb (período)</div><div class="check-obs">Conferido em 22/07/2026 — saldo confere com o conciliado.</div></div>
+        </div>
+        <div class="check-item">
+          <div class="check-box"></div>
+          <div><div class="check-label">Empenhos e liquidações de despesa</div><div class="check-obs">Pendente de verificação.</div></div>
+        </div>
+        <div class="check-item">
+          <div class="check-box"></div>
+          <div><div class="check-label">Atas de reunião do CACS referentes ao exercício</div><div class="check-obs">—</div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 7. Conclusão -->
+    <div class="secao">
+      <div class="secao-titulo"><span class="secao-num">07</span> Conclusão do parecer</div>
+      <div class="conclusao-selo" style="background:#fef9c3; color:#854d0e;">⚠ Aprovado com ressalvas</div>
+      <p class="conclusao-texto">
+        O Conselho de Acompanhamento e Controle Social do Fundeb, após análise do Quadro Demonstrativo referente ao
+        6º Bimestre/2026 e verificação documental complementar, conclui pela <strong>aprovação das contas com
+        ressalvas</strong>, tendo em vista o não cumprimento do percentual mínimo de aplicação em Fomento ETI (4%)
+        e em despesas de capital (15% da complementação VAAT), recomendando à gestão a regularização desses itens
+        no exercício corrente.
+      </p>
+    </div>
+
+    <!-- 8. Assinaturas -->
+    <div class="secao">
+      <div class="secao-titulo"><span class="secao-num">08</span> Assinaturas</div>
+      <div class="sign-grid">
+        <div class="sign-slot"><div class="sign-line"></div><div class="sign-name">Maria da Conceição Lima</div><div class="sign-role">Presidente do CACS</div></div>
+        <div class="sign-slot"><div class="sign-line"></div><div class="sign-name">João Batista Ferreira</div><div class="sign-role">Membro do CACS</div></div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Rodapé -->
+  <div class="rodape">
+    <div class="rodape-aviso">
+      <strong>⚠️ Nota:</strong> os dados constantes neste parecer têm por base as informações declaradas pelo município
+      ao SIOPE, de responsabilidade do Poder Executivo local. O CACS, a seu critério, poderá solicitar documentos
+      contábeis, orçamentários e financeiros complementares que julgar necessários para a análise das contas do Fundeb.
+      Este documento não substitui a fiscalização exercida pelo Conselho nem pelos órgãos de controle externo.
+    </div>
+    <div class="rodape-verif">
+      <div class="rodape-url">radarsiope.com.br</div>
+      <div class="cod">ID: RS-PF-A1B2C3D4</div>
+    </div>
+  </div>
+
+</div>
+
+</body>
+</html>
