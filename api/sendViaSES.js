@@ -1,4 +1,4 @@
-export const config = { runtime: 'nodejs', api: { bodyParser: false }, maxDuration: 300  };
+export const config = { runtime: 'nodejs', api: { bodyParser: false }, maxDuration: 300 };
 
 import crypto from 'crypto';
 import admin from 'firebase-admin';
@@ -30,6 +30,214 @@ const supabase = createClient(
   process.env.VITE_SUPABASE_URL,
   process.env.VITE_SUPABASE_SERVICE_KEY
 );
+
+// ── Parecer Fundeb: parser + template ───────────────────────────────────
+import { parseDemonstrativoFundeb } from '../../lib/parserDemonstrativoFundeb.js';
+import { montarHTMLParecer } from '../../lib/parecerFundebTemplate.js';
+
+// Confere se o uid é assinante com plano ativo, com a feature contratada,
+// e se cod_municipio está dentro do(s) município(s) do plano.
+async function _verificarAcessoParecerFundeb(uid, codMunicipio) {
+  if (!uid) return { ok: false, motivo: 'uid_ausente' };
+
+  const usuarioSnap = await db.collection('usuarios').doc(uid).get();
+  if (!usuarioSnap.exists) return { ok: false, motivo: 'usuario_nao_encontrado' };
+
+  const assinaturasSnap = await db.collection('usuarios').doc(uid).collection('assinaturas')
+    .where('status', 'in', ['ativa', 'aprovada', 'pago'])
+    .limit(1)
+    .get();
+
+  if (assinaturasSnap.empty) return { ok: false, motivo: 'sem_assinatura_ativa' };
+
+  const assinaturaData = assinaturasSnap.docs[0].data();
+  const usuarioData = usuarioSnap.data();
+  const features = usuarioData.features || assinaturaData.features_snapshot || {};
+
+  if (!features.parecer_fundeb) return { ok: false, motivo: 'feature_nao_contratada' };
+
+  const municipiosPlano = assinaturaData.municipios_plano || [];
+  const autorizado = municipiosPlano.length
+    ? municipiosPlano.includes(codMunicipio)
+    : usuarioData.cod_municipio === codMunicipio;
+
+  if (!autorizado) return { ok: false, motivo: 'municipio_fora_do_plano' };
+
+  return { ok: true };
+}
+
+// ── GET ?acao=parecer_fundeb_status ─────────────────────────────────────
+async function _parecerFundebStatus(req, res) {
+  const { uid, cod_municipio, uf, exercicio } = req.query;
+  if (!uid || !cod_municipio || !uf || !exercicio) {
+    return res.status(400).json({ ok: false, error: 'uid, cod_municipio, uf e exercicio são obrigatórios.' });
+  }
+
+  const acesso = await _verificarAcessoParecerFundeb(uid, cod_municipio);
+  if (!acesso.ok) return res.status(403).json({ ok: false, error: acesso.motivo });
+
+  const { data, error } = await supabase
+    .from('pareceres_fundeb')
+    .select('versao, atualizado_em, token_acesso')
+    .eq('cod_municipio', cod_municipio)
+    .eq('uf', uf)
+    .eq('exercicio', Number(exercicio))
+    .maybeSingle();
+
+  if (error) {
+    console.error('[parecer_fundeb_status] Supabase:', error.message);
+    return res.status(500).json({ ok: false, error: 'Erro ao consultar status do parecer.' });
+  }
+
+  return res.status(200).json({
+    ok: true,
+    existe: !!data,
+    parecer: data ? {
+      versao: data.versao,
+      atualizado_em: data.atualizado_em,
+      url_download: `${process.env.NEXT_PUBLIC_BASE_URL}/api/sendViaSES?acao=parecer_fundeb_ver&token=${data.token_acesso}`,
+    } : null,
+  });
+}
+
+// ── POST ?acao=parecer_fundeb_upload ────────────────────────────────────
+// PDF em base64 (não multipart — evita depender de parser de multipart
+// com o bodyParser deste arquivo desabilitado).
+async function _parecerFundebUpload(req, res) {
+  const body = await _lerBody(req);
+  const { uid, cod_municipio, pdf_base64, pdf_nome } = body || {};
+  if (!uid || !cod_municipio || !pdf_base64) {
+    return res.status(400).json({ ok: false, error: 'uid, cod_municipio e pdf_base64 são obrigatórios.' });
+  }
+
+  const acesso = await _verificarAcessoParecerFundeb(uid, cod_municipio);
+  if (!acesso.ok) return res.status(403).json({ ok: false, error: acesso.motivo });
+
+  try {
+    const buffer = Buffer.from(pdf_base64, 'base64');
+    const dadosExtraidos = await parseDemonstrativoFundeb(buffer);
+    return res.status(200).json({ ok: true, dados_extraidos: dadosExtraidos, pdf_nome });
+  } catch (err) {
+    console.error('[parecer_fundeb_upload] Erro no parser:', err.message);
+    return res.status(500).json({ ok: false, error: 'Não foi possível ler o PDF. Verifique se é o demonstrativo do Fundeb gerado pelo SIOPE.' });
+  }
+}
+
+// ── POST ?acao=parecer_fundeb_finalizar ─────────────────────────────────
+async function _parecerFundebFinalizar(req, res) {
+  const body = await _lerBody(req);
+  const {
+    uid, cod_municipio, uf, municipio_nome, exercicio, pdf_nome, dados_extraidos,
+    presidente_cacs_nome, presidente_cacs_email, membros_cacs,
+    checklist_documental, conclusao_tipo, conclusao_parecer,
+  } = body || {};
+
+  if (!uid || !cod_municipio || !uf || !municipio_nome || !exercicio || !dados_extraidos || !presidente_cacs_email) {
+    return res.status(400).json({ ok: false, error: 'Campos obrigatórios ausentes.' });
+  }
+
+  const acesso = await _verificarAcessoParecerFundeb(uid, cod_municipio);
+  if (!acesso.ok) return res.status(403).json({ ok: false, error: acesso.motivo });
+
+  const { data: existente } = await supabase
+    .from('pareceres_fundeb')
+    .select('versao')
+    .eq('cod_municipio', cod_municipio)
+    .eq('uf', uf)
+    .eq('exercicio', Number(exercicio))
+    .maybeSingle();
+
+  const { data, error } = await supabase
+    .from('pareceres_fundeb')
+    .upsert({
+      cod_municipio,
+      uf,
+      municipio_nome,
+      exercicio: Number(exercicio),
+      bimestre_referencia: dados_extraidos.bimestre_pdf || 6,
+      status: 'finalizado',
+      pdf_original_nome: pdf_nome || null,
+      data_upload: new Date().toISOString(),
+      dados_extraidos,
+      presidente_cacs_nome,
+      presidente_cacs_email,
+      membros_cacs: membros_cacs || [],
+      checklist_documental: checklist_documental || [],
+      conclusao_tipo,
+      conclusao_parecer,
+      criado_por: uid,
+      versao: (existente?.versao || 0) + 1,
+    }, { onConflict: 'cod_municipio,uf,exercicio' })
+    .select('token_acesso, versao')
+    .single();
+
+  if (error) {
+    console.error('[parecer_fundeb_finalizar] Supabase:', error.message);
+    return res.status(500).json({ ok: false, error: 'Erro ao salvar o parecer.' });
+  }
+
+  const urlDownload = `${process.env.NEXT_PUBLIC_BASE_URL}/api/sendViaSES?acao=parecer_fundeb_ver&token=${data.token_acesso}`;
+
+  // E-mail via Zoho, reaproveitando o /api/enviarEmail já existente
+  let enviadoEmail = false;
+  try {
+    const respEmail = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL}/api/enviarEmail`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        nome: presidente_cacs_nome,
+        email: presidente_cacs_email,
+        assunto: `Parecer do CACS Fundeb ${exercicio} — pronto para análise`,
+        mensagemHtml: `
+          <p>Olá, ${presidente_cacs_nome || ''}.</p>
+          <p>O parecer do Fundeb referente ao exercício de ${exercicio} foi gerado e está disponível para análise do CACS.</p>
+          <p><a href="${urlDownload}">Clique aqui para visualizar o parecer</a></p>
+          <p style="color:#64748b;font-size:12px">Radar SIOPE — radarsiope.com.br</p>
+        `,
+      }),
+    });
+    enviadoEmail = respEmail.ok;
+  } catch (err) {
+    console.error('[parecer_fundeb_finalizar] Erro ao enviar e-mail:', err.message);
+  }
+
+  return res.status(200).json({ ok: true, url_download: urlDownload, enviado_email: enviadoEmail, versao: data.versao });
+}
+
+// ── GET ?acao=parecer_fundeb_ver ────────────────────────────────────────
+// Acesso público por token (link enviado ao presidente do CACS), sem login.
+async function _parecerFundebVer(req, res) {
+  const { token } = req.query;
+  if (!token) return res.status(400).send('Token ausente.');
+
+  const { data, error } = await supabase
+    .from('pareceres_fundeb')
+    .select('*')
+    .eq('token_acesso', token)
+    .eq('status', 'finalizado')
+    .maybeSingle();
+
+  if (error || !data) return res.status(404).send('Parecer não encontrado ou link inválido.');
+
+  const html = montarHTMLParecer({
+    dadosExtraidos: data.dados_extraidos,
+    form: {
+      presidenteNome: data.presidente_cacs_nome,
+      presidenteEmail: data.presidente_cacs_email,
+      membros: data.membros_cacs,
+      checklist: data.checklist_documental,
+      conclusaoTipo: data.conclusao_tipo,
+      conclusaoTexto: data.conclusao_parecer,
+    },
+    municipio: { cod: data.cod_municipio, uf: data.uf, nome: data.municipio_nome },
+    exercicio: data.exercicio,
+    pdfNome: data.pdf_original_nome,
+    dataGeracao: data.atualizado_em ? new Date(data.atualizado_em) : new Date(),
+  });
+
+  res.setHeader('Content-Type', 'text/html; charset=utf-8');
+  return res.status(200).send(html);
+}
 
 // ─── Parser CSV do Tesouro Transparente ──────────────────────────────────────
 // Parser por índice: ignora headers corrompidos e retorna Array<string[]>
@@ -597,6 +805,12 @@ export default async function handler(req, res) {
   if (acao === 'relatorio_conformidade') {
     return _relatorioConformidade(req, res);
   }
+
+  // ── Parecer Fundeb ─────────────────────────────────────────────────────
+  if (req.method === 'GET' && acao === 'parecer_fundeb_status') return _parecerFundebStatus(req, res);
+  if (req.method === 'GET' && acao === 'parecer_fundeb_ver') return _parecerFundebVer(req, res);
+  if (req.method === 'POST' && acao === 'parecer_fundeb_upload') return _parecerFundebUpload(req, res);
+  if (req.method === 'POST' && acao === 'parecer_fundeb_finalizar') return _parecerFundebFinalizar(req, res);
 
   // Dentro do handler principal, após a verificação de 'relatorio_conformidade':
   if (req.query.acao === 'sync_cauc') {
