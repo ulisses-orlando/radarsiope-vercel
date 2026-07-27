@@ -276,7 +276,11 @@
       window.__fcSugestaoBloqueada = isBlocked;
     } else {
       window.__fcSugestaoBloqueada = false;
-      html += `...`; // (mantém igual)
+      html += `<div><label class="rs-fc-label" for="rs-fc-txt">💬 Nova mensagem</label>
+            <textarea id="rs-fc-txt" class="rs-fc-textarea" placeholder="Digite sua mensagem ou dúvida…" maxlength="${MAX_CHARS}"></textarea>
+            <div class="rs-fc-chars" id="rs-fc-chars">0/${MAX_CHARS}</div>
+            </div>
+            <button class="rs-fc-enviar" id="rs-fc-enviar" disabled onclick="window._fcEnviar('mensagem')">Enviar</button>`;
     }
 
     const historicoFiltrado = tipoAtivo === 'mensagem'
