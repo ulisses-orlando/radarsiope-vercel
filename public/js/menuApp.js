@@ -287,14 +287,14 @@
         }
         window._rsFcAbrir?.();
       });
-    // ⚖️ Parecer Fundeb — COM VALIDAÇÃO DE SESSÃO
+   // ⚖️ Parecer Fundeb 
     document.getElementById('rs-menu-parecer-fundeb')
       ?.addEventListener('click', async () => {
         _fecharMenu();
         if (typeof window._checarSessaoCritica === 'function') {
           if (!(await window._checarSessaoCritica())) return;
         }
-        window._abrirParecerFundeb?.();
+        window.dispatchEvent(new CustomEvent('rs:abrirParecerFundeb'));
       });
     // 🧠 Meu Desempenho — abre modal com resumo geral do quiz
     document.getElementById('rs-menu-desempenho')

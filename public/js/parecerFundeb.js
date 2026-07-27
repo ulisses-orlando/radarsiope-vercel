@@ -7,12 +7,12 @@ Ponto de entrada público: window._abrirParecerFundeb()
 
 (function () {
 
-  const API = '/api/parecerFundeb';
+  const API = '/api/sendViaSES'; // endpoints do Parecer Fundeb vivem aqui (?acao=parecer_fundeb_*)
   const EXERCICIO_ATUAL = new Date().getFullYear();
 
-  // Ative apenas em ambiente local, sem backend ainda no ar.
-  // Remover assim que os endpoints reais de /api/parecerFundeb existirem.
-  const MODO_DEMO = true;
+  // Deixe true apenas se os endpoints ainda não estiverem deployados/configurados
+  // (migration rodada, SUPABASE_URL/SUPABASE_ANON_KEY setadas, lib/ no lugar).
+  const MODO_DEMO = false;
 
   // ── Estado do wizard ────────────────────────────────────────────────────
   let _st = _estadoInicial();
@@ -49,8 +49,8 @@ Ponto de entrada público: window._abrirParecerFundeb()
   }
 
   // ── Ponto de entrada público ────────────────────────────────────────────
-  window._abrirParecerFundeb = async function (cod, nome, uf) {
-    const user = window._radarUser;
+  window._abrirParecerFundebWizard = async function (cod  , nome, uf) {
+      const user = window._radarUser;
     if (!user?.uid) { _msg('Faça login para acessar o Parecer Fundeb.'); return; }
 
     _st = _estadoInicial();
@@ -721,12 +721,26 @@ Ponto de entrada público: window._abrirParecerFundeb()
   // ─────────────────────────────────────────────────────────────────────
   async function _apiStatus() {
     if (MODO_DEMO) { await _delay(400); return null; }
-    const resp = await fetch(`${API}?acao=status&cod_municipio=${_st.municipio.cod}&exercicio=${_st.exercicio}`, {
-      headers: { 'Content-Type': 'application/json' },
+    const user = window._radarUser;
+    const params = new URLSearchParams({
+      uid: user.uid,
+      cod_municipio: _st.municipio.cod,
+      uf: _st.municipio.uf,
+      exercicio: _st.exercicio,
     });
+    const resp = await fetch(`${API}?acao=parecer_fundeb_status&${params}`);
     const dados = await resp.json();
     if (!dados.ok) throw new Error(dados.error || 'Erro ao checar status');
     return dados.existe ? dados.parecer : null;
+  }
+
+  function _arquivoParaBase64(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result.split(',')[1]); // remove o prefixo data:application/pdf;base64,
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
   }
 
   async function _apiUpload(file) {
@@ -735,13 +749,18 @@ Ponto de entrada público: window._abrirParecerFundeb()
       return _mockDadosExtraidos();
     }
     const user = window._radarUser;
-    const formData = new FormData();
-    formData.append('pdf', file);
-    formData.append('uid', user.uid);
-    formData.append('cod_municipio', _st.municipio.cod);
-    formData.append('exercicio', _st.exercicio);
+    const pdfBase64 = await _arquivoParaBase64(file);
 
-    const resp = await fetch(`${API}?acao=upload`, { method: 'POST', body: formData });
+    const resp = await fetch(`${API}?acao=parecer_fundeb_upload`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        uid: user.uid,
+        cod_municipio: _st.municipio.cod,
+        pdf_base64: pdfBase64,
+        pdf_nome: file.name,
+      }),
+    });
     const dados = await resp.json();
     if (!dados.ok) throw new Error(dados.error || 'Erro ao processar PDF');
     return dados;
@@ -753,13 +772,16 @@ Ponto de entrada público: window._abrirParecerFundeb()
       return { ok: true, url_download: '#', enviado_email: true };
     }
     const user = window._radarUser;
-    const resp = await fetch(`${API}?acao=finalizar`, {
+    const resp = await fetch(`${API}?acao=parecer_fundeb_finalizar`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         uid: user.uid,
         cod_municipio: _st.municipio.cod,
+        uf: _st.municipio.uf,
+        municipio_nome: _st.municipio.nome,
         exercicio: _st.exercicio,
+        pdf_nome: _st.pdfNome,
         dados_extraidos: _st.dadosExtraidos,
         presidente_cacs_nome: _st.form.presidenteNome,
         presidente_cacs_email: _st.form.presidenteEmail,

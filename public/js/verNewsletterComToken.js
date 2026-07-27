@@ -450,6 +450,7 @@ function detectarAcesso(destinatario, newsletter, segmento, envio) {
     temChat: isAssinante ? !!features.pergunta_edicao : acessoProTemp,
     temRelatorio: isAssinante ? !!features.relatorio_conformidade : acessoProTemp,
     temCalendario: isAssinante ? !!features.calendario : acessoProTemp,
+    temParecerFundeb: isAssinante && !!features.parecer_fundeb,
     blurMunicipio: !isAssinante && !acessoProTemp,
     truncarTexto: !isAssinante && !acessoProTemp,
     modoPadrao: isAssinante && window.innerWidth > 768 ? 'completo' : 'rapido',
@@ -2882,6 +2883,25 @@ function _getCtx() {
   } catch (e) { return null; }
 }
 
+// ─── Parecer Fundeb: abre o wizard (mesmo padrão de gate do Calendário) ───────
+
+function _abrirParecerFundeb() {
+  const features = window._radarUser?.features || {};
+  const isAssinante = window._radarUser?.segmento === 'assinante';
+  const temAcesso = isAssinante && !!features.parecer_fundeb;
+
+  if (!temAcesso) {
+    _solicitarUpgrade('parecer_fundeb', isAssinante);
+    return;
+  }
+
+  const cod = _municipioAtivo?.cod_municipio || window._radarUser?.cod_municipio;
+  const nome = _municipioAtivo?.nome_municipio || window._radarUser?.nome_municipio;
+  const uf = _municipioAtivo?.cod_uf || window._radarUser?.cod_uf;
+
+  window._abrirParecerFundebWizard?.(cod, nome, uf);
+}
+
 // ─── Calendário: painel de tela cheia ─────────────────────────────────────────
 
 function _abrirCalendario() {
@@ -2981,6 +3001,8 @@ async function iniciarDrawer(newsletter) {
   window.addEventListener('rs:abrirEdicoes', abrirDrawer);
 
   window.addEventListener('rs:abrirCalendario', _abrirCalendario);
+
+  window.addEventListener('rs:abrirParecerFundeb', _abrirParecerFundeb);
 
   // 🔒 Guard de sessão no botão Sentinela (intercepta antes dos handlers do menu)
   document.getElementById('rs-alertas-btn')?.addEventListener('click', async function (e) {
