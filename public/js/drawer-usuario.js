@@ -384,7 +384,7 @@ async function _renderResumo() {
                 ${featChecks}
               </div>
               <button onclick="_salvarFeatures('${uid}','${assinId}',this)" style="font-size:12px;padding:4px 14px;border-radius:6px;border:none;background:#0A3D62;color:#fff;cursor:pointer;font-weight:600">
-                💾 Salvar features
+                💾 Salvar features e enviar pro App
               </button>
               <span id="feat-status-${assinId}" style="font-size:11px;color:#64748b;margin-left:8px"></span>
             </div>
@@ -455,7 +455,7 @@ async function _renderResumo() {
                 style="width:100%;padding:6px 8px;border:1px solid #cbd5e1;border-radius:6px;font-size:12px;box-sizing:border-box">
           </div>
           <button onclick="_salvarFeaturesUsuario('${uid}', this)" style="font-size:12px;padding:4px 14px;border-radius:6px;border:none;background:#0A3D62;color:#fff;cursor:pointer;font-weight:600">
-              💾 Salvar features
+              💾 Salvar features e enviar pro App
           </button>
           <span id="feat-status-usuario" style="font-size:11px;color:#64748b;margin-left:8px"></span>
         </div>
@@ -472,17 +472,30 @@ async function _renderResumo() {
         <div class="drawer-secao-titulo">📑 Assinaturas</div>
         ${assinHtml}
       </div>`;
-        // ✅ Carrega histórico de cortesias (fire-and-forget, não bloqueia)
-        _carregarLogCortesia(uid);
+    // ✅ Carrega histórico de cortesias (fire-and-forget, não bloqueia)
+    _carregarLogCortesia(uid);
   } catch (e) {
     body.innerHTML = `<p style="color:#ef4444">Erro: ${e.message}</p>`;
   }
 }
 
 // ─── SALVAR FEATURES DE ASSINATURA ───────────────────────────────────────────
+// ─── SALVAR FEATURES DE ASSINATURA ───────────────────────────────────────────
 async function _salvarFeatures(uid, assinId, btn) {
   const panel = document.getElementById(`feat-panel-${assinId}`);
   const status = document.getElementById(`feat-status-${assinId}`);
+
+  // ✅ CAPTURA AS FEATURES ANTES DE ALTERAR (para calcular diff depois)
+  let userFeatsAntes = {};
+  try {
+    const snapAntes = await db.collection('usuarios').doc(uid)
+      .collection('assinaturas').doc(assinId).get();
+    if (snapAntes.exists) {
+      userFeatsAntes = snapAntes.data().features_snapshot || {};
+    }
+  } catch (e) {
+    console.warn('[drawer] Erro ao ler features anteriores:', e.message);
+  }
 
   // Coleta valores de todos os inputs [data-feat], respeitando o tipo
   const inputs = panel.querySelectorAll('[data-feat]');
@@ -511,7 +524,13 @@ async function _salvarFeatures(uid, assinId, btn) {
       .collection('assinaturas').doc(assinId)
       .update({ features_snapshot: novasFeatures });
 
-    status.textContent = '✅ Salvo!';
+    // 🔔 Notifica assinante para sincronizar no app
+    const diff = Object.keys(novasFeatures).filter(k =>
+      JSON.stringify(novasFeatures[k]) !== JSON.stringify(userFeatsAntes[k])
+    );
+    await _notificarAssinanteSincronizacao(uid, diff);
+
+    status.textContent = '✅ Salvo! Notificação enviada ao assinante.';
     status.style.color = '#16a34a';
     setTimeout(() => { status.textContent = ''; }, 3000);
 
@@ -520,7 +539,7 @@ async function _salvarFeatures(uid, assinId, btn) {
     status.style.color = '#dc2626';
   } finally {
     btn.disabled = false;
-    btn.textContent = '💾 Salvar features';
+    btn.textContent = '💾 Salvar features e enviar pro App';
   }
 }
 
@@ -612,12 +631,12 @@ async function _renderPagamentos() {
 // ─── ENVIAR MENSAGEM DIRETA AO ASSINANTE ─────────────────────────────────────
 async function _enviarMensagemAdmin(uid, btn) {
   const titulo = document.getElementById('rs-admmsg-titulo')?.value?.trim();
-  const corpo  = document.getElementById('rs-admmsg-corpo')?.value?.trim();
+  const corpo = document.getElementById('rs-admmsg-corpo')?.value?.trim();
   const permite = document.getElementById('rs-admmsg-permite')?.checked || false;
-  const status  = document.getElementById('rs-admmsg-status');
+  const status = document.getElementById('rs-admmsg-status');
 
   if (!titulo) { status.textContent = '⚠️ Informe um título.'; status.style.color = '#d97706'; return; }
-  if (!corpo)  { status.textContent = '⚠️ Informe o corpo da mensagem.'; status.style.color = '#d97706'; return; }
+  if (!corpo) { status.textContent = '⚠️ Informe o corpo da mensagem.'; status.style.color = '#d97706'; return; }
 
   const admin = JSON.parse(localStorage.getItem('usuarioLogado') || '{}');
   btn.disabled = true; btn.textContent = '⏳ Enviando...'; status.textContent = '';
@@ -670,7 +689,7 @@ async function _carregarMensagensAdmin(uid) {
     wrap.innerHTML = snap.docs.map(doc => {
       const m = doc.data();
       let dataStr = '—';
-      try { dataStr = new Date(m.data_solicitacao).toLocaleString('pt-BR', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' }); } catch (e) {}
+      try { dataStr = new Date(m.data_solicitacao).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }); } catch (e) { }
       const lidaLabel = m.lida
         ? `<span style="color:#22c55e;font-size:10px;font-weight:700">✅ Lida</span>`
         : `<span style="color:#f59e0b;font-size:10px;font-weight:700">👁 Não lida</span>`;
@@ -1691,9 +1710,13 @@ async function _salvarFeaturesUsuario(uid, btn) {
       }
     } catch (e) { /* não fatal */ }
 
+    // 🔔 Notifica assinante para sincronizar no app
+    await _notificarAssinanteSincronizacao(uid, diff);
+
     // Atualiza cache local
     _drawerDados.features = novasFeatures;
-    status.textContent = '✅ Salvo!'; status.style.color = '#16a34a';
+    status.textContent = '✅ Salvo! Notificação enviada ao assinante.';
+    status.style.color = '#16a34a';
     setTimeout(() => { status.textContent = ''; }, 3000);
 
     // Recarrega o histórico de cortesias (se a seção existir)
@@ -1701,7 +1724,7 @@ async function _salvarFeaturesUsuario(uid, btn) {
   } catch (e) {
     status.textContent = '❌ Erro: ' + e.message; status.style.color = '#dc2626';
   } finally {
-    btn.disabled = false; btn.textContent = '💾 Salvar features';
+    btn.disabled = false; btn.textContent = '💾 Salvar features e enviar pro App';
   }
 }
 
@@ -1723,11 +1746,11 @@ async function _carregarLogCortesia(uid) {
     wrap.style.display = 'block';
     // Ordena do mais recente para o mais antigo
     const logOrdenado = [...log].sort((a, b) => {
-      const ta = typeof a.alterado_em === 'number' 
-        ? a.alterado_em 
+      const ta = typeof a.alterado_em === 'number'
+        ? a.alterado_em
         : (a.alterado_em?.toMillis?.() || a.alterado_em?.seconds * 1000 || 0);
-      const tb = typeof b.alterado_em === 'number' 
-        ? b.alterado_em 
+      const tb = typeof b.alterado_em === 'number'
+        ? b.alterado_em
         : (b.alterado_em?.toMillis?.() || b.alterado_em?.seconds * 1000 || 0);
       return tb - ta;
     });
@@ -1762,6 +1785,30 @@ async function _carregarLogCortesia(uid) {
   } catch (e) {
     console.warn('[cortesia-log]', e.message);
     wrap.style.display = 'none';
+  }
+}
+
+// ─── Notificar assinante sobre atualização de features ─────────────────────
+async function _notificarAssinanteSincronizacao(uid, featuresAlteradas) {
+  try {
+    const admin = JSON.parse(localStorage.getItem('usuarioLogado') || '{}');
+    const lista = Array.isArray(featuresAlteradas) && featuresAlteradas.length
+      ? featuresAlteradas.join(', ')
+      : 'configuração do plano';
+
+    await db.collection('usuarios').doc(uid).collection('solicitacoes').add({
+      tipo: 'mensagem_admin',
+      acao: 'sincronizar_features',        // ← flag especial
+      titulo: '✨ Seu plano foi atualizado!',
+      descricao: `A equipe Radar SIOPE modificou seu acesso. Clique no botão abaixo para ativar as novas permissões no app.\n\nRecursos alterados: ${lista}`,
+      status: 'atendida',
+      permite_resposta: false,
+      lida: false,
+      enviado_por: admin.nome || admin.email || 'Admin',
+      data_solicitacao: new Date().toISOString(),
+    });
+  } catch (e) {
+    console.warn('[drawer] Falha ao notificar assinante:', e.message);
   }
 }
 

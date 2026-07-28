@@ -89,6 +89,76 @@
     return comLinks.replace(/\n/g, '<br>');
   }
 
+  // ✅ Sincroniza features do Firestore → localStorage + runtime
+  window._fcSincronizarFeatures = async function (solId) {
+    const user = window._radarUser;
+    if (!user || !user.uid) {
+      alert('Sessão não encontrada. Recarregue o app.');
+      return;
+    }
+
+    const btn = document.getElementById(`rs-fc-sync-btn-${solId}`);
+    if (btn) { btn.disabled = true; btn.textContent = '⏳ Atualizando...'; }
+
+    try {
+      // Resolve assinaturaId (pode vir da sessão ou buscar a ativa)
+      let assinaturaId = user.assinaturaId;
+      if (!assinaturaId) {
+        const snapAssin = await window.db.collection('usuarios').doc(user.uid)
+          .collection('assinaturas')
+          .where('status', 'in', ['ativa', 'ativo', 'aprovada'])
+          .limit(1).get();
+        if (!snapAssin.empty) assinaturaId = snapAssin.docs[0].id;
+      }
+      if (!assinaturaId) throw new Error('Assinatura não identificada.');
+
+      // Busca features atualizadas
+      const snap = await window.db.collection('usuarios').doc(user.uid)
+        .collection('assinaturas').doc(assinaturaId).get();
+      if (!snap.exists) throw new Error('Assinatura não encontrada.');
+
+      const novasFeatures = snap.data().features_snapshot || {};
+
+      // 1. Atualiza runtime
+      user.features = novasFeatures;
+
+      // 2. Atualiza localStorage (merge seguro)
+      const sess = JSON.parse(localStorage.getItem('rs_pwa_session') || '{}');
+      sess.features = novasFeatures;
+      sess.features_synced_at = Date.now();
+      localStorage.setItem('rs_pwa_session', JSON.stringify(sess));
+
+      // 3. Marca mensagem como lida
+      if (solId) {
+        await window.db.collection('usuarios').doc(user.uid)
+          .collection('solicitacoes').doc(solId)
+          .update({ lida: true });
+      }
+
+      // 4. Feedback visual
+      if (btn) {
+        btn.textContent = '✅ Recursos ativados!';
+        btn.style.background = '#22c55e';
+      }
+
+      // 5. Notifica outros módulos (chat, mídia, etc.)
+      window.dispatchEvent(new CustomEvent('rs:featuresUpdated', {
+        detail: novasFeatures
+      }));
+
+      // 6. Recarrega o drawer para refletir novas permissões (ex: libera sugestão de tema)
+      setTimeout(() => _renderDrawer('mensagem'), 900);
+
+    } catch (e) {
+      console.error('[faleConosco] sync features:', e);
+      if (btn) {
+        btn.disabled = false;
+        btn.textContent = '❌ Erro. Tentar novamente';
+      }
+      alert('Erro ao atualizar recursos: ' + e.message);
+    }
+  };
+
   // ── Inicialização ─────────────────────────────────────────────────────────
   function init() {
     _injetarHTML();
@@ -293,25 +363,41 @@
         if (msg.tipo === 'mensagem_admin' || msg.tipo === 'resposta_feedback') {
           let dataFormatada = '—';
           try { const rawDate = msg.data_solicitacao; if (rawDate) { const d = new Date(rawDate); if (!isNaN(d.getTime())) dataFormatada = `em ${d.toLocaleDateString('pt-BR')}`; } } catch (e) { }
+
           const tipoLabel = msg.tipo === 'resposta_feedback'
             ? `📰 Resposta ao seu feedback${msg.origem_edicao_label ? ` · ${_esc(msg.origem_edicao_label)}` : ''}`
             : '📣 Equipe Radar SIOPE';
-          const respostaBtn = msg.permite_resposta
-            ? `<button class="rs-fc-enviar" style="margin-top:8px;font-size:12px;padding:8px 14px;background:#1d4ed8"
+
+          // ✅ BOTÃO DE AÇÃO ESPECIAL
+          let acaoHtml = '';
+          if (msg.acao === 'sincronizar_features') {
+            acaoHtml = `
+              <button id="rs-fc-sync-btn-${msg.id}" class="rs-fc-enviar" 
+                style="margin-top:10px;font-size:12px;padding:9px 16px;background:#0e7490"
+                onclick="window._fcSincronizarFeatures('${msg.id || ''}')">
+                🔄 Ativar novos recursos agora
+              </button>`;
+          } else if (msg.permite_resposta) {
+            acaoHtml = `
+              <button class="rs-fc-enviar" style="margin-top:8px;font-size:12px;padding:8px 14px;background:#1d4ed8"
                 onclick="window._fcResponderMensagemAdmin('${msg.id || ''}')">
                 💬 Responder
-               </button>` : '';
+              </button>`;
+          }
+
           const respostaAssinante = msg.resposta_assinante
             ? `<div class="rs-fc-msg-resposta" style="border-color:#3b82f6;background:rgba(59,130,246,.1)">
                 <div class="rs-fc-msg-resposta-label" style="color:#3b82f6">✅ Sua resposta</div>
                 ${_esc(msg.resposta_assinante)}
                </div>` : '';
+
           // Marca como lida no Firestore (fire-and-forget)
           if (!msg.lida && msg.id) {
             window.db.collection('usuarios').doc(user.uid)
               .collection('solicitacoes').doc(msg.id)
               .update({ lida: true }).catch(() => { });
           }
+
           html += `
             <div class="rs-fc-msg-card respondida"
               style="border-color:#3b82f6;background:rgba(59,130,246,.08)">
@@ -320,9 +406,9 @@
                 <span class="rs-fc-msg-data">${dataFormatada}</span>
               </div>
               ${msg.titulo ? `<div style="font-size:13px;font-weight:700;color:var(--rs-text,#f8fafc);margin-bottom:2px">${_esc(msg.titulo)}</div>` : ''}
-              <div class= "rs-fc-msg-texto " style= "word-break:break-word; " >${_formatarDescricaoAdmin(msg.descricao || '')} </div >
+              <div class="rs-fc-msg-texto" style="word-break:break-word">${_formatarDescricaoAdmin(msg.descricao || '')}</div>
               ${respostaAssinante}
-              ${!msg.resposta_assinante ? respostaBtn : ''}
+              ${acaoHtml}
             </div>`;
           return;
         }
