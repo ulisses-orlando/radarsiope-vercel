@@ -89,7 +89,7 @@
     return comLinks.replace(/\n/g, '<br>');
   }
 
-  // ✅ Sincroniza features do Firestore → localStorage + runtime
+  // ✅ Força atualização do localStorage lendo SÓ o documento do usuário
   window._fcSincronizarFeatures = async function (solId) {
     const user = window._radarUser;
     if (!user || !user.uid) {
@@ -101,52 +101,40 @@
     if (btn) { btn.disabled = true; btn.textContent = '⏳ Atualizando...'; }
 
     try {
-      // Resolve assinaturaId (pode vir da sessão ou buscar a ativa)
-      let assinaturaId = user.assinaturaId;
-      if (!assinaturaId) {
-        const snapAssin = await window.db.collection('usuarios').doc(user.uid)
-          .collection('assinaturas')
-          .where('status', 'in', ['ativa', 'ativo', 'aprovada'])
-          .limit(1).get();
-        if (!snapAssin.empty) assinaturaId = snapAssin.docs[0].id;
-      }
-      if (!assinaturaId) throw new Error('Assinatura não identificada.');
+      // 1. Lê SOMENTE o documento do usuário (cortesias/features)
+      const snap = await window.db.collection('usuarios').doc(user.uid).get();
+      if (!snap.exists) throw new Error('Usuário não encontrado.');
 
-      // Busca features atualizadas
-      const snap = await window.db.collection('usuarios').doc(user.uid)
-        .collection('assinaturas').doc(assinaturaId).get();
-      if (!snap.exists) throw new Error('Assinatura não encontrada.');
+      const novasFeatures = snap.data().features || {};
 
-      const novasFeatures = snap.data().features_snapshot || {};
-
-      // 1. Atualiza runtime
+      // 2. Atualiza runtime
       user.features = novasFeatures;
 
-      // 2. Atualiza localStorage (merge seguro)
+      // 3. Atualiza localStorage (merge seguro)
       const sess = JSON.parse(localStorage.getItem('rs_pwa_session') || '{}');
       sess.features = novasFeatures;
       sess.features_synced_at = Date.now();
       localStorage.setItem('rs_pwa_session', JSON.stringify(sess));
 
-      // 3. Marca mensagem como lida
+      // 4. Marca mensagem como lida
       if (solId) {
         await window.db.collection('usuarios').doc(user.uid)
           .collection('solicitacoes').doc(solId)
           .update({ lida: true });
       }
 
-      // 4. Feedback visual
+      // 5. Feedback visual
       if (btn) {
         btn.textContent = '✅ Recursos ativados!';
         btn.style.background = '#22c55e';
       }
 
-      // 5. Notifica outros módulos (chat, mídia, etc.)
+      // 6. Notifica outros módulos abertos (chat, mídia, etc.)
       window.dispatchEvent(new CustomEvent('rs:featuresUpdated', {
         detail: novasFeatures
       }));
 
-      // 6. Recarrega o drawer para refletir novas permissões (ex: libera sugestão de tema)
+      // 7. Recarrega o drawer para refletir novas permissões
       setTimeout(() => _renderDrawer('mensagem'), 900);
 
     } catch (e) {
