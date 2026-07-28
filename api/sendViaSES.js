@@ -32,8 +32,8 @@ const supabase = createClient(
 );
 
 // ── Parecer Fundeb: parser + template ───────────────────────────────────
-import { parseDemonstrativoFundeb } from '../lib/parserDemonstrativoFundeb.js';
-import { montarHTMLParecer } from '../lib/parecerFundebTemplate.js';
+//import { parseDemonstrativoFundeb } from '../lib/parserDemonstrativoFundeb.js';
+//import { montarHTMLParecer } from '../lib/parecerFundebTemplate.js';
 
 // Confere se o uid é assinante com plano ativo, com a feature contratada,
 // e se cod_municipio está dentro do(s) município(s) do plano.
