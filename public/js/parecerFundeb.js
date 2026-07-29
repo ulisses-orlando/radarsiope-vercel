@@ -51,6 +51,7 @@ Ponto de entrada público: window._abrirParecerFundeb()
   // ── Ponto de entrada público ────────────────────────────────────────────
   window._abrirParecerFundebWizard = async function (cod  , nome, uf) {
       const user = window._radarUser;
+console.log('Abrindo Parecer Fundeb Wizard...');      
     if (!user?.uid) { _msg('Faça login para acessar o Parecer Fundeb.'); return; }
 console.log('user', user);
     _st = _estadoInicial();
