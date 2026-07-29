@@ -726,6 +726,9 @@ async function _abrirParecerFundebWizard (cod  , nome, uf) {
       uf: _st.municipio.uf,
       exercicio: _st.exercicio,
     });
+    
+    console.log('[ParecerFundeb] Checando status do parecer… cod_municipio', _st.municipio.cod, 'uf', _st.municipio.uf, 'exercicio', _st.exercicio );
+
     const resp = await fetch(`${API}?acao=parecer_fundeb_status&${params}`);
     const dados = await resp.json();
     if (!dados.ok) throw new Error(dados.error || 'Erro ao checar status');
