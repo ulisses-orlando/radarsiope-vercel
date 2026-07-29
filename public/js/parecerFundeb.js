@@ -5,10 +5,6 @@ Ponto de entrada público: window._abrirParecerFundeb()
 ========================================================================== */
 'use strict';
 
-  // TESTE: isso prova se o script está rodando
-  console.log('[PF] Script executado');
-  window._pfTeste = 'script rodou';
-
 (function () {
 
   const API = '/api/sendViaSES'; // endpoints do Parecer Fundeb vivem aqui (?acao=parecer_fundeb_*)
@@ -55,9 +51,7 @@ Ponto de entrada público: window._abrirParecerFundeb()
   // ── Ponto de entrada público ────────────────────────────────────────────
 async function _abrirParecerFundebWizard (cod  , nome, uf) {
       const user = window._radarUser;
-console.log('Abrindo Parecer Fundeb Wizard...');      
     if (!user?.uid) { _msg('Faça login para acessar o Parecer Fundeb.'); return; }
-console.log('user', user);
     _st = _estadoInicial();
     _st.municipio = {
       cod: cod || user.cod_municipio,
@@ -65,13 +59,9 @@ console.log('user', user);
       uf: uf || user.cod_uf,
     };
     if (!_st.municipio.cod) { _msg('Município não identificado.'); return; }
-console.log('abrirParecerFundebWizard', _st.municipio);
     _criarOverlay();
-console.log('overlay criado');    
     _render();
-console.log('render feito');    
     await _carregarStatus();
-console.log('status carregado', _st.pareceerExistente);    
   };
 
   // ── Overlay (mesmo padrão do rs-relatorio-overlay) ─────────────────────
@@ -993,6 +983,5 @@ console.log('status carregado', _st.pareceerExistente);
 
   // Atribuição ao window DEVE estar aqui, dentro do IIFE
   window._abrirParecerFundebWizard = _abrirParecerFundebWizard;
-  console.log('[PF] Função exposta no window:', typeof window._abrirParecerFundebWizard);
 
 })();
