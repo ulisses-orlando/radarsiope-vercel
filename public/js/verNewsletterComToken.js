@@ -2886,6 +2886,7 @@ function _getCtx() {
 // ─── Parecer Fundeb: abre o wizard (mesmo padrão de gate do Calendário) ───────
 
 function _abrirParecerFundeb() {
+  console.log('[verNL] Tentando abrir Parecer Fundeb Wizard...');
   const features = window._radarUser?.features || {};
   const isAssinante = window._radarUser?.segmento === 'assinante';
   const temAcesso = isAssinante && !!features.parecer_fundeb;
@@ -2898,7 +2899,7 @@ function _abrirParecerFundeb() {
   const cod = _municipioAtivo?.cod_municipio || window._radarUser?.cod_municipio;
   const nome = _municipioAtivo?.nome_municipio || window._radarUser?.nome_municipio;
   const uf = _municipioAtivo?.cod_uf || window._radarUser?.cod_uf;
-
+console.log('[verNL] Abrindo Parecer Fundeb Wizard:', cod, nome, uf);
   window._abrirParecerFundebWizard?.(cod, nome, uf);
 }
 
