@@ -362,7 +362,8 @@ async function _abrirParecerFundebWizard (cod  , nome, uf) {
   function _bindRevisao() {
     document.getElementById('pf-voltar').addEventListener('click', () => { _st.etapa = 1; _render(); });
     document.getElementById('pf-continuar').addEventListener('click', () => {
-      if (!_st.form.conclusaoTexto) _st.form.conclusaoTexto = _sugerirTextoConclusao();
+      if (!_st.form.conclusaoTipo) _st.form.conclusaoTipo = _sugerirTipoConclusao();
+      if (!_st.form.conclusaoTexto) _st.form.conclusaoTexto = _gerarTextoConclusao(_st.form.conclusaoTipo);
       _st.etapa = 3;
       _render();
     });
@@ -429,7 +430,10 @@ async function _abrirParecerFundebWizard (cod  , nome, uf) {
   function _bindFormulario() {
     document.getElementById('pf-presidente-nome').addEventListener('input', e => _st.form.presidenteNome = e.target.value);
     document.getElementById('pf-presidente-email').addEventListener('input', e => _st.form.presidenteEmail = e.target.value);
-    document.getElementById('pf-conclusao-tipo').addEventListener('change', e => _st.form.conclusaoTipo = e.target.value);
+    document.getElementById('pf-conclusao-tipo').addEventListener('change', e => {
+      _st.form.conclusaoTipo = e.target.value;
+      _atualizarTextoConclusao();
+    });
     document.getElementById('pf-conclusao-texto').addEventListener('input', e => _st.form.conclusaoTexto = e.target.value);
 
     document.querySelectorAll('[data-check-idx]').forEach(el => {
@@ -834,15 +838,36 @@ async function _abrirParecerFundebWizard (cod  , nome, uf) {
   function _corBadge(s) {
     return { cumprido: 'verde', nao_cumprido: 'vermelho', atencao: 'amarelo' }[s] || 'cinza';
   }
-  function _sugerirTextoConclusao() {
+  function _sugerirTipoConclusao() {
+    const limites = _st.dadosExtraidos?.limites || [];
+    const problemas = limites.filter(l => l.status !== 'cumprido');
+    if (problemas.length === 0) return 'aprovado';
+    const temNaoCumprido = problemas.some(l => l.status === 'nao_cumprido');
+    return temNaoCumprido ? 'reprovado' : 'aprovado_com_ressalvas';
+  }
+
+  function _gerarTextoConclusao(tipo) {
     const limites = _st.dadosExtraidos?.limites || [];
     const problemas = limites.filter(l => l.status !== 'cumprido').map(l => _labelLimite(l.item));
-    if (problemas.length === 0) {
-      _st.form.conclusaoTipo = 'aprovado';
+
+    if (tipo === 'aprovado') {
       return 'O Conselho de Acompanhamento e Controle Social do Fundeb, após análise do Quadro Demonstrativo e verificação documental complementar, conclui pela aprovação das contas, tendo em vista o cumprimento de todos os limites obrigatórios do exercício.';
     }
-    _st.form.conclusaoTipo = 'aprovado_com_ressalvas';
-    return `O Conselho de Acompanhamento e Controle Social do Fundeb, após análise do Quadro Demonstrativo e verificação documental complementar, conclui pela aprovação das contas com ressalvas, tendo em vista o não cumprimento de: ${problemas.join(', ')}. Recomenda-se à gestão a regularização desses itens no exercício corrente.`;
+    if (tipo === 'aprovado_com_ressalvas') {
+      return `O Conselho de Acompanhamento e Controle Social do Fundeb, após análise do Quadro Demonstrativo e verificação documental complementar, conclui pela aprovação das contas com ressalvas, tendo em vista o não cumprimento de: ${problemas.join(', ')}. Recomenda-se à gestão a regularização desses itens no exercício corrente.`;
+    }
+    if (tipo === 'reprovado') {
+      return `O Conselho de Acompanhamento e Controle Social do Fundeb, após análise do Quadro Demonstrativo e verificação documental complementar, conclui pela REPROVAÇÃO das contas, tendo em vista o não cumprimento dos seguintes limites obrigatórios: ${problemas.join(', ')}. Recomenda-se à gestão a adoção de medidas corretivas imediatas e a apresentação de plano de regularização no prazo de 30 (trinta) dias.`;
+    }
+    return '';
+  }
+
+  function _atualizarTextoConclusao() {
+    const tipo = _st.form.conclusaoTipo;
+    if (!tipo) return;
+    _st.form.conclusaoTexto = _gerarTextoConclusao(tipo);
+    const textarea = document.getElementById('pf-conclusao-texto');
+    if (textarea) textarea.value = _st.form.conclusaoTexto;
   }
   function _moeda(v) {
     if (v === null || v === undefined) return '—';
