@@ -987,5 +987,5 @@ console.log('status carregado', _st.pareceerExistente);
     document.head.appendChild(style);
   }
 
+  window._abrirParecerFundebWizard = _abrirParecerFundebWizard;
 })();
-window._abrirParecerFundebWizard = _abrirParecerFundebWizard;
