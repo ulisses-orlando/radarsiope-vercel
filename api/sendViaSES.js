@@ -801,11 +801,11 @@ export default async function handler(req, res) {
   if (acao === 'relatorio_conformidade') {
     return _relatorioConformidade(req, res);
   }
-  else {
+/*   else {
     // ── Parecer Fundeb: parser + template ───────────────────────────────────
     //import { parseDemonstrativoFundeb } from '../lib/parserDemonstrativoFundeb.js';
     //import { montarHTMLParecer } from '../lib/parecerFundebTemplate.js';
-  }
+  } */
 
 
   // ── Parecer Fundeb ─────────────────────────────────────────────────────
