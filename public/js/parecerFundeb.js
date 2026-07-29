@@ -52,7 +52,7 @@ Ponto de entrada público: window._abrirParecerFundeb()
   window._abrirParecerFundebWizard = async function (cod  , nome, uf) {
       const user = window._radarUser;
     if (!user?.uid) { _msg('Faça login para acessar o Parecer Fundeb.'); return; }
-
+console.log('user', user);
     _st = _estadoInicial();
     _st.municipio = {
       cod: cod || user.cod_municipio,
@@ -60,10 +60,13 @@ Ponto de entrada público: window._abrirParecerFundeb()
       uf: uf || user.cod_uf,
     };
     if (!_st.municipio.cod) { _msg('Município não identificado.'); return; }
-
+console.log('abrirParecerFundebWizard', _st.municipio);
     _criarOverlay();
+console.log('overlay criado');    
     _render();
+console.log('render feito');    
     await _carregarStatus();
+console.log('status carregado', _st.pareceerExistente);    
   };
 
   // ── Overlay (mesmo padrão do rs-relatorio-overlay) ─────────────────────
