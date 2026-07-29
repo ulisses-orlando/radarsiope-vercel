@@ -31,6 +31,10 @@ const supabase = createClient(
   process.env.VITE_SUPABASE_SERVICE_KEY
 );
 
+// ── Parecer Fundeb: parser + template ───────────────────────────────────
+import { parseDemonstrativoFundeb } from '../lib/parserDemonstrativoFundeb.js';
+import { montarHTMLParecer } from '../lib/parecerFundebTemplate.js';
+
 // Confere se o uid é assinante com plano ativo, com a feature contratada,
 // e se cod_municipio está dentro do(s) município(s) do plano.
 async function _verificarAcessoParecerFundeb(uid, codMunicipio) {
@@ -801,12 +805,6 @@ export default async function handler(req, res) {
   if (acao === 'relatorio_conformidade') {
     return _relatorioConformidade(req, res);
   }
-/*   else {
-    // ── Parecer Fundeb: parser + template ───────────────────────────────────
-    //import { parseDemonstrativoFundeb } from '../lib/parserDemonstrativoFundeb.js';
-    //import { montarHTMLParecer } from '../lib/parecerFundebTemplate.js';
-  } */
-
 
   // ── Parecer Fundeb ─────────────────────────────────────────────────────
   if (req.method === 'GET' && acao === 'parecer_fundeb_status') return _parecerFundebStatus(req, res);
