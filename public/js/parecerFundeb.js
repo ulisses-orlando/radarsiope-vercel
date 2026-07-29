@@ -5,6 +5,10 @@ Ponto de entrada público: window._abrirParecerFundeb()
 ========================================================================== */
 'use strict';
 
+  // TESTE: isso prova se o script está rodando
+  console.log('[PF] Script executado');
+  window._pfTeste = 'script rodou';
+
 (function () {
 
   const API = '/api/sendViaSES'; // endpoints do Parecer Fundeb vivem aqui (?acao=parecer_fundeb_*)
@@ -987,5 +991,8 @@ console.log('status carregado', _st.pareceerExistente);
     document.head.appendChild(style);
   }
 
+  // Atribuição ao window DEVE estar aqui, dentro do IIFE
   window._abrirParecerFundebWizard = _abrirParecerFundebWizard;
+  console.log('[PF] Função exposta no window:', typeof window._abrirParecerFundebWizard);
+
 })();
