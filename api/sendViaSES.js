@@ -57,11 +57,12 @@ async function _verificarAcessoParecerFundeb(uid, codMunicipio) {
   if (!features.parecer_fundeb) return { ok: false, motivo: 'feature_nao_contratada' };
 
   const municipiosPlano = assinaturaData.municipios_plano || [];
+  const codStr = String(codMunicipio).replace(/\D/g, '');
   const autorizado = municipiosPlano.length
-    ? municipiosPlano.includes(codMunicipio)
-    : usuarioData.cod_municipio === codMunicipio;
+    ? municipiosPlano.some(mp => String(mp.cod_municipio || mp).replace(/\D/g, '') === codStr)
+    : String(usuarioData.cod_municipio || '').replace(/\D/g, '') === codStr;
 
-    if (!autorizado) return { ok: false, motivo: 'municipio_fora_do_plano' };
+  if (!autorizado) return { ok: false, motivo: 'municipio_fora_do_plano' };
 
   return { ok: true };
 }
