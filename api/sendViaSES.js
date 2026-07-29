@@ -803,8 +803,8 @@ export default async function handler(req, res) {
   }
   else {
     // ── Parecer Fundeb: parser + template ───────────────────────────────────
-    import { parseDemonstrativoFundeb } from '../lib/parserDemonstrativoFundeb.js';
-    import { montarHTMLParecer } from '../lib/parecerFundebTemplate.js';
+    //import { parseDemonstrativoFundeb } from '../lib/parserDemonstrativoFundeb.js';
+    //import { montarHTMLParecer } from '../lib/parecerFundebTemplate.js';
   }
 
 
