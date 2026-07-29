@@ -12,7 +12,7 @@ Ponto de entrada público: window._abrirParecerFundeb()
 
   // Deixe true apenas se os endpoints ainda não estiverem deployados/configurados
   // (migration rodada, SUPABASE_URL/SUPABASE_ANON_KEY setadas, lib/ no lugar).
-  const MODO_DEMO = true;
+  const MODO_DEMO = false;
 
   // ── Estado do wizard ────────────────────────────────────────────────────
   let _st = _estadoInicial();
