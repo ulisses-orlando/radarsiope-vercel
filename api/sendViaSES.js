@@ -60,8 +60,8 @@ async function _verificarAcessoParecerFundeb(uid, codMunicipio) {
   const autorizado = municipiosPlano.length
     ? municipiosPlano.includes(codMunicipio)
     : usuarioData.cod_municipio === codMunicipio;
-console.log('[verificarAcessoParecerFundeb] uid:', uid, 'codMunicipio:', codMunicipio, 'autorizado:', autorizado, 'municipiosPlano:', municipiosPlano);
-  if (!autorizado) return { ok: false, motivo: 'municipio_fora_do_plano' };
+
+    if (!autorizado) return { ok: false, motivo: 'municipio_fora_do_plano' };
 
   return { ok: true };
 }
