@@ -49,8 +49,8 @@ Ponto de entrada público: window._abrirParecerFundeb()
   }
 
   // ── Ponto de entrada público ────────────────────────────────────────────
-async function _abrirParecerFundebWizard (cod  , nome, uf) {
-      const user = window._radarUser;
+  async function _abrirParecerFundebWizard(cod, nome, uf) {
+    const user = window._radarUser;
     if (!user?.uid) { _msg('Faça login para acessar o Parecer Fundeb.'); return; }
     _st = _estadoInicial();
     _st.municipio = {
@@ -572,6 +572,8 @@ async function _abrirParecerFundebWizard (cod  , nome, uf) {
     const linhasAssinaturas = [{ nome: f.presidenteNome, papel: 'Presidente do CACS' }, ...f.membros.map(mb => ({ nome: mb.nome, papel: mb.cargo || 'Membro do CACS' }))]
       .map(s => `<div class="sign-slot"><div class="sign-line"></div><div class="sign-name">${_esc(s.nome)}</div><div class="sign-role">${_esc(s.papel)}</div></div>`).join('');
 
+    const bimestre = _st.dadosExtraidos?.bimestre_pdf || _st.dadosExtraidos?.bimestre_referencia || 6;
+
     // CSS idêntico ao arquivo parecer-fundeb-template.html — mantido em sincronia manualmente.
     return `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -590,7 +592,7 @@ async function _abrirParecerFundebWizard (cod  , nome, uf) {
     </div>
   </div>
   <div class="faixa-mun">
-    <div class="faixa-mun-esq"><div class="faixa-mun-nome">${_esc(m.nome)} / ${_esc(m.uf)}</div><div class="faixa-mun-cod">Base: 6º Bimestre/${_st.exercicio} (SIOPE)</div></div>
+    <div class="faixa-mun-esq"><div class="faixa-mun-nome">${_esc(m.nome)} / ${_esc(m.uf)}</div><div class="faixa-mun-cod">Base: ${bimestre}º Bimestre/${_st.exercicio} (SIOPE)</div></div>
     <div class="faixa-mun-dir"><div class="faixa-mun-asin">Exercício ${_st.exercicio}</div><div class="faixa-mun-plano">Conselho de Acompanhamento e Controle Social do Fundeb</div></div>
   </div>
   <div class="title-block">
@@ -730,7 +732,7 @@ async function _abrirParecerFundebWizard (cod  , nome, uf) {
       uf: _st.municipio.uf,
       exercicio: _st.exercicio,
     });
-    
+
     const resp = await fetch(`${API}?acao=parecer_fundeb_status&${params}`);
     const dados = await resp.json();
     if (!dados.ok) throw new Error(dados.error || 'Erro ao checar status');
