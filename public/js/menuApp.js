@@ -217,10 +217,10 @@
           <span class="rs-menu-item-label">Ações</span>
           <span class="rs-menu-item-badge verde" id="rs-menu-badge-fc" style="display:none">0</span>
         </button>
-        <button class="rs-menu-item" id="rs-menu-parecer-fundeb"
+        <button class="rs-menu-item" id="rs-menu-relatorios"
           style="background:#7c2d12" role="menuitem">
-          <span class="rs-menu-item-icon">⚖️</span>
-          <span class="rs-menu-item-label">Parecer Fundeb</span>
+          <span class="rs-menu-item-icon">📊</span>
+          <span class="rs-menu-item-label">Relatórios</span>
           <span class="rs-menu-item-tag">pro</span>
         </button>
         ${isAssinante ? `
@@ -287,14 +287,14 @@
         }
         window._rsFcAbrir?.();
       });
-   // ⚖️ Parecer Fundeb 
-    document.getElementById('rs-menu-parecer-fundeb')
+    // 📊 Relatórios — painel com Parecer Fundeb + Conformidade
+    document.getElementById('rs-menu-relatorios')
       ?.addEventListener('click', async () => {
         _fecharMenu();
         if (typeof window._checarSessaoCritica === 'function') {
           if (!(await window._checarSessaoCritica())) return;
         }
-        window.dispatchEvent(new CustomEvent('rs:abrirParecerFundeb'));
+        _abrirPainelRelatorios();
       });
     // 🧠 Meu Desempenho — abre modal com resumo geral do quiz
     document.getElementById('rs-menu-desempenho')
@@ -459,7 +459,7 @@
 
   window._rsFecharLogin = _fecharModalLogin;
 
-   // ── Modal de Meu Desempenho (resumo geral do quiz) ─────────────────────────
+  // ── Modal de Meu Desempenho (resumo geral do quiz) ─────────────────────────
   function _abrirModalDesempenho() {
     const uid = window._radarUser?.uid;
     if (!uid) return;
@@ -566,6 +566,147 @@
   window._rsMenuFechar = _fecharMenu;
   window._rsMenuAtualizarBadges = _atualizarTotalBadge;
 
+  // ── Painel de Relatórios (Parecer Fundeb + Conformidade) ─────────────────
+  function _abrirPainelRelatorios() {
+    if (document.getElementById('rs-relatorios-modal')) {
+      document.getElementById('rs-relatorios-modal').style.display = 'flex';
+      return;
+    }
+
+    const features = window._radarUser?.features || {};
+    const isAssinante = window._radarUser?.segmento === 'assinante';
+    const temParecer = isAssinante && !!features.parecer_fundeb;
+    const temConformidade = isAssinante && !!features.relatorio_conformidade;
+
+    const modal = document.createElement('div');
+    modal.id = 'rs-relatorios-modal';
+    modal.style.cssText = `
+      position: fixed; inset: 0; z-index: 9000;
+      background: rgba(0,0,0,.7);
+      display: flex; align-items: center; justify-content: center;
+      backdrop-filter: blur(3px);
+      animation: rsFadeIn .2s ease;
+      padding: 16px;
+    `;
+
+    const cardBase = (bloqueado) => `
+      display: flex; align-items: center; gap: 14px;
+      padding: 16px;
+      background: ${bloqueado ? 'rgba(255,255,255,.03)' : 'rgba(255,255,255,.07)'};
+      border: 1.5px solid ${bloqueado ? 'rgba(255,255,255,.08)' : 'rgba(255,255,255,.15)'};
+      border-radius: 12px;
+      cursor: ${bloqueado ? 'default' : 'pointer'};
+      transition: all .15s ease;
+      text-align: left;
+      width: 100%;
+      color: #fff;
+      font-family: inherit;
+    `;
+
+    modal.innerHTML = `
+      <style>
+        @keyframes rsFadeIn { from { opacity:0 } to { opacity:1 } }
+        @keyframes rsSlideUp { from { opacity:0; transform:translateY(20px) } to { opacity:1; transform:translateY(0) } }
+        #rs-relatorios-wrap {
+          background: linear-gradient(180deg, #13233a, #0f1b2e);
+          border: 1px solid rgba(255,255,255,.08);
+          border-radius: 16px;
+          width: min(380px, 94vw);
+          position: relative; padding: 24px 20px 20px;
+          box-shadow: 0 8px 40px rgba(0,0,0,.5);
+          animation: rsSlideUp .25s ease;
+        }
+        #rs-relatorios-fechar {
+          position: absolute; top: 12px; right: 12px;
+          background: rgba(255,255,255,.1); border: none;
+          border-radius: 50%; width: 28px; height: 28px;
+          color: #fff; font-size: 16px; cursor: pointer;
+          display: flex; align-items: center; justify-content: center;
+          z-index: 1; transition: background .15s;
+        }
+        #rs-relatorios-fechar:hover { background: rgba(255,255,255,.22); }
+        .rs-rel-titulo {
+          font-family: 'Syne', system-ui, sans-serif;
+          font-size: 15px; font-weight: 800; color: #fff;
+          margin: 0 0 16px; padding-right: 24px;
+        }
+        .rs-rel-card { ${cardBase(false)} }
+        .rs-rel-card.bloqueado { ${cardBase(true)} }
+        .rs-rel-card:not(.bloqueado):hover { background: rgba(255,255,255,.12); border-color: rgba(255,255,255,.25); }
+        .rs-rel-icone { font-size: 24px; flex-shrink: 0; }
+        .rs-rel-info { flex: 1; }
+        .rs-rel-nome { font-size: 14px; font-weight: 700; margin-bottom: 2px; }
+        .rs-rel-desc { font-size: 12px; opacity: .65; }
+        .rs-rel-lock { font-size: 16px; opacity: .5; }
+        .rs-rel-cards { display: flex; flex-direction: column; gap: 10px; }
+      </style>
+      <div id="rs-relatorios-wrap">
+        <button id="rs-relatorios-fechar" type="button" aria-label="Fechar">×</button>
+        <h3 class="rs-rel-titulo">📊 Relatórios</h3>
+        <div class="rs-rel-cards">
+          <button class="rs-rel-card ${!temParecer ? 'bloqueado' : ''}" id="rs-rel-parecer" type="button">
+            <span class="rs-rel-icone">⚖️</span>
+            <div class="rs-rel-info">
+              <div class="rs-rel-nome">Parecer Fundeb</div>
+              <div class="rs-rel-desc">Análise da aplicação de recursos do Fundeb</div>
+            </div>
+            ${!temParecer ? '<span class="rs-rel-lock">🔒</span>' : '<span style="opacity:.5">→</span>'}
+          </button>
+          <button class="rs-rel-card ${!temConformidade ? 'bloqueado' : ''}" id="rs-rel-conformidade" type="button">
+            <span class="rs-rel-icone">📋</span>
+            <div class="rs-rel-info">
+              <div class="rs-rel-nome">Conformidade Municipal</div>
+              <div class="rs-rel-desc">Relatório de conformidade do município</div>
+            </div>
+            ${!temConformidade ? '<span class="rs-rel-lock">🔒</span>' : '<span style="opacity:.5">→</span>'}
+          </button>
+        </div>
+      </div>
+    `;
+
+    modal.addEventListener('click', e => {
+      if (e.target === modal) _fecharPainelRelatorios();
+    });
+    document.body.appendChild(modal);
+
+    document.getElementById('rs-relatorios-fechar')
+      ?.addEventListener('click', _fecharPainelRelatorios);
+
+    // ── Ação: Parecer Fundeb ───────────────────────────────────────────────
+    document.getElementById('rs-rel-parecer')?.addEventListener('click', () => {
+      if (!temParecer) {
+        if (typeof _solicitarUpgrade === 'function') _solicitarUpgrade('parecer_fundeb', isAssinante);
+        return;
+      }
+      _fecharPainelRelatorios();
+      window.dispatchEvent(new CustomEvent('rs:abrirParecerFundeb'));
+    });
+
+    // ── Ação: Conformidade ─────────────────────────────────────────────────
+    document.getElementById('rs-rel-conformidade')?.addEventListener('click', () => {
+      if (!temConformidade) {
+        if (typeof _solicitarUpgrade === 'function') _solicitarUpgrade('relatorio', isAssinante);
+        return;
+      }
+      _fecharPainelRelatorios();
+      if (typeof window._abrirRelatorioConformidade === 'function') {
+        window._abrirRelatorioConformidade();
+      } else {
+        console.warn('[menuApp] _abrirRelatorioConformidade não encontrada');
+      }
+    });
+  }
+
+  function _fecharPainelRelatorios() {
+    const modal = document.getElementById('rs-relatorios-modal');
+    if (modal) {
+      modal.style.opacity = '0';
+      modal.style.transition = 'opacity .2s';
+      setTimeout(() => modal.remove(), 200);
+    }
+  }
+
+  window._rsFecharRelatorios = _fecharPainelRelatorios;
   // ── Boot ──────────────────────────────────────────────────────────────────
   function _boot() {
     if (window._radarUser && window.db) {
