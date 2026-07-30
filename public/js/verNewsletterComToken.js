@@ -480,16 +480,16 @@ function renderModoRapido(newsletter, acesso) {
   if (!bullets.length) {
     document.getElementById('rs-toggle-modo')?.style.setProperty('display', 'none');
     trocarModo('completo');
-    return; 
+    return;
   }
 
   // Resumo da edição (texto livre, sem HTML) — aparece antes do título "Pontos-chave"
   const secaoRapido = document.getElementById('modo-rapido');
   if (secaoRapido) {
-      let wrap = document.getElementById('rs-resumo-edicao-wrap');
-      if (newsletter.resumo) {
-        if (!wrap) {
-          secaoRapido.insertAdjacentHTML('afterbegin', `
+    let wrap = document.getElementById('rs-resumo-edicao-wrap');
+    if (newsletter.resumo) {
+      if (!wrap) {
+        secaoRapido.insertAdjacentHTML('afterbegin', `
             <div id="rs-resumo-edicao-wrap">
               <div class="rs-section-header">
                 <span>📝</span>
@@ -499,16 +499,16 @@ function renderModoRapido(newsletter, acesso) {
                 <p id="rs-resumo-edicao" style="font-size:15px;line-height:1.6;color:var(--rs-text);margin:0">${_esc(newsletter.resumo)}</p>
               </div>
             </div>`);
-        } else {
-          const txt = document.getElementById('rs-resumo-edicao');
-          if (txt) txt.textContent = newsletter.resumo;
-          wrap.style.display = '';
-        }
-      } else if (wrap) {
-        wrap.style.display = 'none';
+      } else {
+        const txt = document.getElementById('rs-resumo-edicao');
+        if (txt) txt.textContent = newsletter.resumo;
+        wrap.style.display = '';
       }
+    } else if (wrap) {
+      wrap.style.display = 'none';
+    }
   }
-  
+
   const visiveis = (acesso.isAssinante || acesso.acessoProTemp) ? bullets : bullets.slice(0, 2);
   const temRestante = !acesso.isAssinante && !acesso.acessoProTemp && bullets.length > 2;
   const temAcesso = acesso.isAssinante || acesso.acessoProTemp;
@@ -661,9 +661,9 @@ async function renderMunicipio(destinatario, acesso, newsletter) {
       dadosMunicipioAtual = { cod_municipio: null, nome: null, uf: null };
     }
 
-    if ((acesso.isAssinante || acesso.acessoProTemp) && resumo && cod) {
-      _injetarBotaoRelatorio(cod, nome, uf, acesso.temRelatorio);
-    }
+    /*     if ((acesso.isAssinante || acesso.acessoProTemp) && resumo && cod) {
+          _injetarBotaoRelatorio(cod, nome, uf, acesso.temRelatorio);
+        } */
 
   } catch (err) {
     console.warn('[verNL] Município falhou (não fatal):', err);
@@ -2499,7 +2499,7 @@ async function VerNewsletterComToken() {
               console.warn('[acesso] Não foi possível ler plano:', e);
             }
           }
-          
+
           // Resolve tipos_selecionados → tiposInclusos (id+nome+icone), gravado no localStorage
           // pra evitar query a cada abertura do drawer de edições (ver iniciarDrawer)
           const tiposIds = Array.isArray(assinaturaData.tipos_selecionados)
@@ -2751,6 +2751,42 @@ if (document.readyState === 'loading') {
   initHistoricoButton();
 }
 
+/// ─── Abertura do Relatório de Conformidade via Menu ─────────────────────────
+window._abrirRelatorioConformidade = function () {
+  const features = window._radarUser?.features || {};
+  const isAssinante = window._radarUser?.segmento === 'assinante';
+  const temAcesso = isAssinante && !!features.relatorio_conformidade;
+
+  if (!temAcesso) {
+    if (typeof _solicitarUpgrade === 'function') {
+      _solicitarUpgrade('relatorio', isAssinante);
+    }
+    return;
+  }
+
+  const cod = _municipioAtivo?.cod_municipio || window._radarUser?.municipio_cod || dadosMunicipioAtual?.cod_municipio;
+  const nome = _municipioAtivo?.nome_municipio || window._radarUser?.nome_municipio || dadosMunicipioAtual?.nome;
+  const uf = _municipioAtivo?.cod_uf || window._radarUser?.cod_uf || dadosMunicipioAtual?.uf;
+
+  if (!cod) {
+    alert('Município não identificado. Selecione um município para gerar o relatório.');
+    return;
+  }
+
+  // Compatibilidade: garante que o elemento com dataset exista
+  let btnFantasma = document.getElementById('btn-relatorio-conformidade');
+  if (!btnFantasma) {
+    btnFantasma = document.createElement('button');
+    btnFantasma.id = 'btn-relatorio-conformidade';
+    btnFantasma.style.display = 'none';
+    document.body.appendChild(btnFantasma);
+  }
+  btnFantasma.dataset.cod = String(cod);
+  btnFantasma.dataset.nome = String(nome || '');
+  btnFantasma.dataset.uf = String(uf || '');
+
+  gerarRelatorioConformidade();
+};
 // ─── Expõe para inline handlers ──────────────────────────────────────────────
 window.trocarModo = trocarModo;
 window.toggleFaq = toggleFaq;
@@ -3494,8 +3530,8 @@ function _cardEdicaoLead(ed, isAtual, envio) {
       <div class="rs-drawer-ed-data">
         ${data}${num ? ` · Ed. ${num}` : ''}
         ${ed.formato && String(ed.formato).toLowerCase() === 'extra'
-        ? ' <span style="font-size:9px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;background:rgba(245,158,11,.15);color:#d97706;border:1px solid rgba(245,158,11,.3);border-radius:4px;padding:1px 5px;margin-left:6px;vertical-align:middle">⚡ extra</span>'
-        : ''}
+      ? ' <span style="font-size:9px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;background:rgba(245,158,11,.15);color:#d97706;border:1px solid rgba(245,158,11,.3);border-radius:4px;padding:1px 5px;margin-left:6px;vertical-align:middle">⚡ extra</span>'
+      : ''}
       </div>
         ${badgeExpirando}
         ${contadorHTML}

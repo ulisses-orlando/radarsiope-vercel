@@ -221,7 +221,6 @@
           style="background:#7c2d12" role="menuitem">
           <span class="rs-menu-item-icon">📊</span>
           <span class="rs-menu-item-label">Relatórios</span>
-          <span class="rs-menu-item-tag">pro</span>
         </button>
         ${isAssinante ? `
         <button class="rs-menu-item" id="rs-menu-desempenho"
@@ -689,11 +688,7 @@
         return;
       }
       _fecharPainelRelatorios();
-      if (typeof window._abrirRelatorioConformidade === 'function') {
-        window._abrirRelatorioConformidade();
-      } else {
-        console.warn('[menuApp] _abrirRelatorioConformidade não encontrada');
-      }
+      window._abrirRelatorioConformidade();
     });
   }
 
