@@ -209,35 +209,49 @@ async function _parecerFundebFinalizar(req, res) {
 // Acesso público por token (link enviado ao presidente do CACS), sem login.
 async function _parecerFundebVer(req, res) {
   const { token } = req.query;
-  if (!token) return res.status(400).send('Token ausente.');
+  if (!token) {
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    return res.status(400).send('<!DOCTYPE html><html><body><h2>Token ausente.</h2></body></html>');
+  }
 
-  const { data, error } = await supabase
-    .from('pareceres_fundeb')
-    .select('*')
-    .eq('token_acesso', token)
-    .eq('status', 'finalizado')
-    .maybeSingle();
+  try {
+    const { data, error } = await supabase
+      .from('pareceres_fundeb')
+      .select('*')
+      .eq('token_acesso', token)
+      .eq('status', 'finalizado')
+      .maybeSingle();
 
-  if (error || !data) return res.status(404).send('Parecer não encontrado ou link inválido.');
+    if (error || !data) {
+      res.setHeader('Content-Type', 'text/html; charset=utf-8');
+      return res.status(404).send('<!DOCTYPE html><html><body><h2>Parecer não encontrado ou link inválido.</h2></body></html>');
+    }
 
-  const html = montarHTMLParecer({
-    dadosExtraidos: data.dados_extraidos,
-    form: {
-      presidenteNome: data.presidente_cacs_nome,
-      presidenteEmail: data.presidente_cacs_email,
-      membros: data.membros_cacs,
-      checklist: data.checklist_documental,
-      conclusaoTipo: data.conclusao_tipo,
-      conclusaoTexto: data.conclusao_parecer,
-    },
-    municipio: { cod: data.cod_municipio, uf: data.uf, nome: data.municipio_nome },
-    exercicio: data.exercicio,
-    pdfNome: data.pdf_original_nome,
-    dataGeracao: data.atualizado_em ? new Date(data.atualizado_em) : new Date(),
-  });
+    // ✅ await aqui — montarHTMLParecer é async
+    const html = await montarHTMLParecer({
+      dadosExtraidos: data.dados_extraidos,
+      form: {
+        presidenteNome: data.presidente_cacs_nome,
+        presidenteEmail: data.presidente_cacs_email,
+        membros: data.membros_cacs,
+        checklist: data.checklist_documental,
+        conclusaoTipo: data.conclusao_tipo,
+        conclusaoTexto: data.conclusao_parecer,
+      },
+      municipio: { cod: data.cod_municipio, uf: data.uf, nome: data.municipio_nome },
+      exercicio: data.exercicio,
+      pdfNome: data.pdf_original_nome,
+      dataGeracao: data.atualizado_em ? new Date(data.atualizado_em) : new Date(),
+    });
 
-  res.setHeader('Content-Type', 'text/html; charset=utf-8');
-  return res.status(200).send(html);
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    return res.status(200).send(html);
+
+  } catch (err) {
+    console.error('[parecer_fundeb_ver] Erro:', err);
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    return res.status(500).send('<!DOCTYPE html><html><body><h2>Erro ao carregar o parecer. Tente novamente.</h2></body></html>');
+  }
 }
 
 // ─── Parser CSV do Tesouro Transparente ──────────────────────────────────────
