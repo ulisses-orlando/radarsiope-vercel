@@ -4265,6 +4265,7 @@ const _UPGRADE_INFO = {
   chat: { icone: '✦', nome: 'Pergunte ao Radar', plano: 'Profissional', slug: 'profissional' },
   relatorio: { icone: '📋', nome: 'Relatório de Conformidade', plano: 'Profissional', slug: 'profissional' },
   calendario: { icone: '📅', nome: 'Calendário', plano: 'Essence', slug: 'essence' },
+  parecer_fundeb: { icone: '📄', nome: 'Parecer Fundeb', plano: 'Profissional', slug: 'profissional' },
 };
 
 function _solicitarUpgrade(tipo, isAssinante) {
