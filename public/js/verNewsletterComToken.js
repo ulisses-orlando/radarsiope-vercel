@@ -4266,6 +4266,7 @@ const _UPGRADE_INFO = {
   relatorio: { icone: '📋', nome: 'Relatório de Conformidade', plano: 'Profissional', slug: 'profissional' },
   calendario: { icone: '📅', nome: 'Calendário', plano: 'Essence', slug: 'essence' },
   parecer_fundeb: { icone: '📄', nome: 'Parecer Fundeb', plano: 'Profissional', slug: 'profissional' },
+  meu_desempenho: { icone: '🧠', nome: 'Meu Desempenho', plano: 'Profissional', slug: 'profissional' },
 };
 
 function _solicitarUpgrade(tipo, isAssinante) {

@@ -295,10 +295,25 @@
         }
         _abrirPainelRelatorios();
       });
-    // 🧠 Meu Desempenho — abre modal com resumo geral do quiz
+    // 🧠 Meu Desempenho — com validação de sessão e controle de feature
     document.getElementById('rs-menu-desempenho')
-      ?.addEventListener('click', () => {
+      ?.addEventListener('click', async () => {
         _fecharMenu();
+        if (typeof window._checarSessaoCritica === 'function') {
+          if (!(await window._checarSessaoCritica())) return;
+        }
+
+        const features = window._radarUser?.features || {};
+        const isAssinante = window._radarUser?.segmento === 'assinante';
+        const temAcesso = isAssinante && !!features.meu_desempenho;
+
+        if (!temAcesso) {
+          if (typeof _solicitarUpgrade === 'function') {
+            _solicitarUpgrade('meu_desempenho', isAssinante);
+          }
+          return;
+        }
+
         _abrirModalDesempenho();
       });
     // 👤 Minha Área — abre modal com iframe
