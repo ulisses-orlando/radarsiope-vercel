@@ -99,6 +99,40 @@ function formatarFeaturesBadges(features, featuresList) {
   return ativos.length ? ativos.join(' ') : '📝 Básico';
 }
 
+
+/* ==========================================================================
+Reordenação visual de features (seta para cima / seta para baixo)
+========================================================================== */
+
+async function moverFeature(id, direcao) {
+  try {
+    const features = await carregarFeatures();
+    const idx = features.findIndex(f => f.id === id);
+    if (idx === -1) return;
+
+    const alvoIdx = direcao === 'up' ? idx - 1 : idx + 1;
+    if (alvoIdx < 0 || alvoIdx >= features.length) return;
+
+    const atual = features[idx];
+    const alvo = features[alvoIdx];
+
+    // Troca os valores de ordem
+    const tempOrdem = atual.ordem;
+    await db.collection('features').doc(atual.id).update({ ordem: alvo.ordem, atualizado_em: new Date() });
+    await db.collection('features').doc(alvo.id).update({ ordem: tempOrdem, atualizado_em: new Date() });
+
+    // Limpa cache
+    featuresCache = null;
+    if (typeof window !== 'undefined') window.featuresListCache = null;
+
+    // Recarrega a lista
+    abrirModalFeatures();
+  } catch (err) {
+    console.error('[features] Erro ao mover feature:', err);
+    mostrarMensagem('Erro ao reordenar feature');
+  }
+}
+
 async function abrirModalFeatures() {
   const body = document.getElementById('modal-edit-body');
   if (!body) return console.warn('[features] modal-edit-body não encontrado');
@@ -114,14 +148,18 @@ async function abrirModalFeatures() {
         <button onclick="abrirModalFeature()" style="padding:8px 16px;background:#0A3D62;color:#fff;border:none;border-radius:6px;cursor:pointer">➕ Nova Feature</button>
       </div>
       <div id="features-list" style="max-height:400px;overflow-y:auto">
-        ${features.length === 0 ? '<p style="color:#666;text-align:center;padding:20px">Nenhuma feature cadastrada</p>' : features.map(f => `
+        ${features.length === 0 ? '<p style="color:#666;text-align:center;padding:20px">Nenhuma feature cadastrada</p>' : features.map((f, i) => `
           <div style="display:flex;align-items:center;justify-content:space-between;padding:12px;border:1px solid #e2e8f0;border-radius:6px;margin-bottom:8px">
             <div>
               <div style="font-weight:600">${f.icone || '⚙️'} ${f.nome}</div>
               <div style="font-size:12px;color:#666">${f.descricao || 'Sem descrição'}</div>
               <div style="font-size:11px;color:#888">Tipo: ${f.tipo} ${f.unidade ? `(${f.unidade})` : ''}</div>
             </div>
-            <div style="display:flex;gap:6px">
+            <div style="display:flex;align-items:center;gap:6px">
+              <div style="display:flex;flex-direction:column;gap:1px;margin-right:4px">
+                <button onclick="moverFeature('${f.id}', 'up')" style="padding:2px 6px;background:#e2e8f0;color:#334155;border:none;border-radius:3px;cursor:pointer;font-size:11px;line-height:1" title="Mover para cima" ${i === 0 ? 'disabled style="opacity:0.3;cursor:not-allowed"' : ''}>▲</button>
+                <button onclick="moverFeature('${f.id}', 'down')" style="padding:2px 6px;background:#e2e8f0;color:#334155;border:none;border-radius:3px;cursor:pointer;font-size:11px;line-height:1" title="Mover para baixo" ${i === features.length - 1 ? 'disabled style="opacity:0.3;cursor:not-allowed"' : ''}>▼</button>
+              </div>
               <button onclick="abrirModalFeature('${f.id}')" style="padding:4px 8px;background:#0891B2;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:12px">✏️ Editar</button>
               <button onclick="confirmarExclusaoFeature('${f.id}', '${f.nome}')" style="padding:4px 8px;background:#dc2626;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:12px">🗑️ Excluir</button>
             </div>
@@ -255,5 +293,6 @@ function escapeHtml(str) {
 
 window.FeaturesManager = {
   carregarFeatures, salvarFeature, excluirFeature, renderCampoFeature,
-  coletarValoresFeatures, formatarFeaturesBadges, abrirModalFeatures, abrirModalFeature
+  coletarValoresFeatures, formatarFeaturesBadges, abrirModalFeatures, abrirModalFeature,
+  moverFeature
 };
