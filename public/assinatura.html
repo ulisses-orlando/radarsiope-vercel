@@ -87,6 +87,7 @@
       align-items: center;
       gap: 0.75rem;
       text-decoration: none;
+      color: var(--text);
     }
 
     .rs-logo-icon {
@@ -108,6 +109,10 @@
       font-weight: 700;
       font-size: 1.125rem;
       color: var(--text);
+    }
+
+    .rs-logo-text span {
+      color: var(--accent);
     }
 
     .rs-logo-text span {
@@ -1332,8 +1337,8 @@
     #municipios-panel[style*="block"] {
       display: block !important;
     }
-
   </style>
+  <base target="_blank">
   <base target="_blank">
 <base target="_blank">
 </head>
@@ -1342,13 +1347,92 @@
   <div class="rs-container">
 
     <!-- Nav -->
-    <nav class="rs-nav">
-      <a href="index.html" class="rs-logo">
-        <div class="rs-logo-icon">R</div>
-        <div class="rs-logo-text">Radar <span>SIOPE</span></div>
-      </a>
+                        <nav class="rs-nav">
+      <div style="display: flex; align-items: center; gap: 0.75rem;">
+        <div style="width:40px;height:40px;border-radius:8px;overflow:hidden;flex-shrink:0;position:relative;box-shadow: 0 0 15px rgba(59, 130, 246, 0.3);">
+          <!-- SVG fallback (sempre visível por baixo) -->
+          <svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg" style="position:absolute;top:0;left:0;z-index:1;">
+            <rect width="40" height="40" rx="8" fill="url(#logo-grad)"/>
+            <text x="20" y="26" text-anchor="middle" fill="white" font-family="'Space Grotesk',sans-serif" font-weight="800" font-size="18">R</text>
+            <defs>
+              <linearGradient id="logo-grad" x1="0" y1="0" x2="40" y2="40" gradientUnits="userSpaceOnUse">
+                <stop stop-color="#3b82f6"/><stop offset="1" stop-color="#06b6d4"/>
+              </linearGradient>
+            </defs>
+          </svg>
+          <!-- Imagem real (tenta carregar por cima) -->
+          <img id="logo-img" src="/icons/icon-192x192-transparent.png" alt="" style="position:absolute;top:0;left:0;z-index:2;width:40px;height:40px;object-fit:contain;border-radius:8px;"
+               onerror="this.style.display='none'">
+        </div>
+        <div style="font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 1.125rem; color: #f8fafc;">Radar <span style="color: #3b82f6;">SIOPE</span></div>
+      </div>
       <a href="index.html" class="rs-nav-back">← Voltar para o site</a>
     </nav>
+    <script>
+      (function(){
+        var wrap = document.getElementById('logo-wrap');
+        var fb = document.getElementById('logo-fb');
+        var img = new Image();
+        img.src = '/icons/icon-192x192-transparent.png';
+        img.onload = function(){
+          // imagem carregou, background-image já está aplicado
+        };
+        img.onerror = function(){
+          // imagem não existe, mostra fallback
+          wrap.style.backgroundImage = 'none';
+          if(fb) fb.style.display = 'block';
+        };
+      })();
+    </script>
+    <script>
+      (function(){
+        var img = document.getElementById('logo-img');
+        var fb = document.getElementById('logo-fb');
+        var paths = [
+          '/icons/icon-192x192-transparent.png',
+          'icons/icon-192x192-transparent.png',
+          './icons/icon-192x192-transparent.png',
+          '/img/icon-192x192-transparent.png',
+          'img/icon-192x192-transparent.png'
+        ];
+        var current = 0;
+        function tryNext(){
+          current++;
+          if(current < paths.length){
+            img.src = paths[current];
+          } else {
+            img.style.display = 'none';
+            fb.style.display = 'block';
+          }
+        }
+        if(img){
+          img.addEventListener('error', tryNext);
+          img.addEventListener('load', function(){
+            if(img.naturalWidth === 0) tryNext();
+          });
+        }
+      })();
+    </script>
+    <script>
+      (function(){
+        var img = document.getElementById('logo-img');
+        var fb = document.getElementById('logo-fb');
+        function showFallback(){
+          if(img) img.style.display = 'none';
+          if(fb) fb.style.display = 'block';
+        }
+        if(img){
+          if(img.complete){
+            if(img.naturalWidth === 0) showFallback();
+          } else {
+            img.addEventListener('error', showFallback);
+            img.addEventListener('load', function(){
+              if(img.naturalWidth === 0) showFallback();
+            });
+          }
+        }
+      })();
+    </script>
 
     <!-- Cabeçalho -->
     <div class="rs-header rs-animate-in">
@@ -1536,7 +1620,7 @@
   <script src="js/assinatura.js"></script>
 
 
-  
+
 </body>
 
 </html>
