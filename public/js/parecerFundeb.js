@@ -183,8 +183,11 @@ Ponto de entrada público: window._abrirParecerFundeb()
       _st.etapa = 1;
       _render();
     });
+    // CORREÇÃO: abrir na mesma janela para manter o contexto do PWA
     document.getElementById('pf-ver')?.addEventListener('click', () => {
-      if (_st.pareceerExistente?.url_download) window.open(_st.pareceerExistente.url_download, '_blank');
+      if (_st.pareceerExistente?.url_download) {
+        window.open(_st.pareceerExistente.url_download, '_self');
+      }
     });
   }
 
@@ -523,8 +526,10 @@ Ponto de entrada público: window._abrirParecerFundeb()
       </div>`;
     document.getElementById('pf-stepper').style.display = 'none';
 
+    // CORREÇÃO: abrir na mesma janela para manter o contexto do PWA
     document.getElementById('pf-abrir-final').addEventListener('click', () => {
-      window.open(r?.url_download || '#', '_blank');
+      const url = r?.url_download || '#';
+      window.open(url, '_self');
     });
     document.getElementById('pf-fechar-final').addEventListener('click', _fechar);
   }
