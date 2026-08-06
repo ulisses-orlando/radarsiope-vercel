@@ -1032,33 +1032,43 @@ window._appmsgCarregarAssinantes = async function () {
   lista.innerHTML = '<div class="wa-loading">⏳ Carregando assinantes ativos...</div>';
   if (cont) cont.textContent = '—';
 
+  let todos = [];
+
+  // Tenta com orderBy(nome) — se não tiver índice, cai no catch
   try {
     const snap = await window.db.collection('usuarios')
       .where('ativo', '==', true)
       .orderBy('nome')
       .limit(500)
       .get();
+    todos = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  } catch (err1) {
+    console.warn('[appmsg] orderBy falhou (sem índice?):', err1.message);
 
-    const todos = snap.docs
-      .map(d => ({ id: d.id, ...d.data() }))
-      .filter(u => {
-        const isAssinante = u.tipo_perfil === 'assinante'
-          || u.segmento === 'assinante'
-          || (u.assinatura_ativa === true);
-        return isAssinante;
-      })
-      .sort((a, b) => (a.nome || '').localeCompare(b.nome || '', 'pt-BR'));
-
-    _appmsgState.assinantes = todos;
-    _appmsgRenderLista(todos);
-  } catch (err) {
-    lista.innerHTML = `<div class="wa-vazio">❌ Erro ao carregar: ${err.message}</div>`;
+    // Fallback: sem orderBy, ordena client-side depois
+    try {
+      const snap = await window.db.collection('usuarios')
+        .where('ativo', '==', true)
+        .limit(500)
+        .get();
+      todos = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    } catch (err2) {
+      console.error('[appmsg] Erro ao carregar:', err2.message);
+      lista.innerHTML = `<div class="wa-vazio">❌ Erro ao carregar: ${err2.message}</div>`;
+      return;
+    }
   }
+
+  // Ordena client-side
+  todos.sort((a, b) => (a.nome || '').localeCompare(b.nome || '', 'pt-BR'));
+  _appmsgState.assinantes = todos;
+  _appmsgRenderLista(todos);
 };
 
 function _appmsgRenderLista(lista) {
   const el = document.getElementById('appmsg-lista');
   if (!el) return;
+
   if (!lista.length) {
     el.innerHTML = '<div class="wa-vazio">⚠️ Nenhum assinante ativo encontrado.</div>';
     _appmsgAtualizarBotao();
@@ -1067,7 +1077,7 @@ function _appmsgRenderLista(lista) {
 
   el.innerHTML = lista.map(u => {
     const mun = [u.nome_municipio, u.cod_uf].filter(Boolean).join(' — ');
-    const plano = u.plano_ativo || u.plano_nome || '';
+    const plano = u.plano_ativo || u.plano_nome || u.plano_slug || '';
     return `
       <div class="wa-item" data-busca="${(u.nome || '').toLowerCase()} ${(u.nome_municipio || '').toLowerCase()}" onclick="this.querySelector('input').click()">
         <input type="checkbox" value="${u.id}" data-nome="${(u.nome || '').replace(/"/g, '&quot;')}" data-email="${(u.email || '').replace(/"/g, '&quot;')}" onchange="_appmsgAtualizarBotao()" onclick="event.stopPropagation()">
