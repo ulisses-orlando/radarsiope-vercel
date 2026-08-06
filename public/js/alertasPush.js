@@ -265,6 +265,7 @@ function _renderHTML() {
     <div class="canal-tabs">
       <button class="canal-tab ativo" id="tab-canal-push" onclick="_waToggleCanal('push')">🔔 Push Notification</button>
       <button class="canal-tab" id="tab-canal-whatsapp" onclick="_waToggleCanal('whatsapp')">🟢 WhatsApp</button>
+      <button class="canal-tab" id="tab-canal-appmsg" onclick="_waToggleCanal('appmsg')">📱 Mensagem no App</button>
     </div>
 
     <div class="push-card" id="push-compose-card">
@@ -379,8 +380,62 @@ function _renderHTML() {
         </div>
         <div id="wa-prog-txt" style="font-size:12px;color:#64748b;text-align:right"></div>
       </div>
-      <div class="push-resultado" id="wa-resultado"></div>
+            <div class="push-resultado" id="wa-resultado"></div>
     </div>
+
+    <!-- 📱 NOVO CARD: Mensagem no App -->
+    <div class="push-card" id="appmsg-card" style="display:none">
+      <h3>📱 Enviar mensagem no App</h3>
+      <p style="font-size:12px;color:#64748b;margin:0 0 14px;line-height:1.6">
+        A mensagem aparecerá na Central do Assinante (Ações / Solicitações) como uma comunicação da equipe.
+      </p>
+
+      <div class="push-field" style="margin-bottom:10px">
+        <label>Título</label>
+        <input type="text" id="appmsg-titulo" maxlength="80" placeholder="Ex: Atualização importante sobre o SIOPE"
+          oninput="_appmsgAtualizarBotao()" style="width:100%;box-sizing:border-box">
+      </div>
+
+      <div class="push-field" style="margin-bottom:10px">
+        <label>Mensagem</label>
+        <textarea id="appmsg-corpo" maxlength="500" placeholder="Escreva a mensagem..."
+          oninput="_appmsgAtualizarBotao();document.getElementById('appmsg-chars').textContent=this.value.length+'/500'"
+          style="width:100%;min-height:90px;box-sizing:border-box;resize:vertical"></textarea>
+        <div id="appmsg-chars" style="font-size:10px;color:#94a3b8;text-align:right">0/500</div>
+      </div>
+
+      <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#334155;cursor:pointer;margin-bottom:12px">
+        <input id="appmsg-permite-resposta" type="checkbox" style="width:14px;height:14px;cursor:pointer">
+        Permitir que o assinante responda esta mensagem
+      </label>
+
+      <div class="wa-section-header">
+        <span>📋 Assinantes ativos</span>
+        <button onclick="_appmsgCarregarAssinantes()">⟳ Recarregar lista</button>
+      </div>
+      <div class="wa-toolbar">
+        <input type="text" id="appmsg-busca" placeholder="🔍 Filtrar por nome ou município..." oninput="_appmsgFiltrarLista()">
+        <button onclick="_appmsgToggleAll(true)">✅ Todos</button>
+        <button onclick="_appmsgToggleAll(false)">☐ Limpar</button>
+      </div>
+      <div class="wa-lista" id="appmsg-lista">
+        <div class="wa-loading">⏳ Aguardando carregamento...</div>
+      </div>
+      <div class="wa-contador" id="appmsg-contador">—</div>
+
+      <button class="wa-btn-iniciar" id="appmsg-btn-enviar" onclick="_appmsgEnviarLote()" disabled style="background:#0A3D62">
+        📨 Enviar para selecionados
+      </button>
+
+      <div id="appmsg-progresso" style="display:none;margin-top:12px">
+        <div style="height:6px;background:#e2e8f0;border-radius:10px;overflow:hidden;margin-bottom:6px">
+          <div id="appmsg-prog-fill" style="height:100%;background:#0A3D62;border-radius:10px;width:0%;transition:width .3s ease"></div>
+        </div>
+        <div id="appmsg-prog-txt" style="font-size:12px;color:#64748b;text-align:right"></div>
+      </div>
+      <div class="push-resultado" id="appmsg-resultado"></div>
+    </div>
+    <!-- /📱 FIM NOVO CARD -->
 
     <h3>📋 Histórico de alertas disparados</h3>
     <div class="push-card" id="push-historico-wrap">Carregando...</div>
@@ -720,7 +775,7 @@ window._waPrepararEnvioComunidade = function (grupo) {
     <div style="background:#fff;border-radius:12px;padding:24px;max-width:480px;width:90%;box-shadow:0 10px 40px rgba(0,0,0,.2);">
       <h3 style="margin:0 0 12px;color:#0A3D62">✅ Pronto para enviar</h3>
       <p style="font-size:13px;color:#64748b;margin:0 0 16px">O WhatsApp Web abriu. Cole a mensagem no <strong>${nomeGrupo}</strong> e envie.</p>
-      <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:12px;font-size:13px;line-height:1.5;white-space:pre-wrap;max-height:120px;overflow-y:auto;margin-bottom:14px;color:#1e293b">${mensagem.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</div>
+      <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:12px;font-size:13px;line-height:1.5;white-space:pre-wrap;max-height:120px;overflow-y:auto;margin-bottom:14px;color:#1e293b">${mensagem.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</div>
       <button onclick="navigator.clipboard.writeText('${mensagem.replace(/'/g, "\\'")}').then(()=>{this.textContent='✅ Copiado!';setTimeout(()=>this.textContent='📋 Copiar texto',1500)})" style="width:100%;padding:10px;background:#16a34a;color:#fff;border:none;border-radius:8px;font-weight:600;cursor:pointer;margin-bottom:8px">📋 Copiar texto</button>
       <button onclick="document.getElementById('wa-assistido-overlay').remove()" style="width:100%;padding:10px;background:transparent;border:1px solid #cbd5e1;border-radius:8px;cursor:pointer;color:#64748b">Fechar</button>
     </div>
@@ -751,16 +806,26 @@ async function _waRegistrarHistoricoComunidade(grupoId, nomeGrupo, mensagem) {
 
 window._waToggleCanal = function (canal) {
   const isPush = canal === 'push';
+  const isWa = canal === 'whatsapp';
+  const isApp = canal === 'appmsg';
+
   document.getElementById('tab-canal-push')?.classList.toggle('ativo', isPush);
-  document.getElementById('tab-canal-whatsapp')?.classList.toggle('ativo', !isPush);
+  document.getElementById('tab-canal-whatsapp')?.classList.toggle('ativo', isWa);
+  document.getElementById('tab-canal-appmsg')?.classList.toggle('ativo', isApp);
+
   const pushCard = document.getElementById('push-compose-card');
   const waCard = document.getElementById('wa-card');
+  const appCard = document.getElementById('appmsg-card');
+
   if (pushCard) pushCard.style.display = isPush ? 'block' : 'none';
-  if (waCard) waCard.style.display = isPush ? 'none' : 'block';
-  if (!isPush) {
-    if (_waState.assinantes.length === 0) _waCarregarAssinantes();
+  if (waCard) waCard.style.display = isWa ? 'block' : 'none';
+  if (appCard) appCard.style.display = isApp ? 'block' : 'none';
+
+  if (isWa && _waState.assinantes.length === 0) {
+    _waCarregarAssinantes();
     _waSincronizarMensagem();
   }
+  if (isApp && _appmsgState.assinantes.length === 0) _appmsgCarregarAssinantes();
 };
 
 function _waSincronizarMensagem() {
@@ -929,8 +994,8 @@ window._waIniciarEnvio = async function () {
   // Restaura UI
   if (btn) { btn.disabled = false; btn.textContent = '🟢 Enviar para selecionados'; }
   if (cont) {
-    cont.textContent = cancelado 
-      ? '⚠️ Envio cancelado.' 
+    cont.textContent = cancelado
+      ? '⚠️ Envio cancelado.'
       : `✅ ${enviados} assinante(s) processado(s). Confirme o envio nas abas abertas.`;
     cont.style.color = cancelado ? '#f59e0b' : '#166534';
   }
@@ -951,5 +1016,187 @@ window._waIniciarEnvio = async function () {
   }
 
   // Atualiza histórico do painel
+  _carregarHistorico();
+};
+// ══════════════════════════════════════════════════════════════════════════════
+// APP MESSAGE — Mensagem direta no app (Central do Assinante)
+// ══════════════════════════════════════════════════════════════════════════════
+let _appmsgState = { assinantes: [] };
+
+// ─── Carregar assinantes ativos ──────────────────────────────────────────────
+window._appmsgCarregarAssinantes = async function () {
+  const lista = document.getElementById('appmsg-lista');
+  const cont  = document.getElementById('appmsg-contador');
+  if (!lista) return;
+
+  lista.innerHTML = '<div class="wa-loading">⏳ Carregando assinantes ativos...</div>';
+  if (cont) cont.textContent = '—';
+
+  try {
+    const snap = await window.db.collection('usuarios')
+      .where('ativo', '==', true)
+      .orderBy('nome')
+      .limit(500)
+      .get();
+
+    const todos = snap.docs
+      .map(d => ({ id: d.id, ...d.data() }))
+      .filter(u => {
+        const isAssinante = u.tipo_perfil === 'assinante'
+          || u.segmento === 'assinante'
+          || (u.assinatura_ativa === true);
+        return isAssinante;
+      })
+      .sort((a, b) => (a.nome || '').localeCompare(b.nome || '', 'pt-BR'));
+
+    _appmsgState.assinantes = todos;
+    _appmsgRenderLista(todos);
+  } catch (err) {
+    lista.innerHTML = `<div class="wa-vazio">❌ Erro ao carregar: ${err.message}</div>`;
+  }
+};
+
+function _appmsgRenderLista(lista) {
+  const el = document.getElementById('appmsg-lista');
+  if (!el) return;
+  if (!lista.length) {
+    el.innerHTML = '<div class="wa-vazio">⚠️ Nenhum assinante ativo encontrado.</div>';
+    _appmsgAtualizarBotao();
+    return;
+  }
+
+  el.innerHTML = lista.map(u => {
+    const mun = [u.nome_municipio, u.cod_uf].filter(Boolean).join(' — ');
+    const plano = u.plano_ativo || u.plano_nome || '';
+    return `
+      <div class="wa-item" data-busca="${(u.nome || '').toLowerCase()} ${(u.nome_municipio || '').toLowerCase()}" onclick="this.querySelector('input').click()">
+        <input type="checkbox" value="${u.id}" data-nome="${(u.nome || '').replace(/"/g, '&quot;')}" data-email="${(u.email || '').replace(/"/g, '&quot;')}" onchange="_appmsgAtualizarBotao()" onclick="event.stopPropagation()">
+        <div style="flex:1;min-width:0">
+          <div class="wa-nome">${u.nome || '(sem nome)'}</div>
+          <div class="wa-sub">${mun || '—'} ${plano ? '· ' + plano : ''}</div>
+        </div>
+      </div>`;
+  }).join('');
+
+  _appmsgAtualizarBotao();
+}
+
+window._appmsgFiltrarLista = function () {
+  const termo = (document.getElementById('appmsg-busca')?.value || '').toLowerCase().trim();
+  document.querySelectorAll('#appmsg-lista .wa-item').forEach(item => {
+    item.style.display = !termo || item.dataset.busca.includes(termo) ? 'flex' : 'none';
+  });
+};
+
+window._appmsgToggleAll = function (sel) {
+  document.querySelectorAll('#appmsg-lista .wa-item').forEach(item => {
+    if (item.style.display === 'none') return;
+    const cb = item.querySelector('input[type=checkbox]');
+    if (cb) cb.checked = sel;
+  });
+  _appmsgAtualizarBotao();
+};
+
+window._appmsgAtualizarBotao = function () {
+  const selecionados = document.querySelectorAll('#appmsg-lista input[type=checkbox]:checked').length;
+  const titulo = (document.getElementById('appmsg-titulo')?.value || '').trim();
+  const corpo  = (document.getElementById('appmsg-corpo')?.value || '').trim();
+  const btn    = document.getElementById('appmsg-btn-enviar');
+  const cont   = document.getElementById('appmsg-contador');
+
+  if (cont) {
+    if (selecionados === 0) {
+      cont.textContent = '⚠️ Selecione ao menos 1 assinante.'; cont.style.color = '#f59e0b';
+    } else {
+      cont.textContent = `✅ ${selecionados} assinante(s) selecionado(s).`; cont.style.color = '#166534';
+    }
+  }
+  if (btn) btn.disabled = !selecionados || !titulo || !corpo;
+};
+
+// ─── Envio em lote ───────────────────────────────────────────────────────────
+window._appmsgEnviarLote = async function () {
+  const titulo = (document.getElementById('appmsg-titulo')?.value || '').trim();
+  const corpo  = (document.getElementById('appmsg-corpo')?.value || '').trim();
+  const permiteResposta = document.getElementById('appmsg-permite-resposta')?.checked || false;
+
+  if (!titulo || !corpo) return alert('Preencha título e mensagem.');
+  
+  const cbs = document.querySelectorAll('#appmsg-lista input[type=checkbox]:checked');
+  if (!cbs.length) return alert('Selecione ao menos 1 assinante.');
+
+  const selecionados = Array.from(cbs).map(cb => ({
+    uid: cb.value,
+    nome: cb.dataset.nome || '',
+    email: cb.dataset.email || ''
+  }));
+
+  const btn = document.getElementById('appmsg-btn-enviar');
+  const res = document.getElementById('appmsg-resultado');
+  const prog = document.getElementById('appmsg-progresso');
+  const barra = document.getElementById('appmsg-prog-fill');
+  const txt = document.getElementById('appmsg-prog-txt');
+
+  btn.disabled = true; btn.textContent = '⏳ Enviando...';
+  if (res) res.style.display = 'none';
+  if (prog) prog.style.display = 'block';
+
+  const admin = JSON.parse(localStorage.getItem('usuarioLogado') || '{}');
+  const adminNome = admin.nome || admin.email || 'Admin';
+
+  let enviados = 0, falhas = 0;
+
+  for (let i = 0; i < selecionados.length; i++) {
+    const { uid, nome } = selecionados[i];
+    txt.textContent = `Enviando ${i + 1} de ${selecionados.length} (${nome})...`;
+    barra.style.width = `${Math.round(((i + 1) / selecionados.length) * 100)}%`;
+
+    try {
+      await window.db.collection('usuarios').doc(uid).collection('solicitacoes').add({
+        tipo: 'mensagem_admin',
+        titulo,
+        descricao: corpo,
+        status: 'atendida',
+        permite_resposta: permiteResposta,
+        lida: false,
+        enviado_por: adminNome,
+        data_solicitacao: new Date().toISOString(),
+      });
+      enviados++;
+      await new Promise(r => setTimeout(r, 80));
+    } catch (e) {
+      falhas++;
+      console.warn('[appmsg] Falha ao enviar para', uid, e.message);
+    }
+  }
+
+  barra.style.width = '100%';
+  txt.textContent = `Concluído: ${enviados} enviados, ${falhas} falhas.`;
+  btn.disabled = false; btn.textContent = '📨 Enviar para selecionados';
+
+  res.style.display = 'block';
+  if (falhas === 0) {
+    res.className = 'push-resultado ok';
+    res.innerHTML = `✅ <strong>${enviados}</strong> mensagem(ns) entregue(s) com sucesso no app!`;
+  } else {
+    res.className = 'push-resultado erro';
+    res.innerHTML = `⚠️ <strong>${enviados}</strong> enviados · <strong>${falhas}</strong> falhas.<br>
+      <span style="font-size:11px;font-weight:400">Verifique o console para detalhes.</span>`;
+  }
+
+  try {
+    await window.db.collection('alertas_disparados').add({
+      canal: 'appmsg',
+      tipo: 'mensagem_admin_lote',
+      titulo,
+      mensagem: corpo.slice(0, 140),
+      destinatarios_est: selecionados.length,
+      enviados_ok: enviados,
+      falhas: falhas,
+      status: falhas === 0 ? 'enviado' : 'parcial',
+      disparado_em: new Date(),
+    });
+  } catch (e) { console.warn('[appmsg] Falha ao registrar histórico:', e); }
+
   _carregarHistorico();
 };
