@@ -409,6 +409,30 @@ function _renderHTML() {
         Permitir que o assinante responda esta mensagem
       </label>
 
+            <!-- Toggle de modo -->
+      <div style="display:flex;gap:4px;margin:14px 0 10px;background:#f1f5f9;padding:4px;border-radius:8px">
+        <button id="appmsg-modo-lista" class="wa-modo-tab ativo" onclick="_appmsgToggleModo('lista')" style="flex:1;padding:8px 12px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer">
+          📋 Selecionar da lista
+        </button>
+        <button id="appmsg-modo-todos" class="wa-modo-tab" onclick="_appmsgToggleModo('todos')" style="flex:1;padding:8px 12px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer">
+          🚀 Todos os ativos
+        </button>
+      </div>
+
+      <!-- Painel modo TODOS -->
+      <div id="appmsg-panel-todos" style="display:none;margin-bottom:14px">
+        <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:12px 14px">
+          <div style="font-size:13px;font-weight:700;color:#1e40af;margin-bottom:4px">🚀 Envio em massa</div>
+          <div style="font-size:12px;color:#475569;line-height:1.5">
+            A mensagem será entregue a <strong>TODOS</strong> os assinantes com status ativo diretamente pelo servidor.<br>
+            <span style="color:#ef4444;font-weight:600">⚠️ Esta ação não pode ser desfeita.</span>
+          </div>
+          <div id="appmsg-total-ativos" style="margin-top:8px;font-size:12px;color:#64748b">
+            ⏳ Consultando total de assinantes...
+          </div>
+        </div>
+      </div>
+
       <div class="wa-section-header">
         <span>📋 Assinantes ativos</span>
         <button onclick="_appmsgCarregarAssinantes()">⟳ Recarregar lista</button>
@@ -1021,51 +1045,154 @@ window._waIniciarEnvio = async function () {
 // ══════════════════════════════════════════════════════════════════════════════
 // APP MESSAGE — Mensagem direta no app (Central do Assinante)
 // ══════════════════════════════════════════════════════════════════════════════
-let _appmsgState = { assinantes: [] };
+let _appmsgState = { 
+  assinantes: [], 
+  lastDoc: null, 
+  hasMore: true, 
+  carregando: false,
+  modo: 'lista' // 'lista' | 'todos'
+};
 
-// ─── Carregar assinantes ativos ──────────────────────────────────────────────
-window._appmsgCarregarAssinantes = async function () {
-  const lista = document.getElementById('appmsg-lista');
-  const cont  = document.getElementById('appmsg-contador');
-  if (!lista) return;
+// ─── Toggle de modo ──────────────────────────────────────────────────────────
+window._appmsgToggleModo = function (modo) {
+  _appmsgState.modo = modo;
+  const isLista = modo === 'lista';
+  
+  document.getElementById('appmsg-modo-lista')?.classList.toggle('ativo', isLista);
+  document.getElementById('appmsg-modo-todos')?.classList.toggle('ativo', !isLista);
+  
+  const panelTodos = document.getElementById('appmsg-panel-todos');
+  
+  // Elementos da lista
+  const listaEl = document.getElementById('appmsg-lista');
+  const buscaEl = document.getElementById('appmsg-busca');
+  const toolbarEl = buscaEl?.closest('.wa-toolbar');
+  const headerEl = document.querySelector('#appmsg-card .wa-section-header');
+  const contadorEl = document.getElementById('appmsg-contador');
+  
+  if (isLista) {
+    if (panelTodos) panelTodos.style.display = 'none';
+    if (listaEl) listaEl.style.display = 'block';
+    if (toolbarEl) toolbarEl.style.display = 'flex';
+    if (headerEl) headerEl.style.display = 'flex';
+    if (contadorEl) contadorEl.style.display = 'block';
+    if (_appmsgState.assinantes.length === 0) _appmsgCarregarAssinantes();
+  } else {
+    if (panelTodos) panelTodos.style.display = 'block';
+    if (listaEl) listaEl.style.display = 'none';
+    if (toolbarEl) toolbarEl.style.display = 'none';
+    if (headerEl) headerEl.style.display = 'none';
+    if (contadorEl) contadorEl.style.display = 'none';
+    _appmsgConsultarTotalAtivos();
+  }
+  
+  _appmsgAtualizarBotao();
+};
 
-  lista.innerHTML = '<div class="wa-loading">⏳ Carregando assinantes ativos...</div>';
-  if (cont) cont.textContent = '—';
-
-  let todos = [];
-
-  // Tenta com orderBy(nome) — se não tiver índice, cai no catch
+// ─── Consultar total de ativos (modo todos) ──────────────────────────────────
+async function _appmsgConsultarTotalAtivos() {
+  const el = document.getElementById('appmsg-total-ativos');
+  if (!el) return;
+  el.textContent = '⏳ Consultando total de assinantes...';
+  
+  try {
+    // Tenta contar via API do backend (mais performático)
+    const resp = await fetch('/api/appmsg', {
+      method: 'POST',
+      headers: { 
+        'Content-Type': 'application/json',
+        'x-admin-token': _pushAdminToken || window._adminToken || ''
+      },
+      body: JSON.stringify({ acao: 'contar-ativos' })
+    });
+    
+    if (resp.ok) {
+      const data = await resp.json();
+      const total = data.total ?? '—';
+      el.innerHTML = `📊 <strong>${total}</strong> assinante(s) ativo(s) encontrado(s) no banco.`;
+      return;
+    }
+  } catch (e) {
+    // Silencioso: fallback abaixo
+  }
+  
+  // Fallback: contagem local aproximada (limitada a 1 doc só para não travar)
   try {
     const snap = await window.db.collection('usuarios')
       .where('ativo', '==', true)
-      .orderBy('nome')
-      .limit(500)
+      .limit(1)
       .get();
-    todos = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-  } catch (err1) {
-    console.warn('[appmsg] orderBy falhou (sem índice?):', err1.message);
+    if (snap.empty) {
+      el.innerHTML = '⚠️ Nenhum assinante ativo encontrado.';
+    } else {
+      el.innerHTML = '✅ Há assinantes ativos no banco. O total exato será enviado pelo servidor.';
+    }
+  } catch (e) {
+    el.innerHTML = '⚠️ Não foi possível consultar o total. Verifique sua conexão.';
+  }
+}
 
-    // Fallback: sem orderBy, ordena client-side depois
-    try {
-      const snap = await window.db.collection('usuarios')
-        .where('ativo', '==', true)
-        .limit(500)
-        .get();
-      todos = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-    } catch (err2) {
-      console.error('[appmsg] Erro ao carregar:', err2.message);
-      lista.innerHTML = `<div class="wa-vazio">❌ Erro ao carregar: ${err2.message}</div>`;
+// ─── Carregar assinantes ativos (paginado, 100 em 100) ───────────────────────
+window._appmsgCarregarAssinantes = async function (append = false) {
+  const lista = document.getElementById('appmsg-lista');
+  const cont  = document.getElementById('appmsg-contador');
+  if (!lista) return;
+  if (_appmsgState.carregando) return;
+  
+  if (!append) {
+    _appmsgState.assinantes = [];
+    _appmsgState.lastDoc = null;
+    _appmsgState.hasMore = true;
+    lista.innerHTML = '<div class="wa-loading">⏳ Carregando assinantes...</div>';
+  } else {
+    const btnMais = document.getElementById('appmsg-btn-mais');
+    if (btnMais) { btnMais.disabled = true; btnMais.textContent = '⏳ Carregando...'; }
+  }
+  
+  if (cont) cont.textContent = '—';
+  _appmsgState.carregando = true;
+
+  try {
+    let q = window.db.collection('usuarios')
+      .where('ativo', '==', true)
+      .orderBy('nome')
+      .limit(100);
+
+    if (append && _appmsgState.lastDoc) {
+      q = q.startAfter(_appmsgState.lastDoc);
+    }
+
+    const snap = await q.get();
+    
+    if (snap.empty) {
+      _appmsgState.hasMore = false;
+      if (!append) {
+        lista.innerHTML = '<div class="wa-vazio">⚠️ Nenhum assinante ativo encontrado.</div>';
+      } else {
+        _appmsgRenderLista(_appmsgState.assinantes, false);
+      }
+      _appmsgState.carregando = false;
+      _appmsgAtualizarBotao();
       return;
     }
-  }
 
-  // Ordena client-side
-  todos.sort((a, b) => (a.nome || '').localeCompare(b.nome || '', 'pt-BR'));
-  _appmsgState.assinantes = todos;
-  _appmsgRenderLista(todos);
+    const novos = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    _appmsgState.lastDoc = snap.docs[snap.docs.length - 1];
+    _appmsgState.hasMore = snap.docs.length === 100;
+    _appmsgState.assinantes = append ? [..._appmsgState.assinantes, ...novos] : novos;
+
+    _appmsgRenderLista(_appmsgState.assinantes, false);
+  } catch (err) {
+    console.error('[appmsg] Erro:', err);
+    if (!append) {
+      lista.innerHTML = `<div class="wa-vazio">❌ Erro: ${err.message}</div>`;
+    }
+  } finally {
+    _appmsgState.carregando = false;
+  }
 };
 
-function _appmsgRenderLista(lista) {
+function _appmsgRenderLista(lista, preservarScroll = false) {
   const el = document.getElementById('appmsg-lista');
   if (!el) return;
 
@@ -1075,7 +1202,7 @@ function _appmsgRenderLista(lista) {
     return;
   }
 
-  el.innerHTML = lista.map(u => {
+  const htmlItens = lista.map(u => {
     const mun = [u.nome_municipio, u.cod_uf].filter(Boolean).join(' — ');
     const plano = u.plano_ativo || u.plano_nome || u.plano_slug || '';
     return `
@@ -1088,14 +1215,37 @@ function _appmsgRenderLista(lista) {
       </div>`;
   }).join('');
 
+  const infoTotal = `
+    <div style="padding:6px 10px;font-size:11px;color:#64748b;text-align:center;border-bottom:1px solid #e2e8f0;background:#f8fafc">
+      📊 Exibindo <strong>${lista.length}</strong> assinante(s)${_appmsgState.hasMore ? ' · <span style="color:#0A3D62">há mais resultados abaixo</span>' : ''}
+    </div>`;
+
+  const btnMais = _appmsgState.hasMore ? `
+    <div style="padding:10px;text-align:center;border-top:1px solid #e2e8f0;background:#fff">
+      <button id="appmsg-btn-mais" onclick="_appmsgCarregarAssinantes(true)" 
+        style="padding:8px 18px;background:#f1f5f9;border:1px solid #cbd5e1;border-radius:6px;cursor:pointer;font-size:12px;color:#0A3D62;font-weight:600">
+        ⬇️ Carregar mais 100 assinantes
+      </button>
+    </div>` : '';
+
+  el.innerHTML = infoTotal + htmlItens + btnMais;
   _appmsgAtualizarBotao();
 }
 
 window._appmsgFiltrarLista = function () {
   const termo = (document.getElementById('appmsg-busca')?.value || '').toLowerCase().trim();
+  let visiveis = 0;
   document.querySelectorAll('#appmsg-lista .wa-item').forEach(item => {
-    item.style.display = !termo || item.dataset.busca.includes(termo) ? 'flex' : 'none';
+    const mostrar = !termo || item.dataset.busca.includes(termo);
+    item.style.display = mostrar ? 'flex' : 'none';
+    if (mostrar) visiveis++;
   });
+  const info = document.querySelector('#appmsg-lista > div:first-child');
+  if (info && termo) {
+    info.innerHTML = `🔍 Filtro ativo · <strong>${visiveis}</strong> visíveis de ${_appmsgState.assinantes.length} carregados`;
+  } else if (info) {
+    info.innerHTML = `📊 Exibindo <strong>${_appmsgState.assinantes.length}</strong> assinante(s)${_appmsgState.hasMore ? ' · <span style="color:#0A3D62">há mais resultados abaixo</span>' : ''}`;
+  }
 };
 
 window._appmsgToggleAll = function (sel) {
@@ -1108,20 +1258,42 @@ window._appmsgToggleAll = function (sel) {
 };
 
 window._appmsgAtualizarBotao = function () {
-  const selecionados = document.querySelectorAll('#appmsg-lista input[type=checkbox]:checked').length;
   const titulo = (document.getElementById('appmsg-titulo')?.value || '').trim();
   const corpo  = (document.getElementById('appmsg-corpo')?.value || '').trim();
   const btn    = document.getElementById('appmsg-btn-enviar');
   const cont   = document.getElementById('appmsg-contador');
 
+  if (_appmsgState.modo === 'todos') {
+    if (cont) {
+      cont.textContent = '🚀 Modo: envio para todos os ativos';
+      cont.style.color = '#0A3D62';
+    }
+    if (btn) {
+      btn.disabled = !titulo || !corpo;
+      btn.textContent = '📨 Enviar para TODOS os assinantes ativos';
+    }
+    return;
+  }
+
+  // Modo lista
+  const selecionados = document.querySelectorAll('#appmsg-lista input[type=checkbox]:checked').length;
+  
   if (cont) {
     if (selecionados === 0) {
-      cont.textContent = '⚠️ Selecione ao menos 1 assinante.'; cont.style.color = '#f59e0b';
+      cont.textContent = '⚠️ Selecione ao menos 1 assinante.'; 
+      cont.style.color = '#f59e0b';
     } else {
-      cont.textContent = `✅ ${selecionados} assinante(s) selecionado(s).`; cont.style.color = '#166534';
+      const msg = _appmsgState.hasMore 
+        ? `✅ ${selecionados} selecionado(s) · ${_appmsgState.assinantes.length} carregados (pode haver mais)`
+        : `✅ ${selecionados} de ${_appmsgState.assinantes.length} assinante(s) selecionado(s).`;
+      cont.textContent = msg;
+      cont.style.color = '#166534';
     }
   }
-  if (btn) btn.disabled = !selecionados || !titulo || !corpo;
+  if (btn) {
+    btn.disabled = !selecionados || !titulo || !corpo;
+    btn.textContent = '📨 Enviar para selecionados';
+  }
 };
 
 // ─── Envio em lote ───────────────────────────────────────────────────────────
@@ -1131,7 +1303,104 @@ window._appmsgEnviarLote = async function () {
   const permiteResposta = document.getElementById('appmsg-permite-resposta')?.checked || false;
 
   if (!titulo || !corpo) return alert('Preencha título e mensagem.');
-  
+
+  const btn = document.getElementById('appmsg-btn-enviar');
+  const res = document.getElementById('appmsg-resultado');
+  const prog = document.getElementById('appmsg-progresso');
+  const barra = document.getElementById('appmsg-prog-fill');
+  const txt = document.getElementById('appmsg-prog-txt');
+
+  btn.disabled = true;
+  if (res) res.style.display = 'none';
+  if (prog) prog.style.display = 'block';
+  if (barra) barra.style.width = '0%';
+  if (txt) txt.textContent = 'Preparando envio...';
+
+  const admin = JSON.parse(localStorage.getItem('usuarioLogado') || '{}');
+  const adminNome = admin.nome || admin.email || 'Admin';
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // MODO TODOS: envio server-side
+  // ═══════════════════════════════════════════════════════════════════════════
+  if (_appmsgState.modo === 'todos') {
+    if (!confirm(`⚠️ CONFIRMAÇÃO\n\nVocê está prestes a enviar:\n\n"${titulo}"\n\npara TODOS os assinantes ativos do sistema.\n\nEsta ação não pode ser desfeita. Deseja continuar?`)) {
+      btn.disabled = false;
+      if (prog) prog.style.display = 'none';
+      return;
+    }
+
+    txt.textContent = '⏳ Enviando via servidor... isso pode levar alguns minutos.';
+    barra.style.width = '50%';
+
+    try {
+      const resp = await fetch('/api/appmsg', {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'x-admin-token': _pushAdminToken || window._adminToken || ''
+        },
+        body: JSON.stringify({
+          acao: 'enviar-todos-ativos',
+          titulo,
+          corpo,
+          permite_resposta: permiteResposta,
+          admin_email: admin.email || '',
+          admin_nome: adminNome
+        })
+      });
+
+      const data = await resp.json().catch(() => ({}));
+
+      if (!resp.ok) {
+        // Se o endpoint não existir ainda, avisa claramente
+        if (resp.status === 404) {
+          throw new Error('Endpoint /api/appmsg não implementado no backend. Solicite ao desenvolvedor.');
+        }
+        throw new Error(data.error || `Erro ${resp.status}`);
+      }
+
+      barra.style.width = '100%';
+      txt.textContent = 'Concluído.';
+
+      res.style.display = 'block';
+      res.className = 'push-resultado ok';
+      res.innerHTML = `✅ <strong>${data.enviados ?? '—'}</strong> mensagem(ns) enfileirada(s) com sucesso!<br>
+        <span style="font-size:11px;font-weight:400">Total de assinantes ativos: <strong>${data.total ?? '—'}</strong> · Falhas: <strong>${data.falhas ?? 0}</strong></span>`;
+
+      // Registra no histórico
+      try {
+        await window.db.collection('alertas_disparados').add({
+          canal: 'appmsg',
+          tipo: 'mensagem_admin_todos',
+          titulo,
+          mensagem: corpo.slice(0, 140),
+          destinatarios_est: data.total || 0,
+          enviados_ok: data.enviados || 0,
+          falhas: data.falhas || 0,
+          status: (data.falhas || 0) === 0 ? 'enviado' : 'parcial',
+          disparado_em: new Date(),
+          modo: 'todos'
+        });
+      } catch (e) { console.warn('[appmsg] Falha ao registrar histórico:', e); }
+
+      _carregarHistorico();
+
+    } catch (err) {
+      barra.style.width = '100%';
+      txt.textContent = 'Erro.';
+      res.style.display = 'block';
+      res.className = 'push-resultado erro';
+      res.innerHTML = `❌ <strong>Erro no envio:</strong> ${err.message}<br>
+        <span style="font-size:11px;font-weight:400">Se o endpoint ainda não existir no backend, implemente-o conforme o contrato abaixo.</span>`;
+    } finally {
+      btn.disabled = false;
+    }
+    return;
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // MODO LISTA: envio individual (original)
+  // ═══════════════════════════════════════════════════════════════════════════
   const cbs = document.querySelectorAll('#appmsg-lista input[type=checkbox]:checked');
   if (!cbs.length) return alert('Selecione ao menos 1 assinante.');
 
@@ -1141,18 +1410,7 @@ window._appmsgEnviarLote = async function () {
     email: cb.dataset.email || ''
   }));
 
-  const btn = document.getElementById('appmsg-btn-enviar');
-  const res = document.getElementById('appmsg-resultado');
-  const prog = document.getElementById('appmsg-progresso');
-  const barra = document.getElementById('appmsg-prog-fill');
-  const txt = document.getElementById('appmsg-prog-txt');
-
-  btn.disabled = true; btn.textContent = '⏳ Enviando...';
-  if (res) res.style.display = 'none';
-  if (prog) prog.style.display = 'block';
-
-  const admin = JSON.parse(localStorage.getItem('usuarioLogado') || '{}');
-  const adminNome = admin.nome || admin.email || 'Admin';
+  btn.textContent = '⏳ Enviando...';
 
   let enviados = 0, falhas = 0;
 
@@ -1182,7 +1440,8 @@ window._appmsgEnviarLote = async function () {
 
   barra.style.width = '100%';
   txt.textContent = `Concluído: ${enviados} enviados, ${falhas} falhas.`;
-  btn.disabled = false; btn.textContent = '📨 Enviar para selecionados';
+  btn.disabled = false;
+  btn.textContent = '📨 Enviar para selecionados';
 
   res.style.display = 'block';
   if (falhas === 0) {
@@ -1190,8 +1449,7 @@ window._appmsgEnviarLote = async function () {
     res.innerHTML = `✅ <strong>${enviados}</strong> mensagem(ns) entregue(s) com sucesso no app!`;
   } else {
     res.className = 'push-resultado erro';
-    res.innerHTML = `⚠️ <strong>${enviados}</strong> enviados · <strong>${falhas}</strong> falhas.<br>
-      <span style="font-size:11px;font-weight:400">Verifique o console para detalhes.</span>`;
+    res.innerHTML = `⚠️ <strong>${enviados}</strong> enviados · <strong>${falhas}</strong> falhas.`;
   }
 
   try {
@@ -1205,6 +1463,7 @@ window._appmsgEnviarLote = async function () {
       falhas: falhas,
       status: falhas === 0 ? 'enviado' : 'parcial',
       disparado_em: new Date(),
+      modo: 'lista'
     });
   } catch (e) { console.warn('[appmsg] Falha ao registrar histórico:', e); }
 
