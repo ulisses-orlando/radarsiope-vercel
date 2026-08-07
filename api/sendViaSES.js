@@ -813,6 +813,91 @@ async function _relatorioConformidade(req, res) {
   });
 }
 
+// ─── App Message: enviar para todos os assinantes ativos ─────────────────────
+async function _appmsgEnviarTodosAtivos(req, res) {
+  // Proteção mínima: exige o header x-admin-token (o front já envia)
+  const adminToken = req.headers['x-admin-token'] || req.headers['X-Admin-Token'];
+  if (!adminToken) {
+    return res.status(401).json({ ok: false, error: 'Token admin ausente.' });
+  }
+
+  const body = await _lerBody(req);
+  const { titulo, corpo, permite_resposta, admin_nome } = body || {};
+
+  if (!titulo || !corpo) {
+    return res.status(400).json({ ok: false, error: 'titulo e corpo são obrigatórios.' });
+  }
+
+  const adminNome = admin_nome || 'Admin';
+  let total = 0;
+  let enviados = 0;
+  let lastDoc = null;
+
+  try {
+    // Busca paginada de 500 em 500 (limite do Firestore)
+    while (true) {
+      let q = db.collection('usuarios')
+        .where('ativo', '==', true)
+        .limit(500);
+
+      if (lastDoc) {
+        q = q.startAfter(lastDoc);
+      }
+
+      const snap = await q.get();
+      if (snap.empty) break;
+
+      const docs = snap.docs;
+      total += docs.length;
+      lastDoc = docs[docs.length - 1];
+
+      // Escreve em batches de 500 (limite do Firestore batch)
+      let batch = db.batch();
+      let count = 0;
+
+      for (const userDoc of docs) {
+        const ref = db.collection('usuarios').doc(userDoc.id).collection('solicitacoes').doc();
+        batch.set(ref, {
+          tipo: 'mensagem_admin',
+          titulo,
+          descricao: corpo,
+          status: 'atendida',
+          permite_resposta: !!permite_resposta,
+          lida: false,
+          enviado_por: adminNome,
+          data_solicitacao: new Date().toISOString(),
+        });
+        count++;
+
+        if (count === 500) {
+          await batch.commit();
+          enviados += count;
+          batch = db.batch();
+          count = 0;
+        }
+      }
+
+      if (count > 0) {
+        await batch.commit();
+        enviados += count;
+      }
+
+      if (docs.length < 500) break; // última página
+    }
+
+    return res.status(200).json({
+      ok: true,
+      total,
+      enviados,
+      falhas: total - enviados,
+    });
+
+  } catch (err) {
+    console.error('[appmsg] Erro no envio em massa:', err);
+    return res.status(500).json({ ok: false, error: err.message });
+  }
+}
+
 // ─── Handler principal ────────────────────────────────────────────────────────
 export default async function handler(req, res) {
   const acao = req.query?.acao ? String(req.query.acao) : null;
@@ -924,6 +1009,10 @@ export default async function handler(req, res) {
     } catch (e) {
       return res.status(500).json({ ok: false, error: e.message });
     }
+  }
+
+  if (acao === 'appmsg') {
+    return _appmsgEnviarTodosAtivos(req, res);
   }
 
   // ── SES: envio de e-mail ───────────────────────────────────────────────────
