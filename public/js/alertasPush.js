@@ -1045,10 +1045,10 @@ window._waIniciarEnvio = async function () {
 // ══════════════════════════════════════════════════════════════════════════════
 // APP MESSAGE — Mensagem direta no app (Central do Assinante)
 // ══════════════════════════════════════════════════════════════════════════════
-let _appmsgState = { 
-  assinantes: [], 
-  lastDoc: null, 
-  hasMore: true, 
+let _appmsgState = {
+  assinantes: [],
+  lastDoc: null,
+  hasMore: true,
   carregando: false,
   modo: 'lista' // 'lista' | 'todos'
 };
@@ -1057,19 +1057,19 @@ let _appmsgState = {
 window._appmsgToggleModo = function (modo) {
   _appmsgState.modo = modo;
   const isLista = modo === 'lista';
-  
+
   document.getElementById('appmsg-modo-lista')?.classList.toggle('ativo', isLista);
   document.getElementById('appmsg-modo-todos')?.classList.toggle('ativo', !isLista);
-  
+
   const panelTodos = document.getElementById('appmsg-panel-todos');
-  
+
   // Elementos da lista
   const listaEl = document.getElementById('appmsg-lista');
   const buscaEl = document.getElementById('appmsg-busca');
   const toolbarEl = buscaEl?.closest('.wa-toolbar');
   const headerEl = document.querySelector('#appmsg-card .wa-section-header');
   const contadorEl = document.getElementById('appmsg-contador');
-  
+
   if (isLista) {
     if (panelTodos) panelTodos.style.display = 'none';
     if (listaEl) listaEl.style.display = 'block';
@@ -1085,7 +1085,7 @@ window._appmsgToggleModo = function (modo) {
     if (contadorEl) contadorEl.style.display = 'none';
     _appmsgConsultarTotalAtivos();
   }
-  
+
   _appmsgAtualizarBotao();
 };
 
@@ -1094,18 +1094,18 @@ async function _appmsgConsultarTotalAtivos() {
   const el = document.getElementById('appmsg-total-ativos');
   if (!el) return;
   el.textContent = '⏳ Consultando total de assinantes...';
-  
+
   try {
     // Tenta contar via API do backend (mais performático)
-    const resp = await fetch('/api/appmsg', {
+    const resp = await fetch('/api/sendViaSES?acao=appmsg', {
       method: 'POST',
-      headers: { 
+      headers: {
         'Content-Type': 'application/json',
         'x-admin-token': _pushAdminToken || window._adminToken || ''
       },
       body: JSON.stringify({ acao: 'contar-ativos' })
     });
-    
+
     if (resp.ok) {
       const data = await resp.json();
       const total = data.total ?? '—';
@@ -1115,7 +1115,7 @@ async function _appmsgConsultarTotalAtivos() {
   } catch (e) {
     // Silencioso: fallback abaixo
   }
-  
+
   // Fallback: contagem local aproximada (limitada a 1 doc só para não travar)
   try {
     const snap = await window.db.collection('usuarios')
@@ -1135,10 +1135,10 @@ async function _appmsgConsultarTotalAtivos() {
 // ─── Carregar assinantes ativos (paginado, 100 em 100) ───────────────────────
 window._appmsgCarregarAssinantes = async function (append = false) {
   const lista = document.getElementById('appmsg-lista');
-  const cont  = document.getElementById('appmsg-contador');
+  const cont = document.getElementById('appmsg-contador');
   if (!lista) return;
   if (_appmsgState.carregando) return;
-  
+
   if (!append) {
     _appmsgState.assinantes = [];
     _appmsgState.lastDoc = null;
@@ -1148,7 +1148,7 @@ window._appmsgCarregarAssinantes = async function (append = false) {
     const btnMais = document.getElementById('appmsg-btn-mais');
     if (btnMais) { btnMais.disabled = true; btnMais.textContent = '⏳ Carregando...'; }
   }
-  
+
   if (cont) cont.textContent = '—';
   _appmsgState.carregando = true;
 
@@ -1163,7 +1163,7 @@ window._appmsgCarregarAssinantes = async function (append = false) {
     }
 
     const snap = await q.get();
-    
+
     if (snap.empty) {
       _appmsgState.hasMore = false;
       if (!append) {
@@ -1259,9 +1259,9 @@ window._appmsgToggleAll = function (sel) {
 
 window._appmsgAtualizarBotao = function () {
   const titulo = (document.getElementById('appmsg-titulo')?.value || '').trim();
-  const corpo  = (document.getElementById('appmsg-corpo')?.value || '').trim();
-  const btn    = document.getElementById('appmsg-btn-enviar');
-  const cont   = document.getElementById('appmsg-contador');
+  const corpo = (document.getElementById('appmsg-corpo')?.value || '').trim();
+  const btn = document.getElementById('appmsg-btn-enviar');
+  const cont = document.getElementById('appmsg-contador');
 
   if (_appmsgState.modo === 'todos') {
     if (cont) {
@@ -1277,13 +1277,13 @@ window._appmsgAtualizarBotao = function () {
 
   // Modo lista
   const selecionados = document.querySelectorAll('#appmsg-lista input[type=checkbox]:checked').length;
-  
+
   if (cont) {
     if (selecionados === 0) {
-      cont.textContent = '⚠️ Selecione ao menos 1 assinante.'; 
+      cont.textContent = '⚠️ Selecione ao menos 1 assinante.';
       cont.style.color = '#f59e0b';
     } else {
-      const msg = _appmsgState.hasMore 
+      const msg = _appmsgState.hasMore
         ? `✅ ${selecionados} selecionado(s) · ${_appmsgState.assinantes.length} carregados (pode haver mais)`
         : `✅ ${selecionados} de ${_appmsgState.assinantes.length} assinante(s) selecionado(s).`;
       cont.textContent = msg;
@@ -1299,7 +1299,7 @@ window._appmsgAtualizarBotao = function () {
 // ─── Envio em lote ───────────────────────────────────────────────────────────
 window._appmsgEnviarLote = async function () {
   const titulo = (document.getElementById('appmsg-titulo')?.value || '').trim();
-  const corpo  = (document.getElementById('appmsg-corpo')?.value || '').trim();
+  const corpo = (document.getElementById('appmsg-corpo')?.value || '').trim();
   const permiteResposta = document.getElementById('appmsg-permite-resposta')?.checked || false;
 
   if (!titulo || !corpo) return alert('Preencha título e mensagem.');
@@ -1333,9 +1333,9 @@ window._appmsgEnviarLote = async function () {
     barra.style.width = '50%';
 
     try {
-      const resp = await fetch('/api/appmsg', {
+      const resp = await fetch('/api/sendViaSES?acao=appmsg', {
         method: 'POST',
-        headers: { 
+        headers: {
           'Content-Type': 'application/json',
           'x-admin-token': _pushAdminToken || window._adminToken || ''
         },
