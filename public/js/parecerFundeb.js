@@ -342,7 +342,7 @@ Ponto de entrada público: window._abrirParecerFundeb()
         <div class="pf-secao-mini">
           <div class="pf-secao-mini-titulo">📋 Limites obrigatórios</div>
           <div class="pf-info-box" style="font-size:11px">
-            Preencha <strong>Valor Exigido</strong> e <strong>Valor Aplicado</strong>. O percentual e o status são calculados automaticamente.
+            Preencha <strong>Exigido</strong> e <strong>Aplicado</strong>. O percentual e o status são calculados automaticamente.
           </div>
           ${limites.map((l, i) => `
             <div class="pf-limite-manual">
@@ -464,61 +464,34 @@ Ponto de entrada público: window._abrirParecerFundeb()
       const elStatus = document.querySelector(`[data-limite-status="${i}"]`);
       if (elExigido) l.exigido = _parseMoeda(elExigido.value);
       if (elAplicado) l.aplicado = _parseMoeda(elAplicado.value);
-      l.percentual = _calcularPercentualLimite(l.item, l.aplicado, l.exigido);
-      l.status = _calcularStatusLimite(l.item, l.percentual);
+      // Percentual = proporção da meta atingida: (Aplicado / Exigido) × 100
+      l.percentual = l.exigido > 0 ? parseFloat(((l.aplicado / l.exigido) * 100).toFixed(2)) : 0;
+      l.status = _calcularStatusLimite(l.item, l.percentual, l.exigido);
       if (elPct) elPct.value = _pctInput(l.percentual);
       if (elStatus) elStatus.innerHTML = `<span class="badge ${_corBadge(l.status)}">${_labelStatus(l.status)}</span>`;
     });
     _st.dadosExtraidos.limites = limites;
   }
 
-  function _metaPercentualLimite(item) {
-    const metas = {
-      remuneracao_70: 70,
-      capital_15: 15,
-      max_10_nao_aplicado: 10,
-      fomento_eti_4: 4,
-      iei_educacao_infantil: null,
-    };
-    return metas[item] || null;
-  }
 
-  function _calcularPercentualLimite(item, aplicado, exigido) {
-    const meta = _metaPercentualLimite(item);
-    // Se não tem meta definida (IEI com exigido=0) ou exigido é zero, não calcula
-    if (meta === null || exigido === 0) {
-      // Para IEI sem exigido, usa proporção direta se houver alguma base conhecida
-      // Caso contrário retorna 0
-      return 0;
+
+  function _calcularStatusLimite(item, percentual, exigido) {
+    // IEI — quando exigido é zero, não há meta definida no SIOPE
+    if (item === 'iei_educacao_infantil' && exigido === 0) {
+      if (percentual > 0) return 'atencao';
+      return 'nao_cumprido';
     }
-    // Fórmula: (Aplicado / Exigido) × Percentual_da_Lei
-    // Isso mostra o percentual REAL em relação ao total de recursos
-    const pct = (aplicado / exigido) * meta;
-    return parseFloat(pct.toFixed(2));
-  }
-
-  function _calcularStatusLimite(item, percentual) {
-    const meta = _metaPercentualLimite(item);
 
     // Limite de MÁXIMO (10% não aplicado)
     if (item === 'max_10_nao_aplicado') {
-      if (percentual > meta) return 'nao_cumprido';        // Ultrapassou o teto
-      if (percentual > meta * 0.95) return 'atencao';      // Próximo do teto (95% da meta)
+      if (percentual > 100) return 'nao_cumprido';   // Ultrapassou o teto
+      if (percentual > 95) return 'atencao';         // Próximo do limite
       return 'cumprido';
     }
 
-    // IEI — indicador especial
-    if (item === 'iei_educacao_infantil') {
-      if (meta === null) {
-        // Sem meta definida: se houver aplicação, considera atenção
-        if (percentual > 0) return 'atencao';
-        return 'nao_cumprido';
-      }
-    }
-
-    // Limites de MÍNIMO (70%, 15%, 4%)
-    if (percentual >= meta) return 'cumprido';             // Atingiu ou superou a meta
-    if (percentual >= meta * 0.90) return 'atencao';       // Pelo menos 90% da meta
+    // Limites de MÍNIMO (70%, 15%, 4%, IEI com exigido > 0)
+    if (percentual >= 100) return 'cumprido';        // Atingiu ou superou a meta
+    if (percentual >= 90) return 'atencao';          // Pelo menos 90% da meta
     return 'nao_cumprido';
   }
 
@@ -593,8 +566,8 @@ Ponto de entrada público: window._abrirParecerFundeb()
               </div>
               <div class="limite-bar-track"><div class="limite-bar-fill ${_corBadge(l.status)}" style="width:${Math.min(100, l.percentual || 0)}%"></div></div>
               <div class="limite-nums">
-                <span>Valor Exigido: <b>${_moeda(l.exigido)}</b></span>
-                <span>Valor Aplicado: <b>${_moeda(l.aplicado)}</b> (${_pct(l.percentual)})</span>
+                <span>Exigido: <b>${_moeda(l.exigido)}</b></span>
+                <span>Aplicado: <b>${_moeda(l.aplicado)}</b> (${_pct(l.percentual)})</span>
               </div>
             </div>`).join('')}
         </div>
@@ -799,7 +772,7 @@ Ponto de entrada público: window._abrirParecerFundeb()
           <span class="badge ${_corBadge(l.status)}">${_labelStatus(l.status)}</span>
         </div>
         <div class="limite-bar-track"><div class="limite-bar-fill ${_corBadge(l.status)}" style="width:${Math.min(100, l.percentual || 0)}%"></div></div>
-        <div class="limite-nums"><span>Valor Exigido: <b>${_moeda(l.exigido)}</b></span><span>Valor Aplicado: <b>${_moeda(l.aplicado)}</b> (${_pct(l.percentual)})</span></div>
+        <div class="limite-nums"><span>Exigido: <b>${_moeda(l.exigido)}</b></span><span>Aplicado: <b>${_moeda(l.aplicado)}</b> (${_pct(l.percentual)})</span></div>
       </div>`).join('');
     const linhasAlertas = limites.filter(l => l.status !== 'cumprido').map(l => `
       <li class="alert-item ${l.status === 'nao_cumprido' ? 'vermelho' : 'amarelo'}">
