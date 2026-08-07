@@ -176,7 +176,7 @@ Ponto de entrada público: window._abrirParecerFundeb()
     if (!p?.url_download) { _msg('URL do parecer não disponível.'); return; }
 
     // Tenta várias propriedades possíveis do backend para garantir o preenchimento
-    const emailDefault = p.presidente_cacs_email
+    const emailDefault = p.presidenteEmail
       || p.email_presidente
       || p.email
       || _st.form.presidenteEmail
