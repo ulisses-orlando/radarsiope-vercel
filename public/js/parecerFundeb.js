@@ -43,6 +43,7 @@ Ponto de entrada público: window._abrirParecerFundeb()
       pareceerExistente: null,
       salvando: false,
       resultadoFinal: null,
+      envioEmail: { email: '', enviando: false, erro: null },
     };
   }
 
@@ -167,21 +168,121 @@ Ponto de entrada público: window._abrirParecerFundeb()
     document.getElementById('pf-ver')?.addEventListener('click', () => {
       if (_st.pareceerExistente?.url_download) window.open(_st.pareceerExistente.url_download, '_self');
     });
-    document.getElementById('pf-enviar-email-status')?.addEventListener('click', _enviarEmailStatus);
+    document.getElementById('pf-enviar-email-status')?.addEventListener('click', _abrirModalEnvioEmail);
   }
 
-  async function _enviarEmailStatus() {
+  function _abrirModalEnvioEmail() {
     const p = _st.pareceerExistente;
     if (!p?.url_download) { _msg('URL do parecer não disponível.'); return; }
-    const emailDefault = p.presidente_cacs_email || _st.form.presidenteEmail || '';
-    const email = prompt('Informe o e-mail para envio do parecer:', emailDefault);
-    if (!email) return;
-    if (!email.includes('@') || !email.includes('.')) { _msg('E-mail inválido.'); return; }
 
-    const btn = document.getElementById('pf-enviar-email-status');
-    const textoOriginal = btn.textContent;
-    btn.disabled = true;
-    btn.textContent = '⏳ Enviando…';
+    // Tenta várias propriedades possíveis do backend para garantir o preenchimento
+    const emailDefault = p.presidente_cacs_email
+      || p.email_presidente
+      || p.email
+      || _st.form.presidenteEmail
+      || '';
+
+    _st.envioEmail = { email: emailDefault, enviando: false, erro: null };
+
+    _fecharModalEnvioEmail(); // evita duplicado
+
+    const overlay = document.getElementById('rs-parecer-overlay');
+    if (!overlay) return;
+
+    const modal = document.createElement('div');
+    modal.id = 'pf-modal-envio-email';
+    modal.className = 'pf-modal-overlay';
+    modal.innerHTML = _htmlModalEnvioEmail();
+    overlay.appendChild(modal);
+    _bindModalEnvioEmail();
+  }
+
+  function _fecharModalEnvioEmail() {
+    document.getElementById('pf-modal-envio-email')?.remove();
+    _st.envioEmail = { email: '', enviando: false, erro: null };
+  }
+
+  function _htmlModalEnvioEmail() {
+    const e = _st.envioEmail;
+    return `
+    <div class="pf-modal">
+      <div class="pf-modal-cabecalho">
+        <div class="pf-modal-titulo">📧 Enviar parecer por e-mail</div>
+        <button id="pf-modal-fechar-x" class="pf-btn-fechar" aria-label="Fechar">✕</button>
+      </div>
+      <div class="pf-modal-corpo">
+        <div class="pf-modal-sub">
+          O parecer em PDF será enviado para o e-mail informado abaixo.
+        </div>
+        <div class="pf-campo">
+          <label class="pf-label">E-mail do destinatário</label>
+          <input type="email" id="pf-modal-email" class="pf-input" 
+            value="${_esc(e.email)}" placeholder="presidente@municipio.gov.br">
+        </div>
+        <div id="pf-modal-erro" class="pf-aviso pf-aviso-vermelho" style="display:none"></div>
+      </div>
+      <div class="pf-modal-rodape">
+        <button id="pf-modal-cancelar" class="pf-btn pf-btn-secundario" ${e.enviando ? 'disabled' : ''}>Cancelar</button>
+        <button id="pf-modal-enviar" class="pf-btn pf-btn-primario" ${e.enviando ? 'disabled' : ''}>
+          ${e.enviando ? '⏳ Enviando…' : 'Enviar parecer'}
+        </button>
+      </div>
+    </div>`;
+  }
+
+  function _bindModalEnvioEmail() {
+    document.getElementById('pf-modal-fechar-x')?.addEventListener('click', _fecharModalEnvioEmail);
+    document.getElementById('pf-modal-cancelar')?.addEventListener('click', _fecharModalEnvioEmail);
+    document.getElementById('pf-modal-enviar')?.addEventListener('click', _executarEnvioEmail);
+
+    const emailInput = document.getElementById('pf-modal-email');
+    emailInput?.addEventListener('keydown', e => {
+      if (e.key === 'Enter') { e.preventDefault(); _executarEnvioEmail(); }
+      if (e.key === 'Escape') _fecharModalEnvioEmail();
+    });
+    emailInput?.focus();
+    emailInput?.select();
+
+    // Fecha ao clicar fora do card
+    document.getElementById('pf-modal-envio-email')?.addEventListener('click', e => {
+      if (e.target.id === 'pf-modal-envio-email') _fecharModalEnvioEmail();
+    });
+  }
+
+  function _mostrarErroModal(msg) {
+    const el = document.getElementById('pf-modal-erro');
+    if (el) { el.textContent = msg; el.style.display = 'block'; }
+  }
+
+  function _atualizarBotaoModal() {
+    const btnEnviar = document.getElementById('pf-modal-enviar');
+    const btnCancelar = document.getElementById('pf-modal-cancelar');
+    const emailInput = document.getElementById('pf-modal-email');
+    if (btnEnviar) {
+      btnEnviar.disabled = _st.envioEmail.enviando;
+      btnEnviar.textContent = _st.envioEmail.enviando ? '⏳ Enviando…' : 'Enviar parecer';
+    }
+    if (btnCancelar) btnCancelar.disabled = _st.envioEmail.enviando;
+    if (emailInput) emailInput.disabled = _st.envioEmail.enviando;
+  }
+
+  async function _executarEnvioEmail() {
+    const emailInput = document.getElementById('pf-modal-email');
+    const email = emailInput?.value?.trim();
+
+    if (!email) { _mostrarErroModal('Informe o e-mail do destinatário.'); return; }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      _mostrarErroModal('E-mail inválido. Verifique o formato.');
+      return;
+    }
+
+    const p = _st.pareceerExistente;
+    if (!p?.url_download) { _mostrarErroModal('URL do parecer não disponível.'); return; }
+
+    _st.envioEmail.enviando = true;
+    const erroEl = document.getElementById('pf-modal-erro');
+    if (erroEl) erroEl.style.display = 'none';
+    _atualizarBotaoModal();
 
     try {
       const resp = await fetch(`${API}?acao=enviar_email_parecer`, {
@@ -189,7 +290,7 @@ Ponto de entrada público: window._abrirParecerFundeb()
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           url_parecer: p.url_download,
-          email: email.trim(),
+          email: email,
           assunto: `Parecer do CACS Fundeb ${_st.exercicio} — pronto para análise`,
           nome: p.presidente_cacs_nome || _st.form.presidenteNome || 'Presidente do CACS',
         }),
@@ -197,15 +298,17 @@ Ponto de entrada público: window._abrirParecerFundeb()
       const dados = await resp.json();
       if (dados.ok) {
         _msg('E-mail enviado com sucesso!');
+        _fecharModalEnvioEmail();
       } else {
-        _msg(dados.error || 'Erro ao enviar e-mail.');
+        _mostrarErroModal(dados.error || 'Erro ao enviar e-mail.');
+        _st.envioEmail.enviando = false;
+        _atualizarBotaoModal();
       }
     } catch (err) {
       console.error('[ParecerFundeb] Erro ao enviar e-mail:', err);
-      _msg('Erro ao enviar e-mail. Tente novamente.');
-    } finally {
-      btn.disabled = false;
-      btn.textContent = textoOriginal;
+      _mostrarErroModal('Erro ao enviar e-mail. Tente novamente.');
+      _st.envioEmail.enviando = false;
+      _atualizarBotaoModal();
     }
   }
 
@@ -362,7 +465,7 @@ Ponto de entrada público: window._abrirParecerFundeb()
         <div class="pf-campo">
           <label class="pf-label">Bimestre de referência</label>
           <select id="pf-manual-bimestre" class="pf-input">
-            ${[1,2,3,4,5,6].map(b => `<option value="${b}" ${bimestre == b ? 'selected' : ''}>${b}º bimestre</option>`).join('')}
+            ${[1, 2, 3, 4, 5, 6].map(b => `<option value="${b}" ${bimestre == b ? 'selected' : ''}>${b}º bimestre</option>`).join('')}
           </select>
         </div>
         <div class="pf-secao-mini">
@@ -386,8 +489,8 @@ Ponto de entrada público: window._abrirParecerFundeb()
             Preencha <strong>Exigido</strong> e <strong>Aplicado</strong>. O percentual e o status são calculados automaticamente.
           </div>
           ${limites.map((l, i) => {
-            const isIEI = l.item === 'iei_educacao_infantil';
-            return `
+      const isIEI = l.item === 'iei_educacao_infantil';
+      return `
             <div class="pf-limite-manual">
               <div class="pf-limite-manual-titulo">${_esc(_labelLimite(l.item))}</div>
               <div class="${isIEI ? 'pf-grid-iei' : 'pf-grid-3'}">
@@ -529,11 +632,11 @@ Ponto de entrada público: window._abrirParecerFundeb()
   function _atualizarCalculosManual() {
     if (!_st.dadosExtraidos) _st.dadosExtraidos = {};
     const conc = _st.dadosExtraidos.conciliacao_bancaria || {};
-    ['saldo_inicial','ingressos','pagamentos','ajustes_positivos','ajustes_negativos'].forEach(key => {
+    ['saldo_inicial', 'ingressos', 'pagamentos', 'ajustes_positivos', 'ajustes_negativos'].forEach(key => {
       const el = document.querySelector(`[data-conc="${key}"]`);
       if (el) conc[key] = _parseMoeda(el.value);
     });
-    conc.saldo_conciliado = (conc.saldo_inicial||0) + (conc.ingressos||0) - (conc.pagamentos||0) + (conc.ajustes_positivos||0) - (conc.ajustes_negativos||0);
+    conc.saldo_conciliado = (conc.saldo_inicial || 0) + (conc.ingressos || 0) - (conc.pagamentos || 0) + (conc.ajustes_positivos || 0) - (conc.ajustes_negativos || 0);
     _st.dadosExtraidos.conciliacao_bancaria = conc;
     const saldoEl = document.getElementById('pf-manual-saldo');
     if (saldoEl) saldoEl.value = _moedaInput(conc.saldo_conciliado);
@@ -597,13 +700,13 @@ Ponto de entrada público: window._abrirParecerFundeb()
     const d = _st.dadosExtraidos;
     if (!d) { _msg('Preencha os dados antes de continuar.'); return false; }
     const conc = d.conciliacao_bancaria || {};
-    if ((conc.ingressos||0) === 0 && (conc.pagamentos||0) === 0) {
+    if ((conc.ingressos || 0) === 0 && (conc.pagamentos || 0) === 0) {
       _msg('Preencha pelo menos os ingressos e pagamentos na conciliação bancária.');
       return false;
     }
     const limites = d.limites || [];
     for (const l of limites) {
-      if ((l.exigido||0) === 0 && l.item !== 'iei_educacao_infantil') {
+      if ((l.exigido || 0) === 0 && l.item !== 'iei_educacao_infantil') {
         _msg(`Preencha o valor exigido para "${_labelLimite(l.item)}".`);
         return false;
       }
@@ -843,8 +946,8 @@ Ponto de entrada público: window._abrirParecerFundeb()
           <div class="pf-status-titulo">Parecer gerado com sucesso</div>
           <div class="pf-status-sub">
             ${_st.form.enviarEmail
-              ? (r?.enviado_email ? `Enviado por e-mail para ${_esc(_st.form.presidenteEmail)}.` : 'O parecer será enviado por e-mail em breve.')
-              : 'O parecer foi gerado e está disponível para download.'}
+        ? (r?.enviado_email ? `Enviado por e-mail para ${_esc(_st.form.presidenteEmail)}.` : 'O parecer será enviado por e-mail em breve.')
+        : 'O parecer foi gerado e está disponível para download.'}
           </div>
           <div class="pf-status-acoes">
             <button id="pf-abrir-final" class="pf-btn pf-btn-primario">Abrir / Baixar parecer</button>
@@ -1324,6 +1427,58 @@ Ponto de entrada público: window._abrirParecerFundeb()
         .pf-acoes-rodape .pf-btn { width: 100%; }
         .pf-grid-3 { grid-template-columns: 1fr; }
         .pf-grid-iei { grid-template-columns: 1fr; }
+      }
+            /* ===== Modal de envio de e-mail ===== */
+      .pf-modal-overlay {
+        position: absolute;
+        inset: 0;
+        background: rgba(15, 23, 42, 0.45);
+        backdrop-filter: blur(3px);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 10000;
+        padding: 16px;
+        animation: pf-modal-in .2s ease;
+      }
+      @keyframes pf-modal-in {
+        from { opacity: 0; }
+        to { opacity: 1; }
+      }
+      .pf-modal {
+        background: #fff;
+        border-radius: 14px;
+        width: 100%;
+        max-width: 440px;
+        box-shadow: 0 24px 80px rgba(0,0,0,0.18);
+        display: flex;
+        flex-direction: column;
+        animation: pf-modal-slide .25s ease;
+      }
+      @keyframes pf-modal-slide {
+        from { opacity: 0; transform: translateY(12px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+      .pf-modal-cabecalho {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 18px 20px 0;
+      }
+      .pf-modal-titulo { font-size: 15px; font-weight: 700; color: #1e293b; }
+      .pf-modal-corpo {
+        padding: 14px 20px 6px;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+      .pf-modal-sub { font-size: 12.5px; color: #64748b; line-height: 1.5; }
+      .pf-modal-rodape {
+        display: flex;
+        justify-content: flex-end;
+        gap: 10px;
+        padding: 14px 20px 18px;
+        border-top: 1px solid #f1f5f9;
       }
     `;
     document.head.appendChild(style);
