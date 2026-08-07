@@ -7,28 +7,25 @@ Ponto de entrada público: window._abrirParecerFundeb()
 
 (function () {
 
-  const API = '/api/sendViaSES'; // endpoints do Parecer Fundeb vivem aqui (?acao=parecer_fundeb_*)
+  const API = '/api/sendViaSES';
   const EXERCICIO_ATUAL = new Date().getFullYear();
-
-  // Deixe true apenas se os endpoints ainda não estiverem deployados/configurados
-  // (migration rodada, SUPABASE_URL/SUPABASE_ANON_KEY setadas, lib/ no lugar).
   const MODO_DEMO = false;
 
-  // ── Estado do wizard ────────────────────────────────────────────────────
   let _st = _estadoInicial();
 
   function _estadoInicial() {
     return {
-      etapa: 0, // 0 = status, 1 = upload, 2 = revisão, 3 = formulário, 4 = preview
-      municipio: null, // { cod, nome, uf }
+      etapa: 0,
+      municipio: null,
       exercicio: EXERCICIO_ATUAL,
-      versaoAnterior: null, // preenchido em caso de regeração
+      versaoAnterior: null,
       pdfFile: null,
       pdfNome: null,
       dadosExtraidos: null,
       avisos: [],
       checksumOk: null,
       forcarContinuar: false,
+      modoEntrada: 'pdf',
       form: {
         presidenteNome: '',
         presidenteEmail: '',
@@ -48,7 +45,6 @@ Ponto de entrada público: window._abrirParecerFundeb()
     };
   }
 
-  // ── Ponto de entrada público ────────────────────────────────────────────
   async function _abrirParecerFundebWizard(cod, nome, uf) {
     const user = window._radarUser;
     if (!user?.uid) { _msg('Faça login para acessar o Parecer Fundeb.'); return; }
@@ -64,13 +60,10 @@ Ponto de entrada público: window._abrirParecerFundeb()
     await _carregarStatus();
   };
 
-  // ── Overlay (mesmo padrão do rs-relatorio-overlay) ─────────────────────
   function _criarOverlay() {
     const existente = document.getElementById('rs-parecer-overlay');
     if (existente) existente.remove();
-
     _injetarCSS();
-
     const overlay = document.createElement('div');
     overlay.id = 'rs-parecer-overlay';
     overlay.innerHTML = `
@@ -82,29 +75,24 @@ Ponto de entrada público: window._abrirParecerFundeb()
       <div id="pf-corpo" class="pf-corpo"></div>
     `;
     document.body.appendChild(overlay);
-
     document.getElementById('pf-fechar').addEventListener('click', _fechar);
     document.addEventListener('keydown', _escFecha);
   }
 
-  function _escFecha(e) {
-    if (e.key === 'Escape') _fechar();
-  }
-
+  function _escFecha(e) { if (e.key === 'Escape') _fechar(); }
   function _fechar() {
     document.getElementById('rs-parecer-overlay')?.remove();
     document.removeEventListener('keydown', _escFecha);
   }
 
-  // ── Render geral ─────────────────────────────────────────────────────────
   function _render() {
     _renderStepper();
     const corpo = document.getElementById('pf-corpo');
     if (!corpo) return;
-
     switch (_st.etapa) {
       case 0: corpo.innerHTML = _telaStatus(); _bindStatus(); break;
       case 1: corpo.innerHTML = _telaUpload(); _bindUpload(); break;
+      case 1.5: corpo.innerHTML = _telaPreenchimentoManual(); _bindPreenchimentoManual(); break;
       case 2: corpo.innerHTML = _telaRevisao(); _bindRevisao(); break;
       case 3: corpo.innerHTML = _telaFormulario(); _bindFormulario(); break;
       case 4: corpo.innerHTML = _telaPreview(); _bindPreview(); break;
@@ -116,27 +104,19 @@ Ponto de entrada público: window._abrirParecerFundeb()
     if (!el) return;
     if (_st.etapa === 0) { el.style.display = 'none'; return; }
     el.style.display = 'flex';
-
+    const passoVisual = _st.etapa === 1.5 ? 1 : _st.etapa;
     const nomes = ['Upload', 'Revisão', 'Formulário', 'Confirmação'];
     el.innerHTML = nomes.map((nome, i) => {
       const passo = i + 1;
-      const estado = passo === _st.etapa ? 'ativo' : passo < _st.etapa ? 'feito' : '';
-      return `
-        <div class="pf-step ${estado}">
-          <div class="pf-step-bolha">${passo < _st.etapa ? '✓' : passo}</div>
-          <div class="pf-step-label">${nome}</div>
-        </div>`;
+      const estado = passo === passoVisual ? 'ativo' : passo < passoVisual ? 'feito' : '';
+      return `<div class="pf-step ${estado}"><div class="pf-step-bolha">${passo < passoVisual ? '✓' : passo}</div><div class="pf-step-label">${nome}</div></div>`;
     }).join('<div class="pf-step-linha"></div>');
   }
 
-  // ─────────────────────────────────────────────────────────────────────
-  // ETAPA 0 — Status (ponto de entrada)
-  // ─────────────────────────────────────────────────────────────────────
   function _telaStatus() {
     if (_st.carregandoStatus) {
       return `<div class="pf-loading">⏳ Verificando parecer do exercício ${_st.exercicio}…</div>`;
     }
-
     if (_st.pareceerExistente) {
       const p = _st.pareceerExistente;
       return `
@@ -150,7 +130,6 @@ Ponto de entrada público: window._abrirParecerFundeb()
           </div>
         </div>`;
     }
-
     return `
       <div class="pf-status-card">
         <div class="pf-status-icone">⚖️</div>
@@ -183,29 +162,20 @@ Ponto de entrada público: window._abrirParecerFundeb()
       _st.etapa = 1;
       _render();
     });
-    // CORREÇÃO: abrir na mesma janela para manter o contexto do PWA
     document.getElementById('pf-ver')?.addEventListener('click', () => {
-      if (_st.pareceerExistente?.url_download) {
-        window.open(_st.pareceerExistente.url_download, '_self');
-      }
+      if (_st.pareceerExistente?.url_download) window.open(_st.pareceerExistente.url_download, '_self');
     });
   }
 
   async function _carregarStatus() {
     _st.carregandoStatus = true;
     _render();
-    try {
-      _st.pareceerExistente = await _apiStatus();
-    } catch (err) {
-      console.error('[ParecerFundeb] Erro ao checar status:', err);
-    }
+    try { _st.pareceerExistente = await _apiStatus(); }
+    catch (err) { console.error('[ParecerFundeb] Erro ao checar status:', err); }
     _st.carregandoStatus = false;
     _render();
   }
 
-  // ─────────────────────────────────────────────────────────────────────
-  // ETAPA 1 — Upload
-  // ─────────────────────────────────────────────────────────────────────
   function _telaUpload() {
     const urlSiope = 'https://www.fnde.gov.br/siope/demonstrativoFundebMunicipal.do';
     return `
@@ -215,7 +185,6 @@ Ponto de entrada público: window._abrirParecerFundeb()
           📌 Baixe o PDF no <a href="${urlSiope}" target="_blank" rel="noopener">portal do SIOPE</a>,
           selecionando o <strong>6º bimestre de ${_st.exercicio}</strong> (dados acumulados do exercício).
         </div>
-
         <div id="pf-dropzone" class="pf-dropzone">
           <input type="file" id="pf-input-pdf" accept="application/pdf" style="display:none">
           <div id="pf-dropzone-conteudo">
@@ -223,9 +192,15 @@ Ponto de entrada público: window._abrirParecerFundeb()
             <div class="pf-dropzone-txt">Arraste o PDF aqui ou <strong>clique para selecionar</strong></div>
           </div>
         </div>
-
         <div id="pf-upload-resultado"></div>
-
+        <div class="pf-divisor">
+          <span class="pf-divisor-linha"></span>
+          <span class="pf-divisor-txt">ou</span>
+          <span class="pf-divisor-linha"></span>
+        </div>
+        <button id="pf-modo-manual" class="pf-btn pf-btn-secundario pf-btn-block">
+          ✏️ Não tenho o PDF / prefiro preencher manualmente
+        </button>
         <div class="pf-acoes-rodape">
           <button id="pf-voltar" class="pf-btn pf-btn-secundario">Voltar</button>
           <button id="pf-continuar" class="pf-btn pf-btn-primario" disabled>Continuar</button>
@@ -236,7 +211,6 @@ Ponto de entrada público: window._abrirParecerFundeb()
   function _bindUpload() {
     const dropzone = document.getElementById('pf-dropzone');
     const input = document.getElementById('pf-input-pdf');
-
     dropzone.addEventListener('click', () => input.click());
     dropzone.addEventListener('dragover', e => { e.preventDefault(); dropzone.classList.add('pf-drag'); });
     dropzone.addEventListener('dragleave', () => dropzone.classList.remove('pf-drag'));
@@ -250,7 +224,11 @@ Ponto de entrada público: window._abrirParecerFundeb()
       const file = e.target.files?.[0];
       if (file) _processarUpload(file);
     });
-
+    document.getElementById('pf-modo-manual').addEventListener('click', () => {
+      _st.modoEntrada = 'manual';
+      _st.etapa = 1.5;
+      _render();
+    });
     document.getElementById('pf-voltar').addEventListener('click', () => { _st.etapa = 0; _render(); });
     document.getElementById('pf-continuar').addEventListener('click', () => {
       if (!_st.checksumOk && !_st.forcarContinuar) {
@@ -264,20 +242,17 @@ Ponto de entrada público: window._abrirParecerFundeb()
 
   async function _processarUpload(file) {
     if (file.type !== 'application/pdf') { _msg('Envie um arquivo PDF.'); return; }
-
     _st.pdfFile = file;
     _st.pdfNome = file.name;
-
+    _st.modoEntrada = 'pdf';
     const resultadoEl = document.getElementById('pf-upload-resultado');
     resultadoEl.innerHTML = `<div class="pf-loading">⏳ Lendo e validando o PDF…</div>`;
     document.getElementById('pf-continuar').disabled = true;
-
     try {
       const resp = await _apiUpload(file);
       _st.dadosExtraidos = resp.dados_extraidos;
       _st.avisos = resp.dados_extraidos?.avisos || [];
       _st.checksumOk = resp.dados_extraidos?.checksum_ok;
-
       const bimestre = resp.dados_extraidos?.bimestre_pdf;
       let avisoBimestre = '';
       if (bimestre && bimestre !== 6) {
@@ -289,7 +264,6 @@ Ponto de entrada público: window._abrirParecerFundeb()
             </label>
           </div>`;
       }
-
       if (_st.checksumOk) {
         resultadoEl.innerHTML = `
           <div class="pf-aviso pf-aviso-verde">✅ PDF lido com sucesso — os totais conferem.</div>
@@ -304,31 +278,220 @@ Ponto de entrada público: window._abrirParecerFundeb()
           </div>`;
         document.getElementById('pf-continuar').disabled = true;
       }
-
       document.getElementById('pf-forcar-continuar')?.addEventListener('change', e => {
         _st.forcarContinuar = e.target.checked;
         document.getElementById('pf-continuar').disabled = !e.target.checked;
       });
-
     } catch (err) {
       console.error('[ParecerFundeb] Erro no upload:', err);
       resultadoEl.innerHTML = `<div class="pf-aviso pf-aviso-vermelho">❌ Erro ao processar o PDF. Tente novamente.</div>`;
     }
   }
 
-  // ─────────────────────────────────────────────────────────────────────
-  // ETAPA 2 — Revisão dos dados extraídos (read-only)
-  // ─────────────────────────────────────────────────────────────────────
+  function _limitesPadrao() {
+    return [
+      { item: 'remuneracao_70', exigido: 0, aplicado: 0, percentual: 0, status: 'indefinido' },
+      { item: 'iei_educacao_infantil', exigido: 0, aplicado: 0, percentual: 0, status: 'indefinido' },
+      { item: 'capital_15', exigido: 0, aplicado: 0, percentual: 0, status: 'indefinido' },
+      { item: 'max_10_nao_aplicado', exigido: 0, aplicado: 0, percentual: 0, status: 'indefinido' },
+      { item: 'fomento_eti_4', exigido: 0, aplicado: 0, percentual: 0, status: 'indefinido' },
+    ];
+  }
+
+  function _telaPreenchimentoManual() {
+    const d = _st.dadosExtraidos || {};
+    const conc = d.conciliacao_bancaria || {};
+    const limites = d.limites || _limitesPadrao();
+    const bimestre = d.bimestre_referencia || d.bimestre_pdf || 6;
+    const camposConciliacao = [
+      { key: 'saldo_inicial', label: 'Disponibilidade financeira inicial' },
+      { key: 'ingressos', label: '(+) Ingresso de recursos até o bimestre' },
+      { key: 'pagamentos', label: '(−) Pagamentos efetuados até o bimestre' },
+      { key: 'ajustes_positivos', label: '(+) Ajustes positivos' },
+      { key: 'ajustes_negativos', label: '(−) Ajustes negativos' },
+    ];
+    return `
+      <div class="pf-etapa">
+        <h3 class="pf-etapa-titulo">Preenchimento manual dos dados</h3>
+        <div class="pf-info-box">
+          ℹ️ Informe os valores diretamente do <strong>Quadro Demonstrativo do SIOPE</strong> (6º bimestre).
+          Os percentuais e status dos limites serão calculados automaticamente.
+        </div>
+        <div class="pf-campo">
+          <label class="pf-label">Bimestre de referência</label>
+          <select id="pf-manual-bimestre" class="pf-input">
+            ${[1,2,3,4,5,6].map(b => `<option value="${b}" ${bimestre == b ? 'selected' : ''}>${b}º bimestre</option>`).join('')}
+          </select>
+        </div>
+        <div class="pf-secao-mini">
+          <div class="pf-secao-mini-titulo">📊 Conciliação bancária</div>
+          ${camposConciliacao.map(c => `
+            <div class="pf-campo">
+              <label class="pf-label">${c.label}</label>
+              <input type="text" class="pf-input pf-moeda" data-conc="${c.key}" value="${_moedaInput(conc[c.key])}" placeholder="R$ 0,00">
+            </div>
+          `).join('')}
+          <div class="pf-campo">
+            <label class="pf-label">Saldo conciliado (calculado)</label>
+            <input type="text" id="pf-manual-saldo" class="pf-input" value="${_moedaInput(conc.saldo_conciliado)}" placeholder="R$ 0,00" readonly style="background:#f1f5f9">
+          </div>
+        </div>
+        <div class="pf-secao-mini">
+          <div class="pf-secao-mini-titulo">📋 Limites obrigatórios</div>
+          <div class="pf-info-box" style="font-size:11px">
+            Preencha <strong>Exigido</strong> e <strong>Aplicado</strong>. O percentual e o status são calculados automaticamente.
+          </div>
+          ${limites.map((l, i) => `
+            <div class="pf-limite-manual">
+              <div class="pf-limite-manual-titulo">${_esc(_labelLimite(l.item))}</div>
+              <div class="pf-grid-3">
+                <div class="pf-campo">
+                  <label class="pf-label">Exigido</label>
+                  <input type="text" class="pf-input pf-moeda" data-limite-idx="${i}" data-campo="exigido" value="${_moedaInput(l.exigido)}" placeholder="R$ 0,00">
+                </div>
+                <div class="pf-campo">
+                  <label class="pf-label">Aplicado</label>
+                  <input type="text" class="pf-input pf-moeda" data-limite-idx="${i}" data-campo="aplicado" value="${_moedaInput(l.aplicado)}" placeholder="R$ 0,00">
+                </div>
+                <div class="pf-campo">
+                  <label class="pf-label">Percentual</label>
+                  <input type="text" class="pf-input" data-limite-idx="${i}" data-campo="percentual" value="${_pctInput(l.percentual)}" placeholder="0,00%" readonly style="background:#f1f5f9">
+                </div>
+              </div>
+              <div class="pf-limite-status" data-limite-status="${i}">
+                <span class="badge ${_corBadge(l.status)}">${_labelStatus(l.status)}</span>
+              </div>
+            </div>
+          `).join('')}
+        </div>
+        <div class="pf-acoes-rodape">
+          <button id="pf-voltar" class="pf-btn pf-btn-secundario">Voltar</button>
+          <button id="pf-continuar" class="pf-btn pf-btn-primario">Revisar dados</button>
+        </div>
+      </div>`;
+  }
+
+  function _bindPreenchimentoManual() {
+    document.querySelectorAll('.pf-moeda').forEach(input => {
+      input.addEventListener('input', e => {
+        const val = _parseMoeda(e.target.value);
+        e.target.value = _moedaInput(val);
+        _atualizarCalculosManual();
+      });
+    });
+    document.getElementById('pf-manual-bimestre').addEventListener('change', e => {
+      if (!_st.dadosExtraidos) _st.dadosExtraidos = {};
+      _st.dadosExtraidos.bimestre_referencia = parseInt(e.target.value, 10);
+    });
+    document.getElementById('pf-voltar').addEventListener('click', () => {
+      _st.modoEntrada = 'pdf';
+      _st.etapa = 1;
+      _render();
+    });
+    document.getElementById('pf-continuar').addEventListener('click', () => {
+      if (!_validarPreenchimentoManual()) return;
+      _st.etapa = 2;
+      _render();
+    });
+    _atualizarCalculosManual();
+  }
+
+  function _atualizarCalculosManual() {
+    if (!_st.dadosExtraidos) _st.dadosExtraidos = {};
+    const conc = _st.dadosExtraidos.conciliacao_bancaria || {};
+    ['saldo_inicial','ingressos','pagamentos','ajustes_positivos','ajustes_negativos'].forEach(key => {
+      const el = document.querySelector(`[data-conc="${key}"]`);
+      if (el) conc[key] = _parseMoeda(el.value);
+    });
+    conc.saldo_conciliado = (conc.saldo_inicial||0) + (conc.ingressos||0) - (conc.pagamentos||0) + (conc.ajustes_positivos||0) - (conc.ajustes_negativos||0);
+    _st.dadosExtraidos.conciliacao_bancaria = conc;
+    const saldoEl = document.getElementById('pf-manual-saldo');
+    if (saldoEl) saldoEl.value = _moedaInput(conc.saldo_conciliado);
+
+    const limites = _st.dadosExtraidos.limites || _limitesPadrao();
+    limites.forEach((l, i) => {
+      const elExigido = document.querySelector(`[data-limite-idx="${i}"][data-campo="exigido"]`);
+      const elAplicado = document.querySelector(`[data-limite-idx="${i}"][data-campo="aplicado"]`);
+      const elPct = document.querySelector(`[data-limite-idx="${i}"][data-campo="percentual"]`);
+      const elStatus = document.querySelector(`[data-limite-status="${i}"]`);
+      if (elExigido) l.exigido = _parseMoeda(elExigido.value);
+      if (elAplicado) l.aplicado = _parseMoeda(elAplicado.value);
+      let pct = l.exigido > 0 ? (l.aplicado / l.exigido) * 100 : 0;
+      l.percentual = parseFloat(pct.toFixed(2));
+      l.status = _calcularStatusLimite(l.item, l.percentual);
+      if (elPct) elPct.value = _pctInput(l.percentual);
+      if (elStatus) elStatus.innerHTML = `<span class="badge ${_corBadge(l.status)}">${_labelStatus(l.status)}</span>`;
+    });
+    _st.dadosExtraidos.limites = limites;
+  }
+
+  function _calcularStatusLimite(item, percentual) {
+    if (item === 'max_10_nao_aplicado') {
+      if (percentual > 100) return 'nao_cumprido';
+      if (percentual > 95) return 'atencao';
+      return 'cumprido';
+    }
+    if (item === 'iei_educacao_infantil') {
+      if (percentual >= 90) return 'cumprido';
+      if (percentual > 0) return 'atencao';
+      return 'nao_cumprido';
+    }
+    if (percentual >= 100) return 'cumprido';
+    if (percentual >= 90) return 'atencao';
+    return 'nao_cumprido';
+  }
+
+  function _validarPreenchimentoManual() {
+    const d = _st.dadosExtraidos;
+    if (!d) { _msg('Preencha os dados antes de continuar.'); return false; }
+    const conc = d.conciliacao_bancaria || {};
+    if ((conc.ingressos||0) === 0 && (conc.pagamentos||0) === 0) {
+      _msg('Preencha pelo menos os ingressos e pagamentos na conciliação bancária.');
+      return false;
+    }
+    const limites = d.limites || [];
+    for (const l of limites) {
+      if ((l.exigido||0) === 0 && l.item !== 'iei_educacao_infantil') {
+        _msg(`Preencha o valor exigido para "${_labelLimite(l.item)}".`);
+        return false;
+      }
+    }
+    return true;
+  }
+
+  function _parseMoeda(str) {
+    if (!str) return 0;
+    const limpo = String(str).replace(/[^\d,.-]/g, '').replace(/\./g, '').replace(',', '.');
+    const val = parseFloat(limpo);
+    return isNaN(val) ? 0 : val;
+  }
+  function _moedaInput(v) {
+    if (v === null || v === undefined || v === '') return '';
+    const num = Number(v);
+    if (isNaN(num)) return '';
+    return num.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+  function _pctInput(v) {
+    if (v === null || v === undefined || v === '') return '';
+    const num = Number(v);
+    if (isNaN(num)) return '';
+    return num.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '%';
+  }
+
   function _telaRevisao() {
     const d = _st.dadosExtraidos || {};
     const limites = d.limites || [];
     const conc = d.conciliacao_bancaria || {};
-
+    const origemLabel = _st.modoEntrada === 'manual'
+      ? '<span class="badge amarelo">📝 Dados informados manualmente</span>'
+      : '<span class="badge verde">📄 Extraído do PDF</span>';
     return `
       <div class="pf-etapa">
-        <h3 class="pf-etapa-titulo">Confira os dados extraídos</h3>
-        <div class="pf-info-box">Esses valores vêm direto do PDF oficial e não podem ser editados aqui — confira se o parser leu corretamente antes de seguir.</div>
-
+        <h3 class="pf-etapa-titulo">Confira os dados</h3>
+        <div class="pf-info-box" style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
+          <span>Esses valores serão usados para compor o parecer.</span>
+          ${origemLabel}
+        </div>
         <div class="pf-secao-mini">
           <div class="pf-secao-mini-titulo">Limites obrigatórios</div>
           ${limites.map(l => `
@@ -344,17 +507,17 @@ Ponto de entrada público: window._abrirParecerFundeb()
               </div>
             </div>`).join('')}
         </div>
-
         <div class="pf-secao-mini">
           <div class="pf-secao-mini-titulo">Conciliação bancária</div>
           <table class="conc">
             <tr><td>Saldo inicial</td><td>${_moeda(conc.saldo_inicial)}</td></tr>
             <tr><td>Ingressos até o bimestre</td><td>${_moeda(conc.ingressos)}</td></tr>
             <tr><td>Pagamentos até o bimestre</td><td>${_moeda(conc.pagamentos)}</td></tr>
+            <tr><td>Ajustes positivos</td><td>${_moeda(conc.ajustes_positivos)}</td></tr>
+            <tr><td>Ajustes negativos</td><td>${_moeda(conc.ajustes_negativos)}</td></tr>
             <tr class="total"><td>Saldo conciliado</td><td>${_moeda(conc.saldo_conciliado)}</td></tr>
           </table>
         </div>
-
         <div class="pf-acoes-rodape">
           <button id="pf-voltar" class="pf-btn pf-btn-secundario">Voltar</button>
           <button id="pf-continuar" class="pf-btn pf-btn-primario">Continuar</button>
@@ -363,7 +526,10 @@ Ponto de entrada público: window._abrirParecerFundeb()
   }
 
   function _bindRevisao() {
-    document.getElementById('pf-voltar').addEventListener('click', () => { _st.etapa = 1; _render(); });
+    document.getElementById('pf-voltar').addEventListener('click', () => {
+      _st.etapa = _st.modoEntrada === 'manual' ? 1.5 : 1;
+      _render();
+    });
     document.getElementById('pf-continuar').addEventListener('click', () => {
       if (!_st.form.conclusaoTipo) _st.form.conclusaoTipo = _sugerirTipoConclusao();
       if (!_st.form.conclusaoTexto) _st.form.conclusaoTexto = _gerarTextoConclusao(_st.form.conclusaoTipo);
@@ -372,18 +538,13 @@ Ponto de entrada público: window._abrirParecerFundeb()
     });
   }
 
-  // ─────────────────────────────────────────────────────────────────────
-  // ETAPA 3 — Formulário manual
-  // ─────────────────────────────────────────────────────────────────────
   function _telaFormulario() {
     const f = _st.form;
     const regerando = !!_st.versaoAnterior;
-
     return `
       <div class="pf-etapa">
         <h3 class="pf-etapa-titulo">Preenchimento do parecer</h3>
         ${regerando ? `<div class="pf-info-box">🔁 Regerando a partir da versão anterior — os campos abaixo já vêm preenchidos, confirme ou ajuste o que for necessário.</div>` : ''}
-
         <div class="pf-campo">
           <label class="pf-label">Presidente do CACS</label>
           <input type="text" id="pf-presidente-nome" class="pf-input" value="${_esc(f.presidenteNome)}" placeholder="Nome completo">
@@ -392,7 +553,6 @@ Ponto de entrada público: window._abrirParecerFundeb()
           <label class="pf-label">E-mail do presidente</label>
           <input type="email" id="pf-presidente-email" class="pf-input" value="${_esc(f.presidenteEmail)}" placeholder="email@municipio.gov.br">
         </div>
-
         <div class="pf-secao-mini">
           <div class="pf-secao-mini-titulo">Checklist de verificação documental</div>
           <div class="pf-info-box">ℹ️ Os dados têm origem em informações autodeclaradas ao SIOPE. Confirme abaixo os documentos que o CACS já verificou.</div>
@@ -405,7 +565,6 @@ Ponto de entrada público: window._abrirParecerFundeb()
               <input type="text" class="pf-input pf-input-sm" data-obs-idx="${i}" placeholder="Observação (opcional)" value="${_esc(item.observacao || '')}">
             </div>`).join('')}
         </div>
-
         <div class="pf-secao-mini">
           <div class="pf-secao-mini-titulo">Conclusão do parecer</div>
           <div class="pf-campo">
@@ -422,7 +581,6 @@ Ponto de entrada público: window._abrirParecerFundeb()
             <textarea id="pf-conclusao-texto" class="pf-input pf-textarea" rows="5">${_esc(f.conclusaoTexto)}</textarea>
           </div>
         </div>
-
         <div class="pf-acoes-rodape">
           <button id="pf-voltar" class="pf-btn pf-btn-secundario">Voltar</button>
           <button id="pf-continuar" class="pf-btn pf-btn-primario">Revisar e gerar</button>
@@ -438,36 +596,25 @@ Ponto de entrada público: window._abrirParecerFundeb()
       _atualizarTextoConclusao();
     });
     document.getElementById('pf-conclusao-texto').addEventListener('input', e => _st.form.conclusaoTexto = e.target.value);
-
     document.querySelectorAll('[data-check-idx]').forEach(el => {
-      el.addEventListener('change', e => {
-        _st.form.checklist[+e.target.dataset.checkIdx].confirmado = e.target.checked;
-      });
+      el.addEventListener('change', e => { _st.form.checklist[+e.target.dataset.checkIdx].confirmado = e.target.checked; });
     });
     document.querySelectorAll('[data-obs-idx]').forEach(el => {
-      el.addEventListener('input', e => {
-        _st.form.checklist[+e.target.dataset.obsIdx].observacao = e.target.value;
-      });
+      el.addEventListener('input', e => { _st.form.checklist[+e.target.dataset.obsIdx].observacao = e.target.value; });
     });
-
     document.getElementById('pf-voltar').addEventListener('click', () => { _st.etapa = 2; _render(); });
     document.getElementById('pf-continuar').addEventListener('click', () => {
       if (!_st.form.presidenteNome || !_st.form.presidenteEmail) {
-        _msg('Informe o nome e o e-mail do presidente do CACS.');
-        return;
+        _msg('Informe o nome e o e-mail do presidente do CACS.'); return;
       }
       if (!_st.form.conclusaoTipo) {
-        _msg('Selecione o tipo de conclusão do parecer.');
-        return;
+        _msg('Selecione o tipo de conclusão do parecer.'); return;
       }
       _st.etapa = 4;
       _render();
     });
   }
 
-  // ─────────────────────────────────────────────────────────────────────
-  // ETAPA 4 — Preview final + confirmação
-  // ─────────────────────────────────────────────────────────────────────
   function _telaPreview() {
     return `
       <div class="pf-etapa pf-etapa-preview">
@@ -487,7 +634,6 @@ Ponto de entrada público: window._abrirParecerFundeb()
   function _bindPreview() {
     const iframe = document.getElementById('pf-preview-iframe');
     iframe.setAttribute('srcdoc', _montarHTMLParecer());
-
     document.getElementById('pf-voltar').addEventListener('click', () => { _st.etapa = 3; _render(); });
     document.getElementById('pf-confirmar').addEventListener('click', _confirmarGeracao);
   }
@@ -525,8 +671,6 @@ Ponto de entrada público: window._abrirParecerFundeb()
         </div>
       </div>`;
     document.getElementById('pf-stepper').style.display = 'none';
-
-    // CORREÇÃO: abrir na mesma janela para manter o contexto do PWA
     document.getElementById('pf-abrir-final').addEventListener('click', () => {
       const url = r?.url_download || '#';
       window.open(url, '_self');
@@ -534,9 +678,6 @@ Ponto de entrada público: window._abrirParecerFundeb()
     document.getElementById('pf-fechar-final').addEventListener('click', _fechar);
   }
 
-  // ─────────────────────────────────────────────────────────────────────
-  // Montagem do HTML final do parecer (mesmo template aprovado)
-  // ─────────────────────────────────────────────────────────────────────
   function _montarHTMLParecer() {
     const d = _st.dadosExtraidos || {};
     const f = _st.form;
@@ -544,14 +685,9 @@ Ponto de entrada público: window._abrirParecerFundeb()
     const limites = d.limites || [];
     const conc = d.conciliacao_bancaria || {};
     const dataGeracao = new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
-
-    const corSelo = f.conclusaoTipo === 'aprovado' ? '#dcfce7'
-      : f.conclusaoTipo === 'reprovado' ? '#fee2e2' : '#fef9c3';
-    const fgSelo = f.conclusaoTipo === 'aprovado' ? '#166534'
-      : f.conclusaoTipo === 'reprovado' ? '#991b1b' : '#854d0e';
-    const labelSelo = f.conclusaoTipo === 'aprovado' ? '✅ Aprovado'
-      : f.conclusaoTipo === 'reprovado' ? '❌ Reprovado' : '⚠ Aprovado com ressalvas';
-
+    const corSelo = f.conclusaoTipo === 'aprovado' ? '#dcfce7' : f.conclusaoTipo === 'reprovado' ? '#fee2e2' : '#fef9c3';
+    const fgSelo = f.conclusaoTipo === 'aprovado' ? '#166534' : f.conclusaoTipo === 'reprovado' ? '#991b1b' : '#854d0e';
+    const labelSelo = f.conclusaoTipo === 'aprovado' ? '✅ Aprovado' : f.conclusaoTipo === 'reprovado' ? '❌ Reprovado' : '⚠ Aprovado com ressalvas';
     const linhasLimites = limites.map(l => `
       <div class="limite">
         <div class="limite-top">
@@ -561,25 +697,22 @@ Ponto de entrada público: window._abrirParecerFundeb()
         <div class="limite-bar-track"><div class="limite-bar-fill ${_corBadge(l.status)}" style="width:${Math.min(100, l.percentual || 0)}%"></div></div>
         <div class="limite-nums"><span>Exigido: <b>${_moeda(l.exigido)}</b></span><span>Aplicado: <b>${_moeda(l.aplicado)}</b> (${_pct(l.percentual)})</span></div>
       </div>`).join('');
-
     const linhasAlertas = limites.filter(l => l.status !== 'cumprido').map(l => `
       <li class="alert-item ${l.status === 'nao_cumprido' ? 'vermelho' : 'amarelo'}">
         <span class="alert-dot"></span>
         <span><strong>${_esc(_labelLimite(l.item))}:</strong> ${_pct(l.percentual)} — ${_labelStatus(l.status).toLowerCase()}.</span>
       </li>`).join('') || '<li class="alert-item" style="background:#dcfce7"><span>✅ Nenhum ponto de atenção identificado.</span></li>';
-
     const linhasChecklist = f.checklist.map(c => `
       <div class="check-item">
         <div class="check-box ${c.confirmado ? 'on' : ''}"></div>
         <div><div class="check-label">${_esc(c.label)}</div><div class="check-obs">${_esc(c.observacao) || '—'}</div></div>
       </div>`).join('');
-
     const linhasAssinaturas = [{ nome: f.presidenteNome, papel: 'Presidente do CACS' }, ...f.membros.map(mb => ({ nome: mb.nome, papel: mb.cargo || 'Membro do CACS' }))]
       .map(s => `<div class="sign-slot"><div class="sign-line"></div><div class="sign-name">${_esc(s.nome)}</div><div class="sign-role">${_esc(s.papel)}</div></div>`).join('');
-
     const bimestre = _st.dadosExtraidos?.bimestre_pdf || _st.dadosExtraidos?.bimestre_referencia || 6;
-
-    // CSS idêntico ao arquivo parecer-fundeb-template.html — mantido em sincronia manualmente.
+    const textoFonteDados = _st.modoEntrada === 'manual'
+      ? `Os dados deste parecer foram <strong>informados manualmente</strong> pelo responsável pelo preenchimento, com base no <strong>Quadro Demonstrativo das Receitas e Despesas com o Fundeb</strong> (SIOPE/FNDE), ${bimestre}º bimestre/${_st.exercicio}.`
+      : `Os dados deste parecer foram extraídos do <strong>Quadro Demonstrativo das Receitas e Despesas com o Fundeb</strong>, emitido pelo SIOPE/FNDE, arquivo <strong>${_esc(_st.pdfNome || '')}</strong>, anexado pelo gestor em ${dataGeracao}.`;
     return `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700&display=swap">
@@ -615,7 +748,7 @@ Ponto de entrada público: window._abrirParecerFundeb()
       </div>
     </div>
     <div class="secao"><div class="secao-titulo"><span class="secao-num">02</span> Fonte dos dados</div>
-      <div class="source-note"><span>📄</span><span>Os dados deste parecer foram extraídos do <strong>Quadro Demonstrativo das Receitas e Despesas com o Fundeb</strong>, emitido pelo SIOPE/FNDE, arquivo <strong>${_esc(_st.pdfNome || '')}</strong>, anexado pelo gestor em ${dataGeracao}.</span></div>
+      <div class="source-note"><span>📄</span><span>${textoFonteDados}</span></div>
     </div>
     <div class="secao"><div class="secao-titulo"><span class="secao-num">03</span> Análise dos limites obrigatórios</div>${linhasLimites}</div>
     <div class="secao"><div class="secao-titulo"><span class="secao-num">04</span> Disponibilidade financeira e conciliação bancária</div>
@@ -648,7 +781,6 @@ Ponto de entrada público: window._abrirParecerFundeb()
   }
 
   function _cssParecerFinal() {
-    // Idêntico ao <style> de parecer-fundeb-template.html
     return `
     *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
     html,body{font-family:'Sora','Segoe UI',system-ui,sans-serif;font-size:12px;color:#1e293b;background:#f8fafc;line-height:1.5}
@@ -725,9 +857,6 @@ Ponto de entrada público: window._abrirParecerFundeb()
     `;
   }
 
-  // ─────────────────────────────────────────────────────────────────────
-  // API (com fallback de demonstração enquanto o backend não existe)
-  // ─────────────────────────────────────────────────────────────────────
   async function _apiStatus() {
     if (MODO_DEMO) { await _delay(400); return null; }
     const user = window._radarUser;
@@ -737,7 +866,6 @@ Ponto de entrada público: window._abrirParecerFundeb()
       uf: _st.municipio.uf,
       exercicio: _st.exercicio,
     });
-
     const resp = await fetch(`${API}?acao=parecer_fundeb_status&${params}`);
     const dados = await resp.json();
     if (!dados.ok) throw new Error(dados.error || 'Erro ao checar status');
@@ -747,20 +875,16 @@ Ponto de entrada público: window._abrirParecerFundeb()
   function _arquivoParaBase64(file) {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
-      reader.onload = () => resolve(reader.result.split(',')[1]); // remove o prefixo data:application/pdf;base64,
+      reader.onload = () => resolve(reader.result.split(',')[1]);
       reader.onerror = reject;
       reader.readAsDataURL(file);
     });
   }
 
   async function _apiUpload(file) {
-    if (MODO_DEMO) {
-      await _delay(900);
-      return _mockDadosExtraidos();
-    }
+    if (MODO_DEMO) { await _delay(900); return _mockDadosExtraidos(); }
     const user = window._radarUser;
     const pdfBase64 = await _arquivoParaBase64(file);
-
     const resp = await fetch(`${API}?acao=parecer_fundeb_upload`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -777,10 +901,7 @@ Ponto de entrada público: window._abrirParecerFundeb()
   }
 
   async function _apiFinalizar() {
-    if (MODO_DEMO) {
-      await _delay(1000);
-      return { ok: true, url_download: '#', enviado_email: true };
-    }
+    if (MODO_DEMO) { await _delay(1000); return { ok: true, url_download: '#', enviado_email: true }; }
     const user = window._radarUser;
     const resp = await fetch(`${API}?acao=parecer_fundeb_finalizar`, {
       method: 'POST',
@@ -828,7 +949,6 @@ Ponto de entrada público: window._abrirParecerFundeb()
     };
   }
 
-  // ── Helpers de formatação/label ─────────────────────────────────────────
   function _labelLimite(item) {
     const mapa = {
       remuneracao_70: 'Mínimo 70% — Remuneração dos Profissionais da Educação Básica',
@@ -843,7 +963,7 @@ Ponto de entrada público: window._abrirParecerFundeb()
     return { cumprido: 'Cumprido', nao_cumprido: 'Não cumprido', atencao: 'Atenção', indefinido: 'Indefinido' }[s] || s;
   }
   function _corBadge(s) {
-    return { cumprido: 'verde', nao_cumprido: 'vermelho', atencao: 'amarelo' }[s] || 'cinza';
+    return { cumprido: 'verde', nao_cumprido: 'vermelho', atencao: 'amarelo', indefinido: 'cinza' }[s] || 'cinza';
   }
   function _sugerirTipoConclusao() {
     const limites = _st.dadosExtraidos?.limites || [];
@@ -852,11 +972,9 @@ Ponto de entrada público: window._abrirParecerFundeb()
     const temNaoCumprido = problemas.some(l => l.status === 'nao_cumprido');
     return temNaoCumprido ? 'reprovado' : 'aprovado_com_ressalvas';
   }
-
   function _gerarTextoConclusao(tipo) {
     const limites = _st.dadosExtraidos?.limites || [];
     const problemas = limites.filter(l => l.status !== 'cumprido').map(l => _labelLimite(l.item));
-
     if (tipo === 'aprovado') {
       return 'O Conselho de Acompanhamento e Controle Social do Fundeb, após análise do Quadro Demonstrativo e verificação documental complementar, conclui pela aprovação das contas, tendo em vista o cumprimento de todos os limites obrigatórios do exercício.';
     }
@@ -868,7 +986,6 @@ Ponto de entrada público: window._abrirParecerFundeb()
     }
     return '';
   }
-
   function _atualizarTextoConclusao() {
     const tipo = _st.form.conclusaoTipo;
     if (!tipo) return;
@@ -904,7 +1021,6 @@ Ponto de entrada público: window._abrirParecerFundeb()
     else alert(texto);
   }
 
-  // ── CSS do wizard ────────────────────────────────────────────────────────
   function _injetarCSS() {
     if (document.getElementById('pf-css')) return;
     const style = document.createElement('style');
@@ -953,11 +1069,16 @@ Ponto de entrada público: window._abrirParecerFundeb()
       .pf-btn-primario:disabled { background: #94a3b8; cursor: not-allowed; }
       .pf-btn-secundario { background: #f1f5f9; color: #334155; }
       .pf-btn-secundario:hover { background: #e2e8f0; }
+      .pf-btn-block { width: 100%; }
 
       .pf-dropzone { border: 2px dashed #cbd5e1; border-radius: 10px; padding: 36px 20px; text-align: center; cursor: pointer; background: #fff; transition: border-color .15s, background .15s; }
       .pf-dropzone:hover, .pf-dropzone.pf-drag { border-color: #0A3D62; background: #f0f6fb; }
       .pf-dropzone-icone { font-size: 30px; margin-bottom: 8px; }
       .pf-dropzone-txt { font-size: 12.5px; color: #475569; }
+
+      .pf-divisor { display: flex; align-items: center; gap: 12px; margin: 8px 0; }
+      .pf-divisor-linha { flex: 1; height: 1px; background: #e2e8f0; }
+      .pf-divisor-txt { font-size: 11px; color: #94a3b8; font-weight: 600; text-transform: uppercase; }
 
       .pf-aviso { border-radius: 8px; padding: 10px 12px; font-size: 12px; line-height: 1.5; margin-top: 8px; }
       .pf-aviso-verde { background: #dcfce7; color: #166534; }
@@ -985,6 +1106,12 @@ Ponto de entrada público: window._abrirParecerFundeb()
       .pf-preview-wrap { background: #e2e8f0; border-radius: 10px; overflow: hidden; height: 60vh; min-height: 420px; }
       .pf-preview-iframe { width: 100%; height: 100%; border: none; }
 
+      /* Estilos do modo manual */
+      .pf-grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+      .pf-limite-manual { background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+      .pf-limite-manual-titulo { font-size: 11.5px; font-weight: 600; color: #1e293b; }
+      .pf-limite-status { margin-top: 2px; }
+
       .badge { display: inline-block; padding: 2px 9px; border-radius: 20px; font-size: 10px; font-weight: 600; white-space: nowrap; }
       .badge.verde { background: #dcfce7; color: #166534; }
       .badge.vermelho { background: #fee2e2; color: #991b1b; }
@@ -1009,12 +1136,12 @@ Ponto de entrada público: window._abrirParecerFundeb()
         .pf-status-acoes { flex-direction: column; }
         .pf-acoes-rodape { flex-direction: column-reverse; }
         .pf-acoes-rodape .pf-btn { width: 100%; }
+        .pf-grid-3 { grid-template-columns: 1fr; }
       }
     `;
     document.head.appendChild(style);
   }
 
-  // Atribuição ao window DEVE estar aqui, dentro do IIFE
   window._abrirParecerFundebWizard = _abrirParecerFundebWizard;
 
 })();
