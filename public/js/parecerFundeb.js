@@ -37,7 +37,7 @@ Ponto de entrada público: window._abrirParecerFundeb()
         ],
         conclusaoTipo: '',
         conclusaoTexto: '',
-        enviarEmail: true,
+        enviarEmail: false,
       },
       carregandoStatus: false,
       pareceerExistente: null,
@@ -342,7 +342,7 @@ Ponto de entrada público: window._abrirParecerFundeb()
         <div class="pf-secao-mini">
           <div class="pf-secao-mini-titulo">📋 Limites obrigatórios</div>
           <div class="pf-info-box" style="font-size:11px">
-            Preencha <strong>Valor Exigido</strong> e <strong>Valor Aplicado</strong>. O percentual e o status são calculados automaticamente.
+            Preencha <strong>Exigido</strong> e <strong>Aplicado</strong>. O percentual e o status são calculados automaticamente.
           </div>
           ${limites.map((l, i) => {
             const isIEI = l.item === 'iei_educacao_infantil';
@@ -362,9 +362,9 @@ Ponto de entrada público: window._abrirParecerFundeb()
                 </div>
                 ${isIEI ? `
                 <div class="pf-campo">
-                  <label class="pf-label">Meta (IEI) (%)</label>
+                  <label class="pf-label">Meta Mínima (%)</label>
                   <input type="text" inputmode="decimal" class="pf-input pf-meta-iei" data-limite-idx="${i}" data-campo="meta_iei"
-                    value="${l.meta_iei ? l.meta_iei.toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2}) : ''}" placeholder="0,00" title="Percentual mínimo do IEI para este município">
+                    value="${_pctInput(l.meta_iei)}" placeholder="0,00%" title="Percentual mínimo do IEI para este município">
                 </div>
                 <div class="pf-campo">
                   <label class="pf-label">Cumprimento</label>
@@ -393,27 +393,17 @@ Ponto de entrada público: window._abrirParecerFundeb()
   }
 
   function _bindPreenchimentoManual() {
-    const camposMoeda = document.querySelectorAll('.pf-moeda, .pf-meta-iei');
-
-    camposMoeda.forEach(input => {
-      // Ao receber foco: remove formatação para edição limpa
+    // Campos de moeda (R$)
+    document.querySelectorAll('.pf-moeda').forEach(input => {
       input.addEventListener('focus', e => {
         const val = _parseMoeda(e.target.value);
         if (val !== 0 || e.target.value.trim()) {
-          // Mostra em formato "simples" sem pontos de milhar, com vírgula decimal
           e.target.value = _desformatarMoeda(e.target.value);
-          // Seleciona tudo para facilitar substituição
           setTimeout(() => e.target.select(), 0);
         }
       });
-
-      // Ao digitar: atualiza cálculos em tempo real (sem formatar o campo)
       input.addEventListener('input', e => {
-        // Permite apenas dígitos, vírgula, ponto e sinal negativo
-        let v = e.target.value;
-        // Remove caracteres inválidos mas preserva vírgula/ponto durante digitação
-        v = v.replace(/[^\d.,\-]/g, '');
-        // Evita múltiplas vírgulas/pontos decimais (mantém apenas o último)
+        let v = e.target.value.replace(/[^\d.,\-]/g, '');
         const partes = v.split(/[.,]/);
         if (partes.length > 2) {
           v = partes.slice(0, -1).join('') + ',' + partes[partes.length - 1];
@@ -421,11 +411,35 @@ Ponto de entrada público: window._abrirParecerFundeb()
         if (e.target.value !== v) e.target.value = v;
         _atualizarCalculosManual();
       });
-
-      // Ao sair do campo: aplica formatação bonita
       input.addEventListener('blur', e => {
         const val = _parseMoeda(e.target.value);
         e.target.value = _moedaInput(val);
+        _atualizarCalculosManual();
+      });
+    });
+
+    // Campo de meta IEI (%)
+    document.querySelectorAll('.pf-meta-iei').forEach(input => {
+      input.addEventListener('focus', e => {
+        const val = _parsePercentual(e.target.value);
+        if (val !== 0 || e.target.value.trim()) {
+          // Remove % e pontos de milhar para edição limpa
+          e.target.value = val.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).replace(/\./g, '');
+          setTimeout(() => e.target.select(), 0);
+        }
+      });
+      input.addEventListener('input', e => {
+        let v = e.target.value.replace(/[^\d.,\-]/g, '');
+        const partes = v.split(/[.,]/);
+        if (partes.length > 2) {
+          v = partes.slice(0, -1).join('') + ',' + partes[partes.length - 1];
+        }
+        if (e.target.value !== v) e.target.value = v;
+        _atualizarCalculosManual();
+      });
+      input.addEventListener('blur', e => {
+        const val = _parsePercentual(e.target.value);
+        e.target.value = _pctInput(val);
         _atualizarCalculosManual();
       });
     });
@@ -617,7 +631,7 @@ Ponto de entrada público: window._abrirParecerFundeb()
               <div class="limite-bar-track"><div class="limite-bar-fill ${_corBadge(l.status)}" style="width:${Math.min(100, l.percentual || 0)}%"></div></div>
               <div class="limite-nums">
                 <span>Valor Exigido: <b>${_moeda(l.exigido)}</b></span>
-                <span>Aplicado: <b>${_moeda(l.aplicado)}</b> (${_pct(l.percentual)})</span>
+                <span>Valor Aplicado: <b>${_moeda(l.aplicado)}</b> (${_pct(l.percentual)})</span>
               </div>
             </div>`).join('')}
         </div>
