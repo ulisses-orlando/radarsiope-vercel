@@ -124,6 +124,37 @@ async function _parecerFundebUpload(req, res) {
   }
 }
 
+async function _enviarEmailParecer(req, res) {
+  const body = await _lerBody(req);
+  const { url_parecer, email, assunto, nome } = body || {};
+  
+  if (!url_parecer || !email) {
+    return res.status(400).json({ ok: false, error: 'URL e e-mail são obrigatórios.' });
+  }
+
+  try {
+    const resp = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL}/api/enviarEmail`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        nome: nome || 'Destinatário',
+        email: email,
+        assunto: assunto || 'Parecer do CACS Fundeb',
+        mensagemHtml: `
+          <p>Olá, ${nome || ''}.</p>
+          <p>O parecer do Fundeb está disponível para visualização:</p>
+          <p><a href="${url_parecer}">Clique aqui para visualizar o parecer</a></p>
+          <p style="color:#64748b;font-size:12px">Radar SIOPE — radarsiope.com.br</p>
+        `,
+      }),
+    });
+    if (resp.ok) return res.status(200).json({ ok: true });
+    return res.status(500).json({ ok: false, error: 'Falha ao enviar e-mail.' });
+  } catch (err) {
+    return res.status(500).json({ ok: false, error: err.message });
+  }
+}
+
 // ── POST ?acao=parecer_fundeb_finalizar ─────────────────────────────────
 async function _parecerFundebFinalizar(req, res) {
   const body = await _lerBody(req);
@@ -912,6 +943,7 @@ export default async function handler(req, res) {
   if (req.method === 'GET' && acao === 'parecer_fundeb_ver') return _parecerFundebVer(req, res);
   if (req.method === 'POST' && acao === 'parecer_fundeb_upload') return _parecerFundebUpload(req, res);
   if (req.method === 'POST' && acao === 'parecer_fundeb_finalizar') return _parecerFundebFinalizar(req, res);
+  if (req.method === 'POST' && acao === 'enviar_email_parecer') return _enviarEmailParecer(req, res);
 
   // Dentro do handler principal, após a verificação de 'relatorio_conformidade':
   if (req.query.acao === 'sync_cauc') {
