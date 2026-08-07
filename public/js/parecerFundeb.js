@@ -292,7 +292,7 @@ Ponto de entrada público: window._abrirParecerFundeb()
   function _limitesPadrao() {
     return [
       { item: 'remuneracao_70', exigido: 0, aplicado: 0, percentual: 0, status: 'indefinido' },
-      { item: 'iei_educacao_infantil', exigido: 0, aplicado: 0, percentual: 0, status: 'indefinido' },
+      { item: 'iei_educacao_infantil', exigido: 0, aplicado: 0, percentual: 0, status: 'indefinido', meta_iei: 0 },
       { item: 'capital_15', exigido: 0, aplicado: 0, percentual: 0, status: 'indefinido' },
       { item: 'max_10_nao_aplicado', exigido: 0, aplicado: 0, percentual: 0, status: 'indefinido' },
       { item: 'fomento_eti_4', exigido: 0, aplicado: 0, percentual: 0, status: 'indefinido' },
@@ -344,10 +344,12 @@ Ponto de entrada público: window._abrirParecerFundeb()
           <div class="pf-info-box" style="font-size:11px">
             Preencha <strong>Exigido</strong> e <strong>Aplicado</strong>. O percentual e o status são calculados automaticamente.
           </div>
-          ${limites.map((l, i) => `
+          ${limites.map((l, i) => {
+            const isIEI = l.item === 'iei_educacao_infantil';
+            return `
             <div class="pf-limite-manual">
               <div class="pf-limite-manual-titulo">${_esc(_labelLimite(l.item))}</div>
-              <div class="pf-grid-3">
+              <div class="${isIEI ? 'pf-grid-2-1' : 'pf-grid-3'}">
                 <div class="pf-campo">
                   <label class="pf-label">Valor Exigido</label>
                   <input type="text" inputmode="decimal" class="pf-input pf-moeda" data-limite-idx="${i}" data-campo="exigido"
@@ -358,17 +360,30 @@ Ponto de entrada público: window._abrirParecerFundeb()
                   <input type="text" inputmode="decimal" class="pf-input pf-moeda" data-limite-idx="${i}" data-campo="aplicado"
                     value="${_moedaInput(l.aplicado)}" placeholder="0,00">
                 </div>
+                ${isIEI ? `
+                <div class="pf-campo">
+                  <label class="pf-label">Meta Mínima (%)</label>
+                  <input type="text" inputmode="decimal" class="pf-input pf-meta-iei" data-limite-idx="${i}" data-campo="meta_iei"
+                    value="${l.meta_iei ? l.meta_iei.toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2}) : ''}" placeholder="0,00" title="Percentual mínimo do IEI para este município">
+                </div>
+                <div class="pf-campo">
+                  <label class="pf-label">Cumprimento</label>
+                  <input type="text" class="pf-input" data-limite-idx="${i}" data-campo="percentual"
+                    value="${_pctInput(l.percentual)}" placeholder="0,00%" readonly style="background:#f1f5f9">
+                </div>
+                ` : `
                 <div class="pf-campo">
                   <label class="pf-label">Percentual</label>
                   <input type="text" class="pf-input" data-limite-idx="${i}" data-campo="percentual"
                     value="${_pctInput(l.percentual)}" placeholder="0,00%" readonly style="background:#f1f5f9">
                 </div>
+                `}
               </div>
               <div class="pf-limite-status" data-limite-status="${i}">
                 <span class="badge ${_corBadge(l.status)}">${_labelStatus(l.status)}</span>
               </div>
             </div>
-          `).join('')}
+          `}).join('')}
         </div>
         <div class="pf-acoes-rodape">
           <button id="pf-voltar" class="pf-btn pf-btn-secundario">Voltar</button>
@@ -378,7 +393,7 @@ Ponto de entrada público: window._abrirParecerFundeb()
   }
 
   function _bindPreenchimentoManual() {
-    const camposMoeda = document.querySelectorAll('.pf-moeda');
+    const camposMoeda = document.querySelectorAll('.pf-moeda, .pf-meta-iei');
 
     camposMoeda.forEach(input => {
       // Ao receber foco: remove formatação para edição limpa
@@ -478,9 +493,18 @@ Ponto de entrada público: window._abrirParecerFundeb()
       if (elAplicado) l.aplicado = _parseMoeda(elAplicado.value);
       // Percentual Real = (Aplicado / Exigido) × Meta_da_Lei
       // Ex: Exigido=700 (que é 70% de 1000), Aplicado=800 → (800/700)×70 = 80%
-      const meta = _metaPercentualLimite(l.item);
-      l.percentual = l.exigido > 0 ? parseFloat(((l.aplicado / l.exigido) * meta).toFixed(2)) : 0;
-      l.status = _calcularStatusLimite(l.item, l.percentual);
+      // Para IEI, o usuário informa a meta mínima específica do município
+      if (l.item === 'iei_educacao_infantil') {
+        const elMeta = document.querySelector(`[data-limite-idx="${i}"][data-campo="meta_iei"]`);
+        if (elMeta) l.meta_iei = _parsePercentual(elMeta.value);
+        // Percentual de cumprimento = (Aplicado / Exigido) × 100
+        l.percentual = l.exigido > 0 ? parseFloat(((l.aplicado / l.exigido) * 100).toFixed(2)) : 0;
+        l.status = _calcularStatusLimite(l.item, l.percentual, l.meta_iei);
+      } else {
+        const meta = _metaPercentualLimite(l.item);
+        l.percentual = l.exigido > 0 ? parseFloat(((l.aplicado / l.exigido) * meta).toFixed(2)) : 0;
+        l.status = _calcularStatusLimite(l.item, l.percentual);
+      }
       if (elPct) elPct.value = _pctInput(l.percentual);
       if (elStatus) elStatus.innerHTML = `<span class="badge ${_corBadge(l.status)}">${_labelStatus(l.status)}</span>`;
     });
@@ -489,8 +513,16 @@ Ponto de entrada público: window._abrirParecerFundeb()
 
 
 
-  function _calcularStatusLimite(item, percentual) {
+  function _calcularStatusLimite(item, percentual, meta_iei) {
     const meta = _metaPercentualLimite(item);
+
+    // IEI — usa a meta informada pelo usuário (meta_iei)
+    if (item === 'iei_educacao_infantil') {
+      if (!meta_iei || meta_iei <= 0) return 'indefinido'; // Meta não informada
+      if (percentual >= meta_iei) return 'cumprido';
+      if (percentual >= meta_iei * 0.90) return 'atencao';
+      return 'nao_cumprido';
+    }
 
     // Limite de MÁXIMO (10% não aplicado)
     if (item === 'max_10_nao_aplicado') {
@@ -499,12 +531,7 @@ Ponto de entrada público: window._abrirParecerFundeb()
       return 'cumprido';
     }
 
-    // IEI — quando exigido é zero (sem meta definida no SIOPE)
-    if (item === 'iei_educacao_infantil' && percentual === 0) {
-      return 'indefinido';
-    }
-
-    // Limites de MÍNIMO (70%, 15%, 4%, IEI)
+    // Limites de MÍNIMO (70%, 15%, 4%)
     if (percentual >= meta) return 'cumprido';        // Atingiu ou superou a meta
     if (percentual >= meta * 0.90) return 'atencao';  // Pelo menos 90% da meta
     return 'nao_cumprido';
@@ -526,6 +553,13 @@ Ponto de entrada público: window._abrirParecerFundeb()
       }
     }
     return true;
+  }
+
+  function _parsePercentual(str) {
+    if (!str) return 0;
+    const limpo = String(str).replace(/[^\d.,\-]/g, '').replace(/\./g, '').replace(',', '.');
+    const val = parseFloat(limpo);
+    return isNaN(val) ? 0 : val;
   }
 
   function _parseMoeda(str) {
@@ -1202,6 +1236,8 @@ Ponto de entrada público: window._abrirParecerFundeb()
 
       /* Modo manual */
       .pf-grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+      .pf-grid-2-1 { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 8px; }
+      .pf-meta-iei { text-align: right; }
       .pf-limite-manual { background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; display: flex; flex-direction: column; gap: 8px; }
       .pf-limite-manual-titulo { font-size: 11.5px; font-weight: 600; color: #1e293b; }
       .pf-limite-status { margin-top: 2px; }
@@ -1231,6 +1267,7 @@ Ponto de entrada público: window._abrirParecerFundeb()
         .pf-acoes-rodape { flex-direction: column-reverse; }
         .pf-acoes-rodape .pf-btn { width: 100%; }
         .pf-grid-3 { grid-template-columns: 1fr; }
+        .pf-grid-2-1 { grid-template-columns: 1fr 1fr; }
       }
     `;
     document.head.appendChild(style);
