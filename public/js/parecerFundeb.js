@@ -630,8 +630,8 @@ Ponto de entrada público: window._abrirParecerFundeb()
               </div>
               <div class="limite-bar-track"><div class="limite-bar-fill ${_corBadge(l.status)}" style="width:${Math.min(100, l.percentual || 0)}%"></div></div>
               <div class="limite-nums">
-                <span>Valor Exigido: <b>${_moeda(l.exigido)}</b></span>
-                <span>Valor Aplicado: <b>${_moeda(l.aplicado)}</b> (${_pct(l.percentual)})</span>
+                <span>Exigido: <b>${_moeda(l.exigido)}</b></span>
+                <span>Aplicado: <b>${_moeda(l.aplicado)}</b> (${_pct(l.percentual)})</span>
               </div>
             </div>`).join('')}
         </div>
@@ -795,6 +795,7 @@ Ponto de entrada público: window._abrirParecerFundeb()
   function _mostrarSucesso() {
     const corpo = document.getElementById('pf-corpo');
     const r = _st.resultadoFinal;
+    const emailDefault = _st.form.presidenteEmail || '';
     corpo.innerHTML = `
       <div class="pf-etapa">
         <div class="pf-status-card">
@@ -805,9 +806,15 @@ Ponto de entrada público: window._abrirParecerFundeb()
               ? (r?.enviado_email ? `Enviado por e-mail para ${_esc(_st.form.presidenteEmail)}.` : 'O parecer será enviado por e-mail em breve.')
               : 'O parecer foi gerado e está disponível para download.'}
           </div>
-          <div class="pf-status-acoes">
+          <div class="pf-status-acoes" style="flex-direction:column;gap:12px;align-items:stretch">
             <button id="pf-abrir-final" class="pf-btn pf-btn-primario">Abrir / Baixar parecer</button>
-            <button id="pf-fechar-final" class="pf-btn pf-btn-secundario">Fechar</button>
+            <div style="border-top:1px solid #e2e8f0;padding-top:12px;display:flex;flex-direction:column;gap:8px">
+              <label class="pf-label" style="text-align:left">Enviar parecer por e-mail</label>
+              <input type="email" id="pf-email-envio" class="pf-input" value="${_esc(emailDefault)}" placeholder="email@exemplo.com">
+              <button id="pf-enviar-email-final" class="pf-btn pf-btn-secundario">📧 Enviar por e-mail</button>
+              <div id="pf-email-resultado" style="font-size:12px;min-height:20px"></div>
+            </div>
+            <button id="pf-fechar-final" class="pf-btn pf-btn-secundario" style="margin-top:4px">Fechar</button>
           </div>
         </div>
       </div>`;
@@ -817,6 +824,48 @@ Ponto de entrada público: window._abrirParecerFundeb()
       window.open(url, '_self');
     });
     document.getElementById('pf-fechar-final').addEventListener('click', _fechar);
+    document.getElementById('pf-enviar-email-final').addEventListener('click', _enviarParecerPorEmail);
+  }
+
+  async function _enviarParecerPorEmail() {
+    const btn = document.getElementById('pf-enviar-email-final');
+    const resultado = document.getElementById('pf-email-resultado');
+    const email = document.getElementById('pf-email-envio').value.trim();
+    if (!email) { resultado.innerHTML = '<span style="color:#991b1b">Informe um e-mail.</span>'; return; }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { resultado.innerHTML = '<span style="color:#991b1b">E-mail inválido.</span>'; return; }
+
+    btn.disabled = true;
+    btn.textContent = '⏳ Enviando…';
+    resultado.innerHTML = '';
+
+    try {
+      const resp = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || ''}/api/enviarEmail`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          nome: _st.form.presidenteNome || 'Presidente do CACS',
+          email: email,
+          assunto: `Parecer do CACS Fundeb ${_st.exercicio} — pronto para análise`,
+          mensagemHtml: `
+            <p>Olá, ${_st.form.presidenteNome || ''}.</p>
+            <p>O parecer do Fundeb referente ao exercício de ${_st.exercicio} foi gerado e está disponível para análise do CACS.</p>
+            <p><a href="${_st.resultadoFinal?.url_download || '#'}">Clique aqui para visualizar o parecer</a></p>
+            <p style="color:#64748b;font-size:12px">Radar SIOPE — radarsiope.com.br</p>
+          `,
+        }),
+      });
+      if (resp.ok) {
+        resultado.innerHTML = '<span style="color:#166534">✅ E-mail enviado com sucesso.</span>';
+      } else {
+        resultado.innerHTML = '<span style="color:#991b1b">❌ Erro ao enviar e-mail. Tente novamente.</span>';
+      }
+    } catch (err) {
+      console.error('[ParecerFundeb] Erro ao enviar e-mail:', err);
+      resultado.innerHTML = '<span style="color:#991b1b">❌ Erro ao enviar e-mail. Tente novamente.</span>';
+    } finally {
+      btn.disabled = false;
+      btn.textContent = '📧 Enviar por e-mail';
+    }
   }
 
   function _montarHTMLParecer() {
@@ -836,7 +885,7 @@ Ponto de entrada público: window._abrirParecerFundeb()
           <span class="badge ${_corBadge(l.status)}">${_labelStatus(l.status)}</span>
         </div>
         <div class="limite-bar-track"><div class="limite-bar-fill ${_corBadge(l.status)}" style="width:${Math.min(100, l.percentual || 0)}%"></div></div>
-        <div class="limite-nums"><span>Valor Exigido: <b>${_moeda(l.exigido)}</b></span><span>Valor Aplicado: <b>${_moeda(l.aplicado)}</b> (${_pct(l.percentual)})</span></div>
+        <div class="limite-nums"><span>Exigido: <b>${_moeda(l.exigido)}</b></span><span>Aplicado: <b>${_moeda(l.aplicado)}</b> (${_pct(l.percentual)})</span></div>
       </div>`).join('');
     const linhasAlertas = limites.filter(l => l.status !== 'cumprido').map(l => `
       <li class="alert-item ${l.status === 'nao_cumprido' ? 'vermelho' : 'amarelo'}">
