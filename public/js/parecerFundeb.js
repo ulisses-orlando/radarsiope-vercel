@@ -37,6 +37,7 @@ Ponto de entrada público: window._abrirParecerFundeb()
         ],
         conclusaoTipo: '',
         conclusaoTexto: '',
+        enviarEmail: false,
       },
       carregandoStatus: false,
       pareceerExistente: null,
@@ -341,19 +342,19 @@ Ponto de entrada público: window._abrirParecerFundeb()
         <div class="pf-secao-mini">
           <div class="pf-secao-mini-titulo">📋 Limites obrigatórios</div>
           <div class="pf-info-box" style="font-size:11px">
-            Preencha <strong>Valor Exigido</strong> e <strong>Valor Aplicado</strong>. O percentual e o status são calculados automaticamente.
+            Preencha <strong>Exigido</strong> e <strong>Aplicado</strong>. O percentual e o status são calculados automaticamente.
           </div>
           ${limites.map((l, i) => `
             <div class="pf-limite-manual">
               <div class="pf-limite-manual-titulo">${_esc(_labelLimite(l.item))}</div>
               <div class="pf-grid-3">
                 <div class="pf-campo">
-                  <label class="pf-label">Valor Exigido</label>
+                  <label class="pf-label">Exigido</label>
                   <input type="text" inputmode="decimal" class="pf-input pf-moeda" data-limite-idx="${i}" data-campo="exigido"
                     value="${_moedaInput(l.exigido)}" placeholder="0,00">
                 </div>
                 <div class="pf-campo">
-                  <label class="pf-label">Valor Aplicado</label>
+                  <label class="pf-label">Aplicado</label>
                   <input type="text" inputmode="decimal" class="pf-input pf-moeda" data-limite-idx="${i}" data-campo="aplicado"
                     value="${_moedaInput(l.aplicado)}" placeholder="0,00">
                 </div>
@@ -559,8 +560,8 @@ Ponto de entrada público: window._abrirParecerFundeb()
               </div>
               <div class="limite-bar-track"><div class="limite-bar-fill ${_corBadge(l.status)}" style="width:${Math.min(100, l.percentual || 0)}%"></div></div>
               <div class="limite-nums">
-                <span>Valor Exigido: <b>${_moeda(l.exigido)}</b></span>
-                <span>Valor Aplicado: <b>${_moeda(l.aplicado)}</b> (${_pct(l.percentual)})</span>
+                <span>Exigido: <b>${_moeda(l.exigido)}</b></span>
+                <span>Aplicado: <b>${_moeda(l.aplicado)}</b> (${_pct(l.percentual)})</span>
               </div>
             </div>`).join('')}
         </div>
@@ -623,6 +624,14 @@ Ponto de entrada público: window._abrirParecerFundeb()
             </div>`).join('')}
         </div>
         <div class="pf-secao-mini">
+          <div class="pf-secao-mini-titulo">📧 Envio do parecer</div>
+          <label class="pf-checkbox-inline" style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:10px 12px;margin-top:4px;">
+            <input type="checkbox" id="pf-enviar-email" ${_st.form.enviarEmail ? 'checked' : ''}>
+            <span>Enviar parecer por e-mail para o presidente do CACS</span>
+          </label>
+        </div>
+
+        <div class="pf-secao-mini">
           <div class="pf-secao-mini-titulo">Conclusão do parecer</div>
           <div class="pf-campo">
             <label class="pf-label">Tipo de conclusão</label>
@@ -651,6 +660,9 @@ Ponto de entrada público: window._abrirParecerFundeb()
     document.getElementById('pf-conclusao-tipo').addEventListener('change', e => {
       _st.form.conclusaoTipo = e.target.value;
       _atualizarTextoConclusao();
+    });
+    document.getElementById('pf-enviar-email')?.addEventListener('change', e => {
+      _st.form.enviarEmail = e.target.checked;
     });
     document.getElementById('pf-conclusao-texto').addEventListener('input', e => _st.form.conclusaoTexto = e.target.value);
     document.querySelectorAll('[data-check-idx]').forEach(el => {
@@ -719,7 +731,9 @@ Ponto de entrada público: window._abrirParecerFundeb()
           <div class="pf-status-icone">✅</div>
           <div class="pf-status-titulo">Parecer gerado com sucesso</div>
           <div class="pf-status-sub">
-            ${r?.enviado_email ? `Enviado por e-mail para ${_esc(_st.form.presidenteEmail)}.` : 'Disponível para download abaixo.'}
+            ${_st.form.enviarEmail
+              ? (r?.enviado_email ? `Enviado por e-mail para ${_esc(_st.form.presidenteEmail)}.` : 'O parecer será enviado por e-mail em breve.')
+              : 'O parecer foi gerado e está disponível para download.'}
           </div>
           <div class="pf-status-acoes">
             <button id="pf-abrir-final" class="pf-btn pf-btn-primario">Abrir / Baixar parecer</button>
@@ -752,7 +766,7 @@ Ponto de entrada público: window._abrirParecerFundeb()
           <span class="badge ${_corBadge(l.status)}">${_labelStatus(l.status)}</span>
         </div>
         <div class="limite-bar-track"><div class="limite-bar-fill ${_corBadge(l.status)}" style="width:${Math.min(100, l.percentual || 0)}%"></div></div>
-        <div class="limite-nums"><span>Valor Exigido: <b>${_moeda(l.exigido)}</b></span><span>Valor Aplicado: <b>${_moeda(l.aplicado)}</b> (${_pct(l.percentual)})</span></div>
+        <div class="limite-nums"><span>Exigido: <b>${_moeda(l.exigido)}</b></span><span>Aplicado: <b>${_moeda(l.aplicado)}</b> (${_pct(l.percentual)})</span></div>
       </div>`).join('');
     const linhasAlertas = limites.filter(l => l.status !== 'cumprido').map(l => `
       <li class="alert-item ${l.status === 'nao_cumprido' ? 'vermelho' : 'amarelo'}">
@@ -977,6 +991,7 @@ Ponto de entrada público: window._abrirParecerFundeb()
         checklist_documental: _st.form.checklist,
         conclusao_tipo: _st.form.conclusaoTipo,
         conclusao_parecer: _st.form.conclusaoTexto,
+        enviar_email: _st.form.enviarEmail,
       }),
     });
     const dados = await resp.json();
