@@ -130,7 +130,7 @@ async function _parecerFundebFinalizar(req, res) {
   const {
     uid, cod_municipio, uf, municipio_nome, exercicio, pdf_nome, dados_extraidos,
     presidente_cacs_nome, presidente_cacs_email, membros_cacs,
-    checklist_documental, conclusao_tipo, conclusao_parecer,
+    checklist_documental, conclusao_tipo, conclusao_parecer, enviar_email,
   } = body || {};
 
   if (!uid || !cod_municipio || !uf || !municipio_nome || !exercicio || !dados_extraidos || !presidente_cacs_email) {
@@ -181,27 +181,28 @@ async function _parecerFundebFinalizar(req, res) {
 
   // E-mail via Zoho, reaproveitando o /api/enviarEmail já existente
   let enviadoEmail = false;
-  try {
-    const respEmail = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL}/api/enviarEmail`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        nome: presidente_cacs_nome,
-        email: presidente_cacs_email,
-        assunto: `Parecer do CACS Fundeb ${exercicio} — pronto para análise`,
-        mensagemHtml: `
+  if (enviar_email !== false) {
+    try {
+      const respEmail = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL}/api/enviarEmail`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          nome: presidente_cacs_nome,
+          email: presidente_cacs_email,
+          assunto: `Parecer do CACS Fundeb ${exercicio} — pronto para análise`,
+          mensagemHtml: `
           <p>Olá, ${presidente_cacs_nome || ''}.</p>
           <p>O parecer do Fundeb referente ao exercício de ${exercicio} foi gerado e está disponível para análise do CACS.</p>
           <p><a href="${urlDownload}">Clique aqui para visualizar o parecer</a></p>
           <p style="color:#64748b;font-size:12px">Radar SIOPE — radarsiope.com.br</p>
         `,
-      }),
-    });
-    enviadoEmail = respEmail.ok;
-  } catch (err) {
-    console.error('[parecer_fundeb_finalizar] Erro ao enviar e-mail:', err.message);
+        }),
+      });
+      enviadoEmail = respEmail.ok;
+    } catch (err) {
+      console.error('[parecer_fundeb_finalizar] Erro ao enviar e-mail:', err.message);
+    }
   }
-
   return res.status(200).json({ ok: true, url_download: urlDownload, enviado_email: enviadoEmail, versao: data.versao });
 }
 
