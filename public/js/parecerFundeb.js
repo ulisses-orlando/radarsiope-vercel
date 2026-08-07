@@ -795,7 +795,6 @@ Ponto de entrada público: window._abrirParecerFundeb()
   function _mostrarSucesso() {
     const corpo = document.getElementById('pf-corpo');
     const r = _st.resultadoFinal;
-    const emailDefault = _st.form.presidenteEmail || '';
     corpo.innerHTML = `
       <div class="pf-etapa">
         <div class="pf-status-card">
@@ -806,15 +805,9 @@ Ponto de entrada público: window._abrirParecerFundeb()
               ? (r?.enviado_email ? `Enviado por e-mail para ${_esc(_st.form.presidenteEmail)}.` : 'O parecer será enviado por e-mail em breve.')
               : 'O parecer foi gerado e está disponível para download.'}
           </div>
-          <div class="pf-status-acoes" style="flex-direction:column;gap:12px;align-items:stretch">
+          <div class="pf-status-acoes">
             <button id="pf-abrir-final" class="pf-btn pf-btn-primario">Abrir / Baixar parecer</button>
-            <div style="border-top:1px solid #e2e8f0;padding-top:12px;display:flex;flex-direction:column;gap:8px">
-              <label class="pf-label" style="text-align:left">Enviar parecer por e-mail</label>
-              <input type="email" id="pf-email-envio" class="pf-input" value="${_esc(emailDefault)}" placeholder="email@exemplo.com">
-              <button id="pf-enviar-email-final" class="pf-btn pf-btn-secundario">📧 Enviar por e-mail</button>
-              <div id="pf-email-resultado" style="font-size:12px;min-height:20px"></div>
-            </div>
-            <button id="pf-fechar-final" class="pf-btn pf-btn-secundario" style="margin-top:4px">Fechar</button>
+            <button id="pf-fechar-final" class="pf-btn pf-btn-secundario">Fechar</button>
           </div>
         </div>
       </div>`;
@@ -824,48 +817,6 @@ Ponto de entrada público: window._abrirParecerFundeb()
       window.open(url, '_self');
     });
     document.getElementById('pf-fechar-final').addEventListener('click', _fechar);
-    document.getElementById('pf-enviar-email-final').addEventListener('click', _enviarParecerPorEmail);
-  }
-
-  async function _enviarParecerPorEmail() {
-    const btn = document.getElementById('pf-enviar-email-final');
-    const resultado = document.getElementById('pf-email-resultado');
-    const email = document.getElementById('pf-email-envio').value.trim();
-    if (!email) { resultado.innerHTML = '<span style="color:#991b1b">Informe um e-mail.</span>'; return; }
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { resultado.innerHTML = '<span style="color:#991b1b">E-mail inválido.</span>'; return; }
-
-    btn.disabled = true;
-    btn.textContent = '⏳ Enviando…';
-    resultado.innerHTML = '';
-
-    try {
-      const resp = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || ''}/api/enviarEmail`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          nome: _st.form.presidenteNome || 'Presidente do CACS',
-          email: email,
-          assunto: `Parecer do CACS Fundeb ${_st.exercicio} — pronto para análise`,
-          mensagemHtml: `
-            <p>Olá, ${_st.form.presidenteNome || ''}.</p>
-            <p>O parecer do Fundeb referente ao exercício de ${_st.exercicio} foi gerado e está disponível para análise do CACS.</p>
-            <p><a href="${_st.resultadoFinal?.url_download || '#'}">Clique aqui para visualizar o parecer</a></p>
-            <p style="color:#64748b;font-size:12px">Radar SIOPE — radarsiope.com.br</p>
-          `,
-        }),
-      });
-      if (resp.ok) {
-        resultado.innerHTML = '<span style="color:#166534">✅ E-mail enviado com sucesso.</span>';
-      } else {
-        resultado.innerHTML = '<span style="color:#991b1b">❌ Erro ao enviar e-mail. Tente novamente.</span>';
-      }
-    } catch (err) {
-      console.error('[ParecerFundeb] Erro ao enviar e-mail:', err);
-      resultado.innerHTML = '<span style="color:#991b1b">❌ Erro ao enviar e-mail. Tente novamente.</span>';
-    } finally {
-      btn.disabled = false;
-      btn.textContent = '📧 Enviar por e-mail';
-    }
   }
 
   function _montarHTMLParecer() {
@@ -914,7 +865,10 @@ Ponto de entrada público: window._abrirParecerFundeb()
       <div class="logo-texto"><div class="marca">Radar SIOPE</div><div class="sub">radarsiope.com.br</div></div>
     </div>
     <div class="cabecalho-direita">
-      <button class="btn-imprimir" onclick="window.print()">🖨️ Imprimir / PDF</button>
+      <div style="display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap">
+        <button class="btn-imprimir" onclick="window.print()">🖨️ Imprimir / PDF</button>
+        <button class="btn-imprimir" onclick="enviarParecerEmail()">📧 Enviar por e-mail</button>
+      </div>
       <div class="cabecalho-titulo">PARECER DO CACS FUNDEB ${_st.exercicio}</div>
       <div class="cabecalho-data">Gerado em: ${dataGeracao}</div>
     </div>
@@ -967,6 +921,36 @@ Ponto de entrada público: window._abrirParecerFundeb()
     <div class="rodape-verif"><div class="rodape-url">radarsiope.com.br</div><div class="cod">ID: ${_hashVerif(m.cod, _st.exercicio)}</div></div>
   </div>
 </div>
+<script>
+function enviarParecerEmail() {
+  const emailDefault = document.querySelector('.field-value')?.closest('.grid-2')?.querySelectorAll('.field-value')[3]?.textContent?.trim() || '';
+  const email = prompt('Informe o e-mail para envio do parecer:', emailDefault);
+  if (!email) return;
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { alert('E-mail inválido.'); return; }
+
+  const btn = document.activeElement;
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Enviando…'; }
+
+  const urlAtual = window.location.href;
+  fetch('/api/enviarEmail', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      nome: 'Destinatário',
+      email: email,
+      assunto: 'Parecer do CACS Fundeb — ' + document.querySelector('.cabecalho-titulo')?.textContent?.replace('PARECER DO CACS FUNDEB ', 'Exercício ') || '',
+      mensagemHtml: '<p>Olá,</p><p>O parecer do Fundeb está disponível para visualização:</p><p><a href="' + urlAtual + '">Clique aqui para visualizar o parecer</a></p><p style="color:#64748b;font-size:12px">Radar SIOPE — radarsiope.com.br</p>',
+    }),
+  }).then(r => {
+    if (btn) { btn.disabled = false; btn.textContent = '📧 Enviar por e-mail'; }
+    if (r.ok) alert('✅ E-mail enviado com sucesso!');
+    else alert('❌ Erro ao enviar e-mail. Tente novamente.');
+  }).catch(() => {
+    if (btn) { btn.disabled = false; btn.textContent = '📧 Enviar por e-mail'; }
+    alert('❌ Erro ao enviar e-mail. Tente novamente.');
+  });
+}
+</script>
 </body></html>`;
   }
 
