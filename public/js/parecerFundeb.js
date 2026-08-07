@@ -444,6 +444,18 @@ Ponto de entrada público: window._abrirParecerFundeb()
     return val.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).replace(/\./g, '');
   }
 
+  function _metaPercentualLimite(item) {
+    // Retorna a meta percentual exigida pela lei para cada limite
+    const metas = {
+      remuneracao_70: 70,
+      iei_educacao_infantil: 100, // IEI: precisa atingir 100% do valor exigido
+      capital_15: 15,
+      max_10_nao_aplicado: 10,
+      fomento_eti_4: 4,
+    };
+    return metas[item] || 100;
+  }
+
   function _atualizarCalculosManual() {
     if (!_st.dadosExtraidos) _st.dadosExtraidos = {};
     const conc = _st.dadosExtraidos.conciliacao_bancaria || {};
@@ -464,9 +476,11 @@ Ponto de entrada público: window._abrirParecerFundeb()
       const elStatus = document.querySelector(`[data-limite-status="${i}"]`);
       if (elExigido) l.exigido = _parseMoeda(elExigido.value);
       if (elAplicado) l.aplicado = _parseMoeda(elAplicado.value);
-      // Percentual = proporção da meta atingida: (Aplicado / Exigido) × 100
-      l.percentual = l.exigido > 0 ? parseFloat(((l.aplicado / l.exigido) * 100).toFixed(2)) : 0;
-      l.status = _calcularStatusLimite(l.item, l.percentual, l.exigido);
+      // Percentual Real = (Aplicado / Exigido) × Meta_da_Lei
+      // Ex: Exigido=700 (que é 70% de 1000), Aplicado=800 → (800/700)×70 = 80%
+      const meta = _metaPercentualLimite(l.item);
+      l.percentual = l.exigido > 0 ? parseFloat(((l.aplicado / l.exigido) * meta).toFixed(2)) : 0;
+      l.status = _calcularStatusLimite(l.item, l.percentual);
       if (elPct) elPct.value = _pctInput(l.percentual);
       if (elStatus) elStatus.innerHTML = `<span class="badge ${_corBadge(l.status)}">${_labelStatus(l.status)}</span>`;
     });
@@ -475,23 +489,24 @@ Ponto de entrada público: window._abrirParecerFundeb()
 
 
 
-  function _calcularStatusLimite(item, percentual, exigido) {
-    // IEI — quando exigido é zero, não há meta definida no SIOPE
-    if (item === 'iei_educacao_infantil' && exigido === 0) {
-      if (percentual > 0) return 'atencao';
-      return 'nao_cumprido';
-    }
+  function _calcularStatusLimite(item, percentual) {
+    const meta = _metaPercentualLimite(item);
 
     // Limite de MÁXIMO (10% não aplicado)
     if (item === 'max_10_nao_aplicado') {
-      if (percentual > 100) return 'nao_cumprido';   // Ultrapassou o teto
-      if (percentual > 95) return 'atencao';         // Próximo do limite
+      if (percentual > meta) return 'nao_cumprido';   // Ultrapassou o teto
+      if (percentual > meta * 0.95) return 'atencao'; // Próximo do teto
       return 'cumprido';
     }
 
-    // Limites de MÍNIMO (70%, 15%, 4%, IEI com exigido > 0)
-    if (percentual >= 100) return 'cumprido';        // Atingiu ou superou a meta
-    if (percentual >= 90) return 'atencao';          // Pelo menos 90% da meta
+    // IEI — quando exigido é zero (sem meta definida no SIOPE)
+    if (item === 'iei_educacao_infantil' && percentual === 0) {
+      return 'indefinido';
+    }
+
+    // Limites de MÍNIMO (70%, 15%, 4%, IEI)
+    if (percentual >= meta) return 'cumprido';        // Atingiu ou superou a meta
+    if (percentual >= meta * 0.90) return 'atencao';  // Pelo menos 90% da meta
     return 'nao_cumprido';
   }
 
