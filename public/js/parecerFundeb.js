@@ -208,7 +208,7 @@ Ponto de entrada público: window._abrirParecerFundeb()
       </div>
       <div class="pf-modal-corpo">
         <div class="pf-modal-sub">
-          O parecer em PDF será enviado para o e-mail informado abaixo.
+          O parecer do CACS Fundeb será enviado para o e-mail informado abaixo.
         </div>
         <div class="pf-campo">
           <label class="pf-label">E-mail do destinatário</label>
