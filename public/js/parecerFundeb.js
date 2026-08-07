@@ -127,6 +127,7 @@ Ponto de entrada público: window._abrirParecerFundeb()
           <div class="pf-status-sub">Versão ${p.versao} · gerado em ${_fmtData(p.atualizado_em)}</div>
           <div class="pf-status-acoes">
             <button id="pf-ver" class="pf-btn pf-btn-secundario">Ver parecer</button>
+            <button id="pf-enviar-email-status" class="pf-btn pf-btn-secundario">📧 Enviar por e-mail</button>
             <button id="pf-regerar" class="pf-btn pf-btn-primario">Regerar</button>
           </div>
         </div>`;
@@ -166,6 +167,46 @@ Ponto de entrada público: window._abrirParecerFundeb()
     document.getElementById('pf-ver')?.addEventListener('click', () => {
       if (_st.pareceerExistente?.url_download) window.open(_st.pareceerExistente.url_download, '_self');
     });
+    document.getElementById('pf-enviar-email-status')?.addEventListener('click', _enviarEmailStatus);
+  }
+
+  async function _enviarEmailStatus() {
+    const p = _st.pareceerExistente;
+    if (!p?.url_download) { _msg('URL do parecer não disponível.'); return; }
+    const emailDefault = p.presidente_cacs_email || _st.form.presidenteEmail || '';
+    const email = prompt('Informe o e-mail para envio do parecer:', emailDefault);
+    if (!email) return;
+    if (!email.includes('@') || !email.includes('.')) { _msg('E-mail inválido.'); return; }
+
+    const btn = document.getElementById('pf-enviar-email-status');
+    const textoOriginal = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = '⏳ Enviando…';
+
+    try {
+      const resp = await fetch(`${API}?acao=enviar_email_parecer`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          url_parecer: p.url_download,
+          email: email.trim(),
+          assunto: `Parecer do CACS Fundeb ${_st.exercicio} — pronto para análise`,
+          nome: p.presidente_cacs_nome || _st.form.presidenteNome || 'Presidente do CACS',
+        }),
+      });
+      const dados = await resp.json();
+      if (dados.ok) {
+        _msg('E-mail enviado com sucesso!');
+      } else {
+        _msg(dados.error || 'Erro ao enviar e-mail.');
+      }
+    } catch (err) {
+      console.error('[ParecerFundeb] Erro ao enviar e-mail:', err);
+      _msg('Erro ao enviar e-mail. Tente novamente.');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = textoOriginal;
+    }
   }
 
   async function _carregarStatus() {
@@ -865,10 +906,7 @@ Ponto de entrada público: window._abrirParecerFundeb()
       <div class="logo-texto"><div class="marca">Radar SIOPE</div><div class="sub">radarsiope.com.br</div></div>
     </div>
     <div class="cabecalho-direita">
-      <div style="display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap">
-        <button class="btn-imprimir" onclick="window.print()">🖨️ Imprimir / PDF</button>
-        <button class="btn-imprimir" onclick="enviarParecerEmail()">📧 Enviar por e-mail</button>
-      </div>
+      <button class="btn-imprimir" onclick="window.print()">🖨️ Imprimir / PDF</button>
       <div class="cabecalho-titulo">PARECER DO CACS FUNDEB ${_st.exercicio}</div>
       <div class="cabecalho-data">Gerado em: ${dataGeracao}</div>
     </div>
@@ -921,36 +959,6 @@ Ponto de entrada público: window._abrirParecerFundeb()
     <div class="rodape-verif"><div class="rodape-url">radarsiope.com.br</div><div class="cod">ID: ${_hashVerif(m.cod, _st.exercicio)}</div></div>
   </div>
 </div>
-<script>
-function enviarParecerEmail() {
-  const emailDefault = document.querySelector('.field-value')?.closest('.grid-2')?.querySelectorAll('.field-value')[3]?.textContent?.trim() || '';
-  const email = prompt('Informe o e-mail para envio do parecer:', emailDefault);
-  if (!email) return;
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { alert('E-mail inválido.'); return; }
-
-  const btn = document.activeElement;
-  if (btn) { btn.disabled = true; btn.textContent = '⏳ Enviando…'; }
-
-  const urlAtual = window.location.href;
-  fetch('/api/enviarEmail', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      nome: 'Destinatário',
-      email: email,
-      assunto: 'Parecer do CACS Fundeb — ' + document.querySelector('.cabecalho-titulo')?.textContent?.replace('PARECER DO CACS FUNDEB ', 'Exercício ') || '',
-      mensagemHtml: '<p>Olá,</p><p>O parecer do Fundeb está disponível para visualização:</p><p><a href="' + urlAtual + '">Clique aqui para visualizar o parecer</a></p><p style="color:#64748b;font-size:12px">Radar SIOPE — radarsiope.com.br</p>',
-    }),
-  }).then(r => {
-    if (btn) { btn.disabled = false; btn.textContent = '📧 Enviar por e-mail'; }
-    if (r.ok) alert('✅ E-mail enviado com sucesso!');
-    else alert('❌ Erro ao enviar e-mail. Tente novamente.');
-  }).catch(() => {
-    if (btn) { btn.disabled = false; btn.textContent = '📧 Enviar por e-mail'; }
-    alert('❌ Erro ao enviar e-mail. Tente novamente.');
-  });
-}
-</script>
 </body></html>`;
   }
 
