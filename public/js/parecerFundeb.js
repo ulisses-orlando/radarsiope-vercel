@@ -342,14 +342,14 @@ Ponto de entrada público: window._abrirParecerFundeb()
         <div class="pf-secao-mini">
           <div class="pf-secao-mini-titulo">📋 Limites obrigatórios</div>
           <div class="pf-info-box" style="font-size:11px">
-            Preencha <strong>Exigido</strong> e <strong>Aplicado</strong>. O percentual e o status são calculados automaticamente.
+            Preencha <strong>Valor Exigido</strong> e <strong>Valor Aplicado</strong>. O percentual e o status são calculados automaticamente.
           </div>
           ${limites.map((l, i) => {
             const isIEI = l.item === 'iei_educacao_infantil';
             return `
             <div class="pf-limite-manual">
               <div class="pf-limite-manual-titulo">${_esc(_labelLimite(l.item))}</div>
-              <div class="${isIEI ? 'pf-grid-2-1' : 'pf-grid-3'}">
+              <div class="${isIEI ? 'pf-grid-iei' : 'pf-grid-3'}">
                 <div class="pf-campo">
                   <label class="pf-label">Valor Exigido</label>
                   <input type="text" inputmode="decimal" class="pf-input pf-moeda" data-limite-idx="${i}" data-campo="exigido"
@@ -362,7 +362,7 @@ Ponto de entrada público: window._abrirParecerFundeb()
                 </div>
                 ${isIEI ? `
                 <div class="pf-campo">
-                  <label class="pf-label">Meta Mínima (%)</label>
+                  <label class="pf-label">Meta (IEI) (%)</label>
                   <input type="text" inputmode="decimal" class="pf-input pf-meta-iei" data-limite-idx="${i}" data-campo="meta_iei"
                     value="${l.meta_iei ? l.meta_iei.toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2}) : ''}" placeholder="0,00" title="Percentual mínimo do IEI para este município">
                 </div>
@@ -497,8 +497,9 @@ Ponto de entrada público: window._abrirParecerFundeb()
       if (l.item === 'iei_educacao_infantil') {
         const elMeta = document.querySelector(`[data-limite-idx="${i}"][data-campo="meta_iei"]`);
         if (elMeta) l.meta_iei = _parsePercentual(elMeta.value);
-        // Percentual de cumprimento = (Aplicado / Exigido) × 100
-        l.percentual = l.exigido > 0 ? parseFloat(((l.aplicado / l.exigido) * 100).toFixed(2)) : 0;
+        // Cumprimento = (Aplicado / Exigido) × Meta_Mínima
+        // Ex: Exigido=500 (50% de 1000), Aplicado=400, Meta=50% → (400/500)×50 = 40%
+        l.percentual = (l.exigido > 0 && l.meta_iei > 0) ? parseFloat(((l.aplicado / l.exigido) * l.meta_iei).toFixed(2)) : 0;
         l.status = _calcularStatusLimite(l.item, l.percentual, l.meta_iei);
       } else {
         const meta = _metaPercentualLimite(l.item);
@@ -615,7 +616,7 @@ Ponto de entrada público: window._abrirParecerFundeb()
               </div>
               <div class="limite-bar-track"><div class="limite-bar-fill ${_corBadge(l.status)}" style="width:${Math.min(100, l.percentual || 0)}%"></div></div>
               <div class="limite-nums">
-                <span>Exigido: <b>${_moeda(l.exigido)}</b></span>
+                <span>Valor Exigido: <b>${_moeda(l.exigido)}</b></span>
                 <span>Aplicado: <b>${_moeda(l.aplicado)}</b> (${_pct(l.percentual)})</span>
               </div>
             </div>`).join('')}
@@ -821,7 +822,7 @@ Ponto de entrada público: window._abrirParecerFundeb()
           <span class="badge ${_corBadge(l.status)}">${_labelStatus(l.status)}</span>
         </div>
         <div class="limite-bar-track"><div class="limite-bar-fill ${_corBadge(l.status)}" style="width:${Math.min(100, l.percentual || 0)}%"></div></div>
-        <div class="limite-nums"><span>Exigido: <b>${_moeda(l.exigido)}</b></span><span>Aplicado: <b>${_moeda(l.aplicado)}</b> (${_pct(l.percentual)})</span></div>
+        <div class="limite-nums"><span>Valor Exigido: <b>${_moeda(l.exigido)}</b></span><span>Valor Aplicado: <b>${_moeda(l.aplicado)}</b> (${_pct(l.percentual)})</span></div>
       </div>`).join('');
     const linhasAlertas = limites.filter(l => l.status !== 'cumprido').map(l => `
       <li class="alert-item ${l.status === 'nao_cumprido' ? 'vermelho' : 'amarelo'}">
@@ -1236,7 +1237,7 @@ Ponto de entrada público: window._abrirParecerFundeb()
 
       /* Modo manual */
       .pf-grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
-      .pf-grid-2-1 { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 8px; }
+      .pf-grid-iei { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
       .pf-meta-iei { text-align: right; }
       .pf-limite-manual { background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; display: flex; flex-direction: column; gap: 8px; }
       .pf-limite-manual-titulo { font-size: 11.5px; font-weight: 600; color: #1e293b; }
@@ -1267,7 +1268,7 @@ Ponto de entrada público: window._abrirParecerFundeb()
         .pf-acoes-rodape { flex-direction: column-reverse; }
         .pf-acoes-rodape .pf-btn { width: 100%; }
         .pf-grid-3 { grid-template-columns: 1fr; }
-        .pf-grid-2-1 { grid-template-columns: 1fr 1fr; }
+        .pf-grid-iei { grid-template-columns: 1fr; }
       }
     `;
     document.head.appendChild(style);
