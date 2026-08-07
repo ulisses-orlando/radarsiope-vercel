@@ -341,19 +341,19 @@ Ponto de entrada público: window._abrirParecerFundeb()
         <div class="pf-secao-mini">
           <div class="pf-secao-mini-titulo">📋 Limites obrigatórios</div>
           <div class="pf-info-box" style="font-size:11px">
-            Preencha <strong>Exigido</strong> e <strong>Aplicado</strong>. O percentual e o status são calculados automaticamente.
+            Preencha <strong>Valor Exigido</strong> e <strong>Valor Aplicado</strong>. O percentual e o status são calculados automaticamente.
           </div>
           ${limites.map((l, i) => `
             <div class="pf-limite-manual">
               <div class="pf-limite-manual-titulo">${_esc(_labelLimite(l.item))}</div>
               <div class="pf-grid-3">
                 <div class="pf-campo">
-                  <label class="pf-label">Exigido</label>
+                  <label class="pf-label">Valor Exigido</label>
                   <input type="text" inputmode="decimal" class="pf-input pf-moeda" data-limite-idx="${i}" data-campo="exigido"
                     value="${_moedaInput(l.exigido)}" placeholder="0,00">
                 </div>
                 <div class="pf-campo">
-                  <label class="pf-label">Aplicado</label>
+                  <label class="pf-label">Valor Aplicado</label>
                   <input type="text" inputmode="decimal" class="pf-input pf-moeda" data-limite-idx="${i}" data-campo="aplicado"
                     value="${_moedaInput(l.aplicado)}" placeholder="0,00">
                 </div>
@@ -559,8 +559,8 @@ Ponto de entrada público: window._abrirParecerFundeb()
               </div>
               <div class="limite-bar-track"><div class="limite-bar-fill ${_corBadge(l.status)}" style="width:${Math.min(100, l.percentual || 0)}%"></div></div>
               <div class="limite-nums">
-                <span>Exigido: <b>${_moeda(l.exigido)}</b></span>
-                <span>Aplicado: <b>${_moeda(l.aplicado)}</b> (${_pct(l.percentual)})</span>
+                <span>Valor Exigido: <b>${_moeda(l.exigido)}</b></span>
+                <span>Valor Aplicado: <b>${_moeda(l.aplicado)}</b> (${_pct(l.percentual)})</span>
               </div>
             </div>`).join('')}
         </div>
@@ -752,7 +752,7 @@ Ponto de entrada público: window._abrirParecerFundeb()
           <span class="badge ${_corBadge(l.status)}">${_labelStatus(l.status)}</span>
         </div>
         <div class="limite-bar-track"><div class="limite-bar-fill ${_corBadge(l.status)}" style="width:${Math.min(100, l.percentual || 0)}%"></div></div>
-        <div class="limite-nums"><span>Exigido: <b>${_moeda(l.exigido)}</b></span><span>Aplicado: <b>${_moeda(l.aplicado)}</b> (${_pct(l.percentual)})</span></div>
+        <div class="limite-nums"><span>Valor Exigido: <b>${_moeda(l.exigido)}</b></span><span>Valor Aplicado: <b>${_moeda(l.aplicado)}</b> (${_pct(l.percentual)})</span></div>
       </div>`).join('');
     const linhasAlertas = limites.filter(l => l.status !== 'cumprido').map(l => `
       <li class="alert-item ${l.status === 'nao_cumprido' ? 'vermelho' : 'amarelo'}">
