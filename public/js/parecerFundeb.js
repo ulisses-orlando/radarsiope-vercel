@@ -315,7 +315,7 @@ Ponto de entrada público: window._abrirParecerFundeb()
         <h3 class="pf-etapa-titulo">Preenchimento manual dos dados</h3>
         <div class="pf-info-box">
           ℹ️ Informe os valores diretamente do <strong>Quadro Demonstrativo do SIOPE</strong> (6º bimestre).
-          Os percentuais e status dos limites serão calculados automaticamente.
+          Use vírgula para decimais (ex: <code>1.234,56</code> ou <code>1234,56</code>).
         </div>
         <div class="pf-campo">
           <label class="pf-label">Bimestre de referência</label>
@@ -328,12 +328,14 @@ Ponto de entrada público: window._abrirParecerFundeb()
           ${camposConciliacao.map(c => `
             <div class="pf-campo">
               <label class="pf-label">${c.label}</label>
-              <input type="text" class="pf-input pf-moeda" data-conc="${c.key}" value="${_moedaInput(conc[c.key])}" placeholder="R$ 0,00">
+              <input type="text" inputmode="decimal" class="pf-input pf-moeda" data-conc="${c.key}"
+                value="${_moedaInput(conc[c.key])}" placeholder="0,00">
             </div>
           `).join('')}
           <div class="pf-campo">
             <label class="pf-label">Saldo conciliado (calculado)</label>
-            <input type="text" id="pf-manual-saldo" class="pf-input" value="${_moedaInput(conc.saldo_conciliado)}" placeholder="R$ 0,00" readonly style="background:#f1f5f9">
+            <input type="text" class="pf-input" id="pf-manual-saldo"
+              value="${_moedaInput(conc.saldo_conciliado)}" placeholder="0,00" readonly style="background:#f1f5f9">
           </div>
         </div>
         <div class="pf-secao-mini">
@@ -347,15 +349,18 @@ Ponto de entrada público: window._abrirParecerFundeb()
               <div class="pf-grid-3">
                 <div class="pf-campo">
                   <label class="pf-label">Exigido</label>
-                  <input type="text" class="pf-input pf-moeda" data-limite-idx="${i}" data-campo="exigido" value="${_moedaInput(l.exigido)}" placeholder="R$ 0,00">
+                  <input type="text" inputmode="decimal" class="pf-input pf-moeda" data-limite-idx="${i}" data-campo="exigido"
+                    value="${_moedaInput(l.exigido)}" placeholder="0,00">
                 </div>
                 <div class="pf-campo">
                   <label class="pf-label">Aplicado</label>
-                  <input type="text" class="pf-input pf-moeda" data-limite-idx="${i}" data-campo="aplicado" value="${_moedaInput(l.aplicado)}" placeholder="R$ 0,00">
+                  <input type="text" inputmode="decimal" class="pf-input pf-moeda" data-limite-idx="${i}" data-campo="aplicado"
+                    value="${_moedaInput(l.aplicado)}" placeholder="0,00">
                 </div>
                 <div class="pf-campo">
                   <label class="pf-label">Percentual</label>
-                  <input type="text" class="pf-input" data-limite-idx="${i}" data-campo="percentual" value="${_pctInput(l.percentual)}" placeholder="0,00%" readonly style="background:#f1f5f9">
+                  <input type="text" class="pf-input" data-limite-idx="${i}" data-campo="percentual"
+                    value="${_pctInput(l.percentual)}" placeholder="0,00%" readonly style="background:#f1f5f9">
                 </div>
               </div>
               <div class="pf-limite-status" data-limite-status="${i}">
@@ -372,28 +377,70 @@ Ponto de entrada público: window._abrirParecerFundeb()
   }
 
   function _bindPreenchimentoManual() {
-    document.querySelectorAll('.pf-moeda').forEach(input => {
+    const camposMoeda = document.querySelectorAll('.pf-moeda');
+
+    camposMoeda.forEach(input => {
+      // Ao receber foco: remove formatação para edição limpa
+      input.addEventListener('focus', e => {
+        const val = _parseMoeda(e.target.value);
+        if (val !== 0 || e.target.value.trim()) {
+          // Mostra em formato "simples" sem pontos de milhar, com vírgula decimal
+          e.target.value = _desformatarMoeda(e.target.value);
+          // Seleciona tudo para facilitar substituição
+          setTimeout(() => e.target.select(), 0);
+        }
+      });
+
+      // Ao digitar: atualiza cálculos em tempo real (sem formatar o campo)
       input.addEventListener('input', e => {
+        // Permite apenas dígitos, vírgula, ponto e sinal negativo
+        let v = e.target.value;
+        // Remove caracteres inválidos mas preserva vírgula/ponto durante digitação
+        v = v.replace(/[^\d.,\-]/g, '');
+        // Evita múltiplas vírgulas/pontos decimais (mantém apenas o último)
+        const partes = v.split(/[.,]/);
+        if (partes.length > 2) {
+          v = partes.slice(0, -1).join('') + ',' + partes[partes.length - 1];
+        }
+        if (e.target.value !== v) e.target.value = v;
+        _atualizarCalculosManual();
+      });
+
+      // Ao sair do campo: aplica formatação bonita
+      input.addEventListener('blur', e => {
         const val = _parseMoeda(e.target.value);
         e.target.value = _moedaInput(val);
         _atualizarCalculosManual();
       });
     });
+
     document.getElementById('pf-manual-bimestre').addEventListener('change', e => {
       if (!_st.dadosExtraidos) _st.dadosExtraidos = {};
       _st.dadosExtraidos.bimestre_referencia = parseInt(e.target.value, 10);
     });
+
     document.getElementById('pf-voltar').addEventListener('click', () => {
       _st.modoEntrada = 'pdf';
       _st.etapa = 1;
       _render();
     });
+
     document.getElementById('pf-continuar').addEventListener('click', () => {
       if (!_validarPreenchimentoManual()) return;
       _st.etapa = 2;
       _render();
     });
+
     _atualizarCalculosManual();
+  }
+
+  function _desformatarMoeda(str) {
+    // Converte "1.234,56" → "1234,56" para facilitar edição
+    if (!str) return '';
+    const val = _parseMoeda(str);
+    if (val === 0 && !str.trim()) return '';
+    // Formata com vírgula decimal e sem pontos de milhar
+    return val.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).replace(/\./g, '');
   }
 
   function _atualizarCalculosManual() {
@@ -461,16 +508,26 @@ Ponto de entrada público: window._abrirParecerFundeb()
 
   function _parseMoeda(str) {
     if (!str) return 0;
-    const limpo = String(str).replace(/[^\d,.-]/g, '').replace(/\./g, '').replace(',', '.');
-    const val = parseFloat(limpo);
+    const s = String(str).trim();
+    if (!s) return 0;
+    // Se tem vírgula, assume formato brasileiro: remove pontos de milhar, troca vírgula por ponto decimal
+    if (s.includes(',')) {
+      const limpo = s.replace(/\./g, '').replace(',', '.');
+      const val = parseFloat(limpo);
+      return isNaN(val) ? 0 : val;
+    }
+    // Sem vírgula: pode ser inteiro ou número com ponto decimal (formato inglês)
+    const val = parseFloat(s.replace(/[^\d.\-]/g, ''));
     return isNaN(val) ? 0 : val;
   }
+
   function _moedaInput(v) {
     if (v === null || v === undefined || v === '') return '';
     const num = Number(v);
     if (isNaN(num)) return '';
     return num.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   }
+
   function _pctInput(v) {
     if (v === null || v === undefined || v === '') return '';
     const num = Number(v);
@@ -1054,6 +1111,7 @@ Ponto de entrada público: window._abrirParecerFundeb()
 
       .pf-info-box { background: #e8f0f7; border: 1px solid #dbeafe; border-radius: 8px; padding: 10px 12px; font-size: 12.5px; color: #334155; line-height: 1.5; }
       .pf-info-box a { color: #0A3D62; font-weight: 600; }
+      .pf-info-box code { background: #dbeafe; padding: 1px 4px; border-radius: 4px; font-size: 11px; }
 
       .pf-loading { text-align: center; padding: 30px; color: #64748b; font-size: 13px; }
 
@@ -1106,7 +1164,7 @@ Ponto de entrada público: window._abrirParecerFundeb()
       .pf-preview-wrap { background: #e2e8f0; border-radius: 10px; overflow: hidden; height: 60vh; min-height: 420px; }
       .pf-preview-iframe { width: 100%; height: 100%; border: none; }
 
-      /* Estilos do modo manual */
+      /* Modo manual */
       .pf-grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
       .pf-limite-manual { background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; display: flex; flex-direction: column; gap: 8px; }
       .pf-limite-manual-titulo { font-size: 11.5px; font-weight: 600; color: #1e293b; }
