@@ -79,7 +79,7 @@ async function _parecerFundebStatus(req, res) {
 
   const { data, error } = await supabase
     .from('pareceres_fundeb')
-    .select('versao, atualizado_em, token_acesso')
+    .select('versao, atualizado_em, token_acesso, presidente_cacs_email')
     .eq('cod_municipio', cod_municipio)
     .eq('uf', uf)
     .eq('exercicio', Number(exercicio))
@@ -97,6 +97,7 @@ async function _parecerFundebStatus(req, res) {
       versao: data.versao,
       atualizado_em: data.atualizado_em,
       url_download: `${process.env.NEXT_PUBLIC_BASE_URL}/api/sendViaSES?acao=parecer_fundeb_ver&token=${data.token_acesso}`,
+      presidente_cacs_email: data.presidente_cacs_email || null,
     } : null,
   });
 }
