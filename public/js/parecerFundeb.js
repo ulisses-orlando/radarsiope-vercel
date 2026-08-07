@@ -174,17 +174,13 @@ Ponto de entrada público: window._abrirParecerFundeb()
   function _abrirModalEnvioEmail() {
     const p = _st.pareceerExistente;
 
-      console.log('[DEBUG] pareceerExistente completo:', JSON.stringify(p, null, 2));
-  console.log('[DEBUG] presidente_cacs_email:', p?.presidente_cacs_email);
-  console.log('[DEBUG] todas as chaves:', p ? Object.keys(p) : 'null');
-  
     if (!p?.url_download) { _msg('URL do parecer não disponível.'); return; }
 
     const emailDefault = p.presidente_cacs_email || '';
 
-    _st.envioEmail = { email: emailDefault, enviando: false, erro: null };
+    _fecharModalEnvioEmail();
 
-    _fecharModalEnvioEmail(); // evita duplicado
+    _st.envioEmail = { email: emailDefault, enviando: false, erro: null };
 
     const overlay = document.getElementById('rs-parecer-overlay');
     if (!overlay) return;
