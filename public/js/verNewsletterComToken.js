@@ -4089,18 +4089,11 @@ async function iniciarChatFAB(newsletter, uid, acesso) {
     });
     sendBtn?.addEventListener('click', _enviar);
 
-    if (!window._chatMensagens?.length) {
-      const ctx = window._chatContext || {};
-      _adicionarMensagem('assistant',
-        `Olá! Pode perguntar sobre qualquer tema da Edição ${ctx.edicaoNum || '—'}. Estou aqui para ajudar.`
-      );
-    } else {
-      _renderizarMensagens();
-    }
-
-    // ── Verifica se limite já foi atingido ao abrir ───────────────────────
     const restantesAbertura = Math.max(0, _chatContador.limite - _chatContador.usado);
-    if (restantesAbertura <= 0 && _chatContador.limite > 0) {
+    const limiteAtingido = restantesAbertura <= 0 && _chatContador.limite > 0;
+
+    if (limiteAtingido) {
+      // Limite já esgotado: desabilita input e mostra apenas aviso
       const inputEl = document.getElementById('rs-chat-input');
       const sendEl = document.getElementById('rs-chat-send');
       if (inputEl) {
@@ -4109,9 +4102,18 @@ async function iniciarChatFAB(newsletter, uid, acesso) {
       }
       if (sendEl) sendEl.disabled = true;
       _adicionarMensagem('assistant',
-        '⚠️ Você atingiu o limite de perguntas para esta edição. ' +
+        '⚠️ Você já usou todas as perguntas disponíveis para esta edição. ' +
         'Entre em contato para fazer upgrade do seu plano.'
       );
+    } else if (!window._chatMensagens?.length) {
+      // Ainda tem perguntas e é a primeira abertura: boas-vindas
+      const ctx = window._chatContext || {};
+      _adicionarMensagem('assistant',
+        `Olá! Pode perguntar sobre qualquer tema da Edição ${ctx.edicaoNum || '—'}. Estou aqui para ajudar.`
+      );
+    } else {
+      // Ainda tem perguntas e já existe histórico: re-renderiza
+      _renderizarMensagens();
     }
 
     setTimeout(() => input?.focus(), 380);
@@ -4234,7 +4236,7 @@ async function iniciarChatFAB(newsletter, uid, acesso) {
 
           // Atualiza título para (0/X)
           _atualizarTituloChat(0);
-          return; 
+          return;
         }
 
         _adicionarMensagem('assistant', data.erro || 'Não consegui processar.');
