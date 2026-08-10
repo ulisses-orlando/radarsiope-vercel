@@ -243,6 +243,60 @@ export default async function handler(req, res) {
     // ── 0. Inicializa Firestore ───────────────────────────────────────────
     const firestore = getFirestore();
 
+    // ── 0.5. Busca usuário e define limite de perguntas ───────────────────
+    let limiteChat = 0;
+    const isAssinante = segmento === 'assinante';
+
+    if (isAssinante) {
+      const userSnap = await firestore.collection('usuarios').doc(uid).get();
+      if (!userSnap.exists) {
+        return res.status(403).json({ erro: 'Usuário não encontrado.' });
+      }
+      const userData = userSnap.data();
+      limiteChat = Number(userData.features?.pergunta_edicao || 0);
+    } else if (acesso_pro_temp) {
+      limiteChat = 2; // lead com acesso temporário
+    }
+
+    if (limiteChat <= 0) {
+      return res.status(403).json({ erro: 'Você não tem acesso ao chat nesta edição.' });
+    }
+
+    // ── 0.6. Transaction: valida e incrementa contador ────────────────────
+    const contadorRef = firestore
+      .collection('usuarios').doc(uid)
+      .collection('chat_contadores').doc(nid);
+
+    let contadorAtual = 0;
+
+    try {
+      await firestore.runTransaction(async (t) => {
+        const doc = await t.get(contadorRef);
+        if (doc.exists) {
+          contadorAtual = doc.data().contador || 0;
+        }
+        if (contadorAtual >= limiteChat) {
+          throw new Error('LIMITE_EXCEDIDO');
+        }
+        t.set(contadorRef, {
+          contador: contadorAtual + 1,
+          limite_aplicado: limiteChat,
+          atualizado_em: admin.firestore.FieldValue.serverTimestamp(),
+        }, { merge: true });
+      });
+    } catch (txErr) {
+      if (txErr.message === 'LIMITE_EXCEDIDO') {
+        return res.status(429).json({
+          erro: 'Limite de perguntas atingido para esta edição.',
+          limite_excedido: true,
+          limite: limiteChat,
+        });
+      }
+      throw txErr;
+    }
+
+    const perguntasRestantes = limiteChat - (contadorAtual + 1);
+
     // ── 1. Busca edição no Firestore ──────────────────────────────────────
     const snap = await firestore.collection('newsletters').doc(nid).get();
     if (!snap.exists) {
@@ -321,7 +375,7 @@ ${dadosMunicipio ? `--- DADOS DO MUNICÍPIO DO ASSINANTE ---\n${dadosMunicipio}`
 
     if (respostaEmCache) {
       console.log(`[chat] ✅ Resposta servida do cache (key: ${cacheKey.slice(0, 8)}...)`);
-      return res.status(200).json({ resposta: respostaEmCache, cache: true });
+      return res.status(200).json({ resposta: respostaEmCache, cache: true, perguntas_restantes: perguntasRestantes });
     }
 
     // ── 4. Chama Gemini via fetch ─────────────────────────────────────────
@@ -334,7 +388,7 @@ ${dadosMunicipio ? `--- DADOS DO MUNICÍPIO DO ASSINANTE ---\n${dadosMunicipio}`
     // ── 4.1. Salva no cache após resposta bem-sucedida ───────────────────
     salvarNoCache(cacheKey, resposta);
 
-    return res.status(200).json({ resposta, cache: false });
+    return res.status(200).json({ resposta, cache: false, perguntas_restantes: perguntasRestantes });
 
   } catch (err) {
     console.error('[chat] Erro:', err.message);
