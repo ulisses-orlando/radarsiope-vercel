@@ -3913,7 +3913,7 @@ window.enviarFeedback = enviarFeedback;
 
 // ─── Chat FAB — Pergunte ao Radar ────────────────────────────────────────────
 
-function iniciarChatFAB(newsletter, uid, acesso) {
+async function iniciarChatFAB(newsletter, uid, acesso) {
   // Limpa UI anterior
   document.getElementById('rs-chat-fab')?.remove();
   document.getElementById('rs-chat-sheet')?.remove();
