@@ -448,6 +448,7 @@ function detectarAcesso(destinatario, newsletter, segmento, envio) {
     temMapaMental: isAssinante ? !!features.newsletter_mapa_mental : acessoProTemp,
     temAlertas: isAssinante && !!features.alertas_prioritarios,
     temChat: isAssinante ? !!features.pergunta_edicao : acessoProTemp,
+    limiteChat: isAssinante ? (Number(features.pergunta_edicao) || 0) : (acessoProTemp ? 2 : 0),
     temRelatorio: isAssinante ? !!features.relatorio_conformidade : acessoProTemp,
     temCalendario: isAssinante ? !!features.calendario : acessoProTemp,
     temParecerFundeb: isAssinante && !!features.parecer_fundeb,
@@ -3928,6 +3929,20 @@ function iniciarChatFAB(newsletter, uid, acesso) {
     titulo: newsletter.titulo || ''
   };
 
+  // ── 2.5. Busca contador de perguntas da edição ───────────────────────────
+  let _chatContador = { usado: 0, limite: acesso.limiteChat || 0 };
+  async function _buscarContadorChat() {
+    if (!uid || !newsletter.id || !_chatContador.limite) return;
+    try {
+      const doc = await db.collection('usuarios').doc(uid)
+        .collection('chat_contadores').doc(newsletter.id).get();
+      _chatContador.usado = doc.exists ? (doc.data().contador || 0) : 0;
+    } catch (e) {
+      console.warn('[chat] Falha ao buscar contador:', e);
+    }
+  }
+  await _buscarContadorChat();
+
   // ── 2. Histórico global (evita closure) ──
   // Se mudou de edição, zera. Mantém se reabrir a mesma.
   if (!window._chatMensagens || window._chatMensagens._nid !== newsletter.id) {
@@ -4021,6 +4036,12 @@ function iniciarChatFAB(newsletter, uid, acesso) {
     const partes = ['Pergunte ao Radar'];
     if (ctx.edicaoNum) partes.push(`Edição: ${ctx.edicaoNum}`);
     if (ctx.titulo) partes.push(ctx.titulo);
+
+    // Adiciona contador de perguntas restantes
+    const restantes = Math.max(0, _chatContador.limite - _chatContador.usado);
+    if (_chatContador.limite > 0) {
+      partes.push(`(${restantes}/${_chatContador.limite})`);
+    }
     const tituloCompleto = partes.join(' - ');
 
     sheet.innerHTML = `
@@ -4077,6 +4098,22 @@ function iniciarChatFAB(newsletter, uid, acesso) {
       _renderizarMensagens();
     }
 
+    // ── Verifica se limite já foi atingido ao abrir ───────────────────────
+    const restantesAbertura = Math.max(0, _chatContador.limite - _chatContador.usado);
+    if (restantesAbertura <= 0 && _chatContador.limite > 0) {
+      const inputEl = document.getElementById('rs-chat-input');
+      const sendEl = document.getElementById('rs-chat-send');
+      if (inputEl) {
+        inputEl.disabled = true;
+        inputEl.placeholder = 'Limite de perguntas atingido para esta edição.';
+      }
+      if (sendEl) sendEl.disabled = true;
+      _adicionarMensagem('assistant',
+        '⚠️ Você atingiu o limite de perguntas para esta edição. ' +
+        'Entre em contato para fazer upgrade do seu plano.'
+      );
+    }
+
     setTimeout(() => input?.focus(), 380);
   }
 
@@ -4107,24 +4144,53 @@ function iniciarChatFAB(newsletter, uid, acesso) {
     window._chatMensagens.forEach(m => _adicionarMensagem(m.role, m.text));
   }
 
+  function _atualizarTituloChat(restantes) {
+    if (_chatContador.limite <= 0) return;
+    const tituloEl = document.querySelector('.rs-chat-header-titulo');
+    if (!tituloEl) return;
+
+    const c = window._chatContext || {};
+    const partes = ['Pergunte ao Radar'];
+    if (c.edicaoNum) partes.push(`Edição: ${c.edicaoNum}`);
+    if (c.titulo) partes.push(c.titulo);
+    partes.push(`(${Math.max(0, restantes)}/${_chatContador.limite})`);
+    tituloEl.textContent = partes.join(' - ');
+  }
+
   async function _enviar() {
     const input = document.getElementById('rs-chat-input');
     const sendBtn = document.getElementById('rs-chat-send');
     if (!input) return;
+
     const texto = input.value.trim();
     if (!texto || _digitando) return;
-    input.value = ''; sendBtn?.classList.remove('ativo');
+
+    // ── 1. Valida limite local antes de enviar ─────────────────────────────
+    const restantesEnvio = Math.max(0, _chatContador.limite - _chatContador.usado);
+    if (restantesEnvio <= 0 && _chatContador.limite > 0) {
+      _adicionarMensagem('assistant', 'Você atingiu o limite de perguntas para esta edição.');
+      return;
+    }
+
+    input.value = '';
+    sendBtn?.classList.remove('ativo');
 
     _adicionarMensagem('user', texto);
     _digitando = true;
+
     const wrap = document.getElementById('rs-chat-messages');
     const typing = document.createElement('div');
-    typing.className = 'rs-chat-msg-row assistant'; typing.id = 'rs-chat-typing-row';
-    typing.innerHTML = `<div class="rs-chat-avatar-mini">✦</div><div class="rs-chat-typing"><span></span><span></span><span></span></div>`;
-    wrap?.appendChild(typing); typing?.scrollIntoView({ behavior: 'smooth' });
+    typing.className = 'rs-chat-msg-row assistant';
+    typing.id = 'rs-chat-typing-row';
+    typing.innerHTML = `
+    <div class="rs-chat-avatar-mini">✦</div>
+    <div class="rs-chat-typing"><span></span><span></span><span></span></div>
+  `;
+    wrap?.appendChild(typing);
+    typing?.scrollIntoView({ behavior: 'smooth' });
 
     try {
-      const ctx = window._chatContext; // ✅ Lê contexto ATUALIZADO
+      const ctx = window._chatContext;
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -4135,15 +4201,77 @@ function iniciarChatFAB(newsletter, uid, acesso) {
           uid: ctx.uid,
           segmento: window._radarUser?.segmento || '',
           acesso_pro_temp: window._leadAcessoProTemp === true,
-          historico: window._chatMensagens.slice(-6)
+          historico: window._chatMensagens.slice(-6),
         }),
       });
-      let data; try { data = await res.json(); } catch { _digitando = false; typing?.remove(); return; }
-      _digitando = false; typing?.remove();
-      if (!res.ok || data.erro) { _adicionarMensagem('assistant', data.erro || 'Não consegui processar.'); return; }
+
+      // Parse do JSON
+      let data;
+      try {
+        data = await res.json();
+      } catch {
+        throw new Error('Falha ao interpretar resposta do servidor.');
+      }
+
+      _digitando = false;
+      typing?.remove();
+
+      // ── 2. Erro retornado pela API ───────────────────────────────────────
+      if (!res.ok || data.erro) {
+        if (data.limite_excedido) {
+          _chatContador.usado = _chatContador.limite;
+
+          _adicionarMensagem('assistant', '⚠️ ' + (data.erro || 'Limite de perguntas atingido.'));
+
+          // Desabilita input
+          const inputEl = document.getElementById('rs-chat-input');
+          const sendEl = document.getElementById('rs-chat-send');
+          if (inputEl) {
+            inputEl.disabled = true;
+            inputEl.placeholder = 'Limite atingido.';
+          }
+          if (sendEl) sendEl.disabled = true;
+
+          // Atualiza título para (0/X)
+          _atualizarTituloChat(0);
+          return; 
+        }
+
+        _adicionarMensagem('assistant', data.erro || 'Não consegui processar.');
+        return;
+      }
+
+      // ── 3. Sucesso ───────────────────────────────────────────────────────
       _adicionarMensagem('assistant', data.resposta);
+
+      if (typeof data.perguntas_restantes === 'number') {
+        _chatContador.usado = _chatContador.limite - data.perguntas_restantes;
+      } else {
+        _chatContador.usado += 1;
+      }
+
+      const novosRestantes = Math.max(0, _chatContador.limite - _chatContador.usado);
+      _atualizarTituloChat(novosRestantes);
+
+      // Se acabou, desabilita input
+      if (novosRestantes <= 0) {
+        const inputEl = document.getElementById('rs-chat-input');
+        const sendEl = document.getElementById('rs-chat-send');
+        if (inputEl) {
+          inputEl.disabled = true;
+          inputEl.placeholder = 'Limite de perguntas atingido.';
+        }
+        if (sendEl) sendEl.disabled = true;
+
+        _adicionarMensagem('assistant',
+          'Você usou todas as perguntas disponíveis nesta edição. ' +
+          'Para continuar, faça upgrade do plano.'
+        );
+      }
+
     } catch (err) {
-      _digitando = false; typing?.remove();
+      _digitando = false;
+      typing?.remove();
       _adicionarMensagem('assistant', 'Erro de conexão. Verifique sua internet.');
     }
   }
