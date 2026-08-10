@@ -4093,18 +4093,19 @@ async function iniciarChatFAB(newsletter, uid, acesso) {
     const limiteAtingido = restantesAbertura <= 0 && _chatContador.limite > 0;
 
     if (limiteAtingido) {
-      // Limite já esgotado: desabilita input e mostra apenas aviso
       const inputEl = document.getElementById('rs-chat-input');
       const sendEl = document.getElementById('rs-chat-send');
       if (inputEl) {
         inputEl.disabled = true;
-        inputEl.placeholder = 'Limite de perguntas atingido para esta edição.';
+        inputEl.placeholder = 'Limite de perguntas atingido.';
       }
       if (sendEl) sendEl.disabled = true;
+
       _adicionarMensagem('assistant',
-        '⚠️ Você já usou todas as perguntas disponíveis para esta edição. ' +
-        'Entre em contato para fazer upgrade do seu plano.'
+        'Você usou todas as perguntas disponíveis nesta edição.'
       );
+
+      setTimeout(() => _solicitarUpgrade('chat', acesso.isAssinante), 500);
     } else if (!window._chatMensagens?.length) {
       // Ainda tem perguntas e é a primeira abertura: boas-vindas
       const ctx = window._chatContext || {};
@@ -4222,21 +4223,16 @@ async function iniciarChatFAB(newsletter, uid, acesso) {
       if (!res.ok || data.erro) {
         if (data.limite_excedido) {
           _chatContador.usado = _chatContador.limite;
-
-          _adicionarMensagem('assistant', '⚠️ ' + (data.erro || 'Limite de perguntas atingido.'));
-
-          // Desabilita input
+          _adicionarMensagem('assistant', 'Você atingiu o limite de perguntas para esta edição.');
           const inputEl = document.getElementById('rs-chat-input');
           const sendEl = document.getElementById('rs-chat-send');
-          if (inputEl) {
-            inputEl.disabled = true;
-            inputEl.placeholder = 'Limite atingido.';
-          }
+          if (inputEl) { inputEl.disabled = true; inputEl.placeholder = 'Limite atingido.'; }
           if (sendEl) sendEl.disabled = true;
+
+          setTimeout(() => _solicitarUpgrade('chat', acesso.isAssinante), 400);
 
           // Atualiza título para (0/X)
           _atualizarTituloChat(0);
-          return;
         }
 
         _adicionarMensagem('assistant', data.erro || 'Não consegui processar.');
@@ -4259,16 +4255,14 @@ async function iniciarChatFAB(newsletter, uid, acesso) {
       if (novosRestantes <= 0) {
         const inputEl = document.getElementById('rs-chat-input');
         const sendEl = document.getElementById('rs-chat-send');
-        if (inputEl) {
-          inputEl.disabled = true;
-          inputEl.placeholder = 'Limite de perguntas atingido.';
-        }
+        if (inputEl) { inputEl.disabled = true; inputEl.placeholder = 'Limite de perguntas atingido.'; }
         if (sendEl) sendEl.disabled = true;
 
         _adicionarMensagem('assistant',
-          'Você usou todas as perguntas disponíveis nesta edição. ' +
-          'Para continuar, faça upgrade do plano.'
+          'Você usou todas as perguntas disponíveis nesta edição.'
         );
+
+        setTimeout(() => _solicitarUpgrade('chat', acesso.isAssinante), 600);
       }
 
     } catch (err) {
