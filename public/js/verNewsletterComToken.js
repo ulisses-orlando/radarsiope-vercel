@@ -4209,7 +4209,6 @@ async function iniciarChatFAB(newsletter, uid, acesso) {
         }),
       });
 
-      // Parse do JSON
       let data;
       try {
         data = await res.json();
@@ -4231,26 +4230,13 @@ async function iniciarChatFAB(newsletter, uid, acesso) {
           if (sendEl) sendEl.disabled = true;
 
           setTimeout(() => _solicitarUpgrade('chat', acesso.isAssinante), 400);
-
-          // Atualiza título para (0/X)
           _atualizarTituloChat(0);
+          return; // ← IMPORTANTE: evita cair na mensagem genérica abaixo
         }
 
         _adicionarMensagem('assistant', data.erro || 'Não consegui processar.');
         return;
       }
-
-      // ── 3. Sucesso ───────────────────────────────────────────────────────
-      _adicionarMensagem('assistant', data.resposta);
-
-      if (typeof data.perguntas_restantes === 'number') {
-        _chatContador.usado = _chatContador.limite - data.perguntas_restantes;
-      } else {
-        _chatContador.usado += 1;
-      }
-
-      const novosRestantes = Math.max(0, _chatContador.limite - _chatContador.usado);
-      _atualizarTituloChat(novosRestantes);
 
       // ── 3. Sucesso ───────────────────────────────────────────────────────
       _adicionarMensagem('assistant', data.resposta);
