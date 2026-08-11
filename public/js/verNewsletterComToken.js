@@ -4172,6 +4172,7 @@ async function iniciarChatFAB(newsletter, uid, acesso) {
     const restantesEnvio = Math.max(0, _chatContador.limite - _chatContador.usado);
     if (restantesEnvio <= 0 && _chatContador.limite > 0) {
       _adicionarMensagem('assistant', 'Você atingiu o limite de perguntas para esta edição.');
+      setTimeout(() => _solicitarUpgrade('chat', acesso.isAssinante), 400);
       return;
     }
 
@@ -4186,9 +4187,9 @@ async function iniciarChatFAB(newsletter, uid, acesso) {
     typing.className = 'rs-chat-msg-row assistant';
     typing.id = 'rs-chat-typing-row';
     typing.innerHTML = `
-    <div class="rs-chat-avatar-mini">✦</div>
-    <div class="rs-chat-typing"><span></span><span></span><span></span></div>
-  `;
+      <div class="rs-chat-avatar-mini">✦</div>
+      <div class="rs-chat-typing"><span></span><span></span><span></span></div>
+    `;
     wrap?.appendChild(typing);
     typing?.scrollIntoView({ behavior: 'smooth' });
 
@@ -4251,19 +4252,17 @@ async function iniciarChatFAB(newsletter, uid, acesso) {
       const novosRestantes = Math.max(0, _chatContador.limite - _chatContador.usado);
       _atualizarTituloChat(novosRestantes);
 
-      // Se acabou, desabilita input
-      if (novosRestantes <= 0) {
-        const inputEl = document.getElementById('rs-chat-input');
-        const sendEl = document.getElementById('rs-chat-send');
-        if (inputEl) { inputEl.disabled = true; inputEl.placeholder = 'Limite de perguntas atingido.'; }
-        if (sendEl) sendEl.disabled = true;
+      // ── 3. Sucesso ───────────────────────────────────────────────────────
+      _adicionarMensagem('assistant', data.resposta);
 
-        _adicionarMensagem('assistant',
-          'Você usou todas as perguntas disponíveis nesta edição.'
-        );
-
-        setTimeout(() => _solicitarUpgrade('chat', acesso.isAssinante), 600);
+      if (typeof data.perguntas_restantes === 'number') {
+        _chatContador.usado = _chatContador.limite - data.perguntas_restantes;
+      } else {
+        _chatContador.usado += 1;
       }
+
+      const novosRestantes = Math.max(0, _chatContador.limite - _chatContador.usado);
+      _atualizarTituloChat(novosRestantes);
 
     } catch (err) {
       _digitando = false;
