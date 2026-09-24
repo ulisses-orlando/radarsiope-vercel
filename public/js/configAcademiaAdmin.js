@@ -318,6 +318,29 @@ function _escapeHtml(str) {
     .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 
+async function _obterAdminTokenAcademia() {
+  if (window._adminToken) return window._adminToken;
+
+  const cached = sessionStorage.getItem('_pushAdminToken');
+  if (cached) { window._adminToken = cached; return cached; }
+
+  const usuarioLogado = JSON.parse(localStorage.getItem('usuarioLogado') || '{}');
+  const email = usuarioLogado?.email;
+  if (!email) throw new Error('Sessão expirada. Faça login novamente.');
+
+  const resp = await fetch('/api/push', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ acao: 'admin-token', email }),
+  });
+  const data = await resp.json();
+  if (!data.ok || !data.token) throw new Error('Não foi possível obter token de admin.');
+
+  sessionStorage.setItem('_pushAdminToken', data.token);
+  window._adminToken = data.token;
+  return data.token;
+}
+
 // ─── Script de Carga Inicial (botão do menu, chama a API — Seção 21.10/10) ───
 // firebase-admin só roda no servidor, então este botão apenas dispara o
 // endpoint /api/academiaSetup (academiaSetup.js), que faz o bootstrap real.
@@ -330,12 +353,22 @@ async function executarScriptCargaInicialAcademia(btnEl) {
   btnEl.disabled = true;
   btnEl.textContent = '⏳ Executando...';
 
+  let token;
+  try {
+    token = await _obterAdminTokenAcademia();
+  } catch (e) {
+    alert('❌ ' + e.message);
+    btnEl.disabled = false;
+    btnEl.textContent = textoOriginal;
+    return;
+  }
+
   try {
     const resp = await fetch('/api/academia?acao=setup-inicial', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-admin-token': window._adminToken || '', // mesmo token usado nas outras chamadas admin do projeto
+        'x-admin-token': token, // mesmo token usado nas outras chamadas admin do projeto
       },
     });
     const data = await resp.json();
