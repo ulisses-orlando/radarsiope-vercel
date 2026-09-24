@@ -331,7 +331,7 @@ async function executarScriptCargaInicialAcademia(btnEl) {
   btnEl.textContent = '⏳ Executando...';
 
   try {
-    const resp = await fetch('/api/academiaSetup', {
+    const resp = await fetch('/api/academia?acao=setup-inicial', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
