@@ -1225,30 +1225,53 @@ async function _handleGerarCobrancaCancelamento(req, res) {
 // ─── Persistir resultado do quiz ──────────────────────────────────────────
 async function _handleSalvarResultadoQuiz(req, res) {
   if (req.method !== 'POST') return json(res, 405, { ok: false, message: 'Método não permitido.' });
-  const { uid, newsletter_id, pontuacao, aprovado, detalhes } = req.body || {};
-  if (!uid || !newsletter_id) return json(res, 400, { ok: false, message: 'uid e newsletter_id são obrigatórios.' });
+  const { uid, newsletter_id, quiz_especial_id, pontuacao, aprovado, detalhes } = req.body || {};
+
+  // v1.7: aceita exatamente UMA das duas fontes — newsletter_id (quiz normal) ou
+  // quiz_especial_id (Quiz Especial da Academia). Nunca as duas, nunca nenhuma.
+  if (!uid || (!newsletter_id && !quiz_especial_id) || (newsletter_id && quiz_especial_id)) {
+    return json(res, 400, { ok: false, message: 'uid e exatamente um de newsletter_id/quiz_especial_id são obrigatórios.' });
+  }
   if (typeof pontuacao !== 'number' || pontuacao < 0 || pontuacao > 100) return json(res, 400, { ok: false, message: 'pontuacao inválida.' });
 
+  const tipo = quiz_especial_id ? 'especial' : 'normal';
+  const idField = tipo === 'especial' ? 'quiz_especial_id' : 'newsletter_id';
+  const idValue = String(tipo === 'especial' ? quiz_especial_id : newsletter_id);
+
   try {
-    const newsletterDoc = await db.collection('newsletters').doc(newsletter_id).get();
-    if (!newsletterDoc.exists) return json(res, 404, { ok: false, message: 'Newsletter não encontrada.' });
-    const tentativas_max = newsletterDoc.data()?.quiz?.tentativas_max ?? 3;
+    let tentativas_max, nivel_alvo;
+
+    if (tipo === 'normal') {
+      const newsletterDoc = await db.collection('newsletters').doc(idValue).get();
+      if (!newsletterDoc.exists) return json(res, 404, { ok: false, message: 'Newsletter não encontrada.' });
+      tentativas_max = newsletterDoc.data()?.quiz?.tentativas_max ?? 3;
+    } else {
+      const especialDoc = await db.collection('quizzes_especiais').doc(idValue).get();
+      if (!especialDoc.exists) return json(res, 404, { ok: false, message: 'Quiz Especial não encontrado.' });
+      if (especialDoc.data()?.ativo === false) return json(res, 403, { ok: false, message: 'Este Quiz Especial não está mais ativo.' });
+      tentativas_max = especialDoc.data()?.tentativas_max ?? 3;
+      nivel_alvo = especialDoc.data()?.nivel_alvo || null; // denormalizado — usado por onQuizEspecialToggle
+    }
 
     const resultadosRef = db.collection('usuarios').doc(uid).collection('quiz_resultados');
-    const existentes = await resultadosRef.where('newsletter_id', '==', String(newsletter_id)).get();
+    const existentes = await resultadosRef.where(idField, '==', idValue).get();
 
     if (existentes.size >= tentativas_max) return json(res, 403, { ok: false, message: `Limite de ${tentativas_max} tentativa(s) atingido.` });
 
-    await resultadosRef.add({
-      newsletter_id: String(newsletter_id),
+    const novoDoc = {
+      [idField]: idValue,
+      tipo,
       pontuacao,
       aprovado: aprovado || false,
       detalhes: detalhes || [],
       criado_em: admin.firestore.FieldValue.serverTimestamp()
-    });
+    };
+    if (tipo === 'especial') novoDoc.nivel_alvo = nivel_alvo;
+
+    await resultadosRef.add(novoDoc);
 
     // 🔧 CORREÇÃO: Sem .orderBy() no Firestore. Ordenação feita em memória.
-    const atualizados = await resultadosRef.where('newsletter_id', '==', String(newsletter_id)).get();
+    const atualizados = await resultadosRef.where(idField, '==', idValue).get();
     const tentativas = atualizados.docs
       .map(d => ({
         pontuacao: d.data().pontuacao,
@@ -1256,9 +1279,12 @@ async function _handleSalvarResultadoQuiz(req, res) {
         criado_em: d.data().criado_em?.toDate?.()?.toISOString() ?? null
       }))
       .sort((a, b) => (b.criado_em || '').localeCompare(a.criado_em || '')); // Mais recente primeiro
-    
-      // Atualiza o resumo geral (todas as edições) — best-effort, não bloqueia a resposta em caso de falha
-    await _atualizarResumoQuiz(uid);
+
+    // Resumo geral (todas as edições) só existe pra quiz NORMAL — Especiais não
+    // fazem parte dessa visão (que é organizada por edição de newsletter).
+    if (tipo === 'normal') {
+      await _atualizarResumoQuiz(uid); // best-effort, não bloqueia a resposta em caso de falha
+    }
 
     return json(res, 200, {
       ok: true, message: 'Resultado salvo com sucesso.',
@@ -1273,18 +1299,26 @@ async function _handleSalvarResultadoQuiz(req, res) {
 // ─── GET: buscar histórico de tentativas ─────────────────────────────────────
 async function _handleQuizHistorico(req, res) {
   if (req.method !== 'GET') return json(res, 405, { ok: false, message: 'Método não permitido.' });
-  const { uid, newsletter_id } = req.query || {};
-  if (!uid || !newsletter_id) return json(res, 400, { ok: false, message: 'uid e newsletter_id são obrigatórios.' });
+  const { uid, newsletter_id, quiz_especial_id } = req.query || {};
+  if (!uid || (!newsletter_id && !quiz_especial_id)) {
+    return json(res, 400, { ok: false, message: 'uid e um de newsletter_id/quiz_especial_id são obrigatórios.' });
+  }
+
+  const tipo = quiz_especial_id ? 'especial' : 'normal';
+  const idField = tipo === 'especial' ? 'quiz_especial_id' : 'newsletter_id';
+  const idValue = String(tipo === 'especial' ? quiz_especial_id : newsletter_id);
 
   try {
-    const newsletterDoc = await db.collection('newsletters').doc(newsletter_id).get();
-    const tentativas_max = newsletterDoc.exists ? (newsletterDoc.data()?.quiz?.tentativas_max ?? 3) : 3;
+    const fonteDoc = tipo === 'especial'
+      ? await db.collection('quizzes_especiais').doc(idValue).get()
+      : await db.collection('newsletters').doc(idValue).get();
+    const tentativas_max = fonteDoc.exists ? (fonteDoc.data()?.tentativas_max ?? fonteDoc.data()?.quiz?.tentativas_max ?? 3) : 3;
 
-    // 🔧 CORREÇÃO: Removido .orderBy() + garantido tipo String para newsletter_id
+    // 🔧 CORREÇÃO: Removido .orderBy() + garantido tipo String para o id
     const snap = await db
       .collection('usuarios').doc(uid)
       .collection('quiz_resultados')
-      .where('newsletter_id', '==', String(newsletter_id))
+      .where(idField, '==', idValue)
       .get();
 
     const tentativas = snap.docs
