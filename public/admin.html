@@ -653,6 +653,15 @@
       <button onclick="abrirTab('respostas_automaticas')">✉️ Respostas Automáticas</button>
       <button onclick="abrirTab('aba-temas')">🗞️ Notícias</button>
     </div>
+    
+    <div style="margin-top:12px">
+      <h2 style="font-size:14px;margin-bottom:6px">🎓 Academia</h2>
+      <button onclick="abrirTab('academia-config')" id="btn-tab-academia-config">⚙️ Configuração</button>
+      <button onclick="abrirTab('academia-especiais')" id="btn-tab-academia-especiais">🧩 Quizzes Especiais</button>
+      <button onclick="executarScriptCargaInicialAcademia(this)" title="Grava os valores/descrições padrão em config/selos e config/fidelidade — não sobrescreve o que já existir">
+        🚀 Script de Carga Inicial
+      </button>
+    </div>
 
     <hr style="margin: 30px 0;">
 
@@ -1555,6 +1564,18 @@
           <div class="kanban-list" id="kanban-concluido"></div>
         </div>
       </div>
+    </section>
+
+    <!-- ACADEMIA: CONFIGURAÇÃO -->
+    <section id="academia-config" class="card">
+      <h3 style="margin:0">⚙️ Configuração da Academia</h3>
+      <div id="academia-config-sub" style="font-size:12px;color:#888;margin-bottom:10px"></div>
+      <div id="academia-config-body"></div>
+    </section>
+
+    <!-- ACADEMIA: QUIZZES ESPECIAIS -->
+    <section id="academia-especiais" class="card">
+      <div id="painel-quizzes-especiais"></div>
     </section>
 
     <!-- NEWSLETTERS -->
@@ -2489,7 +2510,8 @@
   <script src="js/functions.js"></script>
   <script src="js/mailer.js"></script>
   <script src="js/calendarioAdmin.js"></script>
-
+  <script src="js/configAcademiaAdmin.js"></script>
+  <script src="js/academiaEspeciaisAdmin.js"></script>
 
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/2.4.0/purify.min.js"></script>
@@ -2612,6 +2634,8 @@
         carregarPainelVotacoesTemas();
       }
       else if (tabId === 'calendario') renderCalendarioAdmin(document.getElementById('cal-admin-root'));
+      else if (tabId === 'academia-config') abrirPainelConfigAcademia();
+      else if (tabId === 'academia-especiais') abrirPainelQuizzesEspeciais();
     }
 
     // inicializa com usuários visível
