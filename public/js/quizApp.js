@@ -5,9 +5,10 @@ Integração com: verNewsletterComToken.js + API /api/pagamentoMP
 (function () {
 'use strict';
 
-let _config     = null;  // newsletter.quiz
+let _config     = null;  // newsletter.quiz OU o próprio doc de quizzes_especiais
 let _state      = null;  // sessão ativa
 let _historico  = null;  // cache da resposta da API { tentativas[], tentativas_total, tentativas_max }
+let _tipoQuiz   = 'normal'; // 'normal' | 'especial' — setado em init()/initEspecial()
 
 const _localKey = (uid, nid) => `rs_quiz_${uid}_${nid}`;
 
@@ -19,30 +20,55 @@ async function init(newsletter, user) {
     if (!newsletter?.quiz?.ativo) return;
     if (!user?.uid) return;
 
+    _tipoQuiz = 'normal';
     _config = newsletter.quiz;
 
     const isAssinante = user.segmento === 'assinante' || user.segmento === 'assinantes';
     const visivelParaLeads = (_config.visivel_leads === true);
     if (!isAssinante && !visivelParaLeads) return;
 
-    injetarEstilosCSS();
+    await _iniciarComum(newsletter.id, user.uid);
+}
 
-    // Exibe skeleton enquanto aguarda API
-    _renderizarSkeleton(newsletter.id);
+// NOVO (v1.7): entrada para Quizzes Especiais da Academia (Seção 21.7).
+// `quizEspecial` é o próprio documento de quizzes_especiais/{id} — já tem
+// ativo/tentativas_max/pontuacao_minima/perguntas no nível raiz (sem `.quiz`
+// aninhado como a newsletter tem), por isso `_config` aponta direto pra ele.
+async function initEspecial(quizEspecial, user) {
+    if (!quizEspecial?.ativo) return;
+    if (!user?.uid) return;
+
+    _tipoQuiz = 'especial';
+    _config = quizEspecial;
+
+    // Especiais nunca são visíveis para leads — só assinantes membros da
+    // Academia. A checagem de "já desbloqueou o nível" é responsabilidade
+    // de quem chama initEspecial (o painel de Especiais só lista o que o
+    // assinante já pode ver), não deste módulo.
+    const isAssinante = user.segmento === 'assinante' || user.segmento === 'assinantes';
+    if (!isAssinante) return;
+
+    await _iniciarComum(quizEspecial.id, user.uid);
+}
+
+// Fluxo comum a init()/initEspecial() — carrega histórico e renderiza o card
+async function _iniciarComum(id, uid) {
+    injetarEstilosCSS();
+    _renderizarSkeleton(id);
 
     try {
-        _historico = await _buscarHistorico(user.uid, newsletter.id);
+        _historico = await _buscarHistorico(uid, id);
     } catch (e) {
         console.warn('[QuizApp] Falha ao buscar histórico, usando fallback local:', e);
-        _historico = _carregarCacheLocal(user.uid, newsletter.id);
+        _historico = _carregarCacheLocal(uid, id);
     }
 
     _removerSkeleton();
 
     if (!_historico || _historico.tentativas_total === 0) {
-        _renderizarCardConvite(newsletter.id, user.uid);
+        _renderizarCardConvite(id, uid);
     } else {
-        _renderizarCardConcluido(newsletter.id, user.uid);
+        _renderizarCardConcluido(id, uid);
     }
 }
 
@@ -169,7 +195,7 @@ function _renderizarCardConcluido(nid, uid) {
 function _abrirQuizModal(nid, uid) {
     document.getElementById('rs-quiz-cta-card')?.remove();
 
-    _state = { nid, uid, qIndex: 0, answers: [], score: 0, finished: false };
+    _state = { nid, uid, tipo: _tipoQuiz, qIndex: 0, answers: [], score: 0, finished: false };
 
     const overlay = document.createElement('div');
     overlay.id = 'rs-quiz-overlay';
@@ -178,7 +204,7 @@ function _abrirQuizModal(nid, uid) {
         <div id="rs-quiz-modal" class="rs-quiz-modal" role="dialog" aria-modal="true" aria-labelledby="rs-quiz-title">
             <header id="rs-quiz-header">
                 <div class="rs-quiz-header-left">
-                    <span class="rs-quiz-badge">Quiz</span>
+                    <span class="rs-quiz-badge">${_tipoQuiz === 'especial' ? '🧩 Desafio Especial' : 'Quiz'}</span>
                     <span id="rs-quiz-title">Pergunta 1</span>
                 </div>
                 <button id="rs-quiz-fechar" aria-label="Fechar quiz">✕</button>
@@ -328,7 +354,7 @@ async function _finalizarQuiz() {
         _salvarCacheLocal(_state.uid, _state.nid, _historico);
 
         window.dispatchEvent(new CustomEvent('rs:quizConcluido', {
-            detail: { nid: _state.nid, pontuacao, aprovado }
+            detail: { nid: _state.nid, tipo: _state.tipo, pontuacao, aprovado }
         }));
     } catch (err) {
         console.error('[QuizApp] Erro ao salvar resultado:', err);
@@ -444,7 +470,8 @@ function _abrirModalHistorico() {
 // ────────────────────────────────────────────────────────────────────────
 
 async function _buscarHistorico(uid, nid) {
-    const url = `/api/pagamentoMP?acao=quiz-historico&uid=${encodeURIComponent(uid)}&newsletter_id=${encodeURIComponent(nid)}`;
+    const idParam = _tipoQuiz === 'especial' ? 'quiz_especial_id' : 'newsletter_id';
+    const url = `/api/pagamentoMP?acao=quiz-historico&uid=${encodeURIComponent(uid)}&${idParam}=${encodeURIComponent(nid)}`;
     const resp = await fetch(url, { method: 'GET' });
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
     const data = await resp.json();
@@ -459,9 +486,11 @@ async function _buscarHistorico(uid, nid) {
 async function _salvarNoBackend({ pontuacao, aprovado }) {
     if (!_state) return;
 
+    const idField = _state.tipo === 'especial' ? 'quiz_especial_id' : 'newsletter_id';
+
     const payload = {
-        uid:           _state.uid,
-        newsletter_id: _state.nid,
+        uid: _state.uid,
+        [idField]: _state.nid,
         pontuacao,
         aprovado,
         detalhes: _state.answers.map(a => ({
@@ -759,6 +788,7 @@ function injetarEstilosCSS() {
 
 window.QuizManager = {
     init,
+    initEspecial, // NOVO v1.7 — Quizzes Especiais da Academia (Seção 21.7)
     jaConcluiu,
     getEstatisticas,
     _getState:     () => _state,
