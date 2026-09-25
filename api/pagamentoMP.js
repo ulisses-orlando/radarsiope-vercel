@@ -1222,72 +1222,239 @@ async function _handleGerarCobrancaCancelamento(req, res) {
   }
 }
 
-// ─── Persistir resultado do quiz ──────────────────────────────────────────
-async function _handleSalvarResultadoQuiz(req, res) {
+// ─── Iniciar tentativa de quiz (cria doc com status 'em_andamento') ─────────
+// Garante que abrir o quiz já consome uma tentativa, impedindo burla por
+// repetição de abertura. Se houver tentativa 'em_andamento' com mais de 30 min,
+// considera abandonada automaticamente (proteção contra crash do navegador).
+async function _handleQuizIniciar(req, res) {
   if (req.method !== 'POST') return json(res, 405, { ok: false, message: 'Método não permitido.' });
-  const { uid, newsletter_id, quiz_especial_id, pontuacao, aprovado, detalhes } = req.body || {};
-
-  // v1.7: aceita exatamente UMA das duas fontes — newsletter_id (quiz normal) ou
-  // quiz_especial_id (Quiz Especial da Academia). Nunca as duas, nunca nenhuma.
+  const { uid, newsletter_id, quiz_especial_id } = req.body || {};
   if (!uid || (!newsletter_id && !quiz_especial_id) || (newsletter_id && quiz_especial_id)) {
     return json(res, 400, { ok: false, message: 'uid e exatamente um de newsletter_id/quiz_especial_id são obrigatórios.' });
   }
-  if (typeof pontuacao !== 'number' || pontuacao < 0 || pontuacao > 100) return json(res, 400, { ok: false, message: 'pontuacao inválida.' });
 
   const tipo = quiz_especial_id ? 'especial' : 'normal';
-  const idField = tipo === 'especial' ? 'quiz_especial_id' : 'newsletter_id';
+  const idField = tipo === 'especial' ? 'quiz_especiais' : 'newsletters';
   const idValue = String(tipo === 'especial' ? quiz_especial_id : newsletter_id);
+  const resultField = tipo === 'especial' ? 'quiz_especial_id' : 'newsletter_id';
+
+  try {
+    // 1. Busca tentativas_max da fonte
+    const fonteDoc = await db.collection(idField).doc(idValue).get();
+    if (!fonteDoc.exists) return json(res, 404, { ok: false, message: 'Fonte do quiz não encontrada.' });
+    const fonteData = fonteDoc.data();
+    if (tipo === 'especial' && fonteData.ativo === false) {
+      return json(res, 403, { ok: false, message: 'Este Quiz Especial não está mais ativo.' });
+    }
+    const tentativas_max = fonteData.tentativas_max ?? fonteData.quiz?.tentativas_max ?? 3;
+
+    const resultadosRef = db.collection('usuarios').doc(uid).collection('quiz_resultados');
+
+    // 2. Limpa tentativas 'em_andamento' antigas (> 30 min) — trata crash do navegador
+    const JANELA_MS = 30 * 60 * 1000;
+    const agora = Date.now();
+    const emAndamentoSnap = await resultadosRef
+      .where(resultField, '==', idValue)
+      .where('status', '==', 'em_andamento')
+      .get();
+
+    for (const doc of emAndamentoSnap.docs) {
+      const criadoMs = doc.data().criado_em?.toMillis?.() || 0;
+      if (agora - criadoMs > JANELA_MS) {
+        await doc.ref.update({
+          status: 'abandonada',
+          pontuacao: 0,
+          aprovado: false,
+          finalizado_em: admin.firestore.FieldValue.serverTimestamp(),
+          abandono_motivo: 'timeout_automatico'
+        });
+      }
+    }
+
+    // 3. Conta tentativas já consolidadas (finalizada + abandonada + em_andamento válida)
+    const todasSnap = await resultadosRef.where(resultField, '==', idValue).get();
+    if (todasSnap.size >= tentativas_max) {
+      return json(res, 403, {
+        ok: false,
+        codigo: 'limite_atingido',
+        message: `Limite de ${tentativas_max} tentativa(s) atingido.`
+      });
+    }
+
+    // 4. Verifica se já existe tentativa em andamento válida (< 30 min)
+    const emAndamentoAtual = emAndamentoSnap.docs.find(doc => {
+      const criadoMs = doc.data().criado_em?.toMillis?.() || 0;
+      return (agora - criadoMs) <= JANELA_MS;
+    });
+
+    if (emAndamentoAtual) {
+      // Retorna o tentativa_id existente para o frontend poder continuar
+      return json(res, 200, {
+        ok: true,
+        tentativa_id: emAndamentoAtual.id,
+        continuando: true,
+        tentativas_restantes: tentativas_max - todasSnap.size
+      });
+    }
+
+    // 5. Cria nova tentativa
+    const novoDoc = {
+      [resultField]: idValue,
+      tipo,
+      status: 'em_andamento',
+      pontuacao: null,
+      aprovado: false,
+      detalhes: [],
+      criado_em: admin.firestore.FieldValue.serverTimestamp(),
+      finalizado_em: null
+    };
+    if (tipo === 'especial') novoDoc.nivel_alvo = fonteData.nivel_alvo || null;
+
+    const ref = await resultadosRef.add(novoDoc);
+
+    return json(res, 200, {
+      ok: true,
+      tentativa_id: ref.id,
+      continuando: false,
+      tentativas_restantes: tentativas_max - (todasSnap.size + 1)
+    });
+  } catch (err) {
+    console.error('[quiz-iniciar] Erro:', err.message);
+    return json(res, 500, { ok: false, message: 'Erro interno ao iniciar quiz.' });
+  }
+}
+
+// ─── Abandonar tentativa de quiz (fechou o modal = gastou a tentativa) ───────
+async function _handleQuizAbandonar(req, res) {
+  if (req.method !== 'POST') return json(res, 405, { ok: false, message: 'Método não permitido.' });
+  const { uid, tentativa_id, pontuacao_parcial, respostas_parciais } = req.body || {};
+  if (!uid || !tentativa_id) {
+    return json(res, 400, { ok: false, message: 'uid e tentativa_id são obrigatórios.' });
+  }
+
+  try {
+    const ref = db.collection('usuarios').doc(uid)
+      .collection('quiz_resultados').doc(tentativa_id);
+    const snap = await ref.get();
+    if (!snap.exists) {
+      return json(res, 404, { ok: false, message: 'Tentativa não encontrada.' });
+    }
+    const data = snap.data();
+    // Só abandona se ainda estiver em_andamento (evita dupla finalização)
+    if (data.status !== 'em_andamento') {
+      return json(res, 200, { ok: true, message: 'Tentativa já finalizada.', ja_finalizada: true });
+    }
+
+    const pontuacao = typeof pontuacao_parcial === 'number' ? Math.max(0, Math.min(100, pontuacao_parcial)) : 0;
+    await ref.update({
+      status: 'abandonada',
+      pontuacao,
+      aprovado: false,
+      detalhes: Array.isArray(respostas_parciais) ? respostas_parciais : [],
+      finalizado_em: admin.firestore.FieldValue.serverTimestamp(),
+      abandono_motivo: 'usuario_fechou'
+    });
+
+    // Atualiza resumo geral (best-effort) se for quiz normal
+    if (data.tipo === 'normal') {
+      _atualizarResumoQuiz(uid).catch(e => console.warn('[abandonar] resumo:', e.message));
+    }
+
+    return json(res, 200, { ok: true, message: 'Tentativa registrada como abandonada.' });
+  } catch (err) {
+    console.error('[quiz-abandonar] Erro:', err.message);
+    return json(res, 500, { ok: false, message: 'Erro interno ao abandonar quiz.' });
+  }
+}
+
+// ─── Persistir resultado do quiz ──────────────────────────────────────────
+async function _handleSalvarResultadoQuiz(req, res) {
+  if (req.method !== 'POST') return json(res, 405, { ok: false, message: 'Método não permitido.' });
+  const { uid, newsletter_id, quiz_especial_id, pontuacao, aprovado, detalhes, tentativa_id } = req.body || {};
+  if (!uid || (!newsletter_id && !quiz_especial_id) || (newsletter_id && quiz_especial_id)) {
+    return json(res, 400, { ok: false, message: 'uid e exatamente um de newsletter_id/quiz_especial_id são obrigatórios.' });
+  }
+  if (typeof pontuacao !== 'number' || pontuacao < 0 || pontuacao > 100) {
+    return json(res, 400, { ok: false, message: 'pontuacao inválida.' });
+  }
+
+  const tipo = quiz_especial_id ? 'especial' : 'normal';
+  const idField = tipo === 'especial' ? 'quiz_especiais' : 'newsletters';
+  const idValue = String(tipo === 'especial' ? quiz_especial_id : newsletter_id);
+  const resultField = tipo === 'especial' ? 'quiz_especial_id' : 'newsletter_id';
 
   try {
     let tentativas_max, nivel_alvo;
-
-    if (tipo === 'normal') {
-      const newsletterDoc = await db.collection('newsletters').doc(idValue).get();
-      if (!newsletterDoc.exists) return json(res, 404, { ok: false, message: 'Newsletter não encontrada.' });
-      tentativas_max = newsletterDoc.data()?.quiz?.tentativas_max ?? 3;
+    const fonteDoc = await db.collection(idField).doc(idValue).get();
+    if (!fonteDoc.exists) return json(res, 404, { ok: false, message: 'Fonte do quiz não encontrada.' });
+    const fonteData = fonteDoc.data();
+    if (tipo === 'especial') {
+      if (fonteData.ativo === false) return json(res, 403, { ok: false, message: 'Quiz Especial inativo.' });
+      tentativas_max = fonteData.tentativas_max ?? 3;
+      nivel_alvo = fonteData.nivel_alvo || null;
     } else {
-      const especialDoc = await db.collection('quizzes_especiais').doc(idValue).get();
-      if (!especialDoc.exists) return json(res, 404, { ok: false, message: 'Quiz Especial não encontrado.' });
-      if (especialDoc.data()?.ativo === false) return json(res, 403, { ok: false, message: 'Este Quiz Especial não está mais ativo.' });
-      tentativas_max = especialDoc.data()?.tentativas_max ?? 3;
-      nivel_alvo = especialDoc.data()?.nivel_alvo || null; // denormalizado — usado por onQuizEspecialToggle
+      tentativas_max = fonteData.quiz?.tentativas_max ?? 3;
     }
 
     const resultadosRef = db.collection('usuarios').doc(uid).collection('quiz_resultados');
-    const existentes = await resultadosRef.where(idField, '==', idValue).get();
 
-    if (existentes.size >= tentativas_max) return json(res, 403, { ok: false, message: `Limite de ${tentativas_max} tentativa(s) atingido.` });
+    // ── NOVO: se veio tentativa_id, atualiza o doc existente (criado em quiz-iniciar)
+    if (tentativa_id) {
+      const ref = resultadosRef.doc(tentativa_id);
+      const snap = await ref.get();
+      if (!snap.exists) {
+        return json(res, 404, { ok: false, message: 'Tentativa não encontrada.' });
+      }
+      const data = snap.data();
+      // Garante que a tentativa pertence a este quiz (segurança)
+      if (data[resultField] !== idValue) {
+        return json(res, 403, { ok: false, message: 'Tentativa não pertence a este quiz.' });
+      }
+      await ref.update({
+        status: 'finalizada',
+        pontuacao,
+        aprovado: aprovado || false,
+        detalhes: detalhes || [],
+        finalizado_em: admin.firestore.FieldValue.serverTimestamp()
+      });
+    } else {
+      // ── FALLBACK retrocompat: cria novo doc (para chamadas antigas)
+      const existentes = await resultadosRef.where(resultField, '==', idValue).get();
+      if (existentes.size >= tentativas_max) {
+        return json(res, 403, { ok: false, message: `Limite de ${tentativas_max} tentativa(s) atingido.` });
+      }
+      const novoDoc = {
+        [resultField]: idValue,
+        tipo,
+        status: 'finalizada',
+        pontuacao,
+        aprovado: aprovado || false,
+        detalhes: detalhes || [],
+        criado_em: admin.firestore.FieldValue.serverTimestamp(),
+        finalizado_em: admin.firestore.FieldValue.serverTimestamp()
+      };
+      if (tipo === 'especial') novoDoc.nivel_alvo = nivel_alvo;
+      await resultadosRef.add(novoDoc);
+    }
 
-    const novoDoc = {
-      [idField]: idValue,
-      tipo,
-      pontuacao,
-      aprovado: aprovado || false,
-      detalhes: detalhes || [],
-      criado_em: admin.firestore.FieldValue.serverTimestamp()
-    };
-    if (tipo === 'especial') novoDoc.nivel_alvo = nivel_alvo;
-
-    await resultadosRef.add(novoDoc);
-
-    // 🔧 CORREÇÃO: Sem .orderBy() no Firestore. Ordenação feita em memória.
-    const atualizados = await resultadosRef.where(idField, '==', idValue).get();
+    // Ordenação em memória (sem .orderBy)
+    const atualizados = await resultadosRef.where(resultField, '==', idValue).get();
     const tentativas = atualizados.docs
       .map(d => ({
-        pontuacao: d.data().pontuacao,
-        aprovado: d.data().aprovado,
+        pontuacao: d.data().pontuacao ?? 0,
+        aprovado: d.data().aprovado || false,
+        status: d.data().status || 'finalizada',
         criado_em: d.data().criado_em?.toDate?.()?.toISOString() ?? null
       }))
-      .sort((a, b) => (b.criado_em || '').localeCompare(a.criado_em || '')); // Mais recente primeiro
+      .sort((a, b) => (b.criado_em || '').localeCompare(a.criado_em || ''));
 
-    // Resumo geral (todas as edições) só existe pra quiz NORMAL — Especiais não
-    // fazem parte dessa visão (que é organizada por edição de newsletter).
     if (tipo === 'normal') {
-      await _atualizarResumoQuiz(uid); // best-effort, não bloqueia a resposta em caso de falha
+      _atualizarResumoQuiz(uid).catch(() => {});
     }
 
     return json(res, 200, {
-      ok: true, message: 'Resultado salvo com sucesso.',
+      ok: true,
+      message: 'Resultado salvo com sucesso.',
       historico: { tentativas, tentativas_total: tentativas.length, tentativas_max }
     });
   } catch (err) {
@@ -1323,8 +1490,9 @@ async function _handleQuizHistorico(req, res) {
 
     const tentativas = snap.docs
       .map(d => ({
-        pontuacao: d.data().pontuacao,
-        aprovado: d.data().aprovado,
+        pontuacao: d.data().pontuacao ?? 0,
+        aprovado: d.data().aprovado || false,
+        status: d.data().status || 'finalizada',
         criado_em: d.data().criado_em?.toDate?.()?.toISOString() ?? null
       }))
       .sort((a, b) => (b.criado_em || '').localeCompare(a.criado_em || ''));
@@ -1342,27 +1510,26 @@ async function _handleQuizHistorico(req, res) {
 // Evita drift entre um contador incremental e os documentos reais.
 async function _computarResumoQuiz(uid) {
   const snap = await db.collection('usuarios').doc(uid).collection('quiz_resultados').get();
- 
-  const porEdicao = {}; // newsletter_id -> { melhor_pontuacao, aprovado, tentativas_usadas }
+  const porEdicao = {};
   snap.docs.forEach(d => {
     const data = d.data();
     const nid = String(data.newsletter_id);
     const atual = porEdicao[nid] || { melhor_pontuacao: 0, aprovado: false, tentativas_usadas: 0 };
-    atual.tentativas_usadas += 1;
-    if (typeof data.pontuacao === 'number' && data.pontuacao > atual.melhor_pontuacao) {
-      atual.melhor_pontuacao = data.pontuacao;
+    atual.tentativas_usadas += 1; // TODAS contam (finalizadas + abandonadas)
+    const status = data.status || 'finalizada'; // legado sem status = finalizada
+    // Só considera pontuação de tentativas finalizadas (abandonadas não competem)
+    if (status === 'finalizada' && typeof data.pontuacao === 'number') {
+      if (data.pontuacao > atual.melhor_pontuacao) atual.melhor_pontuacao = data.pontuacao;
+      if (data.aprovado) atual.aprovado = true;
     }
-    if (data.aprovado) atual.aprovado = true;
     porEdicao[nid] = atual;
   });
- 
   const nids = Object.keys(porEdicao);
   const total_edicoes_feitas = nids.length;
   const total_edicoes_aprovadas = nids.filter(nid => porEdicao[nid].aprovado).length;
   const media_geral = total_edicoes_feitas
-    ? Math.round(nids.reduce((soma, nid) => soma + porEdicao[nid].melhor_pontuacao, 0) / total_edicoes_feitas)
+    ? Math.round(nids.reduce((s, nid) => s + porEdicao[nid].melhor_pontuacao, 0) / total_edicoes_feitas)
     : 0;
- 
   return { edicoes: porEdicao, total_edicoes_feitas, total_edicoes_aprovadas, media_geral };
 }
  
@@ -1448,7 +1615,12 @@ export default async function handler(req, res) {
 
     // Validar assinatura apenas para webhooks (não para criar-pedido / status-pedido)
     const acao = (req.query && req.query.acao) ? String(req.query.acao) : null;
-    const acoesPublicas = ['criar-pedido', 'status-pedido', 'ativar-sessao', 'validar-sessao', 'criar-sessao', 'encerrar-sessao', 'cancelar-assinatura', 'gerar-cobranca-cancelamento', 'salvar-quiz', 'quiz-historico', 'quiz-resumo-geral', 'regenerar-token-ativacao', 'admin-enviar-link-acesso'];
+    const acoesPublicas = [
+      'criar-pedido', 'status-pedido', 'ativar-sessao', 'validar-sessao', 'criar-sessao', 
+      'encerrar-sessao', 'cancelar-assinatura', 'gerar-cobranca-cancelamento', 'salvar-quiz', 
+      'quiz-historico', 'quiz-resumo-geral', 'regenerar-token-ativacao', 'admin-enviar-link-acesso',
+      'quiz-iniciar', 'quiz-abandonar'
+    ];
 
     if (!acao || !acoesPublicas.includes(acao)) {
       const sigCheck = validateMpWebhookSignature(rawBody, req);
@@ -1508,6 +1680,10 @@ export default async function handler(req, res) {
     if (req.method === 'POST' && acao === 'salvar-quiz') {
       return _handleSalvarResultadoQuiz(req, res);
     }
+
+    if (req.method === 'POST' && acao === 'quiz-iniciar')   return _handleQuizIniciar(req, res);
+    
+    if (req.method === 'POST' && acao === 'quiz-abandonar') return _handleQuizAbandonar(req, res);
 
     // ── POST ?acao=ativar-sessao ──────────────────────────────────────────
     if (req.method === 'POST' && acao === 'ativar-sessao') {
