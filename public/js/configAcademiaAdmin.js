@@ -311,91 +311,97 @@ function _renderNo(valor, metadadosNo, caminho) {
   }
 
   // ── Modo: cards_por_filho (cada filho vira um card) ──────────────────────
-  if (configVisual?.modo === 'cards_por_filho') {
-    return chaves.map(chave => {
-      const subCaminho = `${caminho}.${chave}`;
-      const subMetadados = (metadadosNo && typeof metadadosNo === 'object') ? metadadosNo[chave] : undefined;
-      const subValor = valor[chave];
+if (configVisual?.modo === 'cards_por_filho') {
+  return chaves.map(chave => {
+    const subCaminho = `${caminho}.${chave}`;
+    const subMetadados = (metadadosNo && typeof metadadosNo === 'object') ? metadadosNo[chave] : undefined;
+    const subValor = valor[chave];
 
-      const cor       = configVisual.cor(chave, subValor);
-      const icone     = configVisual.icone(chave, subValor);
-      const titulo    = configVisual.titulo(chave, subValor);
-      const subtitulo = configVisual.subtitulo(chave);
-
-      return `
-        <div class="cfg-grupo-card" style="
-          margin:18px 0;
-          padding:14px 16px;
-          background:rgba(255,255,255,0.035);
-          border-radius:10px;
-          border-left:4px solid ${cor};
-          box-shadow:0 1px 4px rgba(0,0,0,0.08);
-        ">
-          <div style="
-            font-size:15px;
-            font-weight:700;
-            color:var(--rs-text,#f1f5f9);
-            margin-bottom:12px;
-            display:flex;
-            align-items:center;
-            gap:8px;
-            flex-wrap:wrap;
-          ">
-            <span style="font-size:20px">${icone}</span>
-            <span>${titulo}</span>
-            <span style="
-              font-size:11px;
-              color:var(--rs-muted,#94a3b8);
-              font-weight:400;
-              margin-left:4px;
-              padding:2px 8px;
-              background:rgba(0,0,0,0.15);
-              border-radius:4px;
-            ">${subtitulo}</span>
-          </div>
-          ${_renderNo(subValor, subMetadados || {}, subCaminho)}
-        </div>
-      `;
-    }).join('');
-  }
-
-  // ─── Modo: card_container (grupo todo vira um card) ───────────────────────
-  if (configVisual?.modo === 'card_container') {
-    const filhosHtml = chaves.map(chave => {
-      const subCaminho = `${caminho}.${chave}`;
-      const subMetadados = (metadadosNo && typeof metadadosNo === 'object') ? metadadosNo[chave] : undefined;
-      const ehFolha = subValorIsFolha(valor[chave]);
-      if (ehFolha) {
-        return _renderLinhaParametro(subCaminho, chave, valor[chave], typeof subMetadados === 'string' ? subMetadados : '');
-      }
-      return _renderNo(valor[chave], subMetadados || {}, subCaminho);
-    }).join('');
+    const cor       = configVisual.cor(chave, subValor);
+    const icone     = configVisual.icone(chave, subValor);
+    const titulo    = configVisual.titulo(chave, subValor);
+    const subtitulo = configVisual.subtitulo(chave);
 
     return `
       <div class="cfg-grupo-card" style="
-        margin:14px 0;
+        margin:18px 0;
         padding:14px 16px;
         background:rgba(255,255,255,0.035);
         border-radius:10px;
-        border-left:4px solid ${configVisual.cor};
+        border-left:4px solid ${cor};
         box-shadow:0 1px 4px rgba(0,0,0,0.08);
       ">
         <div style="
-          font-size:14px;
+          font-size:15px;
           font-weight:700;
-          color:var(--rs-text,#f1f5f9);
+          color:#1e293b;
           margin-bottom:12px;
+          padding:8px 12px;
+          background:rgba(255,255,255,0.5);
+          border-radius:6px;
           display:flex;
           align-items:center;
           gap:8px;
+          flex-wrap:wrap;
         ">
-          <span style="font-size:18px">${configVisual.icone}</span>
-          <span>${configVisual.titulo}</span>
+          <span style="font-size:20px">${icone}</span>
+          <span>${titulo}</span>
+          <span style="
+            font-size:11px;
+            color:#64748b;
+            font-weight:400;
+            margin-left:4px;
+            padding:2px 8px;
+            background:rgba(0,0,0,0.08);
+            border-radius:4px;
+          ">${subtitulo}</span>
         </div>
-        ${filhosHtml}
+        ${_renderNo(subValor, subMetadados || {}, subCaminho)}
       </div>
     `;
-  }
+  }).join('');
+}
+
+// ─── Modo: card_container (grupo todo vira um card) ───────────────────────
+if (configVisual?.modo === 'card_container') {
+  const filhosHtml = chaves.map(chave => {
+    const subCaminho = `${caminho}.${chave}`;
+    const subMetadados = (metadadosNo && typeof metadadosNo === 'object') ? metadadosNo[chave] : undefined;
+    const ehFolha = subValorIsFolha(valor[chave]);
+    if (ehFolha) {
+      return _renderLinhaParametro(subCaminho, chave, valor[chave], typeof subMetadados === 'string' ? subMetadados : '');
+    }
+    return _renderNo(valor[chave], subMetadados || {}, subCaminho);
+  }).join('');
+
+  return `
+    <div class="cfg-grupo-card" style="
+      margin:14px 0;
+      padding:14px 16px;
+      background:rgba(255,255,255,0.035);
+      border-radius:10px;
+      border-left:4px solid ${configVisual.cor};
+      box-shadow:0 1px 4px rgba(0,0,0,0.08);
+    ">
+      <div style="
+        font-size:14px;
+        font-weight:700;
+        color:#1e293b;
+        margin-bottom:12px;
+        padding:8px 12px;
+        background:rgba(255,255,255,0.5);
+        border-radius:6px;
+        display:flex;
+        align-items:center;
+        gap:8px;
+      ">
+        <span style="font-size:18px">${configVisual.icone}</span>
+        <span>${configVisual.titulo}</span>
+      </div>
+      ${filhosHtml}
+    </div>
+  `;
+}
 
   // ── Caso genérico (sem configuração visual especial) ────────────────────
   return chaves.map(chave => {
