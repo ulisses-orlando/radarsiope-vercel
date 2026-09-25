@@ -1,48 +1,69 @@
 /* ==========================================================================
-   configAcademiaAdmin.js — Painel Admin: CRUD de config/selos E config/fidelidade
-   (v3 — vira uma <section> fixa no padrão abrirTab(), não mais um drawer/overlay)
-
-   Segue o mesmo padrão de main.js/drawer-usuario.js:
-   - Funções globais (não módulo ES), penduradas em window.*
-   - Usa o `db` (Firestore compat) já inicializado em outro script do admin
-   - Renderiza dentro de uma <section id="academia-config"> já existente no
-     HTML do admin — chamado por abrirTab('academia-config'), igual a
-     qualquer outra aba (Planos, Newsletters etc.)
-   - Classes CSS reaproveitadas: drawer-secao, drawer-secao-titulo, btn-drawer-sm
-
-   PRÉ-REQUISITO — adicionar ao HTML do admin (uma vez só):
-
-   <section id="academia-config" class="card">
-     <h3 style="margin:0">⚙️ Configuração da Academia</h3>
-     <div id="academia-config-sub" style="font-size:12px;color:#888;margin-bottom:10px"></div>
-     <div id="academia-config-body"></div>
-   </section>
-
-   E em abrirTab(tabId), adicionar:
-     else if (tabId === 'academia-config') abrirPainelConfigAcademia();
-
-   Regra de negócio embutida aqui (Seção 10.2.1 da spec): NENHUM parâmetro
-   pode ser salvo (novo ou alterado), em NENHUM dos dois documentos, sem a
-   descrição correspondente preenchida no _metadados respectivo. Validado
-   no cliente antes do write.
-
-   Caminhos internos deste arquivo são sempre no formato:
-     "<documento>::<caminho.dentro.do.documento>"
-   Ex.: "selos::manutencao.alertas.dias_para_expirado_cancelamento"
-        "fidelidade::regras.recuperacao_perde_um_ano"
-   O "<documento>" vira o nome real do doc em Firestore (config/<documento>
-   e config/<documento>_metadados).
-   ========================================================================== */
+configAcademiaAdmin.js — Painel Admin: CRUD de config/selos E config/fidelidade
+(v4 — agora com abas por grupo de configuração para melhorar usabilidade)
+Segue o mesmo padrão de main.js/drawer-usuario.js:
+Funções globais (não módulo ES), penduradas em window.*
+Usa o `db` (Firestore compat) já inicializado em outro script do admin
+Renderiza dentro de uma <section id="academia-config"> já existente no
+HTML do admin — chamado por abrirTab('academia-config'), igual a
+qualquer outra aba (Planos, Newsletters etc.)
+Classes CSS reaproveitadas: drawer-secao, drawer-secao-titulo, btn-drawer-sm
+PRÉ-REQUISITO — adicionar ao HTML do admin (uma vez só):
+<section id="academia-config" class="card">
+  <h3 style="margin:0">⚙️ Configuração da Academia</h3>
+  <div id="academia-config-sub" style="font-size:12px;color:#888;margin-bottom:10px"></div>
+  <div id="academia-config-body"></div>
+</section>
+E em abrirTab(tabId), adicionar:
+else if (tabId === 'academia-config') abrirPainelConfigAcademia();
+Regra de negócio embutida aqui (Seção 10.2.1 da spec): NENHUM parâmetro
+pode ser salvo (novo ou alterado), em NENHUM dos dois documentos, sem a
+descrição correspondente preenchida no _metadados respectivo. Validado
+no cliente antes do write.
+Caminhos internos deste arquivo são sempre no formato:
+  "<documento>::<caminho.dentro.do.documento>"
+Ex.:  "selos::manutencao.alertas.dias_para_expirado_cancelamento"
+      "fidelidade::regras.recuperacao_perde_um_ano"
+O "<documento>" vira o nome real do doc em Firestore (config/<documento>
+e config/<documento>_metadados).
+========================================================================== */
 
 // ─── Documentos cobertos por este painel ─────────────────────────────────────
 const DOCUMENTOS_CONFIG_ACADEMIA = [
-  { doc: 'selos',       titulo: '📘 config/selos (Selos, Níveis, Coringas, Ranking...)' },
-  { doc: 'fidelidade',  titulo: '🏅 config/fidelidade (Clube de Excelência)' },
+  { doc: 'selos',       titulo: '📘 Selos',       icone: '📘' },
+  { doc: 'fidelidade',  titulo: '🏅 Fidelidade',  icone: '🏅' },
 ];
+
+// ─── Definição das ABAS por documento (grupos lógicos) ───────────────────────
+// Cada aba aponta para uma "chave de topo" do documento.
+// `chaves` pode conter várias chaves quando queremos agrupar itens soltos
+// (ex.: "Geral" agrupa academia_habilitada + versao em selos).
+const ABAS_POR_DOCUMENTO = {
+  selos: [
+    { id: 'geral',          titulo: '⚙️ Geral',           chaves: ['academia_habilitada', 'versao'] },
+    { id: 'niveis',         titulo: '🎖️ Níveis',          chaves: ['niveis'] },
+    { id: 'manutencao',     titulo: '🔧 Manutenção',      chaves: ['manutencao'] },
+    { id: 'notificacoes',   titulo: '🔔 Notificações',    chaves: ['notificacoes'] },
+    { id: 'renovacao',      titulo: '🔄 Renovação',       chaves: ['renovacao'] },
+    { id: 'coringa',        titulo: '🃏 Coringas',        chaves: ['coringa'] },
+    { id: 'quizzes_especiais', titulo: '⭐ Quizzes Especiais', chaves: ['quizzes_especiais'] },
+    { id: 'ranking',        titulo: '🏆 Ranking',         chaves: ['ranking'] },
+    { id: 'adesao',         titulo: '🤝 Adesão',          chaves: ['adesao'] },
+    { id: 'certificado',    titulo: '📜 Certificado',     chaves: ['certificado'] },
+    { id: 'backfill',       titulo: '⏪ Backfill',        chaves: ['backfill'] },
+  ],
+  fidelidade: [
+    { id: 'geral',          titulo: '⚙️ Geral',           chaves: ['ativo', 'nivel_exigido', 'aproveitamento_minimo', 'valor_minimo_assinatura'] },
+    { id: 'tabela_descontos', titulo: '💰 Tabela de Descontos', chaves: ['tabela_descontos'] },
+    { id: 'regras',         titulo: '📋 Regras',          chaves: ['regras'] },
+  ],
+};
 
 // ─── Estado do painel ─────────────────────────────────────────────────────────
 let _cfgValores = {};    // { selos: {...}, fidelidade: {...} }
 let _cfgMetadados = {};  // { selos: {...}, fidelidade: {...} }
+let _abaDocAtiva = 'selos';          // documento atualmente visível
+let _abaGrupoAtiva = {};             // { selos: 'geral', fidelidade: 'geral' }
 
 // ─── Abrir (chamado por abrirTab('academia-config'), sem overlay/drawer) ─────
 async function abrirPainelConfigAcademia() {
@@ -52,7 +73,6 @@ async function abrirPainelConfigAcademia() {
     return;
   }
   body.innerHTML = '<div class="drawer-loading">⏳ Carregando configuração...</div>';
-
   try {
     const leituras = await Promise.all(
       DOCUMENTOS_CONFIG_ACADEMIA.flatMap(({ doc }) => [
@@ -70,51 +90,154 @@ async function abrirPainelConfigAcademia() {
     body.innerHTML = `<div class="drawer-alerta vermelho">Erro ao carregar config: ${e.message}</div>`;
     return;
   }
-
   const sub = document.getElementById('academia-config-sub');
   if (sub) sub.textContent = `versão ${_cfgValores.selos?.versao || '?'}`;
+
+  // Restaurar aba ativa (persistência leve via sessionStorage)
+  try {
+    const salvo = sessionStorage.getItem('cfgAcademia_abaAtiva');
+    if (salvo) {
+      const parsed = JSON.parse(salvo);
+      _abaDocAtiva = parsed.doc || 'selos';
+      _abaGrupoAtiva = parsed.grupos || {};
+    }
+  } catch (_) {}
 
   _renderPainelConfigAcademia();
 }
 
-// ─── Render principal: um bloco por documento, uma drawer-secao por chave de topo ──
+function _persistirAbaAtiva() {
+  try {
+    sessionStorage.setItem('cfgAcademia_abaAtiva', JSON.stringify({
+      doc: _abaDocAtiva,
+      grupos: _abaGrupoAtiva,
+    }));
+  } catch (_) {}
+}
+
+// ─── Render principal: abas de documento + sub-abas de grupo ─────────────────
 function _renderPainelConfigAcademia() {
   const body = document.getElementById('academia-config-body');
 
-  body.innerHTML = DOCUMENTOS_CONFIG_ACADEMIA.map(({ doc, titulo }) => {
-    const valores = _cfgValores[doc] || {};
-    const metadados = _cfgMetadados[doc] || {};
-    const secoesIgnoradas = ['versao', 'atualizado_em', 'atualizado_por', 'historico_alteracoes'];
-    const chavesTopo = Object.keys(valores).filter(k => !secoesIgnoradas.includes(k));
+  // Abas de documento (Selos / Fidelidade)
+  const abasDocHtml = DOCUMENTOS_CONFIG_ACADEMIA.map(({ doc, titulo, icone }) => {
+    const ativa = doc === _abaDocAtiva;
+    return `<button class="cfg-aba-doc ${ativa ? 'ativa' : ''}"
+      onclick="_trocarAbaDocumento('${doc}')"
+      style="
+        padding:8px 14px;font-size:13px;font-weight:600;cursor:pointer;
+        background:${ativa ? 'rgba(255,255,255,0.12)' : 'transparent'};
+        color:${ativa ? 'var(--rs-text,#f1f5f9)' : 'var(--rs-muted,#94a3b8)'};
+        border:1px solid ${ativa ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.08)'};
+        border-bottom:${ativa ? 'none' : '1px solid rgba(255,255,255,0.08)'};
+        border-radius:8px 8px 0 0;margin-right:4px;
+      ">${icone} ${titulo}</button>`;
+  }).join('');
+
+  // Sub-abas do documento ativo
+  const abasGrupo = ABAS_POR_DOCUMENTO[_abaDocAtiva] || [];
+  if (!_abaGrupoAtiva[_abaDocAtiva]) _abaGrupoAtiva[_abaDocAtiva] = abasGrupo[0]?.id;
+  const grupoAtivo = _abaGrupoAtiva[_abaDocAtiva];
+
+  const abasGrupoHtml = abasGrupo.map(aba => {
+    const ativa = aba.id === grupoAtivo;
+    return `<button class="cfg-aba-grupo ${ativa ? 'ativa' : ''}"
+      onclick="_trocarAbaGrupo('${_abaDocAtiva}','${aba.id}')"
+      style="
+        padding:6px 12px;font-size:12px;cursor:pointer;
+        background:${ativa ? 'rgba(99,102,241,0.18)' : 'rgba(255,255,255,0.04)'};
+        color:${ativa ? '#fff' : 'var(--rs-muted,#94a3b8)'};
+        border:1px solid ${ativa ? 'rgba(99,102,241,0.4)' : 'rgba(255,255,255,0.08)'};
+        border-radius:6px;
+      ">${aba.titulo}</button>`;
+  }).join('');
+
+  // Conteúdo da sub-aba ativa
+  const conteudoHtml = _renderConteudoGrupo(_abaDocAtiva, grupoAtivo);
+
+  body.innerHTML = `
+    <div class="cfg-abas-doc" style="display:flex;flex-wrap:wrap;border-bottom:1px solid rgba(255,255,255,0.08);margin-bottom:12px">
+      ${abasDocHtml}
+    </div>
+    <div class="cfg-abas-grupo" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px">
+      ${abasGrupoHtml}
+    </div>
+    <div class="cfg-conteudo-grupo">
+      ${conteudoHtml}
+    </div>
+  `;
+}
+
+// ─── Render do conteúdo de uma sub-aba específica ────────────────────────────
+function _renderConteudoGrupo(nomeDoc, grupoId) {
+  const abasGrupo = ABAS_POR_DOCUMENTO[nomeDoc] || [];
+  const aba = abasGrupo.find(a => a.id === grupoId);
+  if (!aba) return '<div class="drawer-alerta vermelho">Grupo não encontrado.</div>';
+
+  const valores   = _cfgValores[nomeDoc]   || {};
+  const metadados = _cfgMetadados[nomeDoc] || {};
+
+  const blocos = aba.chaves.map(chaveTopo => {
+    const valorTopo   = valores[chaveTopo];
+    const metaTopo    = metadados[chaveTopo];
+    const caminhoBase = `${nomeDoc}::${chaveTopo}`;
+
+    // Se a chave não existe ainda no doc, mostra um placeholder amigável
+    if (valorTopo === undefined) {
+      return `
+        <div class="drawer-secao" style="margin-bottom:12px">
+          <div class="drawer-secao-titulo">${_tituloAmigavel(chaveTopo)}</div>
+          <div style="font-size:12px;color:var(--rs-muted,#94a3b8);padding:8px 0">
+            ⚠️ Esta seção ainda não existe no documento. Use o botão abaixo para criar o primeiro parâmetro.
+          </div>
+          <div id="cfg-secao-${nomeDoc}__${chaveTopo}"></div>
+          <button class="btn-drawer-sm" onclick="_abrirFormNovoParametro('${caminhoBase}')">➕ Criar "${chaveTopo}"</button>
+        </div>
+      `;
+    }
 
     return `
-      <div class="cfg-bloco-documento" style="margin-bottom:16px">
-        <h3 style="font-size:14px;margin:12px 0 6px">${titulo}</h3>
-        ${chavesTopo.map(chaveTopo => `
-          <div class="drawer-secao">
-            <div class="drawer-secao-titulo">${_tituloAmigavel(chaveTopo)}</div>
-            <div id="cfg-secao-${doc}__${chaveTopo}">
-              ${_renderNo(valores[chaveTopo], metadados?.[chaveTopo] || {}, `${doc}::${chaveTopo}`)}
-            </div>
-            <button class="btn-drawer-sm" onclick="_abrirFormNovoParametro('${doc}::${chaveTopo}')">➕ Novo parâmetro em "${chaveTopo}"</button>
-          </div>
-        `).join('')}
+      <div class="drawer-secao" style="margin-bottom:12px">
+        <div class="drawer-secao-titulo">${_tituloAmigavel(chaveTopo)}</div>
+        <div id="cfg-secao-${nomeDoc}__${chaveTopo}">
+          ${_renderNo(valorTopo, metaTopo || {}, caminhoBase)}
+        </div>
+        <button class="btn-drawer-sm" onclick="_abrirFormNovoParametro('${caminhoBase}')">➕ Novo parâmetro em "${chaveTopo}"</button>
       </div>
     `;
-  }).join('<hr style="border-color:rgba(255,255,255,0.08);margin:16px 0">');
+  }).join('');
+
+  return `
+    <div class="cfg-bloco-documento" style="padding:4px 0">
+      ${blocos}
+    </div>
+  `;
+}
+
+// ─── Trocar aba de documento ─────────────────────────────────────────────────
+function _trocarAbaDocumento(doc) {
+  _abaDocAtiva = doc;
+  _persistirAbaAtiva();
+  _renderPainelConfigAcademia();
+}
+
+// ─── Trocar sub-aba de grupo ─────────────────────────────────────────────────
+function _trocarAbaGrupo(doc, grupoId) {
+  _abaDocAtiva = doc;
+  _abaGrupoAtiva[doc] = grupoId;
+  _persistirAbaAtiva();
+  _renderPainelConfigAcademia();
 }
 
 // ─── Render recursivo de um nó (objeto aninhado ou valor-folha) ──────────────
 // `caminho` sempre no formato "<documento>::a.b.c"
 function _renderNo(valor, metadadosNo, caminho) {
   const ehObjetoPlano = valor !== null && typeof valor === 'object' && !Array.isArray(valor);
-
   if (ehObjetoPlano) {
     return Object.keys(valor).map(chave => {
       const subCaminho = `${caminho}.${chave}`;
       const subMetadados = (metadadosNo && typeof metadadosNo === 'object') ? metadadosNo[chave] : undefined;
       const ehFolhaAninhada = valor[chave] === null || typeof valor[chave] !== 'object' || Array.isArray(valor[chave]);
-
       if (ehFolhaAninhada) {
         return _renderLinhaParametro(subCaminho, chave, valor[chave], typeof subMetadados === 'string' ? subMetadados : '');
       }
@@ -126,7 +249,6 @@ function _renderNo(valor, metadadosNo, caminho) {
       `;
     }).join('');
   }
-
   return _renderLinhaParametro(caminho, caminho.split('::').pop(), valor, typeof metadadosNo === 'string' ? metadadosNo : '');
 }
 
@@ -136,23 +258,18 @@ function _renderLinhaParametro(caminho, label, valorAtual, descricaoAtual) {
   const tipo = _inferirTipo(valorAtual);
   const inputValorHtml = _renderInputPorTipo(tipo, `val-${idSeguro}`, valorAtual);
   const [nomeDoc, caminhoInterno] = caminho.split('::');
-
-  return `
-    <div class="cfg-linha-parametro" style="padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.05)">
-      <div style="font-size:12px;color:var(--rs-text,#f1f5f9);font-weight:500">${label}</div>
-      <div style="font-size:11px;color:var(--rs-muted,#94a3b8);margin-bottom:6px">config/${nomeDoc} → ${caminhoInterno}</div>
-      <div style="display:flex;gap:8px;align-items:flex-start;flex-wrap:wrap">
-        ${inputValorHtml}
-        <textarea id="desc-${idSeguro}" placeholder="Descrição obrigatória: o que este parâmetro faz, onde afeta..."
-          style="flex:1;min-width:200px;min-height:40px;font-size:12px;padding:6px;border-radius:6px;
-                 background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.15);color:inherit"
-        >${_escapeHtml(descricaoAtual)}</textarea>
-        <button class="btn-drawer-sm" onclick="_salvarParametroConfigAcademia('${caminho}','${tipo}','val-${idSeguro}','desc-${idSeguro}',this)">
-          💾 Salvar
-        </button>
-      </div>
+  return `<div class="cfg-linha-parametro" style="padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.05)">
+    <div style="font-size:12px;color:var(--rs-text,#f1f5f9);font-weight:500">${label}</div>
+    <div style="font-size:11px;color:var(--rs-muted,#94a3b8);margin-bottom:6px">config/${nomeDoc} → ${caminhoInterno}</div>
+    <div style="display:flex;gap:8px;align-items:flex-start;flex-wrap:wrap">
+      ${inputValorHtml}
+      <textarea id="desc-${idSeguro}" placeholder="Descrição obrigatória: o que este parâmetro faz, onde afeta..."
+        style="flex:1;min-width:200px;min-height:40px;font-size:12px;padding:6px;border-radius:6px;
+        background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.15);color:inherit"
+      >${_escapeHtml(descricaoAtual)}</textarea>
+      <button class="btn-drawer-sm" onclick="_salvarParametroConfigAcademia('${caminho}','${tipo}','val-${idSeguro}','desc-${idSeguro}',this)">💾 Salvar</button>
     </div>
-  `;
+  </div>`;
 }
 
 function _inferirTipo(valor) {
@@ -169,32 +286,31 @@ function _renderInputPorTipo(tipo, id, valorAtual) {
     </label>`;
   }
   if (tipo === 'number') {
-    return `<input type="number" id="${id}" value="${valorAtual}" step="any" style="width:100px;padding:6px;border-radius:6px;
-              background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.15);color:inherit"/>`;
+    return `<input type="number" id="${id}" value="${valorAtual}" step="any"
+      style="width:100px;padding:6px;border-radius:6px;
+      background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.15);color:inherit"/>`;
   }
   if (tipo === 'array') {
-    return `<input type="text" id="${id}" value='${_escapeHtml(JSON.stringify(valorAtual))}'
-              placeholder="[valor1, valor2]" style="width:180px;padding:6px;border-radius:6px;
-              background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.15);color:inherit"/>`;
+    return `<input type="text" id="${id}" value='${_escapeHtml(JSON.stringify(valorAtual))}' placeholder="[valor1, valor2]"
+      style="width:180px;padding:6px;border-radius:6px;
+      background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.15);color:inherit"/>`;
   }
-  return `<input type="text" id="${id}" value="${_escapeHtml(String(valorAtual))}" style="width:160px;padding:6px;
-            border-radius:6px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.15);color:inherit"/>`;
+  return `<input type="text" id="${id}" value="${_escapeHtml(String(valorAtual))}"
+    style="width:160px;padding:6px;border-radius:6px;
+    background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.15);color:inherit"/>`;
 }
 
 // ─── Salvar um parâmetro (existente) — bloqueia sem descrição ────────────────
-// `caminho` no formato "<documento>::a.b.c"
 async function _salvarParametroConfigAcademia(caminho, tipo, inputId, descId, btnEl) {
   const [nomeDoc, caminhoInterno] = caminho.split('::');
   const inputEl = document.getElementById(inputId);
   const descEl  = document.getElementById(descId);
   const descricao = (descEl.value || '').trim();
-
   if (!descricao) {
     alert('⚠️ Não é possível salvar sem preencher a descrição do parâmetro (Seção 10.2.1 da spec).');
     descEl.focus();
     return;
   }
-
   let novoValor;
   try {
     novoValor = _lerValorPorTipo(tipo, inputEl);
@@ -202,7 +318,6 @@ async function _salvarParametroConfigAcademia(caminho, tipo, inputId, descId, bt
     alert(`⚠️ Valor inválido: ${e.message}`);
     return;
   }
-
   btnEl.disabled = true;
   btnEl.textContent = '⏳ Salvando...';
   try {
@@ -210,6 +325,9 @@ async function _salvarParametroConfigAcademia(caminho, tipo, inputId, descId, bt
       db.collection('config_academia').doc(nomeDoc).update({ [caminhoInterno]: novoValor }),
       db.collection('config_academia').doc(`${nomeDoc}_metadados`).update({ [caminhoInterno]: descricao }),
     ]);
+    // Atualiza estado em memória para não perder a aba ativa
+    _setIn(_cfgValores[nomeDoc],   caminhoInterno, novoValor);
+    _setIn(_cfgMetadados[nomeDoc], caminhoInterno, descricao);
     btnEl.textContent = '✅ Salvo';
     setTimeout(() => { btnEl.disabled = false; btnEl.textContent = '💾 Salvar'; }, 1500);
   } catch (e) {
@@ -217,6 +335,18 @@ async function _salvarParametroConfigAcademia(caminho, tipo, inputId, descId, bt
     btnEl.disabled = false;
     btnEl.textContent = '💾 Salvar';
   }
+}
+
+// Helper: set aninhado por caminho "a.b.c"
+function _setIn(obj, path, value) {
+  const parts = path.split('.');
+  let cur = obj;
+  for (let i = 0; i < parts.length - 1; i++) {
+    const k = parts[i];
+    if (cur[k] === undefined || cur[k] === null || typeof cur[k] !== 'object') cur[k] = {};
+    cur = cur[k];
+  }
+  cur[parts[parts.length - 1]] = value;
 }
 
 function _lerValorPorTipo(tipo, inputEl) {
@@ -235,46 +365,44 @@ function _lerValorPorTipo(tipo, inputEl) {
 }
 
 // ─── Criar um novo parâmetro dentro de uma seção existente ───────────────────
-// `caminhoPai` no formato "<documento>::a.b"
 function _abrirFormNovoParametro(caminhoPai) {
   const idContainer = caminhoPai.replace('::', '__');
   const container = document.getElementById(`cfg-secao-${idContainer}`);
   if (!container || container.querySelector('.cfg-form-novo')) return;
-
-  const formHtml = `
-    <div class="cfg-form-novo" style="margin-top:10px;padding:10px;border:1px dashed rgba(255,255,255,0.2);border-radius:8px">
-      <div style="font-size:12px;margin-bottom:6px">Novo parâmetro em <strong>${caminhoPai.split('::').join(' → ')}</strong></div>
-      <input type="text" id="novo-chave-${idContainer}" placeholder="nome_do_parametro" style="width:100%;margin-bottom:6px;padding:6px;
-        border-radius:6px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.15);color:inherit"/>
-      <select id="novo-tipo-${idContainer}" style="width:100%;margin-bottom:6px;padding:6px;border-radius:6px;
-        background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.15);color:inherit">
-        <option value="number">Número</option>
-        <option value="string">Texto</option>
-        <option value="boolean">Sim/Não</option>
-        <option value="array">Lista (JSON)</option>
-      </select>
-      <input type="text" id="novo-valor-${idContainer}" placeholder="valor inicial" style="width:100%;margin-bottom:6px;padding:6px;
-        border-radius:6px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.15);color:inherit"/>
-      <textarea id="novo-desc-${idContainer}" placeholder="Descrição obrigatória" style="width:100%;min-height:40px;margin-bottom:6px;
-        padding:6px;border-radius:6px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.15);color:inherit"></textarea>
-      <div style="display:flex;gap:8px">
-        <button class="btn-drawer-sm btn-verde" onclick="_criarParametroConfigAcademia('${caminhoPai}')">✅ Criar</button>
-        <button class="btn-drawer-sm" onclick="this.closest('.cfg-form-novo').remove()">Cancelar</button>
-      </div>
+  const formHtml = `<div class="cfg-form-novo" style="margin-top:10px;padding:10px;border:1px dashed rgba(255,255,255,0.2);border-radius:8px">
+    <div style="font-size:12px;margin-bottom:6px">Novo parâmetro em <strong>${caminhoPai.split('::').join(' → ')}</strong></div>
+    <input type="text" id="novo-chave-${idContainer}" placeholder="nome_do_parametro"
+      style="width:100%;margin-bottom:6px;padding:6px;border-radius:6px;
+      background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.15);color:inherit"/>
+    <select id="novo-tipo-${idContainer}"
+      style="width:100%;margin-bottom:6px;padding:6px;border-radius:6px;
+      background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.15);color:inherit">
+      <option value="number">Número</option>
+      <option value="string">Texto</option>
+      <option value="boolean">Sim/Não</option>
+      <option value="array">Lista (JSON)</option>
+    </select>
+    <input type="text" id="novo-valor-${idContainer}" placeholder="valor inicial"
+      style="width:100%;margin-bottom:6px;padding:6px;border-radius:6px;
+      background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.15);color:inherit"/>
+    <textarea id="novo-desc-${idContainer}" placeholder="Descrição obrigatória"
+      style="width:100%;min-height:40px;margin-bottom:6px;padding:6px;border-radius:6px;
+      background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.15);color:inherit"></textarea>
+    <div style="display:flex;gap:8px">
+      <button class="btn-drawer-sm btn-verde" onclick="_criarParametroConfigAcademia('${caminhoPai}')">✅ Criar</button>
+      <button class="btn-drawer-sm" onclick="this.closest('.cfg-form-novo').remove()">Cancelar</button>
     </div>
-  `;
+  </div>`;
   container.insertAdjacentHTML('beforeend', formHtml);
 }
 
 async function _criarParametroConfigAcademia(caminhoPai) {
   const [nomeDoc, caminhoInternoPai] = caminhoPai.split('::');
   const idContainer = caminhoPai.replace('::', '__');
-
   const chave = (document.getElementById(`novo-chave-${idContainer}`).value || '').trim();
   const tipo  = document.getElementById(`novo-tipo-${idContainer}`).value;
   const valorBruto = document.getElementById(`novo-valor-${idContainer}`).value;
   const descricao  = (document.getElementById(`novo-desc-${idContainer}`).value || '').trim();
-
   if (!chave || !/^[a-zA-Z0-9_]+$/.test(chave)) {
     alert('⚠️ Nome do parâmetro inválido (use apenas letras, números e underscore).');
     return;
@@ -283,7 +411,6 @@ async function _criarParametroConfigAcademia(caminhoPai) {
     alert('⚠️ Não é possível criar um parâmetro sem descrição (Seção 10.2.1 da spec).');
     return;
   }
-
   let valor;
   try {
     if (tipo === 'boolean') valor = valorBruto === 'true' || valorBruto === '1';
@@ -294,24 +421,32 @@ async function _criarParametroConfigAcademia(caminhoPai) {
     alert(`⚠️ Valor inválido: ${e.message}`);
     return;
   }
-
   const caminhoInternoCompleto = `${caminhoInternoPai}.${chave}`;
   try {
     await Promise.all([
       db.collection('config_academia').doc(nomeDoc).update({ [caminhoInternoCompleto]: valor }),
       db.collection('config_academia').doc(`${nomeDoc}_metadados`).update({ [caminhoInternoCompleto]: descricao }),
     ]);
-    await abrirPainelConfigAcademia(); // recarrega o painel inteiro (mais simples/seguro que remontar só o pedaço)
+    // Atualiza estado em memória mantendo a aba ativa
+    _setIn(_cfgValores[nomeDoc],   caminhoInternoCompleto, valor);
+    _setIn(_cfgMetadados[nomeDoc], caminhoInternoCompleto, descricao);
+    _renderConteudoGrupoAtual(); // re-renderiza só o conteúdo da sub-aba
   } catch (e) {
     alert(`Erro ao criar parâmetro: ${e.message}`);
   }
+}
+
+// Re-renderiza só o conteúdo da sub-aba ativa (sem perder foco/aba)
+function _renderConteudoGrupoAtual() {
+  const container = document.querySelector('.cfg-conteudo-grupo');
+  if (!container) return;
+  container.innerHTML = _renderConteudoGrupo(_abaDocAtiva, _abaGrupoAtiva[_abaDocAtiva]);
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function _tituloAmigavel(chave) {
   return chave.charAt(0).toUpperCase() + chave.slice(1).replace(/_/g, ' ');
 }
-
 function _escapeHtml(str) {
   return String(str)
     .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
@@ -320,17 +455,8 @@ function _escapeHtml(str) {
 
 // ══════════════════════════════════════════════════════════════════════════
 // SCRIPT DE CARGA INICIAL — 100% no navegador (v1.7.2)
-// Antes chamava uma API de backend (/api/academiaSetup), mas isso exigia
-// firebase-admin com credenciais próprias — problemático no Vercel (erro de
-// "ID de projeto não detectado"). Como este arquivo já fala direto com o
-// Firestore pelo SDK do cliente para tudo mais, o bootstrap faz o mesmo:
-// roda com as MESMAS credenciais/sessão que o admin já usa para editar
-// qualquer parâmetro individual. Não depende de token nem de function.
 // ══════════════════════════════════════════════════════════════════════════
-
-// Fonte única de verdade dos parâmetros padrão da Academia — valor + descrição.
-// Estrutura espelha exatamente config/selos e config/fidelidade.
-const _PARAMETROS_SELOS_PADRAO = {
+const PARAMETROS_SELOS_PADRAO = {
   selos: {
     academia_habilitada: { valor: false, descricao: 'Feature flag geral da Academia. Enquanto false, nenhuma funcionalidade da Academia fica visível no app (rollout gradual/beta fechado antes do lançamento público).' }
   },
@@ -350,47 +476,47 @@ const _PARAMETROS_SELOS_PADRAO = {
       cor:                   { valor: '#C0C0C0', descricao: 'Cor (hex) usada no selo, badge e certificado para este nível.' },
       icone:                 { valor: '🥈', descricao: 'Emoji/ícone usado para representar este nível na UI.' },
       ordem:                 { valor: 2, descricao: 'Posição deste nível na hierarquia.' },
-      desbloqueia_especiais: { valor: true, descricao: 'Ao atingir este nível, o painel de Quizzes Especiais fica visível pela primeira vez (mostrando os de nivel_alvo="especialista").' }
+      desbloqueia_especiais: { valor: true, descricao: 'Ao atingir este nível, o painel de Quizzes Especiais fica visível pela primeira vez.' }
     },
     especialista: {
       nome:               { valor: 'Especialista SIOPE', descricao: 'Nome de exibição do 3º nível (🥇).' },
-      quizzes_aprovados:  { valor: 36, descricao: 'Total acumulado de quizzes NORMAIS aprovados necessário para este nível (trilha independente da de especiais).' },
+      quizzes_aprovados:  { valor: 36, descricao: 'Total acumulado de quizzes NORMAIS aprovados necessário para este nível.' },
       percentual_minimo:  { valor: 70, descricao: 'Nota mínima (%) em um quiz para ele contar como aprovado, específico deste nível.' },
       cor:                { valor: '#FFD700', descricao: 'Cor (hex) usada no selo, badge e certificado para este nível.' },
       icone:              { valor: '🥇', descricao: 'Emoji/ícone usado para representar este nível na UI.' },
-      ordem:              { valor: 3, descricao: 'Posição deste nível na hierarquia. Requisito de especiais = 100% dos quizzes_especiais ativos com nivel_alvo="especialista" (contagem ao vivo — v1.7).' }
+      ordem:              { valor: 3, descricao: 'Posição deste nível na hierarquia.' }
     },
     mestre: {
       nome:               { valor: 'Mestre do FUNDEB', descricao: 'Nome de exibição do 4º e último nível (💎).' },
-      quizzes_aprovados:  { valor: 48, descricao: 'Total acumulado de quizzes NORMAIS aprovados necessário para este nível — corresponde a ~48 edições de um ano de contrato.' },
+      quizzes_aprovados:  { valor: 48, descricao: 'Total acumulado de quizzes NORMAIS aprovados necessário para este nível.' },
       percentual_minimo:  { valor: 70, descricao: 'Nota mínima (%) em um quiz para ele contar como aprovado, específico deste nível.' },
       cor:                { valor: '#B9F2FF', descricao: 'Cor (hex) usada no selo, badge e certificado para este nível.' },
       icone:              { valor: '💎', descricao: 'Emoji/ícone usado para representar este nível na UI.' },
-      ordem:              { valor: 4, descricao: 'Posição deste nível na hierarquia (o mais alto). Requisito de especiais = 100% dos quizzes_especiais ativos com nivel_alvo="mestre" (contagem ao vivo — v1.7).' }
+      ordem:              { valor: 4, descricao: 'Posição deste nível na hierarquia (o mais alto).' }
     }
   },
   manutencao: {
     ciclo_dias:                            { valor: 60, descricao: 'Duração (em dias) do ciclo de manutenção do selo.' },
     quizzes_minimos_por_ciclo:             { valor: 4, descricao: 'Quantidade mínima de quizzes respondidos dentro de um ciclo para ele ser considerado regularizado.' },
-    percentual_minimo:                     { valor: 70, descricao: 'Aproveitamento médio mínimo (%) no ciclo de manutenção para considerá-lo regularizado.' },
+    percentual_minimo:                      { valor: 70, descricao: 'Aproveitamento médio mínimo (%) no ciclo de manutenção para considerá-lo regularizado.' },
     permite_uso_com_zero_quizzes_no_ciclo: { valor: true, descricao: 'Se true, o Coringa de Manutenção pode ser usado mesmo com 0 quizzes respondidos no ciclo.' },
     quiz_especial_conta_como:              { valor: 2, descricao: 'Peso de 1 Quiz Especial aprovado na contagem de FREQUÊNCIA do ciclo de manutenção.' },
     alertas: {
       dias_para_alerta_risco:          { valor: 15, descricao: 'Dias antes do fim do ciclo em que o estado vira em_alerta.' },
       dias_para_notificacao_final:     { valor: 30, descricao: 'Dias após o fim do ciclo sem regularizar para o estado virar em_risco.' },
       dias_para_congelamento:          { valor: 60, descricao: 'Dias sem regularizar para o estado virar congelado.' },
-      dias_para_rebaixamento:          { valor: 90, descricao: 'Dias sem regularizar (inatividade orgânica) para o estado virar rebaixado.' },
-      dias_para_expirado:              { valor: 180, descricao: 'Dias sem regularizar (inatividade orgânica) para o selo virar expirado — perde tudo.' },
-      dias_para_expirado_cancelamento: { valor: 90, descricao: 'Prazo em dias, a partir do CANCELAMENTO da assinatura, para o selo virar expirado. O rebaixamento por cancelamento já é imediato (Seção 4.6) — este prazo é até a perda total.' }
+      dias_para_rebaixamento:          { valor: 90, descricao: 'Dias sem regularizar para o estado virar rebaixado.' },
+      dias_para_expirado:              { valor: 180, descricao: 'Dias sem regularizar para o selo virar expirado — perde tudo.' },
+      dias_para_expirado_cancelamento: { valor: 90, descricao: 'Prazo em dias, a partir do CANCELAMENTO da assinatura, para o selo virar expirado.' }
     }
   },
   notificacoes: {
-    raio_alerta_mudanca_config: { valor: 1, descricao: 'Distância (em quizzes) do valor ANTIGO de um requisito de nível para o assinante ser avisado quando ele muda — seja por config alterada ou por ativar/desativar um Quiz Especial.' }
+    raio_alerta_mudanca_config: { valor: 1, descricao: 'Distância (em quizzes) do valor ANTIGO de um requisito de nível para o assinante ser avisado quando ele muda.' }
   },
   renovacao: {
-    ativo:                     { valor: true, descricao: 'Liga/desliga a renovação automática por aniversário de contrato.' },
-    modelo:                    { valor: 'aniversario_contrato', descricao: 'Modelo de renovação: por aniversário de contrato de cada assinante, não data fixa de calendário.' },
-    quizzes_minimos_renovacao: { valor: 3, descricao: 'Quizzes que quem manteve o selo ativo o ciclo inteiro precisa responder para renovar o nível ("Renovação Simplificada").' },
+    ativo:                      { valor: true, descricao: 'Liga/desliga a renovação automática por aniversário de contrato.' },
+    modelo:                     { valor: 'aniversario_contrato', descricao: 'Modelo de renovação: por aniversário de contrato de cada assinante.' },
+    quizzes_minimos_renovacao:  { valor: 3, descricao: 'Quizzes que quem mantém o selo ativo o ciclo inteiro precisa responder para renovar o nível.' },
     bonus_fidelidade: {
       ativo:                   { valor: true, descricao: 'Liga/desliga o bônus de fidelidade na renovação.' },
       coringa_extra:           { valor: 1, descricao: 'Coringas de Manutenção extra concedidos a quem se qualificou ao bônus.' },
@@ -402,7 +528,7 @@ const _PARAMETROS_SELOS_PADRAO = {
       ativo:                     { valor: true, descricao: 'Liga/desliga o Coringa de Manutenção.' },
       quantidade_padrao:         { valor: 1, descricao: 'Coringas de Manutenção por ano de contrato, sem bônus.' },
       quantidade_com_bonus:      { valor: 2, descricao: 'Coringas de Manutenção no ciclo com bônus de fidelidade.' },
-      regra_uso:                 { valor: 'ciclo_em_alerta_ou_risco_e_(aproveitamento_atual_maior_igual_70_ou_zero_quizzes_no_ciclo)', descricao: 'Condição de elegibilidade textual (Seção 6.2). Não se aplica durante cancelamento (Seção 4.6).' },
+      regra_uso:                 { valor: 'ciclo_em_alerta_ou_risco_e_(aproveitamento_atual_maior_igual_70_ou_zero_quizzes_no_ciclo)', descricao: 'Condição de elegibilidade textual (Seção 6.2).' },
       max_usos_por_ciclo:        { valor: 1, descricao: 'Máximo de usos dentro de um ciclo de 60 dias.' },
       max_usos_por_ano_contrato: { valor: 1, descricao: 'Máximo de usos dentro de um ano de contrato inteiro.' }
     },
@@ -418,8 +544,8 @@ const _PARAMETROS_SELOS_PADRAO = {
   quizzes_especiais: {
     ativo:                { valor: true, descricao: 'Liga/desliga os Quizzes Especiais como um todo.' },
     nivel_desbloqueio:    { valor: 'dedicado', descricao: 'Nível a partir do qual o painel de especiais fica visível.' },
-    dificuldade_minima:   { valor: 8, descricao: 'Dificuldade mínima (1-10) para um quiz ser cadastrado como Especial — orientação editorial, não trava automática.' },
-    valor_na_frequencia:  { valor: 2, descricao: 'Peso de um especial na frequência do ciclo de manutenção (espelha manutencao.quiz_especial_conta_como).' },
+    dificuldade_minima:   { valor: 8, descricao: 'Dificuldade mínima (1-10) para um quiz ser cadastrado como Especial.' },
+    valor_na_frequencia:  { valor: 2, descricao: 'Peso de um especial na frequência do ciclo de manutenção.' },
     valor_na_performance: { valor: 1, descricao: 'Peso de um especial na média geral de aproveitamento.' }
   },
   ranking: {
@@ -427,14 +553,14 @@ const _PARAMETROS_SELOS_PADRAO = {
     visibilidade_padrao:                { valor: 'anonimo', descricao: 'Modo padrão de exibição de nomes até opt-in do assinante.' },
     niveis_exibidos:                    { valor: ['especialista', 'mestre'], descricao: 'Níveis exibidos no ranking público.' },
     atualizacao_frequencia:             { valor: 'diaria', descricao: 'Frequência de recálculo do ranking.' },
-    criterios_desempate:                { valor: ['quizzes_aprovados_ano_desc', 'percentual_aproveitamento_desc', 'data_conquista_nivel_atual_asc', 'municipio_alfabetico_asc'], descricao: 'Ordem de critérios de desempate. Ranking sempre em ano calendário puro.' },
-    limiar_municipio_pequeno:           { valor: 5, descricao: 'Abaixo deste nº de especialistas/mestres no município, nomes ficam ocultos e percentil vira faixa larga.' },
+    criterios_desempate:                { valor: ['quizzes_aprovados_ano_desc', 'percentual_aproveitamento_desc', 'data_conquista_nivel_atual_asc', 'municipio_alfabetico_asc'], descricao: 'Ordem de critérios de desempate.' },
+    limiar_municipio_pequeno:           { valor: 5, descricao: 'Abaixo deste nº de especialistas/mestres no município, nomes ficam ocultos.' },
     faixas_percentil_municipio_pequeno: { valor: [25, 50, 75, 100], descricao: 'Faixas de arredondamento do percentil municipal para municípios pequenos.' }
   },
   adesao: {
     cooldown_convite_dias:       { valor: 5, descricao: 'Dias entre exibições do convite de adesão após "mais tarde".' },
     termos_versao_atual:         { valor: 'v1', descricao: 'Versão vigente dos termos de aceite da Academia.' },
-    dias_delay_exibicao_convite: { valor: 2, descricao: 'Segundos de atraso após radarUserReady antes de mostrar o convite (nome mantém "dias" por padrão de nomenclatura, valor é em segundos).' }
+    dias_delay_exibicao_convite: { valor: 2, descricao: 'Segundos de atraso após radarUserReady antes de mostrar o convite.' }
   },
   certificado: {
     formato:                   { valor: 'A4', descricao: 'Formato de página do PDF do certificado.' },
@@ -443,10 +569,10 @@ const _PARAMETROS_SELOS_PADRAO = {
     qr_code_ativo:             { valor: true, descricao: 'Inclui QR Code de validação.' },
     url_validacao:             { valor: 'https://radarsiope.com.br/validar', descricao: 'URL base da página pública de validação.' },
     storage:                   { valor: 'vercel_blob', descricao: 'Onde o PDF é armazenado.' },
-    cache_horas:                { valor: 24, descricao: 'Horas de cache do PDF já gerado.' }
+    cache_horas:               { valor: 24, descricao: 'Horas de cache do PDF já gerado.' }
   },
   backfill: {
-    data_corte: { valor: '2026-01-01', descricao: 'Data mais antiga considerada em qualquer backfill (lançamento ou adesão individual).' },
+    data_corte: { valor: '2026-01-01', descricao: 'Data mais antiga considerada em qualquer backfill.' },
     ativo:      { valor: true, descricao: 'Liga/desliga rotinas de backfill.' }
   },
   versao: { valor: '1.7.0', descricao: 'Versão da especificação da Academia à qual esta configuração corresponde.' }
@@ -467,7 +593,7 @@ const _PARAMETROS_FIDELIDADE_PADRAO = {
   regras: {
     suspensao_por_inadimplencia_dias:      { valor: 30, descricao: 'Dias de inadimplência tolerados antes de suspender benefícios de fidelidade.' },
     recuperacao_perde_um_ano:              { valor: true, descricao: 'Ausência ≤ 1 ano de contrato sem Mestre: contador decresce 1 em vez de zerar.' },
-    reset_apos_mais_de_um_ano_ausente:     { valor: true, descricao: 'Ausência > 1 ano de contrato sem Mestre: contador reseta para 1 (reset total, sem piso).' },
+    reset_apos_mais_de_um_ano_ausente:     { valor: true, descricao: 'Ausência > 1 ano de contrato sem Mestre: contador reseta para 1.' },
     desconto_nao_acumulavel_com_promocoes: { valor: false, descricao: 'Se true, desconto de fidelidade não soma com outras promoções.' },
     contador_minimo:                       { valor: 1, descricao: 'Valor mínimo do contador de anos consecutivos.' }
   }
@@ -476,7 +602,6 @@ const _PARAMETROS_FIDELIDADE_PADRAO = {
 function _ehFolhaParametroPadrao(no) {
   return no !== null && typeof no === 'object' && 'valor' in no && 'descricao' in no;
 }
-
 function _extrairValoresPadrao(definicao, existente = {}) {
   const resultado = {};
   for (const chave of Object.keys(definicao)) {
@@ -490,7 +615,6 @@ function _extrairValoresPadrao(definicao, existente = {}) {
   }
   return resultado;
 }
-
 function _extrairDescricoesPadrao(definicao, existente = {}) {
   const resultado = {};
   for (const chave of Object.keys(definicao)) {
@@ -504,7 +628,6 @@ function _extrairDescricoesPadrao(definicao, existente = {}) {
   }
   return resultado;
 }
-
 function _contarFolhasPadrao(definicao) {
   let n = 0;
   for (const chave of Object.keys(definicao)) {
@@ -513,46 +636,38 @@ function _contarFolhasPadrao(definicao) {
   }
   return n;
 }
-
 async function _bootstrapDocumentoPadrao(nomeDoc, definicao) {
   const ref = db.collection('config_academia').doc(nomeDoc);
   const snap = await ref.get();
   const existente = snap.exists ? snap.data() : {};
-
   const novosValores = _extrairValoresPadrao(definicao, existente);
   await ref.set({
     ...novosValores,
     atualizado_em: new Date().toISOString(),
     atualizado_por: window._adminUid || 'admin_setup_browser',
   }, { merge: true });
-
   const refMeta = db.collection('config_academia').doc(`${nomeDoc}_metadados`);
   const snapMeta = await refMeta.get();
   const existenteMeta = snapMeta.exists ? snapMeta.data() : {};
   const novasDescricoes = _extrairDescricoesPadrao(definicao, existenteMeta);
   await refMeta.set(novasDescricoes, { merge: true });
-
   return _contarFolhasPadrao(definicao);
 }
 
 // ─── Botão do menu — roda 100% no navegador, sem API/token ───────────────────
 async function executarScriptCargaInicialAcademia(btnEl) {
   if (!confirm('Isso grava os valores e descrições padrão da Academia em config/selos e ' +
-               'config/fidelidade (e seus _metadados). Valores já existentes NÃO são sobrescritos, ' +
-               'só o que estiver faltando é preenchido. Continuar?')) return;
-
+    'config/fidelidade (e seus _metadados). Valores já existentes NÃO são sobrescritos, ' +
+    'só o que estiver faltando é preenchido. Continuar?')) return;
   const textoOriginal = btnEl.textContent;
   btnEl.disabled = true;
   btnEl.textContent = '⏳ Executando...';
-
   try {
-    const totalSelos = await _bootstrapDocumentoPadrao('selos', _PARAMETROS_SELOS_PADRAO);
+    const totalSelos = await _bootstrapDocumentoPadrao('selos', PARAMETROS_SELOS_PADRAO);
     const totalFidelidade = await _bootstrapDocumentoPadrao('fidelidade', _PARAMETROS_FIDELIDADE_PADRAO);
-
     alert(`✅ Carga inicial concluída!\n` +
           `config/selos: ${totalSelos} parâmetros verificados/gravados\n` +
           `config/fidelidade: ${totalFidelidade} parâmetros verificados/gravados`);
-
     if (document.getElementById('academia-config-body')) await abrirPainelConfigAcademia();
   } catch (e) {
     alert('❌ Erro ao executar carga inicial: ' + e.message);
@@ -562,9 +677,11 @@ async function executarScriptCargaInicialAcademia(btnEl) {
   }
 }
 
-// ─── Exportação global (mesmo padrão de drawer-usuario.js) ───────────────────
+// ─── Exportação global ───────────────────────────────────────────────────────
 window.executarScriptCargaInicialAcademia = executarScriptCargaInicialAcademia;
 window.abrirPainelConfigAcademia = abrirPainelConfigAcademia;
 window._salvarParametroConfigAcademia = _salvarParametroConfigAcademia;
 window._abrirFormNovoParametro = _abrirFormNovoParametro;
 window._criarParametroConfigAcademia = _criarParametroConfigAcademia;
+window._trocarAbaDocumento = _trocarAbaDocumento;
+window._trocarAbaGrupo = _trocarAbaGrupo;
