@@ -212,7 +212,7 @@ function _contarFolhas(definicao) {
 }
 
 async function _bootstrapDocumento(nomeDoc, definicao) {
-  const ref = db.collection('config').doc(nomeDoc);
+  const ref = db.collection('config_academia').doc(nomeDoc);
   const snap = await ref.get();
   const existente = snap.exists ? snap.data() : {};
 
@@ -223,7 +223,7 @@ async function _bootstrapDocumento(nomeDoc, definicao) {
     atualizado_por: 'admin_setup_endpoint',
   }, { merge: true });
 
-  const refMeta = db.collection('config').doc(`${nomeDoc}_metadados`);
+  const refMeta = db.collection('config_academia').doc(`${nomeDoc}_metadados`);
   const snapMeta = await refMeta.get();
   const existenteMeta = snapMeta.exists ? snapMeta.data() : {};
   const novasDescricoes = _extrairDescricoes(definicao, existenteMeta);

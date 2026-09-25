@@ -118,7 +118,7 @@ exports.onQuizEspecialToggle = functions.firestore
 
     if (totalAntes === totalDepois) return null; // defensivo, não deveria ocorrer
 
-    const configSnap = await db.collection('config').doc('selos').get();
+    const configSnap = await db.collection('config_academia').doc('selos').get();
     const raio = configSnap.data()?.notificacoes?.raio_alerta_mudanca_config ?? 1;
 
     const afetados = await _buscarAssinantesProximosDoRequisito(nivelAlvo, totalAntes, raio);

@@ -56,8 +56,8 @@ async function abrirPainelConfigAcademia() {
   try {
     const leituras = await Promise.all(
       DOCUMENTOS_CONFIG_ACADEMIA.flatMap(({ doc }) => [
-        db.collection('config').doc(doc).get(),
-        db.collection('config').doc(`${doc}_metadados`).get(),
+        db.collection('config_academia').doc(doc).get(),
+        db.collection('config_academia').doc(`${doc}_metadados`).get(),
       ])
     );
     DOCUMENTOS_CONFIG_ACADEMIA.forEach(({ doc }, i) => {
@@ -207,8 +207,8 @@ async function _salvarParametroConfigAcademia(caminho, tipo, inputId, descId, bt
   btnEl.textContent = '⏳ Salvando...';
   try {
     await Promise.all([
-      db.collection('config').doc(nomeDoc).update({ [caminhoInterno]: novoValor }),
-      db.collection('config').doc(`${nomeDoc}_metadados`).update({ [caminhoInterno]: descricao }),
+      db.collection('config_academia').doc(nomeDoc).update({ [caminhoInterno]: novoValor }),
+      db.collection('config_academia').doc(`${nomeDoc}_metadados`).update({ [caminhoInterno]: descricao }),
     ]);
     btnEl.textContent = '✅ Salvo';
     setTimeout(() => { btnEl.disabled = false; btnEl.textContent = '💾 Salvar'; }, 1500);
@@ -298,8 +298,8 @@ async function _criarParametroConfigAcademia(caminhoPai) {
   const caminhoInternoCompleto = `${caminhoInternoPai}.${chave}`;
   try {
     await Promise.all([
-      db.collection('config').doc(nomeDoc).update({ [caminhoInternoCompleto]: valor }),
-      db.collection('config').doc(`${nomeDoc}_metadados`).update({ [caminhoInternoCompleto]: descricao }),
+      db.collection('config_academia').doc(nomeDoc).update({ [caminhoInternoCompleto]: valor }),
+      db.collection('config_academia').doc(`${nomeDoc}_metadados`).update({ [caminhoInternoCompleto]: descricao }),
     ]);
     await abrirPainelConfigAcademia(); // recarrega o painel inteiro (mais simples/seguro que remontar só o pedaço)
   } catch (e) {
@@ -515,7 +515,7 @@ function _contarFolhasPadrao(definicao) {
 }
 
 async function _bootstrapDocumentoPadrao(nomeDoc, definicao) {
-  const ref = db.collection('config').doc(nomeDoc);
+  const ref = db.collection('config_academia').doc(nomeDoc);
   const snap = await ref.get();
   const existente = snap.exists ? snap.data() : {};
 
@@ -526,7 +526,7 @@ async function _bootstrapDocumentoPadrao(nomeDoc, definicao) {
     atualizado_por: window._adminUid || 'admin_setup_browser',
   }, { merge: true });
 
-  const refMeta = db.collection('config').doc(`${nomeDoc}_metadados`);
+  const refMeta = db.collection('config_academia').doc(`${nomeDoc}_metadados`);
   const snapMeta = await refMeta.get();
   const existenteMeta = snapMeta.exists ? snapMeta.data() : {};
   const novasDescricoes = _extrairDescricoesPadrao(definicao, existenteMeta);
