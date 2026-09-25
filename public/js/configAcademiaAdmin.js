@@ -30,8 +30,8 @@ e config/<documento>_metadados).
 
 // ─── Documentos cobertos por este painel ─────────────────────────────────────
 const DOCUMENTOS_CONFIG_ACADEMIA = [
-  { doc: 'selos',       titulo: '📘 Selos',       icone: '📘' },
-  { doc: 'fidelidade',  titulo: '🏅 Fidelidade',  icone: '🏅' },
+  { doc: 'selos',       titulo: 'Selos',       icone: '📘' },
+  { doc: 'fidelidade',  titulo: 'Fidelidade',  icone: '🏅' },
 ];
 
 // ─── Definição das ABAS por documento (grupos lógicos) ───────────────────────
@@ -125,13 +125,18 @@ function _renderPainelConfigAcademia() {
     return `<button class="cfg-aba-doc ${ativa ? 'ativa' : ''}"
       onclick="_trocarAbaDocumento('${doc}')"
       style="
-        padding:8px 14px;font-size:13px;font-weight:600;cursor:pointer;
-        background:${ativa ? 'rgba(255,255,255,0.12)' : 'transparent'};
+        display:inline-flex;align-items:center;gap:6px;
+        padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer;
+        background:${ativa ? 'rgba(99,102,241,0.15)' : 'transparent'};
         color:${ativa ? 'var(--rs-text,#f1f5f9)' : 'var(--rs-muted,#94a3b8)'};
-        border:1px solid ${ativa ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.08)'};
-        border-bottom:${ativa ? 'none' : '1px solid rgba(255,255,255,0.08)'};
+        border:1px solid ${ativa ? 'rgba(99,102,241,0.4)' : 'rgba(255,255,255,0.08)'};
+        border-bottom:${ativa ? '1px solid rgba(99,102,241,0.15)' : '1px solid rgba(255,255,255,0.08)'};
         border-radius:8px 8px 0 0;margin-right:4px;
-      ">${icone} ${titulo}</button>`;
+        transition:background 0.15s;
+      "
+      onmouseover="this.style.background='${ativa ? 'rgba(99,102,241,0.2)' : 'rgba(255,255,255,0.04)'}'"
+      onmouseout="this.style.background='${ativa ? 'rgba(99,102,241,0.15)' : 'transparent'}'"
+    >${icone} ${titulo}</button>`;
   }).join('');
 
   // Sub-abas do documento ativo
