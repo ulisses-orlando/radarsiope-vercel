@@ -318,32 +318,224 @@ function _escapeHtml(str) {
     .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 
-async function _obterAdminTokenAcademia() {
-  if (window._adminToken) return window._adminToken;
+// ══════════════════════════════════════════════════════════════════════════
+// SCRIPT DE CARGA INICIAL — 100% no navegador (v1.7.2)
+// Antes chamava uma API de backend (/api/academiaSetup), mas isso exigia
+// firebase-admin com credenciais próprias — problemático no Vercel (erro de
+// "ID de projeto não detectado"). Como este arquivo já fala direto com o
+// Firestore pelo SDK do cliente para tudo mais, o bootstrap faz o mesmo:
+// roda com as MESMAS credenciais/sessão que o admin já usa para editar
+// qualquer parâmetro individual. Não depende de token nem de function.
+// ══════════════════════════════════════════════════════════════════════════
 
-  const cached = sessionStorage.getItem('_pushAdminToken');
-  if (cached) { window._adminToken = cached; return cached; }
+// Fonte única de verdade dos parâmetros padrão da Academia — valor + descrição.
+// Estrutura espelha exatamente config/selos e config/fidelidade.
+const _PARAMETROS_SELOS_PADRAO = {
+  selos: {
+    academia_habilitada: { valor: false, descricao: 'Feature flag geral da Academia. Enquanto false, nenhuma funcionalidade da Academia fica visível no app (rollout gradual/beta fechado antes do lançamento público).' }
+  },
+  niveis: {
+    iniciante: {
+      nome:               { valor: 'Participante Ativo', descricao: 'Nome de exibição do 1º nível (🥉) no app, dashboard e certificado.' },
+      quizzes_aprovados:  { valor: 12, descricao: 'Quantidade de quizzes NORMAIS aprovados (≥ percentual_minimo) necessária para conquistar este nível.' },
+      percentual_minimo:  { valor: 70, descricao: 'Nota mínima (%) em um quiz para ele contar como aprovado, específico deste nível.' },
+      cor:                { valor: '#CD7F32', descricao: 'Cor (hex) usada no selo, badge e certificado para este nível.' },
+      icone:              { valor: '🥉', descricao: 'Emoji/ícone usado para representar este nível na UI.' },
+      ordem:              { valor: 1, descricao: 'Posição deste nível na hierarquia (1 = mais baixo).' }
+    },
+    dedicado: {
+      nome:                  { valor: 'Estudante Dedicado', descricao: 'Nome de exibição do 2º nível (🥈).' },
+      quizzes_aprovados:     { valor: 24, descricao: 'Total acumulado de quizzes normais aprovados necessário para este nível.' },
+      percentual_minimo:     { valor: 70, descricao: 'Nota mínima (%) em um quiz para ele contar como aprovado, específico deste nível.' },
+      cor:                   { valor: '#C0C0C0', descricao: 'Cor (hex) usada no selo, badge e certificado para este nível.' },
+      icone:                 { valor: '🥈', descricao: 'Emoji/ícone usado para representar este nível na UI.' },
+      ordem:                 { valor: 2, descricao: 'Posição deste nível na hierarquia.' },
+      desbloqueia_especiais: { valor: true, descricao: 'Ao atingir este nível, o painel de Quizzes Especiais fica visível pela primeira vez (mostrando os de nivel_alvo="especialista").' }
+    },
+    especialista: {
+      nome:               { valor: 'Especialista SIOPE', descricao: 'Nome de exibição do 3º nível (🥇).' },
+      quizzes_aprovados:  { valor: 36, descricao: 'Total acumulado de quizzes NORMAIS aprovados necessário para este nível (trilha independente da de especiais).' },
+      percentual_minimo:  { valor: 70, descricao: 'Nota mínima (%) em um quiz para ele contar como aprovado, específico deste nível.' },
+      cor:                { valor: '#FFD700', descricao: 'Cor (hex) usada no selo, badge e certificado para este nível.' },
+      icone:              { valor: '🥇', descricao: 'Emoji/ícone usado para representar este nível na UI.' },
+      ordem:              { valor: 3, descricao: 'Posição deste nível na hierarquia. Requisito de especiais = 100% dos quizzes_especiais ativos com nivel_alvo="especialista" (contagem ao vivo — v1.7).' }
+    },
+    mestre: {
+      nome:               { valor: 'Mestre do FUNDEB', descricao: 'Nome de exibição do 4º e último nível (💎).' },
+      quizzes_aprovados:  { valor: 48, descricao: 'Total acumulado de quizzes NORMAIS aprovados necessário para este nível — corresponde a ~48 edições de um ano de contrato.' },
+      percentual_minimo:  { valor: 70, descricao: 'Nota mínima (%) em um quiz para ele contar como aprovado, específico deste nível.' },
+      cor:                { valor: '#B9F2FF', descricao: 'Cor (hex) usada no selo, badge e certificado para este nível.' },
+      icone:              { valor: '💎', descricao: 'Emoji/ícone usado para representar este nível na UI.' },
+      ordem:              { valor: 4, descricao: 'Posição deste nível na hierarquia (o mais alto). Requisito de especiais = 100% dos quizzes_especiais ativos com nivel_alvo="mestre" (contagem ao vivo — v1.7).' }
+    }
+  },
+  manutencao: {
+    ciclo_dias:                            { valor: 60, descricao: 'Duração (em dias) do ciclo de manutenção do selo.' },
+    quizzes_minimos_por_ciclo:             { valor: 4, descricao: 'Quantidade mínima de quizzes respondidos dentro de um ciclo para ele ser considerado regularizado.' },
+    percentual_minimo:                     { valor: 70, descricao: 'Aproveitamento médio mínimo (%) no ciclo de manutenção para considerá-lo regularizado.' },
+    permite_uso_com_zero_quizzes_no_ciclo: { valor: true, descricao: 'Se true, o Coringa de Manutenção pode ser usado mesmo com 0 quizzes respondidos no ciclo.' },
+    quiz_especial_conta_como:              { valor: 2, descricao: 'Peso de 1 Quiz Especial aprovado na contagem de FREQUÊNCIA do ciclo de manutenção.' },
+    alertas: {
+      dias_para_alerta_risco:          { valor: 15, descricao: 'Dias antes do fim do ciclo em que o estado vira em_alerta.' },
+      dias_para_notificacao_final:     { valor: 30, descricao: 'Dias após o fim do ciclo sem regularizar para o estado virar em_risco.' },
+      dias_para_congelamento:          { valor: 60, descricao: 'Dias sem regularizar para o estado virar congelado.' },
+      dias_para_rebaixamento:          { valor: 90, descricao: 'Dias sem regularizar (inatividade orgânica) para o estado virar rebaixado.' },
+      dias_para_expirado:              { valor: 180, descricao: 'Dias sem regularizar (inatividade orgânica) para o selo virar expirado — perde tudo.' },
+      dias_para_expirado_cancelamento: { valor: 90, descricao: 'Prazo em dias, a partir do CANCELAMENTO da assinatura, para o selo virar expirado. O rebaixamento por cancelamento já é imediato (Seção 4.6) — este prazo é até a perda total.' }
+    }
+  },
+  notificacoes: {
+    raio_alerta_mudanca_config: { valor: 1, descricao: 'Distância (em quizzes) do valor ANTIGO de um requisito de nível para o assinante ser avisado quando ele muda — seja por config alterada ou por ativar/desativar um Quiz Especial.' }
+  },
+  renovacao: {
+    ativo:                     { valor: true, descricao: 'Liga/desliga a renovação automática por aniversário de contrato.' },
+    modelo:                    { valor: 'aniversario_contrato', descricao: 'Modelo de renovação: por aniversário de contrato de cada assinante, não data fixa de calendário.' },
+    quizzes_minimos_renovacao: { valor: 3, descricao: 'Quizzes que quem manteve o selo ativo o ciclo inteiro precisa responder para renovar o nível ("Renovação Simplificada").' },
+    bonus_fidelidade: {
+      ativo:                   { valor: true, descricao: 'Liga/desliga o bônus de fidelidade na renovação.' },
+      coringa_extra:           { valor: 1, descricao: 'Coringas de Manutenção extra concedidos a quem se qualificou ao bônus.' },
+      nivel_minimo_para_bonus: { valor: 'iniciante', descricao: 'Nível mínimo elegível ao bônus de fidelidade.' }
+    }
+  },
+  coringa: {
+    manutencao: {
+      ativo:                     { valor: true, descricao: 'Liga/desliga o Coringa de Manutenção.' },
+      quantidade_padrao:         { valor: 1, descricao: 'Coringas de Manutenção por ano de contrato, sem bônus.' },
+      quantidade_com_bonus:      { valor: 2, descricao: 'Coringas de Manutenção no ciclo com bônus de fidelidade.' },
+      regra_uso:                 { valor: 'ciclo_em_alerta_ou_risco_e_(aproveitamento_atual_maior_igual_70_ou_zero_quizzes_no_ciclo)', descricao: 'Condição de elegibilidade textual (Seção 6.2). Não se aplica durante cancelamento (Seção 4.6).' },
+      max_usos_por_ciclo:        { valor: 1, descricao: 'Máximo de usos dentro de um ciclo de 60 dias.' },
+      max_usos_por_ano_contrato: { valor: 1, descricao: 'Máximo de usos dentro de um ano de contrato inteiro.' }
+    },
+    progressao: {
+      ativo:                            { valor: true, descricao: 'Liga/desliga o Coringa de Prorrogação.' },
+      quantidade_padrao:                { valor: 3, descricao: 'Coringas de Prorrogação por ano de contrato.' },
+      prazo_prorrogacao_dias:           { valor: 30, descricao: 'Dias para responder a newsletter prorrogada e ainda contar para o ciclo original.' },
+      janela_maxima_dias_pos_ciclo:     { valor: 90, descricao: 'Prazo máximo pós-fim-de-ciclo para ativar uma prorrogação.' },
+      bloqueia_prorrogacao_se_temporal: { valor: true, descricao: 'Se true, newsletters com conteudo_temporal=true nunca podem ser prorrogadas.' },
+      max_prorrogacoes_acumuladas:      { valor: 6, descricao: 'Teto de prorrogações em aberto simultaneamente.' }
+    }
+  },
+  quizzes_especiais: {
+    ativo:                { valor: true, descricao: 'Liga/desliga os Quizzes Especiais como um todo.' },
+    nivel_desbloqueio:    { valor: 'dedicado', descricao: 'Nível a partir do qual o painel de especiais fica visível.' },
+    dificuldade_minima:   { valor: 8, descricao: 'Dificuldade mínima (1-10) para um quiz ser cadastrado como Especial — orientação editorial, não trava automática.' },
+    valor_na_frequencia:  { valor: 2, descricao: 'Peso de um especial na frequência do ciclo de manutenção (espelha manutencao.quiz_especial_conta_como).' },
+    valor_na_performance: { valor: 1, descricao: 'Peso de um especial na média geral de aproveitamento.' }
+  },
+  ranking: {
+    ativo:                              { valor: true, descricao: 'Liga/desliga a página de Ranking.' },
+    visibilidade_padrao:                { valor: 'anonimo', descricao: 'Modo padrão de exibição de nomes até opt-in do assinante.' },
+    niveis_exibidos:                    { valor: ['especialista', 'mestre'], descricao: 'Níveis exibidos no ranking público.' },
+    atualizacao_frequencia:             { valor: 'diaria', descricao: 'Frequência de recálculo do ranking.' },
+    criterios_desempate:                { valor: ['quizzes_aprovados_ano_desc', 'percentual_aproveitamento_desc', 'data_conquista_nivel_atual_asc', 'municipio_alfabetico_asc'], descricao: 'Ordem de critérios de desempate. Ranking sempre em ano calendário puro.' },
+    limiar_municipio_pequeno:           { valor: 5, descricao: 'Abaixo deste nº de especialistas/mestres no município, nomes ficam ocultos e percentil vira faixa larga.' },
+    faixas_percentil_municipio_pequeno: { valor: [25, 50, 75, 100], descricao: 'Faixas de arredondamento do percentil municipal para municípios pequenos.' }
+  },
+  adesao: {
+    cooldown_convite_dias:       { valor: 5, descricao: 'Dias entre exibições do convite de adesão após "mais tarde".' },
+    termos_versao_atual:         { valor: 'v1', descricao: 'Versão vigente dos termos de aceite da Academia.' },
+    dias_delay_exibicao_convite: { valor: 2, descricao: 'Segundos de atraso após radarUserReady antes de mostrar o convite (nome mantém "dias" por padrão de nomenclatura, valor é em segundos).' }
+  },
+  certificado: {
+    formato:                   { valor: 'A4', descricao: 'Formato de página do PDF do certificado.' },
+    incluir_historico:         { valor: true, descricao: 'Inclui a Página 2 (histórico) no certificado.' },
+    incluir_ranking_percentil: { valor: true, descricao: 'Inclui a Página 3 (percentil), sempre anonimizada.' },
+    qr_code_ativo:             { valor: true, descricao: 'Inclui QR Code de validação.' },
+    url_validacao:             { valor: 'https://radarsiope.com.br/validar', descricao: 'URL base da página pública de validação.' },
+    storage:                   { valor: 'vercel_blob', descricao: 'Onde o PDF é armazenado.' },
+    cache_horas:                { valor: 24, descricao: 'Horas de cache do PDF já gerado.' }
+  },
+  backfill: {
+    data_corte: { valor: '2026-01-01', descricao: 'Data mais antiga considerada em qualquer backfill (lançamento ou adesão individual).' },
+    ativo:      { valor: true, descricao: 'Liga/desliga rotinas de backfill.' }
+  },
+  versao: { valor: '1.7.0', descricao: 'Versão da especificação da Academia à qual esta configuração corresponde.' }
+};
 
-  const usuarioLogado = JSON.parse(localStorage.getItem('usuarioLogado') || '{}');
-  const email = usuarioLogado?.email;
-  if (!email) throw new Error('Sessão expirada. Faça login novamente.');
+const _PARAMETROS_FIDELIDADE_PADRAO = {
+  ativo:                  { valor: true, descricao: 'Liga/desliga o Clube de Excelência.' },
+  nivel_exigido:          { valor: 'mestre', descricao: 'Nível mínimo mantido durante um ano de contrato para contar um ano de fidelidade.' },
+  aproveitamento_minimo:  { valor: 70, descricao: 'Aproveitamento médio mínimo (%) exigido no ano de contrato.' },
+  tabela_descontos: {
+    '1': { valor: 5,  descricao: '% de desconto após 1 ano de contrato consecutivo como Mestre.' },
+    '2': { valor: 10, descricao: '% de desconto após 2 anos consecutivos.' },
+    '3': { valor: 15, descricao: '% de desconto após 3 anos consecutivos.' },
+    '4': { valor: 20, descricao: '% de desconto após 4 anos consecutivos.' },
+    '5': { valor: 25, descricao: '% de desconto após 5+ anos — TETO, não aumenta mais.' }
+  },
+  valor_minimo_assinatura: { valor: 19.90, descricao: 'Piso (R$) da mensalidade mesmo com desconto de fidelidade + outras promoções.' },
+  regras: {
+    suspensao_por_inadimplencia_dias:      { valor: 30, descricao: 'Dias de inadimplência tolerados antes de suspender benefícios de fidelidade.' },
+    recuperacao_perde_um_ano:              { valor: true, descricao: 'Ausência ≤ 1 ano de contrato sem Mestre: contador decresce 1 em vez de zerar.' },
+    reset_apos_mais_de_um_ano_ausente:     { valor: true, descricao: 'Ausência > 1 ano de contrato sem Mestre: contador reseta para 1 (reset total, sem piso).' },
+    desconto_nao_acumulavel_com_promocoes: { valor: false, descricao: 'Se true, desconto de fidelidade não soma com outras promoções.' },
+    contador_minimo:                       { valor: 1, descricao: 'Valor mínimo do contador de anos consecutivos.' }
+  }
+};
 
-  const resp = await fetch('/api/push', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ acao: 'admin-token', email }),
-  });
-  const data = await resp.json();
-  if (!data.ok || !data.token) throw new Error('Não foi possível obter token de admin.');
-
-  sessionStorage.setItem('_pushAdminToken', data.token);
-  window._adminToken = data.token;
-  return data.token;
+function _ehFolhaParametroPadrao(no) {
+  return no !== null && typeof no === 'object' && 'valor' in no && 'descricao' in no;
 }
 
-// ─── Script de Carga Inicial (botão do menu, chama a API — Seção 21.10/10) ───
-// firebase-admin só roda no servidor, então este botão apenas dispara o
-// endpoint /api/academiaSetup (academiaSetup.js), que faz o bootstrap real.
+function _extrairValoresPadrao(definicao, existente = {}) {
+  const resultado = {};
+  for (const chave of Object.keys(definicao)) {
+    const no = definicao[chave];
+    if (_ehFolhaParametroPadrao(no)) {
+      const jaExiste = existente && Object.prototype.hasOwnProperty.call(existente, chave);
+      resultado[chave] = jaExiste ? existente[chave] : no.valor;
+    } else {
+      resultado[chave] = _extrairValoresPadrao(no, (existente && existente[chave]) || {});
+    }
+  }
+  return resultado;
+}
+
+function _extrairDescricoesPadrao(definicao, existente = {}) {
+  const resultado = {};
+  for (const chave of Object.keys(definicao)) {
+    const no = definicao[chave];
+    if (_ehFolhaParametroPadrao(no)) {
+      const descAtual = existente ? existente[chave] : undefined;
+      resultado[chave] = (typeof descAtual === 'string' && descAtual.trim() !== '') ? descAtual : no.descricao;
+    } else {
+      resultado[chave] = _extrairDescricoesPadrao(no, (existente && existente[chave]) || {});
+    }
+  }
+  return resultado;
+}
+
+function _contarFolhasPadrao(definicao) {
+  let n = 0;
+  for (const chave of Object.keys(definicao)) {
+    const no = definicao[chave];
+    n += _ehFolhaParametroPadrao(no) ? 1 : _contarFolhasPadrao(no);
+  }
+  return n;
+}
+
+async function _bootstrapDocumentoPadrao(nomeDoc, definicao) {
+  const ref = db.collection('config').doc(nomeDoc);
+  const snap = await ref.get();
+  const existente = snap.exists ? snap.data() : {};
+
+  const novosValores = _extrairValoresPadrao(definicao, existente);
+  await ref.set({
+    ...novosValores,
+    atualizado_em: new Date().toISOString(),
+    atualizado_por: window._adminUid || 'admin_setup_browser',
+  }, { merge: true });
+
+  const refMeta = db.collection('config').doc(`${nomeDoc}_metadados`);
+  const snapMeta = await refMeta.get();
+  const existenteMeta = snapMeta.exists ? snapMeta.data() : {};
+  const novasDescricoes = _extrairDescricoesPadrao(definicao, existenteMeta);
+  await refMeta.set(novasDescricoes, { merge: true });
+
+  return _contarFolhasPadrao(definicao);
+}
+
+// ─── Botão do menu — roda 100% no navegador, sem API/token ───────────────────
 async function executarScriptCargaInicialAcademia(btnEl) {
   if (!confirm('Isso grava os valores e descrições padrão da Academia em config/selos e ' +
                'config/fidelidade (e seus _metadados). Valores já existentes NÃO são sobrescritos, ' +
@@ -353,32 +545,14 @@ async function executarScriptCargaInicialAcademia(btnEl) {
   btnEl.disabled = true;
   btnEl.textContent = '⏳ Executando...';
 
-  let token;
   try {
-    token = await _obterAdminTokenAcademia();
-  } catch (e) {
-    alert('❌ ' + e.message);
-    btnEl.disabled = false;
-    btnEl.textContent = textoOriginal;
-    return;
-  }
-
-  try {
-    const resp = await fetch('/api/academia?acao=setup-inicial', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-admin-token': token, // mesmo token usado nas outras chamadas admin do projeto
-      },
-    });
-    const data = await resp.json();
-    if (!resp.ok || !data.ok) throw new Error(data.error || `HTTP ${resp.status}`);
+    const totalSelos = await _bootstrapDocumentoPadrao('selos', _PARAMETROS_SELOS_PADRAO);
+    const totalFidelidade = await _bootstrapDocumentoPadrao('fidelidade', _PARAMETROS_FIDELIDADE_PADRAO);
 
     alert(`✅ Carga inicial concluída!\n` +
-          `config/selos: ${data.parametros_selos} parâmetros verificados/gravados\n` +
-          `config/fidelidade: ${data.parametros_fidelidade} parâmetros verificados/gravados`);
+          `config/selos: ${totalSelos} parâmetros verificados/gravados\n` +
+          `config/fidelidade: ${totalFidelidade} parâmetros verificados/gravados`);
 
-    // Se o painel de configuração já estiver aberto, recarrega pra refletir
     if (document.getElementById('academia-config-body')) await abrirPainelConfigAcademia();
   } catch (e) {
     alert('❌ Erro ao executar carga inicial: ' + e.message);
