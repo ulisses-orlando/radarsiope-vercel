@@ -1,35 +1,11 @@
 /* ==========================================================================
    academiaEspeciaisAdmin.js — Admin: CRUD de Quizzes Especiais da Academia
-   (v3 — modelo "todos os ativos do nível são obrigatórios", substitui o
-   pool aberto único e o parâmetro independente especiais_adicionais_necessarios)
+   (v4 — adiciona o campo "Ativo" ao formulário de criação/edição, com o
+   mesmo aviso de efeito já usado no toggle da listagem)
 
-   Coleção: quizzes_especiais/{id}
-   {
-     titulo, descricao,
-     ativo: true,
-     dificuldade: 8,                        // 1-10, só editorial
-     nivel_alvo: "especialista" | "mestre",  // OBRIGATÓRIO agora (era nivel_alvo_sugerido, opcional)
-     tentativas_max, pontuacao_minima,
-     perguntas: [...],
-     criado_em, criado_por, atualizado_em
-   }
-
-   MODELO v1.7: não existe mais "quantidade exigida" configurável.
-   O requisito de especiais de um nível É, por definição, a contagem de
-   documentos ativos com aquele nivel_alvo — 100% deles são obrigatórios,
-   sem meta separada. Por isso:
-   - Não há mais bloqueio de "não pode desativar, ficaria abaixo do exigido"
-   - Ativar/desativar um especial MUDA o próprio requisito daquele nível
-     para quem ainda não o conquistou — por isso todo toggle mostra um
-     aviso com o efeito antes de confirmar (Seção 7 da spec)
-   - A notificação de quem é afetado (Seção 21.9) é responsabilidade de
-     um trigger de backend (onQuizEspecialToggle, a criar), disparado pela
-     própria escrita em `ativo` — este arquivo só avisa o admin na hora,
-     não escaneia assinantes (isso é trabalho de Cloud Function, não do
-     painel admin no navegador).
-
-   Exclusão continua sendo sempre SOFT DELETE (ativo:false) — nunca remove
-   o documento, preservando quiz_resultados e academia_niveis já gravados.
+   Modelo v1.7 (sem mudanças nesta versão, só a UI do formulário):
+   requisito de um nível = 100% dos quizzes_especiais ativos com aquele
+   nivel_alvo — não há "quantidade exigida" configurada à parte.
    ========================================================================== */
 
 let _listaEspeciaisCache = [];
@@ -55,8 +31,6 @@ async function abrirPainelQuizzesEspeciais() {
   _renderListaQuizzesEspeciais();
 }
 
-// Conta quantos especiais ATIVOS existem para um nivel_alvo — esse número
-// É o requisito vigente daquele nível (não há mais config separada).
 function _contarAtivosPorNivel(nivelAlvo, excluirId = null) {
   return _listaEspeciaisCache.filter(q =>
     q.nivel_alvo === nivelAlvo && q.ativo !== false && q.id !== excluirId
@@ -116,43 +90,43 @@ function _tituloNivel(chave) {
   return nomes[chave] || chave || '(sem nível-alvo)';
 }
 
-// ─── Toggle ativo/inativo — SEM bloqueio, COM aviso do efeito ────────────────
+// ─── Toggle ativo/inativo pela LISTA — sem bloqueio, com aviso do efeito ─────
 async function _confirmarToggleQuizEspecial(id, novoAtivo) {
   const q = _listaEspeciaisCache.find(x => x.id === id);
   if (!q) return;
 
-  const nivel = q.nivel_alvo;
-  const totalAtual = _contarAtivosPorNivel(nivel);
-  const totalDepois = novoAtivo ? totalAtual + 1 : totalAtual - 1;
-
-  const acao = novoAtivo ? 'ativar' : 'desativar';
-  const efeito = novoAtivo
-    ? `Isso AUMENTA o requisito de "${_tituloNivel(nivel)}" de ${totalAtual} para ${totalDepois}.\n` +
-      `Assinantes que já tinham completado todos os ${totalAtual} especiais anteriores desse nível ` +
-      `passarão a precisar deste também (serão notificados automaticamente).`
-    : `Isso REDUZ o requisito de "${_tituloNivel(nivel)}" de ${totalAtual} para ${totalDepois}.\n` +
-      `Quem ainda está buscando esse nível precisará de menos especiais a partir de agora.`;
-
-  const confirmMsg = novoAtivo
-    ? `Reativar "${q.titulo}"?\n\n${efeito}`
-    : `Desativar "${q.titulo}"? (o documento não é apagado, só some do requisito)\n\n${efeito}`;
-
-  if (!confirm(confirmMsg)) return;
+  const mensagem = _mensagemEfeitoToggle(q.nivel_alvo, novoAtivo, id);
+  if (!confirm(`${novoAtivo ? 'Reativar' : 'Desativar'} "${q.titulo}"?\n\n${mensagem}`)) return;
 
   await db.collection('quizzes_especiais').doc(id).update({
     ativo: novoAtivo,
     atualizado_em: new Date().toISOString(),
   });
-  // A notificação de quem foi afetado (Seção 21.9) é disparada por um trigger
-  // de backend ouvindo mudanças em `ativo` nesta coleção — não é feita aqui.
+  // A notificação de quem foi afetado (Seção 21.9) é disparada pelo trigger
+  // onQuizEspecialToggle, ouvindo esta mudança de `ativo` — não é feita aqui.
 
   await abrirPainelQuizzesEspeciais();
+}
+
+// Monta o texto de aviso reaproveitado tanto pelo toggle da lista quanto
+// pelo campo "Ativo" do formulário (criação e edição)
+function _mensagemEfeitoToggle(nivelAlvo, novoAtivo, excluirId = null) {
+  const totalAtual = _contarAtivosPorNivel(nivelAlvo, excluirId);
+  const totalDepois = novoAtivo ? totalAtual + 1 : totalAtual - 1;
+
+  return novoAtivo
+    ? `Isso AUMENTA o requisito de "${_tituloNivel(nivelAlvo)}" de ${totalAtual} para ${totalDepois}.\n` +
+      `Assinantes que já tinham completado todos os ${totalAtual} especiais anteriores desse nível ` +
+      `passarão a precisar deste também (serão notificados automaticamente).`
+    : `Isso REDUZ o requisito de "${_tituloNivel(nivelAlvo)}" de ${totalAtual} para ${totalDepois}.\n` +
+      `Quem ainda está buscando esse nível precisará de menos especiais a partir de agora.`;
 }
 
 // ─── Formulário de criação/edição ─────────────────────────────────────────────
 function abrirFormQuizEspecial(id = null) {
   _especialEmEdicaoId = id;
   const dados = id ? (_listaEspeciaisCache.find(q => q.id === id) || {}) : {};
+  const ativoAtual = id ? (dados.ativo !== false) : true; // novo especial nasce ativo por padrão
   const wrap = document.getElementById('form-quiz-especial-wrap');
   if (!wrap) return;
 
@@ -180,7 +154,7 @@ function abrirFormQuizEspecial(id = null) {
                   placeholder="Contexto/tema do desafio">${_escapeHtml(dados.descricao || '')}</textarea>
       </div>
 
-      <div style="display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap">
+      <div style="display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap;align-items:center">
         <label style="font-size:12px;display:flex;align-items:center;gap:4px">
           <input type="number" id="qe-dificuldade" min="1" max="10" value="${dados.dificuldade ?? 8}"
                  style="width:50px;padding:4px;border:1px solid #ddd;border-radius:4px;font-size:12px">
@@ -197,14 +171,20 @@ function abrirFormQuizEspecial(id = null) {
           % Aprovação
         </label>
         <label style="font-size:12px;display:flex;align-items:center;gap:4px">
-          Nível-alvo <span style="color:#dc2626">*obrigatório*</span>:
+          Nível-alvo <span style="color:#dc2626">*</span>:
           <select id="qe-nivel-alvo" required style="padding:4px;border:1px solid #ddd;border-radius:4px;font-size:12px">
             <option value="" disabled ${!dados.nivel_alvo ? 'selected' : ''}>Selecione...</option>
             <option value="especialista" ${dados.nivel_alvo === 'especialista' ? 'selected' : ''}>Especialista (Dedicado → Especialista)</option>
             <option value="mestre" ${dados.nivel_alvo === 'mestre' ? 'selected' : ''}>Mestre (Especialista → Mestre)</option>
           </select>
         </label>
+        <label style="font-size:12px;display:flex;align-items:center;gap:5px;padding:4px 8px;background:#fff;border:1px solid #ddd;border-radius:4px">
+          <input type="checkbox" id="qe-ativo" data-original="${ativoAtual}" ${ativoAtual ? 'checked' : ''}>
+          <strong>Ativo</strong>
+        </label>
       </div>
+      <div id="qe-ativo-aviso" style="display:none;font-size:11px;color:#b45309;background:#fffbeb;border:1px solid #fde68a;
+           border-radius:6px;padding:6px 8px;margin-bottom:8px;white-space:pre-line"></div>
 
       <div id="qe-perguntas-container" style="display:flex;flex-direction:column;gap:8px"></div>
 
@@ -231,6 +211,23 @@ function abrirFormQuizEspecial(id = null) {
   document.getElementById('qe-add-pergunta').addEventListener('click', () => _renderQuizEspecialPergunta({}));
   document.getElementById('qe-import-json').addEventListener('click', _importarJsonQuizEspecial);
   document.getElementById('qe-salvar').addEventListener('click', _salvarQuizEspecial);
+
+  // Aviso ao vivo quando o admin mexe no checkbox "Ativo" ou troca o nível-alvo
+  const atualizarAvisoAtivo = () => {
+    const avisoEl = document.getElementById('qe-ativo-aviso');
+    const checkboxEl = document.getElementById('qe-ativo');
+    const nivelSelecionado = document.getElementById('qe-nivel-alvo').value;
+    const originalAtivo = checkboxEl.dataset.original === 'true';
+
+    if (!nivelSelecionado || checkboxEl.checked === originalAtivo) {
+      avisoEl.style.display = 'none';
+      return;
+    }
+    avisoEl.textContent = _mensagemEfeitoToggle(nivelSelecionado, checkboxEl.checked, _especialEmEdicaoId);
+    avisoEl.style.display = 'block';
+  };
+  document.getElementById('qe-ativo').addEventListener('change', atualizarAvisoAtivo);
+  document.getElementById('qe-nivel-alvo').addEventListener('change', atualizarAvisoAtivo);
 }
 
 function _renderQuizEspecialPergunta(pergunta = {}) {
@@ -290,6 +287,7 @@ function _importarJsonQuizEspecial() {
     if (dados.tentativas_max !== undefined) document.getElementById('qe-tentativas-max').value = dados.tentativas_max;
     if (dados.pontuacao_minima !== undefined) document.getElementById('qe-pontuacao-minima').value = dados.pontuacao_minima;
     if (dados.nivel_alvo !== undefined) document.getElementById('qe-nivel-alvo').value = dados.nivel_alvo;
+    if (dados.ativo !== undefined) document.getElementById('qe-ativo').checked = !!dados.ativo;
 
     const container = document.getElementById('qe-perguntas-container');
     if (container) container.innerHTML = '';
@@ -327,10 +325,12 @@ function _coletarPerguntasQuizEspecial() {
   return perguntas;
 }
 
-// ─── Salvar (criar ou atualizar) — nivel_alvo agora obrigatório ──────────────
+// ─── Salvar (criar ou atualizar) ──────────────────────────────────────────────
 async function _salvarQuizEspecial() {
   const titulo = document.getElementById('qe-titulo').value.trim();
   const nivelAlvo = document.getElementById('qe-nivel-alvo').value;
+  const ativoSelecionado = document.getElementById('qe-ativo').checked;
+  const ativoOriginal = document.getElementById('qe-ativo').dataset.original === 'true';
 
   if (!titulo) { alert('⚠️ Preencha o título do Quiz Especial.'); return; }
   if (!nivelAlvo) { alert('⚠️ Selecione o nível-alvo (Especialista ou Mestre) — é obrigatório neste modelo.'); return; }
@@ -338,17 +338,11 @@ async function _salvarQuizEspecial() {
   const perguntas = _coletarPerguntasQuizEspecial();
   if (perguntas.length === 0) { alert('⚠️ Adicione ao menos 1 pergunta.'); return; }
 
-  // Se está CRIANDO um novo (ou reativando via edição) e ficaria ativo,
-  // avisa do efeito no requisito antes de gravar — mesmo aviso do toggle.
-  const vaiFicarAtivo = _especialEmEdicaoId
-    ? (_listaEspeciaisCache.find(q => q.id === _especialEmEdicaoId)?.ativo !== false)
-    : true; // novo especial nasce ativo por padrão
-  if (!_especialEmEdicaoId && vaiFicarAtivo) {
-    const totalAtual = _contarAtivosPorNivel(nivelAlvo);
-    const confirmMsg = `Criar este Quiz Especial ativo AUMENTA o requisito de "${_tituloNivel(nivelAlvo)}" ` +
-      `de ${totalAtual} para ${totalAtual + 1}.\nAssinantes que já tinham completado os ${totalAtual} anteriores ` +
-      `precisarão deste também (serão notificados). Continuar?`;
-    if (!confirm(confirmMsg)) return;
+  // Se o campo Ativo mudou de valor (seja criando um novo, seja editando um
+  // existente), confirma o efeito no requisito antes de gravar.
+  if (ativoSelecionado !== ativoOriginal) {
+    const mensagem = _mensagemEfeitoToggle(nivelAlvo, ativoSelecionado, _especialEmEdicaoId);
+    if (!confirm(`Salvar com Ativo = ${ativoSelecionado ? 'Sim' : 'Não'}?\n\n${mensagem}`)) return;
   }
 
   const payload = {
@@ -358,6 +352,7 @@ async function _salvarQuizEspecial() {
     tentativas_max: parseInt(document.getElementById('qe-tentativas-max').value) || 3,
     pontuacao_minima: parseInt(document.getElementById('qe-pontuacao-minima').value) || 70,
     nivel_alvo: nivelAlvo,
+    ativo: ativoSelecionado,
     perguntas,
     atualizado_em: new Date().toISOString(),
   };
@@ -369,7 +364,6 @@ async function _salvarQuizEspecial() {
     if (_especialEmEdicaoId) {
       await db.collection('quizzes_especiais').doc(_especialEmEdicaoId).update(payload);
     } else {
-      payload.ativo = true;
       payload.criado_em = new Date().toISOString();
       payload.criado_por = window._adminUid || 'admin';
       await db.collection('quizzes_especiais').add(payload);
