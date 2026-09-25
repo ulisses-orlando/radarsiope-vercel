@@ -59,6 +59,52 @@ const ABAS_POR_DOCUMENTO = {
   ],
 };
 
+// ─── Ordem explícita dos níveis (hierarquia) ─────────────────────────────────
+const ORDEM_NIVEIS = ['iniciante', 'dedicado', 'especialista', 'mestre'];
+
+// ─── Mapa de configuração visual por caminho de grupo ────────────────────────
+// Cada entrada define como um objeto aninhado deve ser renderizado.
+// `modo`:
+//   'cards_por_filho' → cada chave-filha vira um card independente (ex: níveis, coringas)
+//   'card_container'  → o grupo todo vira um único card com os filhos dentro (ex: alertas, regras)
+const CONFIG_VISUAL_GRUPOS = {
+  // SEL OS
+  'selos::niveis': {
+    modo: 'cards_por_filho',
+    cor:      (chave, valor) => valor?.cor || '#94a3b8',
+    icone:    (chave, valor) => valor?.icone || '📊',
+    titulo:   (chave, valor) => valor?.nome || _tituloAmigavel(chave),
+    subtitulo:(chave) => chave,
+  },
+  'selos::coringa': {
+    modo: 'cards_por_filho',
+    cor:      (chave) => ({ manutencao: '#f59e0b', progressao: '#8b5cf6' })[chave] || '#94a3b8',
+    icone:    (chave) => ({ manutencao: '🔧', progressao: '⏳' })[chave] || '🃏',
+    titulo:   (chave) => `Coringa de ${_tituloAmigavel(chave)}`,
+    subtitulo:(chave) => `coringa.${chave}`,
+  },
+  'selos::manutencao.alertas': {
+    modo: 'card_container',
+    cor: '#ef4444',
+    icone: '🚨',
+    titulo: 'Alertas de Manutenção',
+  },
+
+  // FIDELIDADE
+  'fidelidade::tabela_descontos': {
+    modo: 'card_container',
+    cor: '#10b981',
+    icone: '💰',
+    titulo: 'Tabela de Descontos por Ano de Fidelidade',
+  },
+  'fidelidade::regras': {
+    modo: 'card_container',
+    cor: '#3b82f6',
+    icone: '',
+    titulo: 'Regras do Clube de Excelência',
+  },
+};
+
 // ─── Estado do painel ─────────────────────────────────────────────────────────
 let _cfgValores = {};    // { selos: {...}, fidelidade: {...} }
 let _cfgMetadados = {};  // { selos: {...}, fidelidade: {...} }
@@ -244,23 +290,133 @@ function _trocarAbaGrupo(doc, grupoId) {
 // `caminho` sempre no formato "<documento>::a.b.c"
 function _renderNo(valor, metadadosNo, caminho) {
   const ehObjetoPlano = valor !== null && typeof valor === 'object' && !Array.isArray(valor);
-  if (ehObjetoPlano) {
-    return Object.keys(valor).map(chave => {
+  if (!ehObjetoPlano) {
+    return _renderLinhaParametro(caminho, caminho.split('::').pop(), valor, typeof metadadosNo === 'string' ? metadadosNo : '');
+  }
+
+  // ─── Verifica se este caminho tem configuração visual especial ─────────────
+  const configVisual = CONFIG_VISUAL_GRUPOS[caminho];
+
+  // ─── Ordenação especial para níveis ────────────────────────────────────────
+  let chaves = Object.keys(valor);
+  if (caminho === 'selos::niveis') {
+    chaves = chaves.sort((a, b) => {
+      const idxA = ORDEM_NIVEIS.indexOf(a);
+      const idxB = ORDEM_NIVEIS.indexOf(b);
+      if (idxA === -1 && idxB === -1) return a.localeCompare(b);
+      if (idxA === -1) return 1;
+      if (idxB === -1) return -1;
+      return idxA - idxB;
+    });
+  }
+
+  // ── Modo: cards_por_filho (cada filho vira um card) ──────────────────────
+  if (configVisual?.modo === 'cards_por_filho') {
+    return chaves.map(chave => {
       const subCaminho = `${caminho}.${chave}`;
       const subMetadados = (metadadosNo && typeof metadadosNo === 'object') ? metadadosNo[chave] : undefined;
-      const ehFolhaAninhada = valor[chave] === null || typeof valor[chave] !== 'object' || Array.isArray(valor[chave]);
-      if (ehFolhaAninhada) {
-        return _renderLinhaParametro(subCaminho, chave, valor[chave], typeof subMetadados === 'string' ? subMetadados : '');
-      }
+      const subValor = valor[chave];
+
+      const cor       = configVisual.cor(chave, subValor);
+      const icone     = configVisual.icone(chave, subValor);
+      const titulo    = configVisual.titulo(chave, subValor);
+      const subtitulo = configVisual.subtitulo(chave);
+
       return `
-        <div style="margin:8px 0 8px 12px;padding-left:8px;border-left:2px solid rgba(255,255,255,0.08)">
-          <div style="font-size:12px;color:var(--rs-muted,#94a3b8);margin-bottom:4px">${_tituloAmigavel(chave)}</div>
-          ${_renderNo(valor[chave], subMetadados || {}, subCaminho)}
+        <div class="cfg-grupo-card" style="
+          margin:18px 0;
+          padding:14px 16px;
+          background:rgba(255,255,255,0.035);
+          border-radius:10px;
+          border-left:4px solid ${cor};
+          box-shadow:0 1px 4px rgba(0,0,0,0.08);
+        ">
+          <div style="
+            font-size:15px;
+            font-weight:700;
+            color:var(--rs-text,#f1f5f9);
+            margin-bottom:12px;
+            display:flex;
+            align-items:center;
+            gap:8px;
+            flex-wrap:wrap;
+          ">
+            <span style="font-size:20px">${icone}</span>
+            <span>${titulo}</span>
+            <span style="
+              font-size:11px;
+              color:var(--rs-muted,#94a3b8);
+              font-weight:400;
+              margin-left:4px;
+              padding:2px 8px;
+              background:rgba(0,0,0,0.15);
+              border-radius:4px;
+            ">${subtitulo}</span>
+          </div>
+          ${_renderNo(subValor, subMetadados || {}, subCaminho)}
         </div>
       `;
     }).join('');
   }
-  return _renderLinhaParametro(caminho, caminho.split('::').pop(), valor, typeof metadadosNo === 'string' ? metadadosNo : '');
+
+  // ─── Modo: card_container (grupo todo vira um card) ───────────────────────
+  if (configVisual?.modo === 'card_container') {
+    const filhosHtml = chaves.map(chave => {
+      const subCaminho = `${caminho}.${chave}`;
+      const subMetadados = (metadadosNo && typeof metadadosNo === 'object') ? metadadosNo[chave] : undefined;
+      const ehFolha = subValorIsFolha(valor[chave]);
+      if (ehFolha) {
+        return _renderLinhaParametro(subCaminho, chave, valor[chave], typeof subMetadados === 'string' ? subMetadados : '');
+      }
+      return _renderNo(valor[chave], subMetadados || {}, subCaminho);
+    }).join('');
+
+    return `
+      <div class="cfg-grupo-card" style="
+        margin:14px 0;
+        padding:14px 16px;
+        background:rgba(255,255,255,0.035);
+        border-radius:10px;
+        border-left:4px solid ${configVisual.cor};
+        box-shadow:0 1px 4px rgba(0,0,0,0.08);
+      ">
+        <div style="
+          font-size:14px;
+          font-weight:700;
+          color:var(--rs-text,#f1f5f9);
+          margin-bottom:12px;
+          display:flex;
+          align-items:center;
+          gap:8px;
+        ">
+          <span style="font-size:18px">${configVisual.icone}</span>
+          <span>${configVisual.titulo}</span>
+        </div>
+        ${filhosHtml}
+      </div>
+    `;
+  }
+
+  // ── Caso genérico (sem configuração visual especial) ────────────────────
+  return chaves.map(chave => {
+    const subCaminho = `${caminho}.${chave}`;
+    const subMetadados = (metadadosNo && typeof metadadosNo === 'object') ? metadadosNo[chave] : undefined;
+    const ehFolha = subValorIsFolha(valor[chave]);
+    if (ehFolha) {
+      return _renderLinhaParametro(subCaminho, chave, valor[chave], typeof subMetadados === 'string' ? subMetadados : '');
+    }
+    return `
+      <div style="margin:8px 0 8px 12px;padding-left:8px;border-left:2px solid rgba(255,255,255,0.08)">
+        <div style="font-size:12px;color:var(--rs-muted,#94a3b8);margin-bottom:4px">${_tituloAmigavel(chave)}</div>
+        ${_renderNo(valor[chave], subMetadados || {}, subCaminho)}
+      </div>
+    `;
+  }).join('');
+}
+
+// Helper: detecta se um valor é "folha" (primitivo ou array) — usado no card_container
+function subValorIsFolha(v) {
+  return v === null || typeof v !== 'object' || Array.isArray(v);
 }
 
 // ─── Uma linha editável: label + input de valor + textarea de descrição + salvar ──
