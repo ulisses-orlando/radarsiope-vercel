@@ -120,23 +120,24 @@ function _renderPainelConfigAcademia() {
   const body = document.getElementById('academia-config-body');
 
   // Abas de documento (Selos / Fidelidade)
-  const abasDocHtml = DOCUMENTOS_CONFIG_ACADEMIA.map(({ doc, titulo, icone }) => {
+  const abasDocHtml = DOCUMENTOS_CONFIG_ACADEMIA.map(({ doc, titulo }) => {
     const ativa = doc === _abaDocAtiva;
     return `<button class="cfg-aba-doc ${ativa ? 'ativa' : ''}"
       onclick="_trocarAbaDocumento('${doc}')"
       style="
         display:inline-flex;align-items:center;gap:6px;
-        padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer;
-        background:${ativa ? 'rgba(99,102,241,0.15)' : 'transparent'};
-        color:${ativa ? 'var(--rs-text,#f1f5f9)' : 'var(--rs-muted,#94a3b8)'};
-        border:1px solid ${ativa ? 'rgba(99,102,241,0.4)' : 'rgba(255,255,255,0.08)'};
-        border-bottom:${ativa ? '1px solid rgba(99,102,241,0.15)' : '1px solid rgba(255,255,255,0.08)'};
+        padding:8px 16px;font-size:13px;cursor:pointer;
+        background:${ativa ? 'rgba(59,130,246,0.15)' : 'transparent'};
+        color:${ativa ? '#1e3a8a' : 'var(--rs-muted,#64748b)'};
+        font-weight:${ativa ? '700' : '500'};
+        border:1px solid ${ativa ? 'rgba(59,130,246,0.3)' : 'rgba(0,0,0,0.08)'};
+        border-bottom:${ativa ? '1px solid rgba(59,130,246,0.15)' : '1px solid rgba(0,0,0,0.08)'};
         border-radius:8px 8px 0 0;margin-right:4px;
-        transition:background 0.15s;
+        transition:all 0.15s;
       "
-      onmouseover="this.style.background='${ativa ? 'rgba(99,102,241,0.2)' : 'rgba(255,255,255,0.04)'}'"
-      onmouseout="this.style.background='${ativa ? 'rgba(99,102,241,0.15)' : 'transparent'}'"
-    >${icone} ${titulo}</button>`;
+      onmouseover="this.style.background='${ativa ? 'rgba(59,130,246,0.2)' : 'rgba(0,0,0,0.04)'}'"
+      onmouseout="this.style.background='${ativa ? 'rgba(59,130,246,0.15)' : 'transparent'}'"
+    >${titulo}</button>`;
   }).join('');
 
   // Sub-abas do documento ativo
@@ -150,18 +151,23 @@ function _renderPainelConfigAcademia() {
       onclick="_trocarAbaGrupo('${_abaDocAtiva}','${aba.id}')"
       style="
         padding:6px 12px;font-size:12px;cursor:pointer;
-        background:${ativa ? 'rgba(99,102,241,0.18)' : 'rgba(255,255,255,0.04)'};
-        color:${ativa ? '#fff' : 'var(--rs-muted,#94a3b8)'};
-        border:1px solid ${ativa ? 'rgba(99,102,241,0.4)' : 'rgba(255,255,255,0.08)'};
+        background:${ativa ? 'rgba(59,130,246,0.15)' : 'rgba(0,0,0,0.04)'};
+        color:${ativa ? '#1e3a8a' : 'var(--rs-muted,#64748b)'};
+        font-weight:${ativa ? '700' : '400'};
+        border:1px solid ${ativa ? 'rgba(59,130,246,0.3)' : 'rgba(0,0,0,0.08)'};
         border-radius:6px;
-      ">${aba.titulo}</button>`;
+        transition:all 0.15s;
+      "
+      onmouseover="this.style.background='${ativa ? 'rgba(59,130,246,0.2)' : 'rgba(0,0,0,0.06)'}'"
+      onmouseout="this.style.background='${ativa ? 'rgba(59,130,246,0.15)' : 'rgba(0,0,0,0.04)'}'"
+    >${aba.titulo}</button>`;
   }).join('');
 
   // Conteúdo da sub-aba ativa
   const conteudoHtml = _renderConteudoGrupo(_abaDocAtiva, grupoAtivo);
 
   body.innerHTML = `
-    <div class="cfg-abas-doc" style="display:flex;flex-wrap:wrap;border-bottom:1px solid rgba(255,255,255,0.08);margin-bottom:12px">
+    <div class="cfg-abas-doc" style="display:flex;flex-wrap:wrap;border-bottom:1px solid rgba(0,0,0,0.08);margin-bottom:12px">
       ${abasDocHtml}
     </div>
     <div class="cfg-abas-grupo" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px">
