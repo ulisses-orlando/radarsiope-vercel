@@ -192,53 +192,148 @@ function _renderizarCardConcluido(nid, uid) {
 // MODAL DO QUIZ
 // ────────────────────────────────────────────────────────────────────────
 
-function _abrirQuizModal(nid, uid) {
+async function _abrirQuizModal(nid, uid) {
+  // Trava o botão imediatamente para evitar duplo-clique
+  const btnIniciar = document.getElementById('rs-quiz-btn-iniciar')
+                  || document.getElementById('rs-quiz-btn-reiniciar');
+  if (btnIniciar) { btnIniciar.disabled = true; btnIniciar.textContent = 'Iniciando...'; }
+
+  try {
+    const idField = _tipoQuiz === 'especial' ? 'quiz_especial_id' : 'newsletter_id';
+    const resp = await fetch('/api/pagamentoMP?acao=quiz-iniciar', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ uid, [idField]: nid })
+    });
+    const data = await resp.json();
+
+    if (!resp.ok || !data.ok) {
+      // Limite atingido ou outro erro → recarrega histórico e re-renderiza card
+      console.warn('[QuizApp] Backend recusou início:', data.message);
+      await _recarregarHistorico(uid, nid);
+      _removerCardQuiz();
+      if (_historico && _historico.tentativas_total > 0) {
+        _renderizarCardConcluido(nid, uid);
+      } else {
+        _renderizarCardConvite(nid, uid);
+      }
+      alert(data.message || 'Não foi possível iniciar o quiz.');
+      return;
+    }
+
+    // Backend autorizou — abre o modal
     document.getElementById('rs-quiz-cta-card')?.remove();
+    _state = {
+      nid, uid,
+      tipo: _tipoQuiz,
+      qIndex: 0,
+      answers: [],
+      score: 0,
+      finished: false,
+      tentativaId: data.tentativa_id,   // ← NOVO: armazena ID da tentativa
+      continuando: !!data.continuando
+    };
 
-    _state = { nid, uid, tipo: _tipoQuiz, qIndex: 0, answers: [], score: 0, finished: false };
-
-    const overlay = document.createElement('div');
-    overlay.id = 'rs-quiz-overlay';
-    overlay.className = 'rs-quiz-overlay';
-    overlay.innerHTML = `
-        <div id="rs-quiz-modal" class="rs-quiz-modal" role="dialog" aria-modal="true" aria-labelledby="rs-quiz-title">
-            <header id="rs-quiz-header">
-                <div class="rs-quiz-header-left">
-                    <span class="rs-quiz-badge">${_tipoQuiz === 'especial' ? '🧩 Desafio Especial' : 'Quiz'}</span>
-                    <span id="rs-quiz-title">Pergunta 1</span>
-                </div>
-                <button id="rs-quiz-fechar" aria-label="Fechar quiz">✕</button>
-            </header>
-            <div class="rs-quiz-progress-wrap">
-                <div class="rs-quiz-progress-bar"><div class="fill" style="width:0%"></div></div>
-            </div>
-            <div id="rs-quiz-body">
-                <div id="rs-quiz-question-container"></div>
-            </div>
-            <footer id="rs-quiz-footer"></footer>
-        </div>
-    `;
-
-    document.body.appendChild(overlay);
-    document.body.style.overflow = 'hidden';
-
-    overlay.addEventListener('click', (e) => {
-        if (e.target === overlay) _cancelarQuiz(nid, uid);
-    });
-    document.getElementById('rs-quiz-fechar').addEventListener('click', () => {
-        _cancelarQuiz(nid, uid);
-    });
-
+    _montarModalQuiz(nid, uid);
     _renderizarPergunta();
+  } catch (err) {
+    console.error('[QuizApp] Erro ao iniciar quiz:', err);
+    alert('Erro de conexão. Tente novamente.');
+    // Reabilita botão
+    if (btnIniciar) {
+      btnIniciar.disabled = false;
+      btnIniciar.textContent = btnIniciar.id === 'rs-quiz-btn-reiniciar'
+        ? 'Tentar novamente →' : 'Iniciar Quiz →';
+    }
+  }
 }
 
-function _cancelarQuiz(nid, uid) {
-    _fecharQuizModal();
-    if (!_historico || _historico.tentativas_total === 0) {
-        _renderizarCardConvite(nid, uid);
-    } else {
-        _renderizarCardConcluido(nid, uid);
-    }
+// Extrai a parte visual para uma função separada (modal puro)
+function _montarModalQuiz(nid, uid) {
+  const overlay = document.createElement('div');
+  overlay.id = 'rs-quiz-overlay';
+  overlay.className = 'rs-quiz-overlay';
+  overlay.innerHTML = `
+    <div id="rs-quiz-modal" class="rs-quiz-modal" role="dialog" aria-modal="true" aria-labelledby="rs-quiz-title">
+      <header id="rs-quiz-header">
+        <div class="rs-quiz-header-left">
+          <span class="rs-quiz-badge">${_tipoQuiz === 'especial' ? '🧩 Desafio Especial' : 'Quiz'}</span>
+          <span id="rs-quiz-title">Pergunta 1</span>
+        </div>
+        <button id="rs-quiz-fechar" aria-label="Fechar quiz">✕</button>
+      </header>
+      <div class="rs-quiz-progress-wrap">
+        <div class="rs-quiz-progress-bar"><div class="fill" style="width:0%"></div></div>
+      </div>
+      <div id="rs-quiz-body">
+        <div id="rs-quiz-question-container"></div>
+      </div>
+      <footer id="rs-quiz-footer"></footer>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+  document.body.style.overflow = 'hidden';
+
+  overlay.addEventListener('click', (e) => {
+    if (e.target === overlay) _cancelarQuiz(nid, uid);
+  });
+  document.getElementById('rs-quiz-fechar').addEventListener('click', () => {
+    _cancelarQuiz(nid, uid);
+  });
+}
+
+async function _cancelarQuiz(nid, uid) {
+    // Se ainda não finalizou e já respondeu pelo menos 1 pergunta, confirma
+  if (_state && !_state.finished && _state.answers.length > 0) {
+    const confirmar = confirm(
+      '⚠️ Ao fechar agora, esta tentativa será contabilizada como abandonada.\n\n' +
+      'Tem certeza que deseja sair?'
+    );
+    if (!confirmar) return; // usuário desistiu de fechar
+  }
+
+  // Se havia tentativa em andamento, registra abandono no backend
+  if (_state?.tentativaId && !_state.finished) {
+    const total = _config.perguntas.length;
+    const pontuacaoParcial = total > 0 ? Math.round((_state.score / total) * 100) : 0;
+    const respostasParciais = _state.answers.map(a => ({
+      pergunta_id: a.qId,
+      resposta_selecionada: a.selecionada,
+      resposta_correta: a.correta,
+      acertou: a.acertou
+    }));
+
+    // Fire-and-forget: não bloqueia o fechamento do modal se falhar
+    fetch('/api/pagamentoMP?acao=quiz-abandonar', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        uid,
+        tentativa_id: _state.tentativaId,
+        pontuacao_parcial: pontuacaoParcial,
+        respostas_parciais: respostasParciais
+      })
+    }).catch(err => console.warn('[QuizApp] Falha ao registrar abandono:', err));
+  }
+
+  _fecharQuizModal();
+  // Recarrega histórico do backend (a tentativa abandonada já foi contabilizada)
+  await _recarregarHistorico(uid, nid);
+  if (_historico && _historico.tentativas_total > 0) {
+    _renderizarCardConcluido(nid, uid);
+  } else {
+    _renderizarCardConvite(nid, uid);
+  }
+}
+
+// Helper novo para recarregar histórico
+async function _recarregarHistorico(uid, nid) {
+  try {
+    _historico = await _buscarHistorico(uid, nid);
+    _salvarCacheLocal(uid, nid, _historico);
+  } catch (e) {
+    console.warn('[QuizApp] Falha ao recarregar histórico:', e);
+  }
 }
 
 function _renderizarPergunta() {
@@ -320,47 +415,40 @@ function _proximaPergunta() {
 }
 
 async function _finalizarQuiz() {
-    _state.finished = true;
+  _state.finished = true;
+  const total    = _config.perguntas.length;
+  const pontuacao = Math.round((_state.score / total) * 100);
+  const minimo   = _config.pontuacao_minima || 70;
+  const aprovado = pontuacao >= minimo;
 
-    const total    = _config.perguntas.length;
-    const pontuacao = Math.round((_state.score / total) * 100);
-    const minimo   = _config.pontuacao_minima || 70;
-    const aprovado = pontuacao >= minimo;
+  const btnAcao = document.getElementById('rs-quiz-btn-acao');
+  if (btnAcao) { btnAcao.disabled = true; btnAcao.textContent = 'Salvando...'; }
 
-    // Trava botão enquanto salva
-    const btnAcao = document.getElementById('rs-quiz-btn-acao');
-    if (btnAcao) { btnAcao.disabled = true; btnAcao.textContent = 'Salvando...'; }
-
-    try {
-        const respApi = await _salvarNoBackend({ pontuacao, aprovado });
-
-        // Atualiza histórico em memória com retorno da API (preferencial)
-        if (respApi?.historico) {
-            _historico = respApi.historico;
-        } else {
-            // Fallback: atualiza manualmente
-            const entrada = { pontuacao, aprovado, criado_em: new Date().toISOString() };
-            if (!_historico) {
-                _historico = {
-                    tentativas: [],
-                    tentativas_total: 0,
-                    tentativas_max: _config.tentativas_max || 3
-                };
-            }
-            _historico.tentativas.unshift(entrada);
-            _historico.tentativas_total += 1;
-        }
-
-        _salvarCacheLocal(_state.uid, _state.nid, _historico);
-
-        window.dispatchEvent(new CustomEvent('rs:quizConcluido', {
-            detail: { nid: _state.nid, tipo: _state.tipo, pontuacao, aprovado }
-        }));
-    } catch (err) {
-        console.error('[QuizApp] Erro ao salvar resultado:', err);
+  try {
+    const respApi = await _salvarNoBackend({
+      pontuacao,
+      aprovado,
+      tentativa_id: _state.tentativaId   // ← NOVO
+    });
+    if (respApi?.historico) {
+      _historico = respApi.historico;
+    } else {
+      // Fallback (não deve acontecer mais, mas mantém)
+      const entrada = { pontuacao, aprovado, status: 'finalizada', criado_em: new Date().toISOString() };
+      if (!_historico) {
+        _historico = { tentativas: [], tentativas_total: 0, tentativas_max: _config.tentativas_max || 3 };
+      }
+      _historico.tentativas.unshift(entrada);
+      _historico.tentativas_total += 1;
     }
-
-    _renderizarResultadoFinal(pontuacao, aprovado, minimo);
+    _salvarCacheLocal(_state.uid, _state.nid, _historico);
+    window.dispatchEvent(new CustomEvent('rs:quizConcluido', {
+      detail: { nid: _state.nid, tipo: _state.tipo, pontuacao, aprovado }
+    }));
+  } catch (err) {
+    console.error('[QuizApp] Erro ao salvar resultado:', err);
+  }
+  _renderizarResultadoFinal(pontuacao, aprovado, minimo);
 }
 
 function _renderizarResultadoFinal(pontuacao, aprovado, minimo) {
@@ -416,13 +504,21 @@ function _abrirModalHistorico() {
     
     const linhas = tentativas.map((t, i) => {
         const data  = _formatarData(t.criado_em);
-        const icone = t.aprovado ? '✅' : '❌';
+        const status = t.status || 'finalizada';
+        let icone, label;
+        if (status === 'abandonada') {
+            icone = '⏸️'; label = 'Abandonada';
+        } else if (t.aprovado) {
+            icone = '✅'; label = 'Aprovado';
+        } else {
+            icone = '❌'; label = 'Não aprovado';
+        }
         return `
             <div class="rs-quiz-hist-row">
-                <span class="rs-quiz-hist-num">${i + 1}ª</span>
-                <span class="rs-quiz-hist-score ${t.aprovado ? 'aprovado' : 'reprovado'}">${t.pontuacao}%</span>
-                <span class="rs-quiz-hist-status">${icone} ${t.aprovado ? 'Aprovado' : 'Não aprovado'}</span>
-                <span class="rs-quiz-hist-data">${data}</span>
+            <span class="rs-quiz-hist-num">${i + 1}ª</span>
+            <span class="rs-quiz-hist-score ${t.aprovado ? 'aprovado' : 'reprovado'}">${t.pontuacao ?? 0}%</span>
+            <span class="rs-quiz-hist-status">${icone} ${label}</span>
+            <span class="rs-quiz-hist-data">${data}</span>
             </div>
         `;
     }).join('');
@@ -483,36 +579,32 @@ async function _buscarHistorico(uid, nid) {
     };
 }
 
-async function _salvarNoBackend({ pontuacao, aprovado }) {
-    if (!_state) return;
-
-    const idField = _state.tipo === 'especial' ? 'quiz_especial_id' : 'newsletter_id';
-
-    const payload = {
-        uid: _state.uid,
-        [idField]: _state.nid,
-        pontuacao,
-        aprovado,
-        detalhes: _state.answers.map(a => ({
-            pergunta_id:         a.qId,
-            resposta_selecionada: a.selecionada,
-            resposta_correta:    a.correta,
-            acertou:             a.acertou
-        }))
-    };
-
-    const resp = await fetch('/api/pagamentoMP?acao=salvar-quiz', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-    });
-
-    if (!resp.ok) {
-        const err = await resp.json().catch(() => ({}));
-        throw new Error(err.message || `HTTP ${resp.status}`);
-    }
-
-    return resp.json().catch(() => ({}));
+async function _salvarNoBackend({ pontuacao, aprovado, tentativa_id }) {
+  if (!_state) return;
+  const idField = _state.tipo === 'especial' ? 'quiz_especial_id' : 'newsletter_id';
+  const payload = {
+    uid: _state.uid,
+    [idField]: _state.nid,
+    pontuacao,
+    aprovado,
+    tentativa_id: tentativa_id || null,   // ← NOVO
+    detalhes: _state.answers.map(a => ({
+      pergunta_id: a.qId,
+      resposta_selecionada: a.selecionada,
+      resposta_correta: a.correta,
+      acertou: a.acertou
+    }))
+  };
+  const resp = await fetch('/api/pagamentoMP?acao=salvar-quiz', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  });
+  if (!resp.ok) {
+    const err = await resp.json().catch(() => ({}));
+    throw new Error(err.message || `HTTP ${resp.status}`);
+  }
+  return resp.json().catch(() => ({}));
 }
 
 // ────────────────────────────────────────────────────────────────────────
