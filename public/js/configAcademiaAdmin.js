@@ -459,10 +459,54 @@ function _inferirTipo(valor) {
 }
 
 function _renderInputPorTipo(tipo, id, valorAtual, caminho) {
+  // Campo de data
+  if (_isDateField(caminho)) {
+    return `<input type="date" id="${id}" value="${_escapeHtml(String(valorAtual))}"
+      style="width:100%;max-width:200px;padding:8px;border-radius:6px;
+      background:rgba(255,255,255,0.9);border:1px solid rgba(0,0,0,0.2);color:#1e293b;font-size:13px"/>`;
+  }
+
+  // Array com valores pré-definidos → multi-select com chips
+  const multiSelectOptions = _getMultiSelectOptions(caminho, valorAtual);
+  if (multiSelectOptions) {
+    const valoresSelecionados = Array.isArray(valorAtual) ? valorAtual.map(String) : [];
+    return `
+      <div class="cfg-multi-select" id="${id}-container" style="width:100%">
+        <div class="cfg-chips" id="${id}-chips" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px">
+          ${valoresSelecionados.map(v => {
+            const opt = multiSelectOptions.find(o => o.value === v);
+            const label = opt ? opt.label : v;
+            return `<span class="cfg-chip" data-value="${v}" style="
+              display:inline-flex;align-items:center;gap:4px;
+              padding:4px 10px;
+              background:rgba(59,130,246,0.15);
+              color:#1e3a8a;
+              border:1px solid rgba(59,130,246,0.3);
+              border-radius:16px;
+              font-size:12px;
+              font-weight:500;
+            ">${label} <button type="button" onclick="_removerChip('${id}','${v}')" style="
+              background:none;border:none;cursor:pointer;color:#1e3a8a;font-size:14px;padding:0 2px;
+            ">×</button></span>`;
+          }).join('')}
+        </div>
+        <select id="${id}-select" onchange="_adicionarChip('${id}',this.value);this.value=''" 
+          style="width:100%;padding:8px;border-radius:6px;
+          background:rgba(255,255,255,0.9);border:1px solid rgba(0,0,0,0.2);color:#1e293b;font-size:13px">
+          <option value="">+ Adicionar item...</option>
+          ${multiSelectOptions.filter(opt => !valoresSelecionados.includes(opt.value)).map(opt => 
+            `<option value="${opt.value}">${opt.label}</option>`
+          ).join('')}
+        </select>
+        <input type="hidden" id="${id}" value='${_escapeHtml(JSON.stringify(valorAtual))}'/>
+      </div>
+    `;
+  }
+
   // Campos com valores pré-definidos → usar select
   const selectOptions = _getSelectOptions(caminho, valorAtual);
   if (selectOptions) {
-    return `<select id="${id}" style="width:100%;padding:8px;border-radius:6px;
+    return `<select id="${id}" style="width:100%;max-width:300px;padding:8px;border-radius:6px;
       background:rgba(255,255,255,0.9);border:1px solid rgba(0,0,0,0.2);color:#1e293b;font-size:13px">
       ${selectOptions.map(opt => `<option value="${opt.value}" ${opt.value === String(valorAtual) ? 'selected' : ''}>${opt.label}</option>`).join('')}
     </select>`;
@@ -484,7 +528,7 @@ function _renderInputPorTipo(tipo, id, valorAtual, caminho) {
       background:rgba(255,255,255,0.9);border:1px solid rgba(0,0,0,0.2);color:#1e293b;font-size:13px"/>`;
   }
 
-  // Array → input text com placeholder
+  // Array genérico → input text com placeholder
   if (tipo === 'array') {
     return `<input type="text" id="${id}" value='${_escapeHtml(JSON.stringify(valorAtual))}' 
       placeholder="[valor1, valor2, valor3]"
@@ -507,14 +551,14 @@ function _renderInputPorTipo(tipo, id, valorAtual, caminho) {
 
   // Texto longo → textarea
   if (tipo === 'string' && String(valorAtual).length > 50) {
-    return `<textarea id="${id}" style="width:100%;min-height:60px;padding:8px;border-radius:6px;
-      background:rgba(255,255,255,0.9);border:1px solid rgba(0,0,0,0.2);color:#1e293b;font-size:13px;resize:vertical"
+    return `<textarea id="${id}" style="width:100%;min-height:80px;padding:8px;border-radius:6px;
+      background:rgba(255,255,255,0.9);border:1px solid rgba(0,0,0,0.2);color:#1e293b;font-size:13px;resize:vertical;font-family:monospace"
     >${_escapeHtml(String(valorAtual))}</textarea>`;
   }
 
   // Texto normal → input text
   return `<input type="text" id="${id}" value="${_escapeHtml(String(valorAtual))}"
-    style="width:100%;padding:8px;border-radius:6px;
+    style="width:100%;max-width:300px;padding:8px;border-radius:6px;
     background:rgba(255,255,255,0.9);border:1px solid rgba(0,0,0,0.2);color:#1e293b;font-size:13px"/>`;
 }
 
@@ -584,6 +628,124 @@ function _getSelectOptions(caminho, valorAtual) {
   return null;
 }
 
+function _isDateField(caminho) {
+  const dateFields = [
+    'selos::backfill.data_corte',
+  ];
+  return dateFields.includes(caminho);
+}
+
+function _getMultiSelectOptions(caminho, valorAtual) {
+  if (!Array.isArray(valorAtual)) return null;
+
+  const multiSelectsConfig = {
+    'selos::ranking.niveis_exibidos': [
+      { value: 'iniciante', label: '🥉 Iniciante' },
+      { value: 'dedicado', label: '🥈 Dedicado' },
+      { value: 'especialista', label: ' Especialista' },
+      { value: 'mestre', label: '💎 Mestre' },
+    ],
+    'selos::ranking.criterios_desempate': [
+      { value: 'quizzes_aprovados_ano_desc', label: ' Quizzes aprovados (desc)' },
+      { value: 'percentual_aproveitamento_desc', label: '📈 % Aproveitamento (desc)' },
+      { value: 'data_conquista_nivel_atual_asc', label: '📅 Data conquista nível (asc)' },
+      { value: 'municipio_alfabetico_asc', label: '🏙️ Município (alfabético)' },
+    ],
+    'selos::ranking.faixas_percentil_municipio_pequeno': [
+      { value: '25', label: '25%' },
+      { value: '50', label: '50%' },
+      { value: '75', label: '75%' },
+      { value: '100', label: '100%' },
+    ],
+  };
+
+  for (const [pattern, options] of Object.entries(multiSelectsConfig)) {
+    if (caminho === pattern) {
+      return options;
+    }
+  }
+
+  return null;
+}
+
+function _adicionarChip(containerId, valor) {
+  if (!valor) return;
+  const container = document.getElementById(`${containerId}-container`);
+  const chipsContainer = document.getElementById(`${containerId}-chips`);
+  const hiddenInput = document.getElementById(containerId);
+  const select = document.getElementById(`${containerId}-select`);
+  
+  let valoresAtuais = [];
+  try {
+    valoresAtuais = JSON.parse(hiddenInput.value);
+  } catch (e) {
+    valoresAtuais = [];
+  }
+  
+  if (!valoresAtuais.includes(valor)) {
+    valoresAtuais.push(valor);
+    hiddenInput.value = JSON.stringify(valoresAtuais);
+    
+    // Adiciona chip visual
+    const opt = Array.from(select.options).find(o => o.value === valor);
+    const label = opt ? opt.textContent : valor;
+    const chip = document.createElement('span');
+    chip.className = 'cfg-chip';
+    chip.dataset.value = valor;
+    chip.style.cssText = `
+      display:inline-flex;align-items:center;gap:4px;
+      padding:4px 10px;
+      background:rgba(59,130,246,0.15);
+      color:#1e3a8a;
+      border:1px solid rgba(59,130,246,0.3);
+      border-radius:16px;
+      font-size:12px;
+      font-weight:500;
+    `;
+    chip.innerHTML = `${label} <button type="button" onclick="_removerChip('${containerId}','${valor}')" style="
+      background:none;border:none;cursor:pointer;color:#1e3a8a;font-size:14px;padding:0 2px;
+    ">×</button>`;
+    chipsContainer.appendChild(chip);
+    
+    // Remove opção do select
+    const optionToRemove = Array.from(select.options).find(o => o.value === valor);
+    if (optionToRemove) optionToRemove.remove();
+  }
+}
+
+function _removerChip(containerId, valor) {
+  const container = document.getElementById(`${containerId}-container`);
+  const chipsContainer = document.getElementById(`${containerId}-chips`);
+  const hiddenInput = document.getElementById(containerId);
+  const select = document.getElementById(`${containerId}-select`);
+  
+  let valoresAtuais = [];
+  try {
+    valoresAtuais = JSON.parse(hiddenInput.value);
+  } catch (e) {
+    valoresAtuais = [];
+  }
+  
+  valoresAtuais = valoresAtuais.filter(v => v !== valor);
+  hiddenInput.value = JSON.stringify(valoresAtuais);
+  
+  // Remove chip visual
+  const chip = chipsContainer.querySelector(`[data-value="${valor}"]`);
+  if (chip) chip.remove();
+  
+  // Adiciona opção de volta ao select (se existir)
+  const multiSelectOptions = _getMultiSelectOptions(containerId.replace('val-', '').replace(/__/g, '.'), valoresAtuais);
+  if (multiSelectOptions) {
+    const opt = multiSelectOptions.find(o => o.value === valor);
+    if (opt && !Array.from(select.options).some(o => o.value === valor)) {
+      const newOption = document.createElement('option');
+      newOption.value = opt.value;
+      newOption.textContent = opt.label;
+      select.appendChild(newOption);
+    }
+  }
+}
+
 // ─── Salvar um parâmetro (existente) — bloqueia sem descrição ────────────────
 async function _salvarParametroConfigAcademia(caminho, tipo, inputId, descId, btnEl) {
   const [nomeDoc, caminhoInterno] = caminho.split('::');
@@ -634,6 +796,13 @@ function _setIn(obj, path, value) {
 }
 
 function _lerValorPorTipo(tipo, inputEl) {
+  // Se é um container de multi-select, usa o hidden input
+  if (inputEl.type === 'hidden' && inputEl.id.endsWith('-container') === false) {
+    const parsed = JSON.parse(inputEl.value);
+    if (!Array.isArray(parsed)) throw new Error('precisa ser um array JSON válido');
+    return parsed;
+  }
+  
   if (tipo === 'boolean') return !!inputEl.checked;
   if (tipo === 'number') {
     const n = Number(inputEl.value);
@@ -970,3 +1139,5 @@ window._abrirFormNovoParametro = _abrirFormNovoParametro;
 window._criarParametroConfigAcademia = _criarParametroConfigAcademia;
 window._trocarAbaDocumento = _trocarAbaDocumento;
 window._trocarAbaGrupo = _trocarAbaGrupo;
+window._adicionarChip = _adicionarChip;
+window._removerChip = _removerChip;
