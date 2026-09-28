@@ -429,18 +429,24 @@ function subValorIsFolha(v) {
 function _renderLinhaParametro(caminho, label, valorAtual, descricaoAtual) {
   const idSeguro = caminho.replace(/[.:]/g, '__');
   const tipo = _inferirTipo(valorAtual);
-  const inputValorHtml = _renderInputPorTipo(tipo, `val-${idSeguro}`, valorAtual);
+  const inputValorHtml = _renderInputPorTipo(tipo, `val-${idSeguro}`, valorAtual, caminho);
   const [nomeDoc, caminhoInterno] = caminho.split('::');
-  return `<div class="cfg-linha-parametro" style="padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.05)">
-    <div style="font-size:12px;color:var(--rs-text,#f1f5f9);font-weight:500">${label}</div>
-    <div style="font-size:11px;color:var(--rs-muted,#94a3b8);margin-bottom:6px">config/${nomeDoc} → ${caminhoInterno}</div>
-    <div style="display:flex;gap:8px;align-items:flex-start;flex-wrap:wrap">
-      ${inputValorHtml}
+  
+  return `<div class="cfg-linha-parametro" style="padding:10px 0;border-bottom:1px solid rgba(0,0,0,0.08)">
+    <div style="font-size:13px;color:#1e293b;font-weight:600;margin-bottom:4px">${_tituloAmigavel(label)}</div>
+    <div style="font-size:11px;color:#64748b;margin-bottom:8px">config/${nomeDoc} → ${caminhoInterno}</div>
+    <div style="display:flex;gap:10px;align-items:flex-start;flex-wrap:wrap">
+      <div style="flex:1;min-width:200px">
+        ${inputValorHtml}
+      </div>
       <textarea id="desc-${idSeguro}" placeholder="Descrição obrigatória: o que este parâmetro faz, onde afeta..."
-        style="flex:1;min-width:200px;min-height:40px;font-size:12px;padding:6px;border-radius:6px;
-        background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.15);color:inherit"
+        style="flex:1;min-width:200px;min-height:50px;font-size:12px;padding:8px;border-radius:6px;
+        background:rgba(255,255,255,0.8);border:1px solid rgba(0,0,0,0.15);color:#1e293b;resize:vertical"
       >${_escapeHtml(descricaoAtual)}</textarea>
-      <button class="btn-drawer-sm" onclick="_salvarParametroConfigAcademia('${caminho}','${tipo}','val-${idSeguro}','desc-${idSeguro}',this)">💾 Salvar</button>
+      <button class="btn-drawer-sm" onclick="_salvarParametroConfigAcademia('${caminho}','${tipo}','val-${idSeguro}','desc-${idSeguro}',this)"
+        style="padding:8px 16px;background:#3b82f6;color:white;border:none;border-radius:6px;cursor:pointer;font-weight:600">
+        💾 Salvar
+      </button>
     </div>
   </div>`;
 }
@@ -452,25 +458,130 @@ function _inferirTipo(valor) {
   return 'string';
 }
 
-function _renderInputPorTipo(tipo, id, valorAtual) {
+function _renderInputPorTipo(tipo, id, valorAtual, caminho) {
+  // Campos com valores pré-definidos → usar select
+  const selectOptions = _getSelectOptions(caminho, valorAtual);
+  if (selectOptions) {
+    return `<select id="${id}" style="width:100%;padding:8px;border-radius:6px;
+      background:rgba(255,255,255,0.9);border:1px solid rgba(0,0,0,0.2);color:#1e293b;font-size:13px">
+      ${selectOptions.map(opt => `<option value="${opt.value}" ${opt.value === String(valorAtual) ? 'selected' : ''}>${opt.label}</option>`).join('')}
+    </select>`;
+  }
+
+  // Boolean → checkbox
   if (tipo === 'boolean') {
-    return `<label style="display:flex;align-items:center;gap:6px;font-size:12px">
-      <input type="checkbox" id="${id}" ${valorAtual ? 'checked' : ''}/> ativo
+    return `<label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer">
+      <input type="checkbox" id="${id}" ${valorAtual ? 'checked' : ''} 
+        style="width:18px;height:18px;cursor:pointer"/>
+      <span style="color:#1e293b;font-weight:500">${valorAtual ? '✅ Ativo' : '⏸️ Inativo'}</span>
     </label>`;
   }
+
+  // Número → input number
   if (tipo === 'number') {
     return `<input type="number" id="${id}" value="${valorAtual}" step="any"
-      style="width:100px;padding:6px;border-radius:6px;
-      background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.15);color:inherit"/>`;
+      style="width:100%;max-width:200px;padding:8px;border-radius:6px;
+      background:rgba(255,255,255,0.9);border:1px solid rgba(0,0,0,0.2);color:#1e293b;font-size:13px"/>`;
   }
+
+  // Array → input text com placeholder
   if (tipo === 'array') {
-    return `<input type="text" id="${id}" value='${_escapeHtml(JSON.stringify(valorAtual))}' placeholder="[valor1, valor2]"
-      style="width:180px;padding:6px;border-radius:6px;
-      background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.15);color:inherit"/>`;
+    return `<input type="text" id="${id}" value='${_escapeHtml(JSON.stringify(valorAtual))}' 
+      placeholder="[valor1, valor2, valor3]"
+      style="width:100%;padding:8px;border-radius:6px;
+      background:rgba(255,255,255,0.9);border:1px solid rgba(0,0,0,0.2);color:#1e293b;font-size:13px"/>`;
   }
+
+  // Cor hex → color picker + text input
+  if (tipo === 'string' && /^#[0-9A-Fa-f]{6}$/.test(String(valorAtual))) {
+    return `<div style="display:flex;gap:8px;align-items:center">
+      <input type="color" id="${id}-color" value="${valorAtual}" 
+        onchange="document.getElementById('${id}').value=this.value"
+        style="width:50px;height:40px;border:1px solid rgba(0,0,0,0.2);border-radius:6px;cursor:pointer"/>
+      <input type="text" id="${id}" value="${_escapeHtml(String(valorAtual))}"
+        onchange="document.getElementById('${id}-color').value=this.value"
+        style="flex:1;padding:8px;border-radius:6px;
+        background:rgba(255,255,255,0.9);border:1px solid rgba(0,0,0,0.2);color:#1e293b;font-size:13px"/>
+    </div>`;
+  }
+
+  // Texto longo → textarea
+  if (tipo === 'string' && String(valorAtual).length > 50) {
+    return `<textarea id="${id}" style="width:100%;min-height:60px;padding:8px;border-radius:6px;
+      background:rgba(255,255,255,0.9);border:1px solid rgba(0,0,0,0.2);color:#1e293b;font-size:13px;resize:vertical"
+    >${_escapeHtml(String(valorAtual))}</textarea>`;
+  }
+
+  // Texto normal → input text
   return `<input type="text" id="${id}" value="${_escapeHtml(String(valorAtual))}"
-    style="width:160px;padding:6px;border-radius:6px;
-    background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.15);color:inherit"/>`;
+    style="width:100%;padding:8px;border-radius:6px;
+    background:rgba(255,255,255,0.9);border:1px solid rgba(0,0,0,0.2);color:#1e293b;font-size:13px"/>`;
+}
+
+function _getSelectOptions(caminho, valorAtual) {
+  // Mapa de campos que devem usar select
+  const selectsConfig = {
+    // Selos
+    'selos::niveis.*.ordem': [
+      { value: '1', label: '1 - Iniciante (mais baixo)' },
+      { value: '2', label: '2 - Dedicado' },
+      { value: '3', label: '3 - Especialista' },
+      { value: '4', label: '4 - Mestre (mais alto)' },
+    ],
+    'selos::renovacao.modelo': [
+      { value: 'aniversario_contrato', label: ' Aniversário de Contrato' },
+      { value: 'calendario', label: ' Data Fixa de Calendário' },
+    ],
+    'selos::renovacao.bonus_fidelidade.nivel_minimo_para_bonus': [
+      { value: 'iniciante', label: '🥉 Iniciante' },
+      { value: 'dedicado', label: '🥈 Dedicado' },
+      { value: 'especialista', label: '🥇 Especialista' },
+      { value: 'mestre', label: '💎 Mestre' },
+    ],
+    'selos::quizzes_especiais.nivel_desbloqueio': [
+      { value: 'iniciante', label: '🥉 Iniciante' },
+      { value: 'dedicado', label: ' Dedicado' },
+      { value: 'especialista', label: '🥇 Especialista' },
+      { value: 'mestre', label: '💎 Mestre' },
+    ],
+    'selos::ranking.visibilidade_padrao': [
+      { value: 'anonimo', label: '👤 Anônimo (padrão)' },
+      { value: 'publico', label: '🌐 Público' },
+    ],
+    'selos::ranking.atualizacao_frequencia': [
+      { value: 'hora', label: '⏰ A cada hora' },
+      { value: 'diaria', label: '📅 Diária' },
+      { value: 'semanal', label: '📆 Semanal' },
+    ],
+    'selos::certificado.formato': [
+      { value: 'A4', label: ' A4' },
+      { value: 'A3', label: '📄 A3' },
+      { value: 'carta', label: '📄 Carta (Letter)' },
+    ],
+    'selos::certificado.storage': [
+      { value: 'vercel_blob', label: '☁️ Vercel Blob' },
+      { value: 'firebase_storage', label: '🔥 Firebase Storage' },
+      { value: 'aws_s3', label: ' AWS S3' },
+    ],
+    
+    // Fidelidade
+    'fidelidade::nivel_exigido': [
+      { value: 'iniciante', label: '🥉 Iniciante' },
+      { value: 'dedicado', label: '🥈 Dedicado' },
+      { value: 'especialista', label: ' Especialista' },
+      { value: 'mestre', label: '💎 Mestre' },
+    ],
+  };
+
+  // Verifica se o caminho atual corresponde a algum padrão
+  for (const [pattern, options] of Object.entries(selectsConfig)) {
+    const regex = new RegExp('^' + pattern.replace(/\./g, '\\.').replace(/\*/g, '[^.]+') + '$');
+    if (regex.test(caminho)) {
+      return options;
+    }
+  }
+
+  return null;
 }
 
 // ─── Salvar um parâmetro (existente) — bloqueia sem descrição ────────────────
@@ -620,6 +731,7 @@ function _renderConteudoGrupoAtual() {
 function _tituloAmigavel(chave) {
   return chave.charAt(0).toUpperCase() + chave.slice(1).replace(/_/g, ' ');
 }
+
 function _escapeHtml(str) {
   return String(str)
     .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
