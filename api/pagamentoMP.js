@@ -1228,15 +1228,15 @@ async function _handleGerarCobrancaCancelamento(req, res) {
 // considera abandonada automaticamente (proteção contra crash do navegador).
 async function _handleQuizIniciar(req, res) {
   if (req.method !== 'POST') return json(res, 405, { ok: false, message: 'Método não permitido.' });
-  const { uid, newsletter_id, quiz_especial_id } = req.body || {};
-  if (!uid || (!newsletter_id && !quiz_especial_id) || (newsletter_id && quiz_especial_id)) {
-    return json(res, 400, { ok: false, message: 'uid e exatamente um de newsletter_id/quiz_especial_id são obrigatórios.' });
+  const { uid, newsletter_id, quizzes_especiais_id } = req.body || {};
+  if (!uid || (!newsletter_id && !quizzes_especiais_id) || (newsletter_id && quizzes_especiais_id)) {
+    return json(res, 400, { ok: false, message: 'uid e exatamente um de newsletter_id/quizzes_especiais_id são obrigatórios.' });
   }
 
-  const tipo = quiz_especial_id ? 'especial' : 'normal';
-  const idField = tipo === 'especial' ? 'quiz_especiais' : 'newsletters';
-  const idValue = String(tipo === 'especial' ? quiz_especial_id : newsletter_id);
-  const resultField = tipo === 'especial' ? 'quiz_especial_id' : 'newsletter_id';
+  const tipo = quizzes_especiais_id ? 'especial' : 'normal';  
+  const idField = tipo === 'especial' ? 'quizzes_especiais' : 'newsletters';
+  const idValue = String(tipo === 'especial' ? quizzes_especiais_id : newsletter_id);
+  const resultField = tipo === 'especial' ? 'quizzes_especiais_id' : 'newsletter_id';
 
   try {
     // 1. Busca tentativas_max da fonte
@@ -1370,18 +1370,18 @@ async function _handleQuizAbandonar(req, res) {
 // ─── Persistir resultado do quiz ──────────────────────────────────────────
 async function _handleSalvarResultadoQuiz(req, res) {
   if (req.method !== 'POST') return json(res, 405, { ok: false, message: 'Método não permitido.' });
-  const { uid, newsletter_id, quiz_especial_id, pontuacao, aprovado, detalhes, tentativa_id } = req.body || {};
-  if (!uid || (!newsletter_id && !quiz_especial_id) || (newsletter_id && quiz_especial_id)) {
-    return json(res, 400, { ok: false, message: 'uid e exatamente um de newsletter_id/quiz_especial_id são obrigatórios.' });
+  const { uid, newsletter_id, quizzes_especiais_id, pontuacao, aprovado, detalhes, tentativa_id } = req.body || {};
+  if (!uid || (!newsletter_id && !quizzes_especiais_id) || (newsletter_id && quizzes_especiais_id)) {
+    return json(res, 400, { ok: false, message: 'uid e exatamente um de newsletter_id/quizzes_especiais_id são obrigatórios.' });
   }
   if (typeof pontuacao !== 'number' || pontuacao < 0 || pontuacao > 100) {
     return json(res, 400, { ok: false, message: 'pontuacao inválida.' });
   }
 
-  const tipo = quiz_especial_id ? 'especial' : 'normal';
-  const idField = tipo === 'especial' ? 'quiz_especiais' : 'newsletters';
-  const idValue = String(tipo === 'especial' ? quiz_especial_id : newsletter_id);
-  const resultField = tipo === 'especial' ? 'quiz_especial_id' : 'newsletter_id';
+  const tipo = quizzes_especiais_id ? 'especial' : 'normal';
+  const idField = tipo === 'especial' ? 'quizzes_especiais' : 'newsletters';
+  const idValue = String(tipo === 'especial' ? quizzes_especiais_id : newsletter_id);
+  const resultField = tipo === 'especial' ? 'quizzes_especiais_id' : 'newsletter_id';
 
   try {
     let tentativas_max, nivel_alvo;
@@ -1466,14 +1466,14 @@ async function _handleSalvarResultadoQuiz(req, res) {
 // ─── GET: buscar histórico de tentativas ─────────────────────────────────────
 async function _handleQuizHistorico(req, res) {
   if (req.method !== 'GET') return json(res, 405, { ok: false, message: 'Método não permitido.' });
-  const { uid, newsletter_id, quiz_especial_id } = req.query || {};
-  if (!uid || (!newsletter_id && !quiz_especial_id)) {
-    return json(res, 400, { ok: false, message: 'uid e um de newsletter_id/quiz_especial_id são obrigatórios.' });
+  const { uid, newsletter_id, quizzes_especiais_id } = req.query || {};
+  if (!uid || (!newsletter_id && !quizzes_especiais_id)) {
+    return json(res, 400, { ok: false, message: 'uid e um de newsletter_id/quizzes_especiais_id são obrigatórios.' });
   }
 
-  const tipo = quiz_especial_id ? 'especial' : 'normal';
-  const idField = tipo === 'especial' ? 'quiz_especial_id' : 'newsletter_id';
-  const idValue = String(tipo === 'especial' ? quiz_especial_id : newsletter_id);
+  const tipo = quizzes_especiais_id ? 'especial' : 'normal';
+  const idField = tipo === 'especial' ? 'quizzes_especiais_id' : 'newsletter_id';
+  const idValue = String(tipo === 'especial' ? quizzes_especiais_id : newsletter_id);
 
   try {
     const fonteDoc = tipo === 'especial'
@@ -1682,7 +1682,7 @@ export default async function handler(req, res) {
     }
 
     if (req.method === 'POST' && acao === 'quiz-iniciar')   return _handleQuizIniciar(req, res);
-    
+
     if (req.method === 'POST' && acao === 'quiz-abandonar') return _handleQuizAbandonar(req, res);
 
     // ── POST ?acao=ativar-sessao ──────────────────────────────────────────
