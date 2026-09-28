@@ -11,6 +11,50 @@
 let _listaEspeciaisCache = [];
 let _especialEmEdicaoId = null;
 
+// ─── Token de admin — mesmo helper de configAcademiaAdmin.js (Fale Conosco/
+// alertasPush.js já resolve isso; aqui só reaproveitamos o cache de sessão) ──
+async function _obterAdminTokenAcademia() {
+  if (window._adminToken) return window._adminToken;
+  const cached = sessionStorage.getItem('_pushAdminToken');
+  if (cached) { window._adminToken = cached; return cached; }
+
+  const usuarioLogado = JSON.parse(localStorage.getItem('usuarioLogado') || '{}');
+  const email = usuarioLogado?.email;
+  if (!email) throw new Error('Sessão expirada. Faça login novamente.');
+
+  const resp = await fetch('/api/push', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ acao: 'admin-token', email }),
+  });
+  const data = await resp.json();
+  if (!data.ok || !data.token) throw new Error('Não foi possível obter token de admin.');
+
+  sessionStorage.setItem('_pushAdminToken', data.token);
+  window._adminToken = data.token;
+  return data.token;
+}
+
+// ─── Notifica assinantes afetados por mudança de requisito (Seção 21.9) ─────
+// Sem trigger do Firestore (plano free), quem grava `ativo` precisa avisar
+// a API explicitamente — academia.js chama processarToggleEspecial().
+// Best-effort: se falhar, não desfaz a gravação nem trava a tela do admin.
+async function _notificarToggleEspecial(quizEspecialId, nivelAlvo, novoAtivo) {
+  try {
+    const token = await _obterAdminTokenAcademia();
+    const resp = await fetch('/api/academia?acao=toggle-especial', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-admin-token': token },
+      body: JSON.stringify({ quiz_especial_id: quizEspecialId, nivel_alvo: nivelAlvo, novo_ativo: novoAtivo }),
+    });
+    const data = await resp.json();
+    if (!resp.ok || !data.ok) throw new Error(data.message || `HTTP ${resp.status}`);
+    console.log(`[academiaEspeciaisAdmin] Notificação processada: ${data.afetados ?? 0} assinante(s) avisado(s).`);
+  } catch (e) {
+    console.warn('[academiaEspeciaisAdmin] Falha ao notificar mudança de requisito (a gravação em si foi mantida):', e.message);
+  }
+}
+
 // ─── Painel: listagem + contadores ao vivo por nível ─────────────────────────
 async function abrirPainelQuizzesEspeciais() {
   const container = document.getElementById('painel-quizzes-especiais');
@@ -102,8 +146,9 @@ async function _confirmarToggleQuizEspecial(id, novoAtivo) {
     ativo: novoAtivo,
     atualizado_em: new Date().toISOString(),
   });
-  // A notificação de quem foi afetado (Seção 21.9) é disparada pelo trigger
-  // onQuizEspecialToggle, ouvindo esta mudança de `ativo` — não é feita aqui.
+  // Sem trigger do Firestore (plano free) — chamamos a API explicitamente
+  // pra notificar quem foi afetado (Seção 21.9). Não bloqueia a tela.
+  _notificarToggleEspecial(id, q.nivel_alvo, novoAtivo);
 
   await abrirPainelQuizzesEspeciais();
 }
