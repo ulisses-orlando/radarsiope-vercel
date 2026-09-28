@@ -5,6 +5,7 @@ export const config = { runtime: 'nodejs', api: { bodyParser: false } };
 
 import crypto from 'crypto';
 import admin from 'firebase-admin';
+import { processarResultadoQuiz } from '../lib/academiaCore.js';
 
 // Inicializa Firebase (atenção ao formato da PRIVATE_KEY no Vercel: use \\n)
 if (!admin.apps.length) {
@@ -1399,8 +1400,9 @@ async function _handleSalvarResultadoQuiz(req, res) {
     const resultadosRef = db.collection('usuarios').doc(uid).collection('quiz_resultados');
 
     // ── NOVO: se veio tentativa_id, atualiza o doc existente (criado em quiz-iniciar)
+    let ref;
     if (tentativa_id) {
-      const ref = resultadosRef.doc(tentativa_id);
+      ref = resultadosRef.doc(tentativa_id);
       const snap = await ref.get();
       if (!snap.exists) {
         return json(res, 404, { ok: false, message: 'Tentativa não encontrada.' });
@@ -1434,8 +1436,15 @@ async function _handleSalvarResultadoQuiz(req, res) {
         finalizado_em: admin.firestore.FieldValue.serverTimestamp()
       };
       if (tipo === 'especial') novoDoc.nivel_alvo = nivel_alvo;
-      await resultadosRef.add(novoDoc);
+      ref = await resultadosRef.add(novoDoc);
     }
+    
+    // Academia: processa nível/certificado em segundo plano — não bloqueia a resposta
+    // ao assinante (mesmo padrão de _atualizarResumoQuiz logo abaixo)
+    const dadosFinais = (await ref.get()).data();
+    processarResultadoQuiz(db, uid, ref, dadosFinais).catch(e =>
+      console.warn('[salvar-quiz] Falha ao processar Academia:', e.message)
+    );
 
     // Ordenação em memória (sem .orderBy)
     const atualizados = await resultadosRef.where(resultField, '==', idValue).get();
