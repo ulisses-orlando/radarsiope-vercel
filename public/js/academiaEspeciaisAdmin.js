@@ -1,59 +1,16 @@
 /* ==========================================================================
    academiaEspeciaisAdmin.js — Admin: CRUD de Quizzes Especiais da Academia
-   (v4 — adiciona o campo "Ativo" ao formulário de criação/edição, com o
-   mesmo aviso de efeito já usado no toggle da listagem)
+   (v5 — sem Cloud Function/trigger: após gravar `ativo`, chama a ação
+   toggle-especial em academia.js, que roda academiaCore.js na hora.
+   Corrige também o bug da v4: criar um especial já ativo não disparava
+   aviso nem notificação, porque comparava com o próprio default do form.)
 
-   Modelo v1.7 (sem mudanças nesta versão, só a UI do formulário):
-   requisito de um nível = 100% dos quizzes_especiais ativos com aquele
-   nivel_alvo — não há "quantidade exigida" configurada à parte.
+   Modelo v1.7 (sem mudanças de regra nesta versão): requisito de um nível =
+   100% dos quizzes_especiais ativos com aquele nivel_alvo.
    ========================================================================== */
 
 let _listaEspeciaisCache = [];
 let _especialEmEdicaoId = null;
-
-// ─── Token de admin — mesmo helper de configAcademiaAdmin.js (Fale Conosco/
-// alertasPush.js já resolve isso; aqui só reaproveitamos o cache de sessão) ──
-async function _obterAdminTokenAcademia() {
-  if (window._adminToken) return window._adminToken;
-  const cached = sessionStorage.getItem('_pushAdminToken');
-  if (cached) { window._adminToken = cached; return cached; }
-
-  const usuarioLogado = JSON.parse(localStorage.getItem('usuarioLogado') || '{}');
-  const email = usuarioLogado?.email;
-  if (!email) throw new Error('Sessão expirada. Faça login novamente.');
-
-  const resp = await fetch('/api/push', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ acao: 'admin-token', email }),
-  });
-  const data = await resp.json();
-  if (!data.ok || !data.token) throw new Error('Não foi possível obter token de admin.');
-
-  sessionStorage.setItem('_pushAdminToken', data.token);
-  window._adminToken = data.token;
-  return data.token;
-}
-
-// ─── Notifica assinantes afetados por mudança de requisito (Seção 21.9) ─────
-// Sem trigger do Firestore (plano free), quem grava `ativo` precisa avisar
-// a API explicitamente — academia.js chama processarToggleEspecial().
-// Best-effort: se falhar, não desfaz a gravação nem trava a tela do admin.
-async function _notificarToggleEspecial(quizEspecialId, nivelAlvo, novoAtivo) {
-  try {
-    const token = await _obterAdminTokenAcademia();
-    const resp = await fetch('/api/academia?acao=toggle-especial', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-admin-token': token },
-      body: JSON.stringify({ quiz_especial_id: quizEspecialId, nivel_alvo: nivelAlvo, novo_ativo: novoAtivo }),
-    });
-    const data = await resp.json();
-    if (!resp.ok || !data.ok) throw new Error(data.message || `HTTP ${resp.status}`);
-    console.log(`[academiaEspeciaisAdmin] Notificação processada: ${data.afetados ?? 0} assinante(s) avisado(s).`);
-  } catch (e) {
-    console.warn('[academiaEspeciaisAdmin] Falha ao notificar mudança de requisito (a gravação em si foi mantida):', e.message);
-  }
-}
 
 // ─── Painel: listagem + contadores ao vivo por nível ─────────────────────────
 async function abrirPainelQuizzesEspeciais() {
@@ -134,6 +91,23 @@ function _tituloNivel(chave) {
   return nomes[chave] || chave || '(sem nível-alvo)';
 }
 
+// ─── Notifica a API (que roda academiaCore.js) após QUALQUER mudança de `ativo` ──
+// Sem trigger de Firestore: quem escreve o dado também avisa quem precisa saber.
+// Best-effort — se falhar, o toggle em si já foi salvo; só a notificação aos
+// assinantes afetados não sai. Não bloqueia a UI do admin por causa disso.
+async function _notificarToggleEspecial(quizEspecialId, nivelAlvo, novoAtivo) {
+  try {
+    const token = await _obterAdminTokenAcademia(); // definida em configAcademiaAdmin.js, mesmo escopo global
+    await fetch('/api/academia?acao=toggle-especial', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-admin-token': token },
+      body: JSON.stringify({ quiz_especial_id: quizEspecialId, nivel_alvo: nivelAlvo, novo_ativo: novoAtivo }),
+    });
+  } catch (e) {
+    console.warn('[academiaEspeciaisAdmin] Falha ao notificar toggle (não bloqueia o salvamento):', e.message);
+  }
+}
+
 // ─── Toggle ativo/inativo pela LISTA — sem bloqueio, com aviso do efeito ─────
 async function _confirmarToggleQuizEspecial(id, novoAtivo) {
   const q = _listaEspeciaisCache.find(x => x.id === id);
@@ -146,15 +120,12 @@ async function _confirmarToggleQuizEspecial(id, novoAtivo) {
     ativo: novoAtivo,
     atualizado_em: new Date().toISOString(),
   });
-  // Sem trigger do Firestore (plano free) — chamamos a API explicitamente
-  // pra notificar quem foi afetado (Seção 21.9). Não bloqueia a tela.
-  _notificarToggleEspecial(id, q.nivel_alvo, novoAtivo);
+  await _notificarToggleEspecial(id, q.nivel_alvo, novoAtivo);
 
   await abrirPainelQuizzesEspeciais();
 }
 
-// Monta o texto de aviso reaproveitado tanto pelo toggle da lista quanto
-// pelo campo "Ativo" do formulário (criação e edição)
+// Monta o texto de aviso reaproveitado pelo toggle da lista e pelo formulário
 function _mensagemEfeitoToggle(nivelAlvo, novoAtivo, excluirId = null) {
   const totalAtual = _contarAtivosPorNivel(nivelAlvo, excluirId);
   const totalDepois = novoAtivo ? totalAtual + 1 : totalAtual - 1;
@@ -171,7 +142,12 @@ function _mensagemEfeitoToggle(nivelAlvo, novoAtivo, excluirId = null) {
 function abrirFormQuizEspecial(id = null) {
   _especialEmEdicaoId = id;
   const dados = id ? (_listaEspeciaisCache.find(q => q.id === id) || {}) : {};
-  const ativoAtual = id ? (dados.ativo !== false) : true; // novo especial nasce ativo por padrão
+  const ativoAtual = id ? (dados.ativo !== false) : true; // estado inicial do checkbox (novo nasce marcado)
+  // CORREÇÃO v5: para um especial NOVO, o "original" pra fins de comparação de
+  // efeito é sempre `false` (nada existia antes) — não o próprio default do
+  // checkbox. Sem isso, criar já ativo (checkbox continua no default) nunca
+  // disparava aviso nem notificação, porque comparava "true" com "true".
+  const ativoOriginalParaComparacao = id ? ativoAtual : false;
   const wrap = document.getElementById('form-quiz-especial-wrap');
   if (!wrap) return;
 
@@ -224,7 +200,7 @@ function abrirFormQuizEspecial(id = null) {
           </select>
         </label>
         <label style="font-size:12px;display:flex;align-items:center;gap:5px;padding:4px 8px;background:#fff;border:1px solid #ddd;border-radius:4px">
-          <input type="checkbox" id="qe-ativo" data-original="${ativoAtual}" ${ativoAtual ? 'checked' : ''}>
+          <input type="checkbox" id="qe-ativo" data-original="${ativoOriginalParaComparacao}" ${ativoAtual ? 'checked' : ''}>
           <strong>Ativo</strong>
         </label>
       </div>
@@ -273,6 +249,7 @@ function abrirFormQuizEspecial(id = null) {
   };
   document.getElementById('qe-ativo').addEventListener('change', atualizarAvisoAtivo);
   document.getElementById('qe-nivel-alvo').addEventListener('change', atualizarAvisoAtivo);
+  atualizarAvisoAtivo(); // já mostra o aviso de cara se abrir um "Novo" (ativo=true vs original=false)
 }
 
 function _renderQuizEspecialPergunta(pergunta = {}) {
@@ -341,6 +318,7 @@ function _importarJsonQuizEspecial() {
       dados.perguntas.forEach(p => _renderQuizEspecialPergunta(p));
       alert('✅ Quiz Especial importado com sucesso!');
     }
+    document.getElementById('qe-ativo').dispatchEvent(new Event('change'));
   } catch (e) {
     alert('❌ Erro ao processar JSON: ' + e.message);
   }
@@ -383,9 +361,8 @@ async function _salvarQuizEspecial() {
   const perguntas = _coletarPerguntasQuizEspecial();
   if (perguntas.length === 0) { alert('⚠️ Adicione ao menos 1 pergunta.'); return; }
 
-  // Se o campo Ativo mudou de valor (seja criando um novo, seja editando um
-  // existente), confirma o efeito no requisito antes de gravar.
-  if (ativoSelecionado !== ativoOriginal) {
+  const efeitoMudou = ativoSelecionado !== ativoOriginal;
+  if (efeitoMudou) {
     const mensagem = _mensagemEfeitoToggle(nivelAlvo, ativoSelecionado, _especialEmEdicaoId);
     if (!confirm(`Salvar com Ativo = ${ativoSelecionado ? 'Sim' : 'Não'}?\n\n${mensagem}`)) return;
   }
@@ -406,13 +383,19 @@ async function _salvarQuizEspecial() {
   btn.disabled = true; btn.textContent = '⏳ Salvando...';
 
   try {
+    let idParaNotificar = _especialEmEdicaoId;
     if (_especialEmEdicaoId) {
       await db.collection('quizzes_especiais').doc(_especialEmEdicaoId).update(payload);
     } else {
       payload.criado_em = new Date().toISOString();
       payload.criado_por = window._adminUid || 'admin';
-      await db.collection('quizzes_especiais').add(payload);
+      const novoRef = await db.collection('quizzes_especiais').add(payload);
+      idParaNotificar = novoRef.id; // precisa do id real pra notificar — só existe depois do add()
     }
+    // Notifica a API só quando o efeito de `ativo` realmente mudou (cobre
+    // tanto edição quanto criação de um novo já ativo — Correção v5)
+    if (efeitoMudou) await _notificarToggleEspecial(idParaNotificar, nivelAlvo, ativoSelecionado);
+
     document.getElementById('form-quiz-especial-wrap').innerHTML = '';
     await abrirPainelQuizzesEspeciais();
   } catch (e) {
