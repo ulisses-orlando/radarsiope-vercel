@@ -912,9 +912,6 @@ function _escapeHtml(str) {
 // ══════════════════════════════════════════════════════════════════════════
 const PARAMETROS_SELOS_PADRAO = {
   
-  academia_habilitada: { valor: false, descricao: 'Feature flag geral da Academia. Enquanto false, nenhuma funcionalidade da Academia fica visível no app (rollout gradual/beta fechado antes do lançamento público).' },
-  versao: { valor: '1.7.0', descricao: 'Versão da especificação da Academia à qual esta configuração corresponde.' },
-
   niveis: {
     iniciante: {
       nome:               { valor: 'Participante Ativo', descricao: 'Nome de exibição do 1º nível (🥉) no app, dashboard e certificado.' },
@@ -963,7 +960,11 @@ const PARAMETROS_SELOS_PADRAO = {
       dias_para_rebaixamento:          { valor: 90, descricao: 'Dias sem regularizar para o estado virar rebaixado.' },
       dias_para_expirado:              { valor: 180, descricao: 'Dias sem regularizar para o selo virar expirado — perde tudo.' },
       dias_para_expirado_cancelamento: { valor: 90, descricao: 'Prazo em dias, a partir do CANCELAMENTO da assinatura, para o selo virar expirado.' }
-    }
+    },
+
+  academia_habilitada: { valor: false, descricao: 'Feature flag geral da Academia. Enquanto false, nenhuma funcionalidade da Academia fica visível no app (rollout gradual/beta fechado antes do lançamento público).' },
+  versao: { valor: '1.7.0', descricao: 'Versão da especificação da Academia à qual esta configuração corresponde.' }
+
   },
   notificacoes: {
     raio_alerta_mudanca_config: { valor: 1, descricao: 'Distância (em quizzes) do valor ANTIGO de um requisito de nível para o assinante ser avisado quando ele muda.' }
