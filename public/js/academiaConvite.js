@@ -36,7 +36,7 @@ async function verificarConviteAcademia() {
     // 1. Verificar feature flag
     const configSnap = await window.db.collection('config_academia').doc('selos').get();
     const config = configSnap.data() || {};
-    if (!config.selos?.academia_habilitada) {
+    if (!config.academia_habilitada?.academia_habilitada) {
       console.info('[academiaConvite] Academia não habilitada — convite não exibido.');
       return;
     }
