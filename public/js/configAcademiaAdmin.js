@@ -911,9 +911,10 @@ function _escapeHtml(str) {
 // SCRIPT DE CARGA INICIAL — 100% no navegador (v1.7.2)
 // ══════════════════════════════════════════════════════════════════════════
 const PARAMETROS_SELOS_PADRAO = {
-  selos: {
-    academia_habilitada: { valor: false, descricao: 'Feature flag geral da Academia. Enquanto false, nenhuma funcionalidade da Academia fica visível no app (rollout gradual/beta fechado antes do lançamento público).' }
-  },
+  
+  academia_habilitada: { valor: false, descricao: 'Feature flag geral da Academia. Enquanto false, nenhuma funcionalidade da Academia fica visível no app (rollout gradual/beta fechado antes do lançamento público).' },
+  versao: { valor: '1.7.0', descricao: 'Versão da especificação da Academia à qual esta configuração corresponde.' },
+
   niveis: {
     iniciante: {
       nome:               { valor: 'Participante Ativo', descricao: 'Nome de exibição do 1º nível (🥉) no app, dashboard e certificado.' },
@@ -1028,8 +1029,7 @@ const PARAMETROS_SELOS_PADRAO = {
   backfill: {
     data_corte: { valor: '2026-01-01', descricao: 'Data mais antiga considerada em qualquer backfill.' },
     ativo:      { valor: true, descricao: 'Liga/desliga rotinas de backfill.' }
-  },
-  versao: { valor: '1.7.0', descricao: 'Versão da especificação da Academia à qual esta configuração corresponde.' }
+  }
 };
 
 const _PARAMETROS_FIDELIDADE_PADRAO = {
