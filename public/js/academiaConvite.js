@@ -395,12 +395,13 @@ Tom híbrido: formal em pontos críticos (LGPD, certificados), amigável no rest
 
       const data = await resp.json();
 
-      if (resp.ok && (data.status === 'membro' || data.status === 'ja_membro')) {
+      // ✅ CORREÇÃO: verificar data.ok em vez de data.status
+      if (resp.ok && data.ok) {
         _fecharTudo();
         _mostrarToast('🎉 Bem-vindo à Academia Radar SIOPE!');
-        console.info('[academiaConvite] Adesão confirmada com sucesso.');
+        console.info('[academiaConvite] Adesão confirmada com sucesso:', data);
       } else {
-        throw new Error(data.erro || 'Erro desconhecido');
+        throw new Error(data.message || data.erro || 'Erro desconhecido');
       }
     } catch (e) {
       console.error('[academiaConvite] Falha na adesão:', e);
