@@ -165,7 +165,7 @@ Tom híbrido: formal em pontos críticos (LGPD, certificados), amigável no rest
             </li>
             <li>
               <span class="rs-acad-bullet">🃏</span>
-              Coringas disponíveis para imprevistos (férias, doença, sobrecarga de trabalho)
+              Coringas para imprevistos (férias, doença, sobrecarga de trabalho)
             </li>
           </ul>
 
