@@ -1,0 +1,656 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Termos de Participação — Academia Radar SIOPE</title>
+  <meta name="description" content="Termos de Participação da Academia Radar SIOPE — programa de certificação profissional contínua para servidores públicos municipais.">
+  <meta name="robots" content="index, follow">
+  <link rel="canonical" href="https://radarsiope.com.br/termosAcademia.html">
+  <link rel="icon" type="image/png" href="/icons/icon-192x192-transparent.png">
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --rs-bg: #0f172a;
+      --rs-card: #1e293b;
+      --rs-card2: #162032;
+      --rs-text: #f1f5f9;
+      --rs-muted: #94a3b8;
+      --rs-borda: rgba(255,255,255,0.08);
+      --azul: #0A3D62;
+      --roxo: #8b5cf6;
+      --roxo-claro: #a78bfa;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html { scroll-behavior: smooth; scroll-padding-top: 24px; }
+
+    body {
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+      background: var(--rs-bg);
+      color: var(--rs-text);
+      line-height: 1.65;
+      font-size: 15px;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ── Header ─────────────────────────────────────────────────── */
+    .termos-header {
+      background: linear-gradient(135deg, rgba(139,92,246,0.12), rgba(10,61,98,0.25));
+      border-bottom: 1px solid var(--rs-borda);
+      padding: 40px 20px 32px;
+      text-align: center;
+    }
+    .termos-header-inner {
+      max-width: 720px;
+      margin: 0 auto;
+    }
+    .termos-logo {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 20px;
+      font-family: 'Syne', sans-serif;
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--rs-muted);
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+    }
+    .termos-logo-icon {
+      font-size: 24px;
+    }
+    .termos-titulo {
+      font-family: 'Syne', sans-serif;
+      font-size: 32px;
+      font-weight: 800;
+      color: var(--rs-text);
+      margin-bottom: 8px;
+      line-height: 1.2;
+    }
+    .termos-subtitulo {
+      font-size: 15px;
+      color: var(--rs-muted);
+      margin-bottom: 20px;
+    }
+    .termos-meta {
+      display: flex;
+      justify-content: center;
+      gap: 20px;
+      flex-wrap: wrap;
+      font-size: 12px;
+      color: var(--rs-muted);
+    }
+    .termos-meta-item {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 12px;
+      background: rgba(139,92,246,0.1);
+      border: 1px solid rgba(139,92,246,0.2);
+      border-radius: 20px;
+    }
+    .termos-meta-item strong {
+      color: var(--roxo-claro);
+    }
+
+    /* ── Container principal ────────────────────────────────────── */
+    .termos-container {
+      max-width: 720px;
+      margin: 0 auto;
+      padding: 32px 20px 60px;
+    }
+
+    /* ── Sumário ────────────────────────────────────────────────── */
+    .termos-sumario {
+      background: var(--rs-card);
+      border: 1px solid var(--rs-borda);
+      border-radius: 12px;
+      padding: 20px 24px;
+      margin-bottom: 40px;
+    }
+    .termos-sumario-titulo {
+      font-family: 'Syne', sans-serif;
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--roxo-claro);
+      margin-bottom: 14px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .termos-sumario ol {
+      list-style: none;
+      counter-reset: sumario;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px 24px;
+    }
+    .termos-sumario li {
+      counter-increment: sumario;
+      font-size: 13px;
+    }
+    .termos-sumario li::before {
+      content: counter(sumario) ".";
+      color: var(--roxo-claro);
+      font-weight: 700;
+      margin-right: 8px;
+    }
+    .termos-sumario a {
+      color: var(--rs-text);
+      text-decoration: none;
+      transition: color 0.15s;
+    }
+    .termos-sumario a:hover {
+      color: var(--roxo-claro);
+      text-decoration: underline;
+    }
+
+    /* ── Seções ─────────────────────────────────────────────────── */
+    .termos-secao {
+      margin-bottom: 36px;
+      scroll-margin-top: 20px;
+    }
+    .termos-secao h2 {
+      font-family: 'Syne', sans-serif;
+      font-size: 20px;
+      font-weight: 700;
+      color: var(--rs-text);
+      margin-bottom: 14px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid var(--rs-borda);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .termos-secao h2 .num {
+      color: var(--roxo-claro);
+      font-size: 14px;
+      font-weight: 600;
+      background: rgba(139,92,246,0.15);
+      padding: 2px 10px;
+      border-radius: 12px;
+    }
+    .termos-secao p {
+      margin-bottom: 12px;
+      color: var(--rs-text);
+    }
+    .termos-secao p:last-child {
+      margin-bottom: 0;
+    }
+    .termos-secao strong {
+      color: var(--roxo-claro);
+      font-weight: 600;
+    }
+    .termos-secao ul {
+      margin: 12px 0 12px 20px;
+      color: var(--rs-text);
+    }
+    .termos-secao ul li {
+      margin-bottom: 6px;
+      padding-left: 4px;
+    }
+    .termos-secao ul li::marker {
+      color: var(--roxo-claro);
+    }
+    .termos-secao em {
+      color: var(--rs-muted);
+      font-style: italic;
+    }
+
+    /* ── Callout (destaque LGPD) ────────────────────────────────── */
+    .termos-callout {
+      background: rgba(139,92,246,0.08);
+      border-left: 3px solid var(--roxo);
+      border-radius: 0 8px 8px 0;
+      padding: 14px 18px;
+      margin: 16px 0;
+      font-size: 14px;
+    }
+    .termos-callout strong {
+      color: var(--roxo-claro);
+    }
+
+    /* ── Rodapé ─────────────────────────────────────────────────── */
+    .termos-footer {
+      border-top: 1px solid var(--rs-borda);
+      padding: 32px 20px;
+      text-align: center;
+      background: var(--rs-card2);
+    }
+    .termos-footer-inner {
+      max-width: 720px;
+      margin: 0 auto;
+    }
+    .termos-footer-contato {
+      background: var(--rs-card);
+      border: 1px solid var(--rs-borda);
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 20px;
+    }
+    .termos-footer-contato-titulo {
+      font-family: 'Syne', sans-serif;
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--rs-text);
+      margin-bottom: 8px;
+    }
+    .termos-footer-contato p {
+      font-size: 13px;
+      color: var(--rs-muted);
+      margin-bottom: 12px;
+    }
+    .termos-footer-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 20px;
+      background: var(--azul);
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      text-decoration: none;
+      cursor: pointer;
+      transition: background 0.2s, transform 0.15s;
+    }
+    .termos-footer-btn:hover {
+      background: #0d4f7c;
+      transform: translateY(-1px);
+    }
+    .termos-footer-info {
+      font-size: 12px;
+      color: var(--rs-muted);
+      line-height: 1.6;
+    }
+    .termos-footer-info strong {
+      color: var(--rs-text);
+    }
+
+    /* ── Botão voltar ao topo ───────────────────────────────────── */
+    .termos-voltar-topo {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      background: var(--azul);
+      color: #fff;
+      border: none;
+      font-size: 18px;
+      cursor: pointer;
+      box-shadow: 0 4px 14px rgba(0,0,0,0.3);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s, transform 0.15s;
+      z-index: 100;
+    }
+    .termos-voltar-topo.visivel {
+      opacity: 1;
+      pointer-events: auto;
+    }
+    .termos-voltar-topo:hover {
+      transform: translateY(-2px);
+      background: #0d4f7c;
+    }
+
+    /* ── Responsivo ─────────────────────────────────────────────── */
+    @media (max-width: 640px) {
+      .termos-header { padding: 28px 16px 24px; }
+      .termos-titulo { font-size: 24px; }
+      .termos-subtitulo { font-size: 14px; }
+      .termos-meta { gap: 8px; }
+      .termos-meta-item { font-size: 11px; padding: 3px 10px; }
+      .termos-container { padding: 24px 16px 40px; }
+      .termos-sumario { padding: 16px; }
+      .termos-sumario ol { grid-template-columns: 1fr; gap: 6px; }
+      .termos-secao h2 { font-size: 17px; }
+      .termos-secao { margin-bottom: 28px; }
+      .termos-voltar-topo { bottom: 16px; right: 16px; width: 40px; height: 40px; }
+    }
+
+    /* ── Impressão ──────────────────────────────────────────────── */
+    @media print {
+      body { background: #fff; color: #000; font-size: 11pt; }
+      .termos-header { background: none; border-bottom: 2px solid #000; }
+      .termos-titulo, .termos-secao h2 { color: #000; }
+      .termos-secao h2 .num { background: #eee; color: #000; }
+      .termos-sumario, .termos-footer-contato { background: #f5f5f5; border-color: #ccc; }
+      .termos-voltar-topo { display: none; }
+      .termos-secao { page-break-inside: avoid; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ═══════════════════ HEADER ═══════════════════ -->
+  <header class="termos-header">
+    <div class="termos-header-inner">
+      <div class="termos-logo">
+        <span class="termos-logo-icon">🏆</span>
+        <span>Academia Radar SIOPE</span>
+      </div>
+      <h1 class="termos-titulo">Termos de Participação</h1>
+      <p class="termos-subtitulo">Programa de certificação profissional contínua para servidores públicos municipais</p>
+      <div class="termos-meta">
+        <span class="termos-meta-item">Versão <strong>1.0</strong></span>
+        <span class="termos-meta-item">Vigência: <strong id="termos-vigencia">a definir</strong></span>
+        <span class="termos-meta-item">Última atualização: <strong id="termos-atualizacao">—</strong></span>
+      </div>
+    </div>
+  </header>
+
+  <!-- ═══════════════════ CONTEÚDO ═══════════════════ -->
+  <main class="termos-container">
+
+    <!-- Sumário -->
+    <nav class="termos-sumario" aria-label="Sumário dos termos">
+      <div class="termos-sumario-titulo">📑 Sumário</div>
+      <ol>
+        <li><a href="#secao-1">O que é a Academia Radar SIOPE</a></li>
+        <li><a href="#secao-2">Níveis de Certificação</a></li>
+        <li><a href="#secao-3">Manutenção do Selo</a></li>
+        <li><a href="#secao-4">Desafios Especiais</a></li>
+        <li><a href="#secao-5">Visibilidade no Ranking</a></li>
+        <li><a href="#secao-6">Certificados</a></li>
+        <li><a href="#secao-7">Clube de Excelência</a></li>
+        <li><a href="#secao-8">Cancelamento da Participação</a></li>
+        <li><a href="#secao-9">Proteção de Dados (LGPD)</a></li>
+        <li><a href="#secao-10">Alterações nos Termos</a></li>
+      </ol>
+    </nav>
+
+    <p style="font-size:14px;color:var(--rs-muted);margin-bottom:32px;line-height:1.7">
+      Ao confirmar sua adesão à Academia Radar SIOPE, você concorda com os termos descritos abaixo.
+      Recomendamos a leitura completa antes de aceitar.
+    </p>
+
+    <!-- Seção 1 -->
+    <section class="termos-secao" id="secao-1">
+      <h2><span class="num">1</span> O que é a Academia Radar SIOPE</h2>
+      <p>
+        A Academia Radar SIOPE é um programa de certificação profissional contínua oferecido
+        <strong>gratuitamente</strong> aos assinantes ativos da plataforma Radar SIOPE. Seu objetivo
+        é reconhecer, por meio de quizzes semanais, o conhecimento dos assinantes (servidores públicos municipais, cidadãos e gestores interessados)
+        em gestão educacional — especialmente nos temas do projeto da academia.
+      </p>
+      <p>
+        A participação é <strong>voluntária e opt-in</strong>: nenhum assinante é inscrito
+        automaticamente. A adesão é um ato consciente e pode ser cancelada a qualquer momento.
+      </p>
+    </section>
+
+    <!-- Seção 2 -->
+    <section class="termos-secao" id="secao-2">
+      <h2><span class="num">2</span> Níveis de Certificação</h2>
+      <p>
+        A Academia possui níveis progressivos de certificação, cada um representando um grau de
+        domínio sobre os conteúdos. Para conquistar cada nível, o assinante deve atingir uma
+        <strong>quantidade específica de quizzes aprovados</strong> com o <strong>aproveitamento
+        mínimo definido</strong> pela administração.
+      </p>
+      <p>
+        A progressão é <strong>automática</strong>: ao atingir os requisitos, o nível é concedido
+        imediatamente, com notificação no aplicativo.
+      </p>
+    </section>
+
+    <!-- Seção 3 -->
+    <section class="termos-secao" id="secao-3">
+      <h2><span class="num">3</span> Manutenção do Selo</h2>
+      <p>
+        Conquistar um nível não é definitivo. Para manter o selo ativo ao longo do tempo, o
+        participante precisa responder aos quizzes com regularidade e atingir o aproveitamento
+        mínimo nos ciclos de manutenção.
+      </p>
+      <p>
+        A inatividade prolongada pode resultar em estados de alerta, congelamento ou rebaixamento
+        de nível. A Academia oferece mecanismos de proteção (como "Coringas") para situações de
+        imprevisto — conforme as regras vigentes no painel do participante.
+      </p>
+    </section>
+
+    <!-- Seção 4 -->
+    <section class="termos-secao" id="secao-4">
+      <h2><span class="num">4</span> Desafios Especiais (Quizzes Especiais)</h2>
+      <p>
+        Além dos quizzes regulares das edições semanais, a Academia oferece
+        <strong>Desafios Especiais</strong> — quizzes de maior complexidade, com temas aprofundados
+        (estudos de caso, legislação recente, interpretação de dados).
+      </p>
+      <p>Os Desafios Especiais:</p>
+      <ul>
+        <li>São <strong>desbloqueados progressivamente</strong>, conforme o participante avança de nível</li>
+        <li>São <strong>obrigatórios</strong> para conquistar os níveis mais altos</li>
+        <li>Podem ser respondidos em qualquer ordem, dentro da etapa em que o participante está</li>
+        <li>Têm número máximo de tentativas definido pela administração</li>
+      </ul>
+    </section>
+
+    <!-- Seção 5 -->
+    <section class="termos-secao" id="secao-5">
+      <h2><span class="num">5</span> Visibilidade no Ranking</h2>
+      <p>
+        A Academia mantém um <strong>ranking público</strong> de participantes, exibindo desempenho
+        por município, estado e nacional.
+      </p>
+      <div class="termos-callout">
+        <strong>Por padrão, sua participação é anônima</strong>: você aparece no ranking como
+        <em>"Servidor de [Município/UF]"</em>.
+      </div>
+      <p>
+        Você pode, a qualquer momento, optar por:
+      </p>
+      <ul>
+        <li>Continuar anônimo (padrão)</li>
+        <li>Aparecer com seu nome completo</li>
+        <li>Não aparecer no ranking</li>
+      </ul>
+      <p>
+        Essa escolha pode ser alterada nas configurações da Academia dentro do app. Em municípios
+        com poucos participantes, o sistema adota proteções adicionais de privacidade
+        automaticamente, exibindo apenas dados agregados.
+      </p>
+    </section>
+
+    <!-- Seção 6 -->
+    <section class="termos-secao" id="secao-6">
+      <h2><span class="num">6</span> Certificados</h2>
+      <p>
+        Ao conquistar ou manter um nível, você pode emitir um <strong>certificado PDF</strong> com:
+      </p>
+      <ul>
+        <li>Seu nome e nível conquistado</li>
+        <li>Dados de desempenho (aproveitamento, quantidade de quizzes)</li>
+        <li>Posicionamento percentil no ranking (sempre anonimizado)</li>
+        <li>Código único de validação e QR Code</li>
+      </ul>
+      <p>
+        Os certificados são <strong>validáveis publicamente</strong> por qualquer pessoa, através
+        do site <em>radarsiope.com.br/validar</em>, sem necessidade de login.
+      </p>
+    </section>
+
+    <!-- Seção 7 -->
+    <section class="termos-secao" id="secao-7">
+      <h2><span class="num">7</span> Clube de Excelência (Descontos por Fidelidade)</h2>
+      <p>
+        Assinantes que mantêm o nível mais alto (Mestre do FUNDEB) por ciclos consecutivos têm
+        direito a <strong>descontos progressivos</strong> na mensalidade do Radar SIOPE.
+      </p>
+      <ul>
+        <li>O desconto aumenta conforme os anos consecutivos no nível mais alto</li>
+        <li>Existe um teto máximo de desconto</li>
+        <li>A perda do nível mais alto, mesmo que temporária, impacta o contador de anos consecutivos</li>
+        <li>Inadimplência superior a um limite definido suspende o benefício</li>
+      </ul>
+      <p>
+        Os percentuais exatos, o teto e as regras de recuperação podem ser consultados no painel
+        do Clube de Excelência dentro do app.
+      </p>
+    </section>
+
+    <!-- Seção 8 -->
+    <section class="termos-secao" id="secao-8">
+      <h2><span class="num">8</span> Cancelamento da Participação</h2>
+      <p>
+        Você pode cancelar sua participação na Academia a qualquer momento, diretamente nas
+        configurações do app.
+      </p>
+      <p>Ao cancelar:</p>
+      <ul>
+        <li>Seu histórico de conquistas é <strong>preservado</strong> (não é apagado)</li>
+        <li>Seu selo entra em processo de expiração gradual</li>
+        <li>Seu desconto de fidelidade é <strong>suspenso</strong> (pode ser reativado se você voltar a participar)</li>
+        <li>Você pode readquirir a participação a qualquer momento, retomando de onde parou (respeitadas as regras vigentes)</li>
+      </ul>
+      <div class="termos-callout">
+        O cancelamento da participação na Academia <strong>não cancela sua assinatura do Radar SIOPE</strong>
+        — são serviços independentes.
+      </div>
+    </section>
+
+    <!-- Seção 9 -->
+    <section class="termos-secao" id="secao-9">
+      <h2><span class="num">9</span> Proteção de Dados (LGPD)</h2>
+      <p>
+        A participação na Academia está em conformidade com a
+        <strong>Lei Geral de Proteção de Dados (Lei 13.709/2018)</strong>.
+      </p>
+      <p><strong>Dados tratados:</strong></p>
+      <ul>
+        <li>Desempenho em quizzes (pontuações, aprovações, tentativas)</li>
+        <li>Nível conquistado e histórico de conquistas</li>
+        <li>Município e estado (para fins de ranking)</li>
+        <li>Preferências de visibilidade no ranking</li>
+      </ul>
+      <p><strong>Finalidades:</strong></p>
+      <ul>
+        <li>Cálculo e concessão de níveis e certificados</li>
+        <li>Composição do ranking público (respeitando suas preferências de visibilidade)</li>
+        <li>Emissão de certificados validáveis</li>
+        <li>Comunicação de novidades e alertas da Academia</li>
+      </ul>
+      <p><strong>Seus direitos:</strong></p>
+      <ul>
+        <li>Consultar seus dados a qualquer momento no app</li>
+        <li>Alterar sua visibilidade no ranking</li>
+        <li>Solicitar a exclusão de seus dados do ranking</li>
+        <li>Solicitar informações sobre o tratamento dos seus dados</li>
+      </ul>
+      <div class="termos-callout">
+        Para exercer qualquer direito ou tirar dúvidas, entre em contato através da central
+        <strong>"Fale Conosco"</strong> disponível no aplicativo.
+      </div>
+    </section>
+
+    <!-- Seção 10 -->
+    <section class="termos-secao" id="secao-10">
+      <h2><span class="num">10</span> Alterações nos Termos</h2>
+      <p>
+        A administração do Radar SIOPE pode atualizar estes Termos de Participação a qualquer momento.
+      </p>
+      <ul>
+        <li>Alterações <strong>relevantes</strong> (que modifiquem direitos ou obrigações) serão comunicadas com antecedência, via notificação no app</li>
+        <li>Alterações <strong>operacionais</strong> (ajustes de redação, correções) podem ser feitas sem aviso prévio</li>
+        <li>Você pode consultar a versão vigente a qualquer momento nesta página</li>
+        <li>A continuidade da participação após a publicação de novas versões implica aceitação dos termos atualizados</li>
+      </ul>
+    </section>
+
+  </main>
+
+  <!-- ═══════════════════ RODAPÉ ═══════════════════ -->
+  <footer class="termos-footer">
+    <div class="termos-footer-inner">
+
+      <div class="termos-footer-contato">
+        <div class="termos-footer-contato-titulo">💬 Dúvidas sobre os termos?</div>
+        <p>
+          Entre em contato com nossa equipe através da central de atendimento no app.
+          Respondemos em até 2 dias úteis.
+        </p>
+        <a href="/verNewsletterComToken.html" class="termos-footer-btn" id="termos-btn-fale-conosco">
+          💬 Abrir Fale Conosco no app →
+        </a>
+      </div>
+
+      <div class="termos-footer-info">
+        <p>
+          <strong>Radar SIOPE</strong> · Guia Digital FUNDEB e SIOPE<br>
+          <span id="termos-rodape-versao">Versão dos termos: v1.0</span> ·
+          <span id="termos-rodape-vigencia">Vigência: a definir</span>
+        </p>
+      </div>
+
+    </div>
+  </footer>
+
+  <!-- Botão voltar ao topo -->
+  <button class="termos-voltar-topo" id="termos-btn-topo" aria-label="Voltar ao topo" title="Voltar ao topo">↑</button>
+
+  <script>
+    // ─── Datas (preenchidas automaticamente) ────────────────────────────
+    // Quando a Academia for lançada, atualize a data de vigência aqui.
+    // Enquanto não houver lançamento oficial, mostra "a definir".
+    (function () {
+      const DATA_VIGENCIA = null; // Ex.: '2026-10-02' quando lançar
+      const dataAtualizacao = new Date();
+      const fmtData = (d) => d.toLocaleDateString('pt-BR', {
+        day: '2-digit', month: 'long', year: 'numeric'
+      });
+
+      const vigenciaEl = document.getElementById('termos-vigencia');
+      const atualizacaoEl = document.getElementById('termos-atualizacao');
+      const rodapeVersao = document.getElementById('termos-rodape-versao');
+      const rodapeVigencia = document.getElementById('termos-rodape-vigencia');
+
+      if (DATA_VIGENCIA) {
+        const d = new Date(DATA_VIGENCIA + 'T00:00:00');
+        const txt = fmtData(d);
+        vigenciaEl.textContent = txt;
+        rodapeVigencia.textContent = 'Vigência: ' + txt;
+      } else {
+        vigenciaEl.textContent = 'a definir (lançamento oficial)';
+        rodapeVigencia.textContent = 'Vigência: a definir';
+      }
+
+      atualizacaoEl.textContent = fmtData(dataAtualizacao);
+    })();
+
+    // ─── Botão voltar ao topo ───────────────────────────────────────────
+    (function () {
+      const btn = document.getElementById('termos-btn-topo');
+      if (!btn) return;
+      window.addEventListener('scroll', () => {
+        btn.classList.toggle('visivel', window.scrollY > 400);
+      }, { passive: true });
+      btn.addEventListener('click', () => {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      });
+    })();
+
+    // ─── Botão Fale Conosco ─────────────────────────────────────────────
+    // Abre o app e dispara o evento para abrir o Fale Conosco
+    // (se o usuário estiver logado; senão, apenas carrega o app)
+    (function () {
+      const btn = document.getElementById('termos-btn-fale-conosco');
+      if (!btn) return;
+      btn.addEventListener('click', (e) => {
+        // Se estiver dentro do app (iframe ou mesma origem), dispara evento
+        if (window.parent !== window) {
+          try {
+            window.parent.postMessage({ tipo: 'rs:fecharModal' }, '*');
+          } catch (_) {}
+        }
+        // Redireciona para o app — o Fale Conosco será acessível pelo menu
+        // (não forçamos abertura automática para não interferir em outros fluxos)
+      });
+    })();
+  </script>
+
+</body>
+</html>
