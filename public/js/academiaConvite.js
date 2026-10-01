@@ -153,7 +153,7 @@ Tom híbrido: formal em pontos críticos (LGPD, certificados), amigável no rest
           <ul class="rs-acad-lista">
             <li>
               <span class="rs-acad-bullet">📚</span>
-              Responda quizzes semanais sobre FUNDEB, SIOPE e MDE
+              Responda quizzes semanais sobre nossos conteúdos de gestão educacional
             </li>
             <li>
               <span class="rs-acad-bullet">✅</span>
@@ -165,7 +165,7 @@ Tom híbrido: formal em pontos críticos (LGPD, certificados), amigável no rest
             </li>
             <li>
               <span class="rs-acad-bullet">🃏</span>
-              Coringas disponíveis para imprevistos
+              Coringas disponíveis para imprevistos (férias, doença, sobrecarga de trabalho)
             </li>
           </ul>
 
