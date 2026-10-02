@@ -212,15 +212,27 @@ function _renderPainelConfigAcademia() {
   // Conteúdo da sub-aba ativa
   const conteudoHtml = _renderConteudoGrupo(_abaDocAtiva, grupoAtivo);
 
-  body.innerHTML = `
-    <div class="cfg-abas-doc" style="display:flex;flex-wrap:wrap;border-bottom:1px solid rgba(0,0,0,0.08);margin-bottom:12px">
-      ${abasDocHtml}
-    </div>
-    <div class="cfg-abas-grupo" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px">
-      ${abasGrupoHtml}
-    </div>
-    <div class="cfg-conteudo-grupo">
-      ${conteudoHtml}
+    body.innerHTML = `
+    <div class="cfg-abas-doc" style="display:flex;flex-wrap:wrap;border-bottom:1px solid rgba(0,0,0,0.08);margin-bottom:12px"> ${abasDocHtml} </div>
+    <div class="cfg-abas-grupo" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px"> ${abasGrupoHtml} </div>
+    <div class="cfg-conteudo-grupo"> ${conteudoHtml} </div>
+    
+    <!-- NOVO: Botão para invalidar cache da Academia (v1.7.3) -->
+    <div style="margin-top:20px;padding:12px 14px;background:rgba(245,158,11,0.08);border:1px dashed rgba(245,158,11,0.4);border-radius:8px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
+      <div style="flex:1;min-width:200px">
+        <div style="font-size:12px;font-weight:700;color:#92400e;margin-bottom:4px">
+          🔄 Cache do App (LocalStorage)
+        </div>
+        <div style="font-size:11px;color:#78350f;line-height:1.5">
+          O app guarda a feature flag <code>academia_habilitada</code> em cache por 1 hora.
+          Se você alterou a flag e quer que a mudança seja vista imediatamente pelos assinantes,
+          clique no botão ao lado para invalidar o cache local.
+        </div>
+      </div>
+      <button class="btn-drawer-sm" onclick="_invalidarCacheAcademia(this)"
+        style="padding:8px 16px;background:#f59e0b;color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:600;white-space:nowrap">
+        🔄 Invalidar Cache
+      </button>
     </div>
   `;
 }
@@ -1127,6 +1139,27 @@ async function executarScriptCargaInicialAcademia(btnEl) {
   } finally {
     btnEl.disabled = false;
     btnEl.textContent = textoOriginal;
+  }
+}
+
+// ─── Invalidar cache da Academia no localStorage do app ──────────────────────
+// Usado quando o admin altera `academia_habilitada` e quer que a mudança
+// seja refletida imediatamente nos apps dos assinantes (sem esperar o TTL de 1h).
+function _invalidarCacheAcademia(btnEl) {
+  try {
+    localStorage.removeItem('rs_config_academia_cache');
+    if (btnEl) {
+      const textoOriginal = btnEl.textContent;
+      btnEl.textContent = '✅ Cache invalidado!';
+      btnEl.style.background = '#22c55e';
+      setTimeout(() => {
+        btnEl.textContent = textoOriginal;
+        btnEl.style.background = '#f59e0b';
+      }, 2000);
+    }
+    alert('✅ Cache da Academia invalidado!\n\nOs assinantes verão a mudança na próxima abertura do menu (ou ao recarregar o app).');
+  } catch (e) {
+    alert('❌ Erro ao invalidar cache: ' + e.message);
   }
 }
 

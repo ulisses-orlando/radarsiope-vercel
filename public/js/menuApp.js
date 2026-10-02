@@ -10,7 +10,7 @@
   // ── Cache da Feature Flag (evita 1000 reads no Firestore) ─────────────────
   async function _isAcademiaHabilitada() {
     const CACHE_KEY = 'rs_config_academia_cache';
-    const TTL_MS = 60 * 60 * 1000; // 1 hora
+    const TTL_MS = 5 * 60 * 1000; // 5 minutos
 
     try {
       const cacheStr = localStorage.getItem(CACHE_KEY);
@@ -35,6 +35,16 @@
       return false;
     }
   }
+
+  // Adicionar após _isAcademiaHabilitada()
+  function _invalidarCacheAcademia() {
+    localStorage.removeItem('rs_config_academia_cache');
+    console.info('[menuApp] Cache da Academia invalidado.');
+  }
+
+  // Expor globalmente para uso no admin
+  window._invalidarCacheAcademia = _invalidarCacheAcademia;
+
   // ── Inicialização ─────────────────────────────────────────────────────────
  // CORREÇÃO: tornar a função async e aguardar o render
   async function init() {
