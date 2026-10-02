@@ -300,6 +300,7 @@ async function _handleAceitarTermos(req, res) {
     // 2. Inicializa certificados/{uid}
     const certificadoRef = db.collection('certificados').doc(uid);
     await certificadoRef.set({
+      uid: uid,
       data_inicio_contrato: dataInicioContrato.toISOString(),
       nivel_atual_global: 'iniciante',
       status_atual: 'ativo',
@@ -340,6 +341,7 @@ async function _handleAceitarTermos(req, res) {
       ultimoResumo = resultado;
 
       await certificadoRef.collection('historico').doc(String(n)).set({
+        uid: uid,
         n,
         nivel_atual: nivelAtual,
         quizzes_normais_aprovados_ciclo: resultado.normaisAprovados,
