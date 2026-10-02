@@ -285,12 +285,17 @@ function _injetarCSS() {
   const style = document.createElement('style');
   style.id = 'rs-acad-dash-style';
   style.textContent = `
+    /* ── Fundo do Dashboard (força escuro) ────────────────── */
+    #rs-acad-dashboard {
+      background: #0f172a !important;
+    }
+    
     /* ── Header ─────────────────────────────────────────────── */
     .rs-acad-dash-header {
       position: sticky;
       top: 0;
       z-index: 10;
-      background: var(--rs-bg, #0f172a);
+      background: #0f172a;
       border-bottom: 1px solid #1e293b;
       padding: 14px 16px;
       display: flex;
@@ -300,7 +305,7 @@ function _injetarCSS() {
     .rs-acad-dash-voltar {
       background: none;
       border: none;
-      color: #94a3b8;
+      color: #e2e8f0;
       font-size: 13px;
       font-weight: 700;
       padding: 8px 12px;
@@ -311,7 +316,7 @@ function _injetarCSS() {
     }
     .rs-acad-dash-voltar:hover {
       background: rgba(255,255,255,.06);
-      color: #f1f5f9;
+      color: #fff;
     }
     .rs-acad-dash-titulo-wrap {
       display: flex;
@@ -348,7 +353,7 @@ function _injetarCSS() {
     
     /* ── Cards ──────────────────────────────────────────────── */
     .rs-acad-dash-card {
-      background: var(--rs-card, #1e293b);
+      background: #1e293b;
       border: 1px solid rgba(255,255,255,.08);
       border-radius: 12px;
       padding: 18px;
@@ -358,10 +363,10 @@ function _injetarCSS() {
       margin: 0 0 12px;
       font-size: 14px;
       font-weight: 700;
-      color: #e2e8f0; /* ✅ CORREÇÃO: mais escuro para melhor contraste */
+      color: #f1f5f9;
     }
     .rs-acad-dash-card-nivel {
-      background: linear-gradient(135deg, var(--rs-card, #1e293b), rgba(139,92,246,.08));
+      background: linear-gradient(135deg, #1e293b, rgba(139,92,246,.08));
     }
     .rs-acad-dash-nivel-header {
       display: flex;
@@ -384,13 +389,13 @@ function _injetarCSS() {
       font-weight: 700;
       text-transform: uppercase;
       letter-spacing: .05em;
-      color: #cbd5e1; /* ✅ CORREÇÃO: mais escuro */
+      color: #cbd5e1;
       margin-bottom: 2px;
     }
     .rs-acad-dash-nivel-nome-grande {
       font-size: 18px;
       font-weight: 800;
-      color: #f8fafc; /* ✅ CORREÇÃO: branco mais puro */
+      color: #f8fafc;
       font-family: 'Syne', system-ui, sans-serif;
     }
     .rs-acad-dash-nivel-ciclo {
@@ -408,12 +413,12 @@ function _injetarCSS() {
     .rs-acad-dash-progresso-num {
       font-size: 28px;
       font-weight: 800;
-      color: #f8fafc; /* ✅ CORREÇÃO: branco mais puro */
+      color: #f8fafc;
       font-family: 'Syne', system-ui, sans-serif;
     }
     .rs-acad-dash-progresso-total {
       font-size: 12px;
-      color: #cbd5e1; /* ✅ CORREÇÃO: mais escuro */
+      color: #cbd5e1;
     }
     .rs-acad-dash-progresso-barra {
       height: 8px;
@@ -457,7 +462,7 @@ function _injetarCSS() {
     }
     .rs-acad-dash-especial-label {
       font-size: 10px;
-      color: #cbd5e1; /* ✅ CORREÇÃO: mais escuro */
+      color: #cbd5e1;
       margin-top: 2px;
       text-transform: uppercase;
       letter-spacing: .03em;
@@ -490,7 +495,7 @@ function _injetarCSS() {
     .rs-acad-dash-nivel-card .rs-acad-dash-nivel-nome {
       font-size: 13px;
       font-weight: 600;
-      color: #f1f5f9; /* ✅ CORREÇÃO: mais escuro */
+      color: #f1f5f9;
     }
     .rs-acad-dash-nivel-card .rs-acad-dash-nivel-data {
       font-size: 11px;
