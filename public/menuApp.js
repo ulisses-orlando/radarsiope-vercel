@@ -1,0 +1,856 @@
+// menuApp.js
+// Menu hamburger do app Radar SIOPE
+// Integra: Edições, Alertas, Fale Conosco, Minha Área
+// ─────────────────────────────────────────────────────────────────────────────
+
+(function () {
+  'use strict';
+
+
+  // ── Cache da Feature Flag (evita 1000 reads no Firestore) ─────────────────
+  async function _isAcademiaHabilitada() {
+    const CACHE_KEY = 'rs_config_academia_cache';
+    const TTL_MS = 5 * 60 * 1000; // 5 minutos
+
+    try {
+      const cacheStr = localStorage.getItem(CACHE_KEY);
+      if (cacheStr) {
+        const cache = JSON.parse(cacheStr);
+        if (Date.now() - cache.ts < TTL_MS) {
+          return cache.habilitada === true;
+        }
+      }
+      
+      // Cache expirado ou inexistente: busca no Firestore (apenas 1 vez por hora por dispositivo)
+      const configSnap = await window.db.collection('config_academia').doc('selos').get();
+      const habilitada = configSnap.data()?.academia_habilitada === true;
+      
+      localStorage.setItem(CACHE_KEY, JSON.stringify({
+        habilitada,
+        ts: Date.now()
+      }));
+      return habilitada;
+    } catch (e) {
+      console.warn('[menuApp] Falha ao verificar flag da Academia, assumindo desativada:', e);
+      return false;
+    }
+  }
+  // ── Inicialização ─────────────────────────────────────────────────────────
+ // CORREÇÃO: tornar a função async e aguardar o render
+  async function init() {
+    _injetarCSS();
+    await _renderMenu(); // <-- ADICIONE O AWAIT AQUI
+    _bindEventos();
+    _atualizarTotalBadge();
+  }
+
+  // ── CSS ───────────────────────────────────────────────────────────────────
+  function _injetarCSS() {
+    const style = document.createElement('style');
+    style.textContent = `
+      /* ── Hamburger button ───────────────────────────────────────────────── */
+      #rs-menu-btn {
+        background: rgba(255,255,255,.12);
+        border: 1px solid rgba(255,255,255,.2);
+        border-radius: 8px;
+        padding: 7px 12px;
+        cursor: pointer;
+        color: #fff;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 12px;
+        font-weight: 700;
+        font-family: 'Syne', system-ui, sans-serif;
+        transition: background .15s;
+        position: relative;
+        user-select: none;
+        -webkit-tap-highlight-color: transparent;
+        touch-action: manipulation;
+      }
+      #rs-menu-btn:hover,
+      #rs-menu-btn.open { background: rgba(255,255,255,.22); }
+
+      /* Linhas do hamburger */
+      .rs-ham {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        width: 16px;
+        flex-shrink: 0;
+      }
+      .rs-ham span {
+        display: block;
+        height: 2px;
+        background: #fff;
+        border-radius: 2px;
+        transition: transform .22s ease, opacity .22s ease, width .22s ease;
+        width: 100%;
+      }
+      #rs-menu-btn.open .rs-ham span:nth-child(1) {
+        transform: rotate(45deg) translate(4px, 4px);
+      }
+      #rs-menu-btn.open .rs-ham span:nth-child(2) {
+        opacity: 0; width: 0%;
+      }
+      #rs-menu-btn.open .rs-ham span:nth-child(3) {
+        transform: rotate(-45deg) translate(4px, -4px);
+      }
+
+      /* Badge total no hamburger */
+      #rs-menu-total-badge {
+        position: absolute;
+        top: -7px; right: -7px;
+        min-width: 19px; height: 19px;
+        padding: 0 5px;
+        background: #ef4444;
+        color: #fff;
+        border-radius: 99px;
+        font-size: 10px; font-weight: 900;
+        line-height: 19px; text-align: center;
+        box-shadow: 0 0 0 2px var(--azul, #0A3D62);
+        transition: opacity .2s;
+        pointer-events: none;
+      }
+
+      /* ── Dropdown ───────────────────────────────────────────────────────── */
+      #rs-menu-dropdown {
+        position: absolute;
+        top: calc(100% + 8px);
+        right: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+        z-index: 500;
+        min-width: 195px;
+        pointer-events: none;
+        opacity: 0;
+        transform: translateY(-6px) scale(.97);
+        transition: opacity .18s ease, transform .18s ease;
+      }
+      #rs-menu-dropdown.open {
+        pointer-events: all;
+        opacity: 1;
+        transform: translateY(0) scale(1);
+      }
+
+      /* Item do menu */
+      .rs-menu-item {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 11px 14px;
+        border: none;
+        border-radius: 9px;
+        cursor: pointer;
+        color: #fff;
+        font-size: 13px;
+        font-weight: 700;
+        font-family: 'Syne', system-ui, sans-serif;
+        box-shadow: 0 2px 10px rgba(0,0,0,.3);
+        width: 100%;
+        text-align: left;
+        transition: filter .15s, transform .1s;
+        opacity: 0;
+        transform: translateY(-4px);
+        -webkit-tap-highlight-color: transparent;
+        touch-action: manipulation;
+      }
+      #rs-menu-dropdown.open .rs-menu-item {
+        opacity: 1;
+        transform: translateY(0);
+      }
+      #rs-menu-dropdown.open .rs-menu-item:nth-child(1) { transition: opacity .16s ease .02s, transform .16s ease .02s, filter .15s; }
+      #rs-menu-dropdown.open .rs-menu-item:nth-child(2) { transition: opacity .16s ease .06s, transform .16s ease .06s, filter .15s; }
+      #rs-menu-dropdown.open .rs-menu-item:nth-child(3) { transition: opacity .16s ease .10s, transform .16s ease .10s, filter .15s; }
+      #rs-menu-dropdown.open .rs-menu-item:nth-child(4) { transition: opacity .16s ease .14s, transform .16s ease .14s, filter .15s; }
+      #rs-menu-dropdown.open .rs-menu-item:nth-child(5) { transition: opacity .16s ease .18s, transform .16s ease .18s, filter .15s; }
+      #rs-menu-dropdown.open .rs-menu-item:nth-child(6) { transition: opacity .16s ease .22s, transform .16s ease .22s, filter .15s; }
+      #rs-menu-dropdown.open .rs-menu-item:nth-child(7) { transition: opacity .16s ease .26s, transform .16s ease .26s, filter .15s; }
+      #rs-menu-dropdown.open .rs-menu-item:nth-child(8) { transition: opacity .16s ease .30s, transform .16s ease .30s, filter .15s; }
+
+      .rs-menu-item:hover { filter: brightness(1.15); }
+      .rs-menu-item:active { transform: scale(.97); }
+
+      .rs-menu-item-icon  { font-size: 15px; flex-shrink: 0; }
+      .rs-menu-item-label { flex: 1; }
+      .rs-menu-item-tag   {
+        font-size: 8px; font-weight: 700;
+        letter-spacing: .5px; opacity: .65;
+        text-transform: uppercase;
+      }
+
+      /* Badge individual */
+      .rs-menu-item-badge {
+        min-width: 17px; height: 17px;
+        padding: 0 5px;
+        background: #ef4444;
+        color: #fff;
+        border-radius: 99px;
+        font-size: 9px; font-weight: 900;
+        line-height: 17px; text-align: center;
+        flex-shrink: 0;
+      }
+      .rs-menu-item-badge.verde { background: #22c55e; }
+
+      /* ── Overlay ────────────────────────────────────────────────────────── */
+      #rs-menu-overlay {
+        display: none;
+        position: fixed;
+        inset: 0;
+        z-index: 400;
+      }
+      #rs-menu-overlay.open { display: block; }
+
+      /* Temas */
+      [data-theme="exito"]      #rs-menu-btn { border-color: rgba(34,197,94,.3); }
+      [data-theme="aurora"]     #rs-menu-btn { border-color: rgba(167,139,250,.3); }
+    `;
+    document.head.appendChild(style);
+  }
+
+  // ── Render do menu (Otimizado: Zero leituras no Firestore) ────────────────
+  async function _renderMenu() {
+    const wrap = document.getElementById('rs-menu-wrap');
+    if (!wrap) return;
+    
+    const user = window._radarUser;
+    const isAssinante = user?.segmento === 'assinante';
+    wrap.style.position = 'relative';
+
+    // 1. Verifica Feature Flag via Cache (rápido)
+    const academiaHabilitada = await _isAcademiaHabilitada();
+
+    // 2. Lê status da Academia direto da sessão local (evita read no Firestore)
+    let academiaStatus = null;
+    let academiaUltimaExibicao = null;
+    try {
+      const sessao = JSON.parse(localStorage.getItem('rs_pwa_session') || '{}');
+      if (sessao.academia) {
+        academiaStatus = sessao.academia.status;
+        academiaUltimaExibicao = sessao.academia.convite_ultima_exibicao;
+      }
+    } catch (e) { /* ignora */ }
+
+    // 3. Decide se mostra o botão
+    let academiaMenuHtml = '';
+    if (isAssinante && academiaHabilitada) {
+      // Mostra se: nunca viu, está pendente, ou recusou (para permitir adesão manual)
+      // NÃO mostra se já for 'membro' (nesse caso, mostraremos "Minha Academia")
+      const deveMostrarConvite = !academiaStatus || 
+                                academiaStatus === 'pendente' || 
+                                academiaStatus === 'recusado';
+      
+      const ehMembro = academiaStatus === 'membro';
+
+      if (ehMembro) {
+        academiaMenuHtml = `
+          <button class="rs-menu-item" id="rs-menu-academia"
+            style="background:linear-gradient(135deg, #8b5cf6, #6366f1)" role="menuitem">
+            <span class="rs-menu-item-icon">🏆</span>
+            <span class="rs-menu-item-label">Minha Academia</span>
+            <span class="rs-menu-item-tag">ativo</span>
+          </button>
+        `;
+      } else if (deveMostrarConvite) {
+        academiaMenuHtml = `
+          <button class="rs-menu-item" id="rs-menu-academia"
+            style="background:linear-gradient(135deg, #8b5cf6, #6366f1)" role="menuitem">
+            <span class="rs-menu-item-icon">🎓</span>
+            <span class="rs-menu-item-label">Academia Radar SIOPE</span>
+            <span class="rs-menu-item-tag">novo</span>
+          </button>
+        `;
+      }
+    }
+
+    // 4. Renderiza o HTML
+    wrap.innerHTML = `
+      <button id="rs-menu-btn" type="button" aria-label="Central" aria-expanded="false">
+        <div class="rs-ham">
+          <span></span><span></span><span></span>
+        </div>
+        Central
+        <div id="rs-menu-total-badge" style="display:none">0</div>
+      </button>
+      <div id="rs-menu-dropdown" role="menu">
+        <button class="rs-menu-item" id="rs-menu-edicoes"
+          style="background:#0A3D62" role="menuitem">
+          <span class="rs-menu-item-icon">📚</span>
+          <span class="rs-menu-item-label">Edições</span>
+        </button>
+        <button class="rs-menu-item" id="rs-menu-alertas"
+          style="background:#1e4d78" role="menuitem">
+          <span class="rs-menu-item-icon">🔔</span>
+          <span class="rs-menu-item-label">Sentinela</span>
+          <span class="rs-menu-item-badge" id="rs-menu-badge-alertas" style="display:none">0</span>
+        </button>
+        <button class="rs-menu-item" id="rs-menu-calendario"
+          style="background:#164e63" role="menuitem">
+          <span class="rs-menu-item-icon">📅</span>
+          <span class="rs-menu-item-label">Calendário</span>
+        </button>
+        <button class="rs-menu-item" id="rs-menu-fale"
+          style="background:#0e6a82" role="menuitem">
+          <span class="rs-menu-item-icon">💬</span>
+          <span class="rs-menu-item-label">Ações</span>
+          <span class="rs-menu-item-badge verde" id="rs-menu-badge-fc" style="display:none">0</span>
+        </button>
+        <button class="rs-menu-item" id="rs-menu-relatorios"
+          style="background:#7c2d12" role="menuitem">
+          <span class="rs-menu-item-icon">📊</span>
+          <span class="rs-menu-item-label">Relatórios</span>
+        </button>
+        ${isAssinante ? `
+        <button class="rs-menu-item" id="rs-menu-desempenho"
+          style="background:#0f6b52" role="menuitem">
+          <span class="rs-menu-item-icon">🧠</span>
+          <span class="rs-menu-item-label">Meu Desempenho</span>
+        </button>` : ''}
+        ${academiaMenuHtml}
+        ${isAssinante ? `
+        <button class="rs-menu-item" id="rs-menu-area"
+          style="background:#5b21b6" role="menuitem">
+          <span class="rs-menu-item-icon">👤</span>
+          <span class="rs-menu-item-label">Minha Área</span>
+          <span class="rs-menu-item-tag">assinante</span>
+        </button>` : ''}
+      </div>
+      <div id="rs-menu-overlay"></div>
+    `;
+  }
+
+  // ── Bind de eventos ───────────────────────────────────────────────────────
+  function _bindEventos() {
+    const wrap = document.getElementById('rs-menu-wrap');
+    if (!wrap) return;
+    document.getElementById('rs-menu-btn')
+      ?.addEventListener('click', _toggleMenu);
+
+    document.getElementById('rs-menu-overlay')
+      ?.addEventListener('click', _fecharMenu);
+
+    // 📚 Edições — fluxo original (já validado em abrirDrawer)
+    document.getElementById('rs-menu-edicoes')
+      ?.addEventListener('click', () => {
+        _fecharMenu();
+        window.dispatchEvent(new CustomEvent('rs:abrirEdicoes'));
+      });
+
+    // 🔔 Sentinela — COM VALIDAÇÃO DE SESSÃO
+    document.getElementById('rs-menu-alertas')
+      ?.addEventListener('click', async () => {
+        _fecharMenu();
+        if (typeof window._checarSessaoCritica === 'function') {
+          if (!(await window._checarSessaoCritica())) return;
+        }
+        window._rsAlertasAbrir?.();
+      });
+
+    document.getElementById('rs-menu-calendario')
+      ?.addEventListener('click', async () => {
+        _fecharMenu();
+        if (typeof window._checarSessaoCritica === 'function') {
+          if (!(await window._checarSessaoCritica())) return;
+        }
+        window.dispatchEvent(new CustomEvent('rs:abrirCalendario'));
+      });
+
+    // 💬 Ações — COM VALIDAÇÃO DE SESSÃO
+    document.getElementById('rs-menu-fale')
+      ?.addEventListener('click', async () => {
+        _fecharMenu();
+        if (typeof window._checarSessaoCritica === 'function') {
+          if (!(await window._checarSessaoCritica())) return;
+        }
+        window._rsFcAbrir?.();
+      });
+    // 📊 Relatórios — painel com Parecer Fundeb + Conformidade
+    document.getElementById('rs-menu-relatorios')
+      ?.addEventListener('click', async () => {
+        _fecharMenu();
+        if (typeof window._checarSessaoCritica === 'function') {
+          if (!(await window._checarSessaoCritica())) return;
+        }
+        _abrirPainelRelatorios();
+      });
+    // 🧠 Meu Desempenho — com validação de sessão e controle de feature
+    document.getElementById('rs-menu-desempenho')
+      ?.addEventListener('click', async () => {
+        _fecharMenu();
+        if (typeof window._checarSessaoCritica === 'function') {
+          if (!(await window._checarSessaoCritica())) return;
+        }
+
+        const features = window._radarUser?.features || {};
+        const isAssinante = window._radarUser?.segmento === 'assinante';
+        const temAcesso = isAssinante && !!features.meu_desempenho;
+
+        if (!temAcesso) {
+          if (typeof _solicitarUpgrade === 'function') {
+            _solicitarUpgrade('meu_desempenho', isAssinante);
+          }
+          return;
+        }
+
+        _abrirModalDesempenho();
+      });
+    // 👤 Minha Área — abre modal com iframe
+    document.getElementById('rs-menu-area')
+      ?.addEventListener('click', () => {
+        _fecharMenu();
+        _abrirModalLogin();
+      });
+
+        // 👤 Minha Área — abre modal com iframe
+      document.getElementById('rs-menu-area')
+        ?.addEventListener('click', () => {
+          _fecharMenu();
+          _abrirModalLogin();
+        });
+
+  // 🎓 NOVO: Academia Radar SIOPE / Minha Academia
+    document.getElementById('rs-menu-academia')
+      ?.addEventListener('click', async () => {
+        _fecharMenu();
+        
+        // Validação de sessão de segurança
+        if (typeof window._checarSessaoCritica === 'function') {
+          if (!(await window._checarSessaoCritica())) return;
+        }
+        
+        // Re-cheque o status atual no localStorage para decidir a ação
+        const sessao = JSON.parse(localStorage.getItem('rs_pwa_session') || '{}');
+        const academiaStatus = sessao.academia?.status;
+
+        if (academiaStatus === 'membro') {
+          // Futuro: Aqui abrirá o Dashboard da Academia (academiaDashboard.js)
+          // Por enquanto, um feedback visual ou redirecionamento:
+          alert('🏆 Bem-vindo à sua Academia! (Dashboard em implementação)');
+          // window.location.href = '/academia-dashboard.html'; // Descomente quando tiver a página
+        } else {
+          // Abre o modal de convite (forçando, pois o usuário pode ter clicado em "recusado" antes)
+          if (window.AcademiaConvite) {
+            window.AcademiaConvite._reset();
+            window.AcademiaConvite.verificar(true); // true = forçar abertura, ignorando cooldown/recusa
+          }
+        }
+      });
+
+    // ESC fecha
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape') _fecharMenu();
+    });
+
+    // ESC fecha
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape') _fecharMenu();
+    });
+
+    // Atualiza badges periodicamente
+    setInterval(_atualizarBadges, 30000);
+    setTimeout(_atualizarBadges, 1000);
+  }
+
+  // ── Toggle / Abrir / Fechar ───────────────────────────────────────────────
+  let _aberto = false;
+
+  function _toggleMenu() {
+    _aberto ? _fecharMenu() : _abrirMenu();
+  }
+
+  function _abrirMenu() {
+    _aberto = true;
+    document.getElementById('rs-menu-btn')?.classList.add('open');
+    document.getElementById('rs-menu-btn')?.setAttribute('aria-expanded', 'true');
+    document.getElementById('rs-menu-dropdown')?.classList.add('open');
+    document.getElementById('rs-menu-overlay')?.classList.add('open');
+    // Oculta badge total ao abrir
+    const tb = document.getElementById('rs-menu-total-badge');
+    if (tb) tb.style.opacity = '0';
+  }
+
+  function _fecharMenu() {
+    _aberto = false;
+    document.getElementById('rs-menu-btn')?.classList.remove('open');
+    document.getElementById('rs-menu-btn')?.setAttribute('aria-expanded', 'false');
+    document.getElementById('rs-menu-dropdown')?.classList.remove('open');
+    document.getElementById('rs-menu-overlay')?.classList.remove('open');
+    // Restaura badge total
+    const tb = document.getElementById('rs-menu-total-badge');
+    if (tb) tb.style.opacity = '1';
+  }
+
+  // ── Badges ────────────────────────────────────────────────────────────────
+  function _atualizarBadges() {
+    // Alertas — lê do badge da central
+    window._rsAlertasBadgeAtualizar?.();
+    // Fale Conosco — lê do badge do fc
+    window._rsFcBadgeAtualizar?.();
+    // Após breve delay, lê os valores e atualiza o total
+    setTimeout(_atualizarTotalBadge, 500);
+  }
+
+  function _atualizarTotalBadge() {
+    // Lê badges individuais
+    const bAlertas = _getBadgeCount('rs-alertas-badge');
+    const bFc = _getBadgeCount('rs-fc-badge');
+    const total = bAlertas + bFc;
+
+    // Atualiza badges individuais no menu
+    _setBadge('rs-menu-badge-alertas', bAlertas);
+    _setBadge('rs-menu-badge-fc', bFc, true);
+
+    // Atualiza total no hamburger
+    const tb = document.getElementById('rs-menu-total-badge');
+    if (tb) {
+      tb.textContent = total > 9 ? '9+' : String(total);
+      tb.style.display = total > 0 ? 'block' : 'none';
+    }
+  }
+
+  function _getBadgeCount(id) {
+    const el = document.getElementById(id);
+    if (!el || el.style.display === 'none') return 0;
+    return parseInt(el.textContent) || 0;
+  }
+
+  function _setBadge(id, count) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.textContent = count > 9 ? '9+' : String(count);
+    el.style.display = count > 0 ? 'inline-block' : 'none';
+  }
+
+  // ── Modal de login ───────────────────────────────────────────────────────
+  function _abrirModalLogin() {
+    if (!document.getElementById('rs-login-modal')) {
+      const modal = document.createElement('div');
+      modal.id = 'rs-login-modal';
+      modal.style.cssText = `
+      position: fixed; inset: 0; z-index: 9000;
+      background: rgba(0,0,0,.7);
+      display: flex; align-items: center; justify-content: center;
+      backdrop-filter: blur(3px);
+      animation: rsFadeIn .2s ease;
+    `;
+      const _emailParam = window._radarUser?.email
+        ? '?email=' + encodeURIComponent(window._radarUser.email) : '';
+      modal.innerHTML = `
+      <style>
+        @keyframes rsFadeIn { from { opacity:0 } to { opacity:1 } }
+        @keyframes rsSlideUp { from { opacity:0; transform:translateY(20px) } to { opacity:1; transform:translateY(0) } }
+        #rs-login-iframe-wrap {
+          background: #fff; border-radius: 16px;
+          width: min(420px, 94vw); height: min(520px, 90vh);
+          position: relative; overflow: hidden;
+          box-shadow: 0 8px 40px rgba(0,0,0,.4);
+          animation: rsSlideUp .25s ease;
+        }
+        #rs-login-iframe { width: 100%; height: 100%; border: none; }
+        #rs-login-fechar {
+          position: absolute; top: 10px; right: 12px;
+          background: rgba(0,0,0,.15); border: none;
+          border-radius: 50%; width: 28px; height: 28px;
+          color: #fff; font-size: 16px; cursor: pointer;
+          display: flex; align-items: center; justify-content: center;
+          z-index: 1; transition: background .15s;
+        }
+        #rs-login-fechar:hover { background: rgba(0,0,0,.3); }
+      </style>
+      <div id="rs-login-iframe-wrap">
+        <button id="rs-login-fechar" onclick="window._rsFecharLogin()">×</button>
+        <iframe id="rs-login-iframe" src="/login.html${_emailParam}" title="Minha Área"></iframe>
+      </div>`;
+
+      modal.addEventListener('click', e => {
+        if (e.target === modal) _fecharModalLogin();
+      });
+      document.body.appendChild(modal);
+
+      // ── Injeta loginUsuario no iframe após carregamento ──────────────────────
+      // Necessário porque site.js pode não estar carregado no contexto do iframe
+      const iframe = document.getElementById('rs-login-iframe');
+      iframe.addEventListener('load', function () {
+        // site.js já carregado em login.html — loginUsuario disponível nativamente
+        // Nenhuma injeção necessária
+      });
+
+    } else {
+      document.getElementById('rs-login-modal').style.display = 'flex';
+    }
+  }
+
+  function _fecharModalLogin() {
+    const modal = document.getElementById('rs-login-modal');
+    if (modal) {
+      modal.style.opacity = '0';
+      modal.style.transition = 'opacity .2s';
+      setTimeout(() => modal.remove(), 200);
+    }
+  }
+
+  window._rsFecharLogin = _fecharModalLogin;
+
+  // ── Modal de Meu Desempenho (resumo geral do quiz) ─────────────────────────
+  function _abrirModalDesempenho() {
+    const uid = window._radarUser?.uid;
+    if (!uid) return;
+
+    if (!document.getElementById('rs-quiz-resumo-modal')) {
+      const modal = document.createElement('div');
+      modal.id = 'rs-quiz-resumo-modal';
+      modal.style.cssText = `
+        position: fixed; inset: 0; z-index: 9000;
+        background: rgba(0,0,0,.7);
+        display: flex; align-items: center; justify-content: center;
+        backdrop-filter: blur(3px);
+        animation: rsFadeIn .2s ease;
+        padding: 16px;
+      `;
+      modal.innerHTML = `
+        <style>
+          @keyframes rsFadeIn { from { opacity:0 } to { opacity:1 } }
+          @keyframes rsSlideUp { from { opacity:0; transform:translateY(20px) } to { opacity:1; transform:translateY(0) } }
+          #rs-quiz-resumo-wrap {
+            background: linear-gradient(180deg, #13233a, #0f1b2e);
+            border: 1px solid rgba(255,255,255,.08);
+            border-radius: 16px;
+            width: min(440px, 94vw); max-height: min(600px, 90vh);
+            overflow-y: auto; -webkit-overflow-scrolling: touch;
+            position: relative; padding: 24px 20px 20px;
+            box-shadow: 0 8px 40px rgba(0,0,0,.5);
+            animation: rsSlideUp .25s ease;
+          }
+          #rs-quiz-resumo-fechar {
+            position: absolute; top: 12px; right: 12px;
+            background: rgba(255,255,255,.1); border: none;
+            border-radius: 50%; width: 28px; height: 28px;
+            color: #fff; font-size: 16px; cursor: pointer;
+            display: flex; align-items: center; justify-content: center;
+            z-index: 1; transition: background .15s;
+            -webkit-tap-highlight-color: transparent;
+          }
+          #rs-quiz-resumo-fechar:hover { background: rgba(255,255,255,.22); }
+          .rs-quiz-resumo-titulo {
+            font-family: 'Syne', system-ui, sans-serif;
+            font-size: 15px; font-weight: 800; color: #fff;
+            margin: 0 0 16px; padding-right: 24px;
+          }
+        </style>
+        <div id="rs-quiz-resumo-wrap">
+          <button id="rs-quiz-resumo-fechar" type="button" aria-label="Fechar">×</button>
+          <h3 class="rs-quiz-resumo-titulo">🧠 Meu Desempenho no Quiz</h3>
+          <div id="quiz-resumo-container"></div>
+        </div>
+      `;
+
+      modal.addEventListener('click', e => {
+        if (e.target === modal) _fecharModalDesempenho();
+      });
+      document.body.appendChild(modal);
+      document.getElementById('rs-quiz-resumo-fechar')
+        .addEventListener('click', _fecharModalDesempenho);
+    } else {
+      document.getElementById('rs-quiz-resumo-modal').style.display = 'flex';
+    }
+
+    if (window.QuizResumoManager?.renderizar) {
+      window.QuizResumoManager.renderizar('quiz-resumo-container', uid);
+    } else {
+      console.warn('[menuApp] QuizResumoManager não encontrado — confira se quizResumo.js foi incluído na página.');
+    }
+  }
+
+  function _fecharModalDesempenho() {
+    const modal = document.getElementById('rs-quiz-resumo-modal');
+    if (modal) {
+      modal.style.opacity = '0';
+      modal.style.transition = 'opacity .2s';
+      setTimeout(() => modal.remove(), 200);
+    }
+  }
+
+  window._rsFecharDesempenho = _fecharModalDesempenho;
+
+  // ── Recebe mensagens do iframe de login ──────────────────────────────────────
+  window.addEventListener('message', function (e) {
+    // Botão "← Voltar ao app" dentro do iframe
+    if (e.data?.tipo === 'rs:fecharModal') {
+      _fecharModalLogin();
+      return;
+    }
+
+    // Login concluído: navega o iframe para painel.html
+    if (e.data?.tipo === 'rs:loginSucesso') {
+      const destino = e.data?.destino || 'painel.html';
+      const iframe = document.getElementById('rs-login-iframe');
+      const wrap = document.getElementById('rs-login-iframe-wrap');
+      if (wrap) {
+        wrap.style.width = 'min(700px, 96vw)';
+        wrap.style.height = 'min(700px, 92vh)';
+      }
+      if (iframe) iframe.src = '/' + destino;
+      return;
+    }
+  });
+
+  // Expõe para uso externo
+  window._rsMenuFechar = _fecharMenu;
+  window._rsMenuAtualizarBadges = _atualizarTotalBadge;
+
+  // ── Painel de Relatórios (Parecer Fundeb + Conformidade) ─────────────────
+  function _abrirPainelRelatorios() {
+    if (document.getElementById('rs-relatorios-modal')) {
+      document.getElementById('rs-relatorios-modal').style.display = 'flex';
+      return;
+    }
+
+    const features = window._radarUser?.features || {};
+    const isAssinante = window._radarUser?.segmento === 'assinante';
+    const temParecer = isAssinante && !!features.parecer_fundeb;
+    const temConformidade = isAssinante && !!features.relatorio_conformidade;
+
+    const modal = document.createElement('div');
+    modal.id = 'rs-relatorios-modal';
+    modal.style.cssText = `
+      position: fixed; inset: 0; z-index: 9000;
+      background: rgba(0,0,0,.7);
+      display: flex; align-items: center; justify-content: center;
+      backdrop-filter: blur(3px);
+      animation: rsFadeIn .2s ease;
+      padding: 16px;
+    `;
+
+    const cardBase = (bloqueado) => `
+      display: flex; align-items: center; gap: 14px;
+      padding: 16px;
+      background: ${bloqueado ? 'rgba(255,255,255,.03)' : 'rgba(255,255,255,.07)'};
+      border: 1.5px solid ${bloqueado ? 'rgba(255,255,255,.08)' : 'rgba(255,255,255,.15)'};
+      border-radius: 12px;
+      cursor: ${bloqueado ? 'default' : 'pointer'};
+      transition: all .15s ease;
+      text-align: left;
+      width: 100%;
+      color: #fff;
+      font-family: inherit;
+    `;
+
+    modal.innerHTML = `
+      <style>
+        @keyframes rsFadeIn { from { opacity:0 } to { opacity:1 } }
+        @keyframes rsSlideUp { from { opacity:0; transform:translateY(20px) } to { opacity:1; transform:translateY(0) } }
+        #rs-relatorios-wrap {
+          background: linear-gradient(180deg, #13233a, #0f1b2e);
+          border: 1px solid rgba(255,255,255,.08);
+          border-radius: 16px;
+          width: min(380px, 94vw);
+          position: relative; padding: 24px 20px 20px;
+          box-shadow: 0 8px 40px rgba(0,0,0,.5);
+          animation: rsSlideUp .25s ease;
+        }
+        #rs-relatorios-fechar {
+          position: absolute; top: 12px; right: 12px;
+          background: rgba(255,255,255,.1); border: none;
+          border-radius: 50%; width: 28px; height: 28px;
+          color: #fff; font-size: 16px; cursor: pointer;
+          display: flex; align-items: center; justify-content: center;
+          z-index: 1; transition: background .15s;
+        }
+        #rs-relatorios-fechar:hover { background: rgba(255,255,255,.22); }
+        .rs-rel-titulo {
+          font-family: 'Syne', system-ui, sans-serif;
+          font-size: 15px; font-weight: 800; color: #fff;
+          margin: 0 0 16px; padding-right: 24px;
+        }
+        .rs-rel-card { ${cardBase(false)} }
+        .rs-rel-card.bloqueado { ${cardBase(true)} }
+        .rs-rel-card:not(.bloqueado):hover { background: rgba(255,255,255,.12); border-color: rgba(255,255,255,.25); }
+        .rs-rel-icone { font-size: 24px; flex-shrink: 0; }
+        .rs-rel-info { flex: 1; }
+        .rs-rel-nome { font-size: 14px; font-weight: 700; margin-bottom: 2px; }
+        .rs-rel-desc { font-size: 12px; opacity: .65; }
+        .rs-rel-lock { font-size: 16px; opacity: .5; }
+        .rs-rel-cards { display: flex; flex-direction: column; gap: 10px; }
+      </style>
+      <div id="rs-relatorios-wrap">
+        <button id="rs-relatorios-fechar" type="button" aria-label="Fechar">×</button>
+        <h3 class="rs-rel-titulo">📊 Relatórios</h3>
+        <div class="rs-rel-cards">
+          <button class="rs-rel-card ${!temParecer ? 'bloqueado' : ''}" id="rs-rel-parecer" type="button">
+            <span class="rs-rel-icone">⚖️</span>
+            <div class="rs-rel-info">
+              <div class="rs-rel-nome">Parecer Fundeb</div>
+              <div class="rs-rel-desc">Análise da aplicação de recursos do Fundeb</div>
+            </div>
+            ${!temParecer ? '<span class="rs-rel-lock">🔒</span>' : '<span style="opacity:.5">→</span>'}
+          </button>
+          <button class="rs-rel-card ${!temConformidade ? 'bloqueado' : ''}" id="rs-rel-conformidade" type="button">
+            <span class="rs-rel-icone">📋</span>
+            <div class="rs-rel-info">
+              <div class="rs-rel-nome">Conformidade Municipal</div>
+              <div class="rs-rel-desc">Relatório de conformidade do município</div>
+            </div>
+            ${!temConformidade ? '<span class="rs-rel-lock">🔒</span>' : '<span style="opacity:.5">→</span>'}
+          </button>
+        </div>
+      </div>
+    `;
+
+    modal.addEventListener('click', e => {
+      if (e.target === modal) _fecharPainelRelatorios();
+    });
+    document.body.appendChild(modal);
+
+    document.getElementById('rs-relatorios-fechar')
+      ?.addEventListener('click', _fecharPainelRelatorios);
+
+    // ── Ação: Parecer Fundeb ───────────────────────────────────────────────
+    document.getElementById('rs-rel-parecer')?.addEventListener('click', () => {
+      if (!temParecer) {
+        if (typeof _solicitarUpgrade === 'function') _solicitarUpgrade('parecer_fundeb', isAssinante);
+        return;
+      }
+      _fecharPainelRelatorios();
+      window.dispatchEvent(new CustomEvent('rs:abrirParecerFundeb'));
+    });
+
+    // ── Ação: Conformidade ─────────────────────────────────────────────────
+    document.getElementById('rs-rel-conformidade')?.addEventListener('click', () => {
+      if (!temConformidade) {
+        if (typeof _solicitarUpgrade === 'function') _solicitarUpgrade('relatorio', isAssinante);
+        return;
+      }
+      _fecharPainelRelatorios();
+      window._abrirRelatorioConformidade();
+    });
+  }
+
+  function _fecharPainelRelatorios() {
+    const modal = document.getElementById('rs-relatorios-modal');
+    if (modal) {
+      modal.style.opacity = '0';
+      modal.style.transition = 'opacity .2s';
+      setTimeout(() => modal.remove(), 200);
+    }
+  }
+
+  window._rsFecharRelatorios = _fecharPainelRelatorios;
+  // ── Boot ──────────────────────────────────────────────────────────────────
+  function _boot() {
+    if (window._radarUser && window.db) {
+      init();
+    } else {
+      window.addEventListener('radarUserReady', () => {
+        setTimeout(init, 600);
+      }, { once: true });
+    }
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', _boot);
+  } else {
+    _boot();
+  }
+
+})();
