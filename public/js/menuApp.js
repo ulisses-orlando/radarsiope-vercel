@@ -242,33 +242,30 @@
       }
     } catch (e) { /* ignora */ }
 
-    // 3. Decide se mostra o botão
+    // 3. Decide se mostra os botões da Academia
     let academiaMenuHtml = '';
-    if (isAssinante && academiaHabilitada) {
-      // Mostra se: nunca viu, está pendente, ou recusou (para permitir adesão manual)
-      // NÃO mostra se já for 'membro' (nesse caso, mostraremos "Minha Academia")
-      const deveMostrarConvite = !academiaStatus || 
-                                academiaStatus === 'pendente' || 
-                                academiaStatus === 'recusado';
-      
-      const ehMembro = academiaStatus === 'membro';
 
-      if (ehMembro) {
-        academiaMenuHtml = `
-          <button class="rs-menu-item" id="rs-menu-academia"
+    if (isAssinante && academiaHabilitada) {
+      // Botão 1: Academia Adesão (sempre visível para não-membros)
+      if (academiaStatus !== 'membro') {
+        academiaMenuHtml += `
+          <button class="rs-menu-item" id="rs-menu-academia-adesao"
+            style="background:linear-gradient(135deg, #8b5cf6, #6366f1)" role="menuitem">
+            <span class="rs-menu-item-icon">🎓</span>
+            <span class="rs-menu-item-label">Academia Adesão</span>
+            <span class="rs-menu-item-tag">novo</span>
+          </button>
+        `;
+      }
+      
+      // Botão 2: Minha Academia (sempre visível para membros)
+      if (academiaStatus === 'membro') {
+        academiaMenuHtml += `
+          <button class="rs-menu-item" id="rs-menu-minha-academia"
             style="background:linear-gradient(135deg, #8b5cf6, #6366f1)" role="menuitem">
             <span class="rs-menu-item-icon">🏆</span>
             <span class="rs-menu-item-label">Minha Academia</span>
             <span class="rs-menu-item-tag">ativo</span>
-          </button>
-        `;
-      } else if (deveMostrarConvite) {
-        academiaMenuHtml = `
-          <button class="rs-menu-item" id="rs-menu-academia"
-            style="background:linear-gradient(135deg, #8b5cf6, #6366f1)" role="menuitem">
-            <span class="rs-menu-item-icon">🎓</span>
-            <span class="rs-menu-item-label">Academia Radar SIOPE</span>
-            <span class="rs-menu-item-tag">novo</span>
           </button>
         `;
       }
@@ -419,8 +416,8 @@
           _abrirModalLogin();
         });
 
-  // 🎓 NOVO: Academia Radar SIOPE / Minha Academia
-    document.getElementById('rs-menu-academia')
+    // 🎓 Academia Adesão — abre modal de convite (forçado)
+    document.getElementById('rs-menu-academia-adesao')
       ?.addEventListener('click', async () => {
         _fecharMenu();
         
@@ -429,23 +426,30 @@
           if (!(await window._checarSessaoCritica())) return;
         }
         
-        // Re-cheque o status atual no localStorage para decidir a ação
-        const sessao = JSON.parse(localStorage.getItem('rs_pwa_session') || '{}');
-        const academiaStatus = sessao.academia?.status;
-
-        if (academiaStatus === 'membro') {
-          // Futuro: Aqui abrirá o Dashboard da Academia (academiaDashboard.js)
-          // Por enquanto, um feedback visual ou redirecionamento:
-          alert('🏆 Bem-vindo à sua Academia! (Dashboard em implementação)');
-          // window.location.href = '/academia-dashboard.html'; // Descomente quando tiver a página
-        } else {
-          // Abre o modal de convite (forçando, pois o usuário pode ter clicado em "recusado" antes)
-          if (window.AcademiaConvite) {
-            window.AcademiaConvite._reset();
-            window.AcademiaConvite.verificar(true); // true = forçar abertura, ignorando cooldown/recusa
-          }
+        // Abre o modal de convite (forçando, pois o usuário pode ter clicado em "recusado" antes)
+        if (window.AcademiaConvite) {
+          window.AcademiaConvite._reset();
+          window.AcademiaConvite.verificar(true); // true = forçar abertura, ignorando cooldown/recusa
         }
-      });
+    });
+
+    // 🏆 Minha Academia — abre dashboard da academia
+    document.getElementById('rs-menu-minha-academia')
+      ?.addEventListener('click', async () => {
+        _fecharMenu();
+        
+        // Validação de sessão de segurança
+        if (typeof window._checarSessaoCritica === 'function') {
+          if (!(await window._checarSessaoCritica())) return;
+        }
+        
+        // Abre o dashboard da Academia
+        if (typeof window.AcademiaDashboard?.abrir === 'function') {
+          window.AcademiaDashboard.abrir();
+        } else {
+          alert('🏆 Dashboard da Academia em implementação');
+        }
+    });
 
     // ESC fecha
     document.addEventListener('keydown', e => {
