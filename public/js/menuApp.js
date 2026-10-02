@@ -433,7 +433,7 @@
         }
     });
 
-    // 🏆 Minha Academia — abre dashboard da academia
+     // 🏆 Minha Academia — abre dashboard da academia
     document.getElementById('rs-menu-minha-academia')
       ?.addEventListener('click', async () => {
         _fecharMenu();
@@ -443,10 +443,14 @@
           if (!(await window._checarSessaoCritica())) return;
         }
         
-        // Abre o dashboard da Academia
-        if (typeof window.AcademiaDashboard?.abrir === 'function') {
-          window.AcademiaDashboard.abrir();
+        // ✅ CORREÇÃO: Captura o uid do usuário logado
+        const uid = window._radarUser?.uid;
+        
+        // Abre o dashboard da Academia passando o uid
+        if (uid && typeof window.AcademiaDashboard?.abrir === 'function') {
+          window.AcademiaDashboard.abrir(uid);
         } else {
+          console.warn('[menuApp] UID não encontrado ou Dashboard não carregado.');
           alert('🏆 Dashboard da Academia em implementação');
         }
     });
