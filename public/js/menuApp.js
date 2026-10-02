@@ -6,10 +6,40 @@
 (function () {
   'use strict';
 
+
+  // ── Cache da Feature Flag (evita 1000 reads no Firestore) ─────────────────
+  async function _isAcademiaHabilitada() {
+    const CACHE_KEY = 'rs_config_academia_cache';
+    const TTL_MS = 60 * 60 * 1000; // 1 hora
+
+    try {
+      const cacheStr = localStorage.getItem(CACHE_KEY);
+      if (cacheStr) {
+        const cache = JSON.parse(cacheStr);
+        if (Date.now() - cache.ts < TTL_MS) {
+          return cache.habilitada === true;
+        }
+      }
+      
+      // Cache expirado ou inexistente: busca no Firestore (apenas 1 vez por hora por dispositivo)
+      const configSnap = await window.db.collection('config_academia').doc('selos').get();
+      const habilitada = configSnap.data()?.academia_habilitada === true;
+      
+      localStorage.setItem(CACHE_KEY, JSON.stringify({
+        habilitada,
+        ts: Date.now()
+      }));
+      return habilitada;
+    } catch (e) {
+      console.warn('[menuApp] Falha ao verificar flag da Academia, assumindo desativada:', e);
+      return false;
+    }
+  }
   // ── Inicialização ─────────────────────────────────────────────────────────
-  function init() {
+ // CORREÇÃO: tornar a função async e aguardar o render
+  async function init() {
     _injetarCSS();
-    _renderMenu();
+    await _renderMenu(); // <-- ADICIONE O AWAIT AQUI
     _bindEventos();
     _atualizarTotalBadge();
   }
@@ -136,6 +166,9 @@
       #rs-menu-dropdown.open .rs-menu-item:nth-child(4) { transition: opacity .16s ease .14s, transform .16s ease .14s, filter .15s; }
       #rs-menu-dropdown.open .rs-menu-item:nth-child(5) { transition: opacity .16s ease .18s, transform .16s ease .18s, filter .15s; }
       #rs-menu-dropdown.open .rs-menu-item:nth-child(6) { transition: opacity .16s ease .22s, transform .16s ease .22s, filter .15s; }
+      #rs-menu-dropdown.open .rs-menu-item:nth-child(7) { transition: opacity .16s ease .26s, transform .16s ease .26s, filter .15s; }
+      #rs-menu-dropdown.open .rs-menu-item:nth-child(8) { transition: opacity .16s ease .30s, transform .16s ease .30s, filter .15s; }
+
       .rs-menu-item:hover { filter: brightness(1.15); }
       .rs-menu-item:active { transform: scale(.97); }
 
@@ -176,15 +209,62 @@
     document.head.appendChild(style);
   }
 
-  // ── Render do menu ────────────────────────────────────────────────────────
-  function _renderMenu() {
+  // ── Render do menu (Otimizado: Zero leituras no Firestore) ────────────────
+  async function _renderMenu() {
     const wrap = document.getElementById('rs-menu-wrap');
     if (!wrap) return;
-
+    
     const user = window._radarUser;
     const isAssinante = user?.segmento === 'assinante';
-
     wrap.style.position = 'relative';
+
+    // 1. Verifica Feature Flag via Cache (rápido)
+    const academiaHabilitada = await _isAcademiaHabilitada();
+
+    // 2. Lê status da Academia direto da sessão local (evita read no Firestore)
+    let academiaStatus = null;
+    let academiaUltimaExibicao = null;
+    try {
+      const sessao = JSON.parse(localStorage.getItem('rs_pwa_session') || '{}');
+      if (sessao.academia) {
+        academiaStatus = sessao.academia.status;
+        academiaUltimaExibicao = sessao.academia.convite_ultima_exibicao;
+      }
+    } catch (e) { /* ignora */ }
+
+    // 3. Decide se mostra o botão
+    let academiaMenuHtml = '';
+    if (isAssinante && academiaHabilitada) {
+      // Mostra se: nunca viu, está pendente, ou recusou (para permitir adesão manual)
+      // NÃO mostra se já for 'membro' (nesse caso, mostraremos "Minha Academia")
+      const deveMostrarConvite = !academiaStatus || 
+                                academiaStatus === 'pendente' || 
+                                academiaStatus === 'recusado';
+      
+      const ehMembro = academiaStatus === 'membro';
+
+      if (ehMembro) {
+        academiaMenuHtml = `
+          <button class="rs-menu-item" id="rs-menu-academia"
+            style="background:linear-gradient(135deg, #8b5cf6, #6366f1)" role="menuitem">
+            <span class="rs-menu-item-icon">🏆</span>
+            <span class="rs-menu-item-label">Minha Academia</span>
+            <span class="rs-menu-item-tag">ativo</span>
+          </button>
+        `;
+      } else if (deveMostrarConvite) {
+        academiaMenuHtml = `
+          <button class="rs-menu-item" id="rs-menu-academia"
+            style="background:linear-gradient(135deg, #8b5cf6, #6366f1)" role="menuitem">
+            <span class="rs-menu-item-icon">🎓</span>
+            <span class="rs-menu-item-label">Academia Radar SIOPE</span>
+            <span class="rs-menu-item-tag">novo</span>
+          </button>
+        `;
+      }
+    }
+
+    // 4. Renderiza o HTML
     wrap.innerHTML = `
       <button id="rs-menu-btn" type="button" aria-label="Central" aria-expanded="false">
         <div class="rs-ham">
@@ -193,7 +273,6 @@
         Central
         <div id="rs-menu-total-badge" style="display:none">0</div>
       </button>
-
       <div id="rs-menu-dropdown" role="menu">
         <button class="rs-menu-item" id="rs-menu-edicoes"
           style="background:#0A3D62" role="menuitem">
@@ -228,6 +307,7 @@
           <span class="rs-menu-item-icon">🧠</span>
           <span class="rs-menu-item-label">Meu Desempenho</span>
         </button>` : ''}
+        ${academiaMenuHtml}
         ${isAssinante ? `
         <button class="rs-menu-item" id="rs-menu-area"
           style="background:#5b21b6" role="menuitem">
@@ -236,7 +316,6 @@
           <span class="rs-menu-item-tag">assinante</span>
         </button>` : ''}
       </div>
-
       <div id="rs-menu-overlay"></div>
     `;
   }
@@ -322,6 +401,46 @@
         _fecharMenu();
         _abrirModalLogin();
       });
+
+        // 👤 Minha Área — abre modal com iframe
+      document.getElementById('rs-menu-area')
+        ?.addEventListener('click', () => {
+          _fecharMenu();
+          _abrirModalLogin();
+        });
+
+  // 🎓 NOVO: Academia Radar SIOPE / Minha Academia
+    document.getElementById('rs-menu-academia')
+      ?.addEventListener('click', async () => {
+        _fecharMenu();
+        
+        // Validação de sessão de segurança
+        if (typeof window._checarSessaoCritica === 'function') {
+          if (!(await window._checarSessaoCritica())) return;
+        }
+        
+        // Re-cheque o status atual no localStorage para decidir a ação
+        const sessao = JSON.parse(localStorage.getItem('rs_pwa_session') || '{}');
+        const academiaStatus = sessao.academia?.status;
+
+        if (academiaStatus === 'membro') {
+          // Futuro: Aqui abrirá o Dashboard da Academia (academiaDashboard.js)
+          // Por enquanto, um feedback visual ou redirecionamento:
+          alert('🏆 Bem-vindo à sua Academia! (Dashboard em implementação)');
+          // window.location.href = '/academia-dashboard.html'; // Descomente quando tiver a página
+        } else {
+          // Abre o modal de convite (forçando, pois o usuário pode ter clicado em "recusado" antes)
+          if (window.AcademiaConvite) {
+            window.AcademiaConvite._reset();
+            window.AcademiaConvite.verificar(true); // true = forçar abertura, ignorando cooldown/recusa
+          }
+        }
+      });
+
+    // ESC fecha
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape') _fecharMenu();
+    });
 
     // ESC fecha
     document.addEventListener('keydown', e => {

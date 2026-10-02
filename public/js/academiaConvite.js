@@ -395,13 +395,22 @@ Tom híbrido: formal em pontos críticos (LGPD, certificados), amigável no rest
 
       const data = await resp.json();
 
-      // ✅ CORREÇÃO: verificar data.ok em vez de data.status
-      if (resp.ok && data.ok) {
+      if (resp.ok && (data.status === 'membro' || data.status === 'ja_membro' || data.ok)) { // data.ok para compatibilidade com sua API atual
+      
+        // ✅ SINCRONIZA COM LOCALSTORAGE
+        const sessao = JSON.parse(localStorage.getItem('rs_pwa_session') || '{}');
+        sessao.academia = { status: 'membro', data_adesao: new Date().toISOString() };
+        localStorage.setItem('rs_pwa_session', JSON.stringify(sessao));
+
         _fecharTudo();
         _mostrarToast('🎉 Bem-vindo à Academia Radar SIOPE!');
-        console.info('[academiaConvite] Adesão confirmada com sucesso:', data);
+        console.info('[academiaConvite] Adesão confirmada com sucesso.');
+        
+        // Opcional: recarregar o menu para trocar o botão instantaneamente
+        if (typeof window._rsMenuAtualizarBadges === 'function') window._rsMenuAtualizarBadges(); 
+          // Ou simplesmente: location.reload(); se preferir um refresh limpo
       } else {
-        throw new Error(data.message || data.erro || 'Erro desconhecido');
+        throw new Error(data.erro || data.message || 'Erro desconhecido');
       }
     } catch (e) {
       console.error('[academiaConvite] Falha na adesão:', e);
@@ -418,6 +427,11 @@ Tom híbrido: formal em pontos críticos (LGPD, certificados), amigável no rest
           convite_ultima_exibicao: new Date().toISOString()
         }
       }, { merge: true });
+        // ✅ SINCRONIZA COM LOCALSTORAGE
+      const sessao = JSON.parse(localStorage.getItem('rs_pwa_session') || '{}');
+      if (!sessao.academia) sessao.academia = {};
+      sessao.academia.status = 'pendente'; // ou mantém como estava
+      sessao.academia.convite_ultima_exibicao = agora
       console.info(`[academiaConvite] Adiado — volta em ${_cooldownDias} dias.`);
     } catch (e) {
       console.warn('[academiaConvite] Falha ao gravar adiamento:', e);
@@ -434,12 +448,21 @@ Tom híbrido: formal em pontos críticos (LGPD, certificados), amigável no rest
     if (!confirmar) return;
 
     try {
+      const agoraISO = new Date().toISOString();
+      
+      // Grava no Firestore
       await window.db.collection('usuarios').doc(_uidAtual).set({
         academia: {
           status: 'recusado',
-          data_recusa: new Date().toISOString()
+          data_recusa: agoraISO
         }
       }, { merge: true });
+
+      // ✅ SINCRONIZA COM LOCALSTORAGE
+      const sessao = JSON.parse(localStorage.getItem('rs_pwa_session') || '{}');
+      sessao.academia = { status: 'recusado', data_recusa: agoraISO };
+      localStorage.setItem('rs_pwa_session', JSON.stringify(sessao));
+
       console.info('[academiaConvite] Convite recusado.');
     } catch (e) {
       console.warn('[academiaConvite] Falha ao gravar recusa:', e);
