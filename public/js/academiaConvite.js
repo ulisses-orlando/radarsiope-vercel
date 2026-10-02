@@ -431,7 +431,7 @@ Tom híbrido: formal em pontos críticos (LGPD, certificados), amigável no rest
       const sessao = JSON.parse(localStorage.getItem('rs_pwa_session') || '{}');
       if (!sessao.academia) sessao.academia = {};
       sessao.academia.status = 'pendente'; // ou mantém como estava
-      sessao.academia.convite_ultima_exibicao = agora
+      sessao.academia.convite_ultima_exibicao = new Date().toISOString();
       console.info(`[academiaConvite] Adiado — volta em ${_cooldownDias} dias.`);
     } catch (e) {
       console.warn('[academiaConvite] Falha ao gravar adiamento:', e);
