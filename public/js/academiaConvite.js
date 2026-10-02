@@ -407,7 +407,7 @@ Tom híbrido: formal em pontos críticos (LGPD, certificados), amigável no rest
           window._rsMenuAtualizarBadges();
         }
         _fecharTudo();
-        _mostrarToast('🎉 Bem-vindo à Academia Radar SIOPE!');
+        _mostrarToast('🎉 Bem-vindo à Academia Radar SIOPE! Em instantes, você poderá acessar pela Central do app.');
         console.info('[academiaConvite] Adesão confirmada com sucesso.');
         
         // Opcional: recarregar o menu para trocar o botão instantaneamente
