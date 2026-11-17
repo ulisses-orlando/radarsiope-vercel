@@ -1223,6 +1223,17 @@ async function _handleGerarCobrancaCancelamento(req, res) {
   }
 }
 
+// Marca a fonte do quiz (newsletter ou quiz especial) como "já respondida".
+// O admin usa esse flag para travar a estrutura do quiz.
+async function _marcarQuizRespondido(fonteRef, tipo, fonteData) {
+  const jaMarcado = tipo === 'especial'
+    ? fonteData.tem_respostas === true
+    : fonteData.quiz?.tem_respostas === true;
+  if (jaMarcado) return;
+  const campo = tipo === 'especial' ? 'tem_respostas' : 'quiz.tem_respostas';
+  await fonteRef.update({ [campo]: true });
+}
+
 // ─── Iniciar tentativa de quiz (cria doc com status 'em_andamento') ─────────
 // Garante que abrir o quiz já consome uma tentativa, impedindo burla por
 // repetição de abertura. Se houver tentativa 'em_andamento' com mais de 30 min,
@@ -1310,6 +1321,10 @@ async function _handleQuizIniciar(req, res) {
       finalizado_em: null
     };
     if (tipo === 'especial') novoDoc.nivel_alvo = fonteData.nivel_alvo || null;
+
+        // Marca antes de criar a tentativa: se falhar, o pior caso é travar a mais
+    await _marcarQuizRespondido(fonteDoc.ref, tipo, fonteData)
+      .catch(e => console.warn('[quiz-iniciar] Falha ao marcar tem_respostas:', e.message));
 
     const ref = await resultadosRef.add(novoDoc);
 
@@ -1436,6 +1451,8 @@ async function _handleSalvarResultadoQuiz(req, res) {
         finalizado_em: admin.firestore.FieldValue.serverTimestamp()
       };
       if (tipo === 'especial') novoDoc.nivel_alvo = nivel_alvo;
+      await _marcarQuizRespondido(fonteDoc.ref, tipo, fonteData)
+        .catch(e => console.warn('[salvar-quiz] Falha ao marcar tem_respostas:', e.message));
       ref = await resultadosRef.add(novoDoc);
     }
     
@@ -1448,14 +1465,7 @@ async function _handleSalvarResultadoQuiz(req, res) {
 
     // Ordenação em memória (sem .orderBy)
     const atualizados = await resultadosRef.where(resultField, '==', idValue).get();
-    const tentativas = atualizados.docs
-      .map(d => ({
-        pontuacao: d.data().pontuacao ?? 0,
-        aprovado: d.data().aprovado || false,
-        status: d.data().status || 'finalizada',
-        criado_em: d.data().criado_em?.toDate?.()?.toISOString() ?? null
-      }))
-      .sort((a, b) => (b.criado_em || '').localeCompare(a.criado_em || ''));
+    const historico = _montarHistoricoQuiz(atualizados.docs, tentativas_max);
 
     if (tipo === 'normal') {
       _atualizarResumoQuiz(uid).catch(() => {});
@@ -1464,12 +1474,49 @@ async function _handleSalvarResultadoQuiz(req, res) {
     return json(res, 200, {
       ok: true,
       message: 'Resultado salvo com sucesso.',
-      historico: { tentativas, tentativas_total: tentativas.length, tentativas_max }
+      historico
     });
   } catch (err) {
     console.error('[salvar-quiz] Erro:', err.message);
     return json(res, 500, { ok: false, message: 'Erro interno ao salvar resultado.' });
   }
+}
+
+// Monta o histórico + flag de liberação da revisão de respostas.
+// Liberada se: há tentativa finalizada aprovada OU as tentativas se esgotaram.
+// "Esgotadas" segue o critério do quiz-iniciar (todas as tentativas contam),
+// exceto se houver uma em andamento ainda válida (< 30 min): o assinante está
+// na última tentativa e a revisão só libera quando ela for finalizada.
+function _montarHistoricoQuiz(docs, tentativas_max) {
+  const JANELA_MS = 30 * 60 * 1000;
+  const agora = Date.now();
+
+  const itens = docs
+    .map(d => {
+      const x = d.data();
+      return {
+        pontuacao: x.pontuacao ?? 0,
+        aprovado: x.aprovado || false,
+        status: x.status || 'finalizada',
+        criado_em: x.criado_em?.toDate?.()?.toISOString() ?? null,
+        _criadoMs: x.criado_em?.toMillis?.() || 0,
+        _detalhes: Array.isArray(x.detalhes) ? x.detalhes : []
+      };
+    })
+    .sort((a, b) => (b.criado_em || '').localeCompare(a.criado_em || ''));
+
+  const emAndamentoValida  = itens.some(t => t.status === 'em_andamento' && (agora - t._criadoMs) <= JANELA_MS);
+  const aprovadoFinalizado = itens.some(t => t.status === 'finalizada' && t.aprovado);
+  const esgotou            = itens.length >= tentativas_max && !emAndamentoValida;
+  const revisao_liberada   = aprovadoFinalizado || esgotou;
+
+  // detalhes só saem do servidor quando a revisão está liberada, e só de tentativas finalizadas
+  const tentativas = itens.map(({ _criadoMs, _detalhes, ...t }) => {
+    if (revisao_liberada && t.status === 'finalizada') t.detalhes = _detalhes;
+    return t;
+  });
+
+  return { tentativas, tentativas_total: tentativas.length, tentativas_max, revisao_liberada };
 }
 
 // ─── GET: buscar histórico de tentativas ─────────────────────────────────────
@@ -1497,16 +1544,9 @@ async function _handleQuizHistorico(req, res) {
       .where(idField, '==', idValue)
       .get();
 
-    const tentativas = snap.docs
-      .map(d => ({
-        pontuacao: d.data().pontuacao ?? 0,
-        aprovado: d.data().aprovado || false,
-        status: d.data().status || 'finalizada',
-        criado_em: d.data().criado_em?.toDate?.()?.toISOString() ?? null
-      }))
-      .sort((a, b) => (b.criado_em || '').localeCompare(a.criado_em || ''));
+    const historico = _montarHistoricoQuiz(snap.docs, tentativas_max);
 
-    return json(res, 200, { ok: true, tentativas, tentativas_total: tentativas.length, tentativas_max });
+    return json(res, 200, { ok: true, ...historico });
   } catch (err) {
     console.error('[quiz-historico] Erro:', err.message);
     return json(res, 500, { ok: false, message: 'Erro interno ao buscar histórico.' });
