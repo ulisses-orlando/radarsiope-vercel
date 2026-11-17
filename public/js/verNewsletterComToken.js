@@ -4143,8 +4143,21 @@ async function iniciarChatFAB(newsletter, uid, acesso) {
 
   function _renderizarMensagens() {
     const wrap = document.getElementById('rs-chat-messages');
-    if (!wrap) return; wrap.innerHTML = '';
-    window._chatMensagens.forEach(m => _adicionarMensagem(m.role, m.text));
+    if (!wrap) return;
+    wrap.innerHTML = ''; // Limpa o DOM
+    
+    // Renderiza diretamente no DOM sem fazer push no array
+    window._chatMensagens.forEach(m => {
+      const row = document.createElement('div');
+      row.className = `rs-chat-msg-row ${m.role}`;
+      row.innerHTML = m.role === 'assistant'
+        ? `<div class="rs-chat-avatar-mini">✦</div><div class="rs-chat-bubble assistant">${_esc(m.text)}</div>`
+        : `<div class="rs-chat-bubble user">${_esc(m.text)}</div>`;
+      wrap.appendChild(row);
+    });
+    
+    // Scroll para o final
+    wrap.scrollTop = wrap.scrollHeight;
   }
 
   function _atualizarTituloChat(restantes) {
