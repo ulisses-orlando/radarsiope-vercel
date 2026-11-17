@@ -254,6 +254,38 @@ function confirmarExclusaoUsuario(id, nome) {
   });
 }
 
+// Quiz já respondido: estrutura, gabarito, ordem, nº de alternativas, nota mínima
+// e tentativas vêm do BANCO. Da tela só entram: explicação, correções de texto
+// (enunciado/alternativas) e "visível p/ leads".
+function montarQuizTravado(quizBanco, container) {
+  const itensTela = new Map();
+  container?.querySelectorAll(':scope > div').forEach(item => {
+    if (item.dataset.qid) itensTela.set(item.dataset.qid, item);
+  });
+
+  const perguntas = quizBanco.perguntas.map(q => {
+    const item = itensTela.get(q.id);
+    if (!item) return q;   // não está na tela: mantém como está
+
+    const texto = item.querySelector('.quiz-pergunta-texto')?.value?.trim();
+    const alts  = Array.from(item.querySelectorAll('.quiz-alternativa')).map(i => i.value.trim());
+    const expl  = item.querySelector('.quiz-explicacao')?.value?.trim();
+
+    return {
+      ...q,
+      pergunta: texto || q.pergunta,
+      alternativas: (q.alternativas || []).map((a, i) => alts[i] || a),
+      explicacao: expl ?? q.explicacao ?? ''
+    };
+  });
+
+  return {
+    ...quizBanco,
+    visivel_leads: document.getElementById('quiz-visivel-leads')?.checked || false,
+    perguntas
+  };
+}
+
 /* ======================
    MODAL NEWSLETTERS
    ====================== */
@@ -575,6 +607,7 @@ async function abrirModalNewsletter(docId = null, isEdit = false) {
   btnAddFaq.onclick = () => renderFaqItem();
 
   // ── QUIZ INTERATIVO ───────────────────────────────────────────────────────
+  const quizTravado = data.quiz?.tem_respostas === true;
   const quizSection = document.createElement('div');
   quizSection.style.cssText = 'margin-top:18px;padding:14px;border:1.5px solid #a78bfa;border-radius:8px;background:#faf5ff';
   quizSection.innerHTML = `
@@ -587,12 +620,12 @@ Adicione perguntas para testar o conhecimento dos assinantes sobre esta edição
  </div>
 <div style="display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap">
  <label style="font-size:12px;display:flex;align-items:center;gap:4px">
- <input type="number" id="quiz-tentativas-max" min="1" max="10" value="${data.quiz?.tentativas_max || 3}" 
+ <input type="number" id="quiz-tentativas-max" min="1" max="10" value="${data.quiz?.tentativas_max || 3}" ${quizTravado ? 'disabled' : ''} 
 style="width:50px;padding:4px;border:1px solid #ddd;border-radius:4px;font-size:12px">
 Tentativas máx.
  </label>
  <label style="font-size:12px;display:flex;align-items:center;gap:4px">
- <input type="number" id="quiz-pontuacao-minima" min="0" max="100" value="${data.quiz?.pontuacao_minima || 70}" 
+ <input type="number" id="quiz-pontuacao-minima" min="0" max="100" value="${data.quiz?.pontuacao_minima || 70}" ${quizTravado ? 'disabled' : ''} 
 style="width:50px;padding:4px;border:1px solid #ddd;border-radius:4px;font-size:12px">
 % Aprovação
  </label>
@@ -601,19 +634,31 @@ style="width:50px;padding:4px;border:1px solid #ddd;border-radius:4px;font-size:
 Visível p/ leads
  </label>
  </div>
+${quizTravado ? `<div style="margin-bottom:10px;padding:10px 12px;background:#fef3c7;border:1px solid #f59e0b;border-radius:6px;font-size:12px;color:#92400e;line-height:1.5">
+🔒 <strong>Este quiz já foi respondido por assinantes.</strong> Gabarito, ordem e quantidade de perguntas, nota mínima e tentativas estão travados. Você pode corrigir erros de digitação, editar as explicações e alterar "Visível p/ leads".
+</div>` : ''}
 <div id="quiz-perguntas-container" style="display:flex;flex-direction:column;gap:8px"></div>
 <div style="display:flex;gap:8px;margin-top:10px">
- <button type="button" id="quiz-add-pergunta" 
+ <button type="button" id="quiz-add-pergunta" ${quizTravado ? 'disabled' : ''}
 style="flex:1;padding:6px 12px;background:#8b5cf6;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:12px">
 ➕ Adicionar Pergunta
  </button>
- <button type="button" id="quiz-import-json" 
+ <button type="button" id="quiz-import-json" ${quizTravado ? 'disabled' : ''} 
 style="flex:1;padding:6px 12px;background:#059669;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:12px">
 📥 Importar JSON
  </button>
  </div>
 `;
   col1.appendChild(quizSection);
+
+    // Escapa texto para value="..." e <textarea>, sem perder dados no ciclo editar → salvar
+  function escAttrQuiz(s) {
+    return String(s ?? '')
+      .replace(/&/g, '&amp;')
+      .replace(/"/g, '&quot;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+  }
 
   // 1. Função de renderização de perguntas (Carregamento)
   function renderQuizPergunta(pergunta = {}) {
@@ -627,6 +672,8 @@ style="flex:1;padding:6px 12px;background:#059669;color:#fff;border:none;border-
 
     const item = document.createElement('div');
     item.style.cssText = 'border:1px solid #ddd;border-radius:6px;padding:10px;background:#fff;position:relative';
+    item.dataset.qid = pergunta.id || '';                                   // preserva o id entre salvamentos
+    const grupoCorreta = `quiz-correta-${Date.now()}-${Math.random()}`;    // UM name por pergunta
 
     // HTML da pergunta
     item.innerHTML = `
@@ -634,7 +681,7 @@ style="flex:1;padding:6px 12px;background:#059669;color:#fff;border:none;border-
                 onclick="this.closest('div[style]').remove()">×</button>
         <div style="margin-bottom:6px">
             <label style="font-size:11px;font-weight:600;color:#666;display:block;margin-bottom:3px">PERGUNTA</label>
-            <input type="text" class="quiz-pergunta-texto" value="${texto}" 
+            <input type="text" class="quiz-pergunta-texto" value="${escAttrQuiz(texto)}" 
                   style="width:100%;padding:6px;border:1px solid #ddd;border-radius:4px;font-size:13px" 
                   placeholder="Digite a pergunta...">
         </div>
@@ -642,7 +689,7 @@ style="flex:1;padding:6px 12px;background:#059669;color:#fff;border:none;border-
             ${['A', 'B', 'C', 'D'].map((letra, idx) => `
                 <div>
                     <label style="font-size:10px;color:#888">${letra}</label>
-                    <input type="text" class="quiz-alternativa" data-idx="${idx}" value="${pergunta.alternativas?.[idx] || ''}" 
+                    <input type="text" class="quiz-alternativa" data-idx="${idx}" value="${escAttrQuiz(pergunta.alternativas?.[idx])}" 
                           style="width:100%;padding:5px;border:1px solid #ddd;border-radius:4px;font-size:12px" 
                           placeholder="Alternativa ${letra}">
                 </div>
@@ -651,8 +698,8 @@ style="flex:1;padding:6px 12px;background:#059669;color:#fff;border:none;border-
         <div style="display:flex;gap:8px;align-items:center">
             ${[0, 1, 2, 3].map(idx => `
                 <label style="font-size:11px;display:flex;align-items:center;gap:4px">
-                    <input type="radio" name="quiz-correta-${Date.now()}-${Math.random()}" class="quiz-correta" value="${idx}"
-                          ${(pergunta.correta ?? -1) === idx ? 'checked' : 'Resposta correta: '}>
+                    <input type="radio" name="${grupoCorreta}" class="quiz-correta" value="${idx}"
+                          ${(pergunta.correta ?? -1) === idx ? 'checked' : ''}>
                     ${['A', 'B', 'C', 'D'][idx]}
                 </label>
             `).join('')}
@@ -660,9 +707,13 @@ style="flex:1;padding:6px 12px;background:#059669;color:#fff;border:none;border-
         <div style="margin-top:6px">
             <label style="font-size:11px;font-weight:600;color:#666;display:block;margin-bottom:3px">EXPLICAÇÃO (feedback)</label>
             <textarea class="quiz-explicacao" rows="2" style="width:100%;padding:6px;border:1px solid #ddd;border-radius:4px;font-size:12px;resize:vertical"
-                     placeholder="Por que a alternativa correta está certa?">${pergunta.explicacao || ''}</textarea>
+                      placeholder="Por que a alternativa correta está certa?">${escAttrQuiz(pergunta.explicacao)}</textarea>
         </div>
     `;
+    if (quizTravado) {
+      item.querySelector('button[title="Remover"]')?.remove();
+      item.querySelectorAll('.quiz-correta').forEach(r => { r.disabled = true; });
+    }
     container.appendChild(item);
   }
 
@@ -1407,6 +1458,7 @@ style="flex:1;padding:6px 12px;background:#059669;color:#fff;border:none;border-
     })).filter(i => i.pergunta); // descarta itens sem pergunta
 
     // ── Coleta do Quiz ─────────────────────────────────────────────────
+    const semGabarito = [];
     const coletarQuiz = () => {
       const container = document.getElementById('quiz-perguntas-container');
       if (!container) return {};
@@ -1415,12 +1467,14 @@ style="flex:1;padding:6px 12px;background:#059669;color:#fff;border:none;border-
       container.querySelectorAll(':scope > div').forEach(item => {
         const perguntaTexto = item.querySelector('.quiz-pergunta-texto')?.value?.trim() || '';
         const alternativas = Array.from(item.querySelectorAll('.quiz-alternativa')).map(i => i.value.trim());
-        const correta = parseInt(item.querySelector('.quiz-correta:checked')?.value) || 0;
+        const marcada = item.querySelector('.quiz-correta:checked');
+        const correta = marcada ? parseInt(marcada.value) : 0;
+        if (perguntaTexto && !marcada) semGabarito.push(perguntas.length + 1);
         const explicacao = item.querySelector('.quiz-explicacao')?.value?.trim() || '';
 
         if (perguntaTexto) {
           perguntas.push({
-            id: crypto.randomUUID?.() || `q_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+            id: item.dataset.qid || crypto.randomUUID?.() || `q_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
             pergunta: perguntaTexto,
             alternativas,
             correta,
@@ -1441,6 +1495,10 @@ style="flex:1;padding:6px 12px;background:#059669;color:#fff;border:none;border-
     };
 
     payload.quiz = coletarQuiz();
+    if (semGabarito.length) {
+      alert(`❌ Marque a resposta correta nas perguntas: ${semGabarito.join(', ')}.`);
+      return;
+    }
 
     // ── Coleta do Mapa Mental ──────────────────────────────────────────────
     const coletarMapaMental = () => {
@@ -1473,6 +1531,18 @@ style="flex:1;padding:6px 12px;background:#059669;color:#fff;border:none;border-
     // ── Data de publicação ────────────────────────────────────────────────
     const inputData = document.getElementById("data_publicacao");
     payload.data_publicacao = dateStringToLocalTimestamp(inputData?.value);
+
+    // ── Trava do quiz: se já foi respondido, a estrutura vem do banco, não da tela ──
+    if (isEdit && docId) {
+      const frescoSnap = await db.collection('newsletters').doc(docId).get();
+      const quizBanco  = frescoSnap.exists ? frescoSnap.data().quiz : null;
+      if (quizBanco?.tem_respostas === true && Array.isArray(quizBanco.perguntas)) {
+        payload.quiz = montarQuizTravado(quizBanco, document.getElementById('quiz-perguntas-container'));
+        if (!quizTravado) {
+          alert('ℹ️ Este quiz recebeu respostas enquanto você editava. A estrutura e o gabarito foram mantidos; só explicações, correções de texto e "Visível p/ leads" foram aplicados.');
+        }
+      }
+    }
 
     // ── Salvar ────────────────────────────────────────────────────────────
     const ref = db.collection('newsletters');

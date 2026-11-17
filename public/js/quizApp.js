@@ -199,7 +199,7 @@ async function _abrirQuizModal(nid, uid) {
   if (btnIniciar) { btnIniciar.disabled = true; btnIniciar.textContent = 'Iniciando...'; }
 
   try {
-    const idField = _tipoQuiz === 'especial' ? 'quiz_especial_id' : 'newsletter_id';
+    const idField = _tipoQuiz === 'especial' ? 'quizzes_especiais_id' : 'newsletter_id';
     const resp = await fetch('/api/pagamentoMP?acao=quiz-iniciar', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -470,6 +470,9 @@ function _renderizarResultadoFinal(pontuacao, aprovado, minimo) {
                     ? '✅ Você atingiu a pontuação mínima necessária.'
                     : `📌 A pontuação mínima para aprovação é ${minimo}%.`}
             </p>
+            ${_historico?.revisao_liberada
+                ? `<button id="rs-quiz-btn-revisar-final" type="button" class="rs-quiz-btn-sec" style="margin-top:16px;">Revisar minhas respostas</button>`
+                : ''}
         </div>
     `;
 
@@ -477,10 +480,20 @@ function _renderizarResultadoFinal(pontuacao, aprovado, minimo) {
     footer.style.display = 'flex';
     footer.innerHTML = `<button id="rs-quiz-btn-sair" type="button">Fechar e Voltar à Leitura</button>`;
     document.getElementById('rs-quiz-btn-sair').addEventListener('click', () => {
-        const nid = _state?.nid;
+                const nid = _state?.nid;
         const uid = _state?.uid;
         _fecharQuizModal();
         _renderizarCardConcluido(nid, uid);
+    });
+
+    document.getElementById('rs-quiz-btn-revisar-final')?.addEventListener('click', () => {
+        const nid = _state?.nid;
+        const uid = _state?.uid;
+        const tentativa = _historico?.tentativas?.[0];          // a que acabou de ser finalizada
+        const numero    = _historico?.tentativas?.length || 1;
+        _fecharQuizModal();
+        _renderizarCardConcluido(nid, uid);
+        if (tentativa) _abrirModalRevisao(tentativa, numero);
     });
 }
 
@@ -502,8 +515,11 @@ function _abrirModalHistorico() {
     const tentativas_total = _historico?.tentativas_total || 0;
     const tentativas_max = _historico?.tentativas_max || _config?.tentativas_max || 3;
     
+    const revisaoLiberada = _historico?.revisao_liberada === true;
+
     const linhas = tentativas.map((t, i) => {
-        const data  = _formatarData(t.criado_em);
+        const numero = tentativas.length - i;   // lista vem do mais recente p/ o mais antigo
+        const data   = _formatarData(t.criado_em);
         const status = t.status || 'finalizada';
         let icone, label;
         if (status === 'abandonada') {
@@ -513,12 +529,17 @@ function _abrirModalHistorico() {
         } else {
             icone = '❌'; label = 'Não aprovado';
         }
+        const podeRever = revisaoLiberada && status === 'finalizada'
+                          && Array.isArray(t.detalhes) && t.detalhes.length > 0;
         return `
-            <div class="rs-quiz-hist-row">
-            <span class="rs-quiz-hist-num">${i + 1}ª</span>
-            <span class="rs-quiz-hist-score ${t.aprovado ? 'aprovado' : 'reprovado'}">${t.pontuacao ?? 0}%</span>
-            <span class="rs-quiz-hist-status">${icone} ${label}</span>
-            <span class="rs-quiz-hist-data">${data}</span>
+            <div class="rs-quiz-hist-item">
+                <div class="rs-quiz-hist-row">
+                    <span class="rs-quiz-hist-num">${numero}ª</span>
+                    <span class="rs-quiz-hist-score ${t.aprovado ? 'aprovado' : 'reprovado'}">${t.pontuacao ?? 0}%</span>
+                    <span class="rs-quiz-hist-status">${icone} ${label}</span>
+                    <span class="rs-quiz-hist-data">${data}</span>
+                </div>
+                ${podeRever ? `<button type="button" class="rs-quiz-hist-rever" data-idx="${i}">Ver respostas</button>` : ''}
             </div>
         `;
     }).join('');
@@ -539,6 +560,9 @@ function _abrirModalHistorico() {
                 <p class="rs-quiz-hist-meta">
                     ${tentativas_total} de ${tentativas_max} tentativa${tentativas_max > 1 ? 's' : ''} realizada${tentativas_total > 1 ? 's' : ''}
                 </p>
+                ${!revisaoLiberada && tentativas_total > 0
+                    ? `<p class="rs-quiz-hist-aviso">🔒 As respostas ficam disponíveis após a aprovação ou ao esgotar as tentativas.</p>`
+                    : ''}
                 <div class="rs-quiz-hist-lista">
                     ${linhas}
                 </div>
@@ -558,7 +582,122 @@ function _abrirModalHistorico() {
     };
     document.getElementById('rs-quiz-hist-fechar').addEventListener('click', fechar);
     document.getElementById('rs-quiz-hist-ok').addEventListener('click', fechar);
+    overlay.querySelectorAll('.rs-quiz-hist-rever').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const i = parseInt(btn.dataset.idx);
+            fechar();
+            _abrirModalRevisao(tentativas[i], tentativas.length - i);
+        });
+    });
     overlay.addEventListener('click', (e) => { if (e.target === overlay) fechar(); });
+}
+
+// ────────────────────────────────────────────────────────────────────────
+// MODAL DE REVISÃO DE RESPOSTAS
+// ────────────────────────────────────────────────────────────────────────
+
+function _abrirModalRevisao(tentativa, numero) {
+    document.getElementById('rs-quiz-revisao-overlay')?.remove();
+
+    const perguntas = Array.isArray(_config?.perguntas) ? _config.perguntas : [];
+    const detalhes  = Array.isArray(tentativa?.detalhes) ? tentativa.detalhes : [];
+
+    const itens = detalhes.map((d, pos) => {
+        // Cruza por pergunta_id (mesma regra da gravação: id, ou índice se não houver id).
+        // Gabarito vem do _config; a alternativa escolhida vem da tentativa gravada.
+        let p = perguntas.find((q, k) => String(q.id || k) === String(d.pergunta_id));
+        // Tentativas antigas foram gravadas com ids que o admin regenerava a cada salvamento:
+        // se o id não casa e a contagem bate, cruza pela posição.
+        if (!p && perguntas.length === detalhes.length) p = perguntas[pos];
+        if (!p) return { p: null };
+        const correta     = parseInt(p.correta);
+        const selecionada = parseInt(d.resposta_selecionada);
+        return { p, correta, selecionada, acertou: selecionada === correta };
+    });
+    const erros = itens.filter(it => it.p && !it.acertou).length;
+
+    const htmlItens = itens.map((it, n) => {
+        if (!it.p) {
+            return `
+                <div class="rs-quiz-rev-item" data-acertou="1">
+                    <div class="rs-quiz-rev-topo"><span class="rs-quiz-rev-num">Pergunta ${n + 1}</span></div>
+                    <div class="rs-quiz-explicacao">Esta pergunta não está mais disponível para revisão.</div>
+                </div>`;
+        }
+        const { p, correta, selecionada, acertou } = it;
+        const alternativas = (p.alternativas || []).map((alt, idx) => {
+            let cls = '', tag = '';
+            if (idx === correta) {
+                cls = 'rs-quiz-correta';
+                tag = idx === selecionada ? 'Sua resposta · certa' : 'Resposta certa';
+            } else if (idx === selecionada) {
+                cls = 'rs-quiz-errada';
+                tag = 'Sua resposta';
+            }
+            return `
+                <button type="button" class="rs-quiz-opcao-btn ${cls}" disabled>
+                    <span class="rs-quiz-opcao-letra">${String.fromCharCode(65 + idx)}</span>
+                    <span class="rs-quiz-opcao-texto">${alt}</span>
+                    ${tag ? `<span class="rs-quiz-rev-tag">${tag}</span>` : ''}
+                </button>`;
+        }).join('');
+        return `
+            <div class="rs-quiz-rev-item" data-acertou="${acertou ? '1' : '0'}">
+                <div class="rs-quiz-rev-topo">
+                    <span class="rs-quiz-rev-num">Pergunta ${n + 1}</span>
+                    <span class="rs-quiz-rev-resultado ${acertou ? 'ok' : 'erro'}">${acertou ? '✅ Acertou' : '❌ Errou'}</span>
+                </div>
+                <div class="rs-quiz-texto">${p.pergunta}</div>
+                <div class="rs-quiz-opcoes">${alternativas}</div>
+                ${p.explicacao ? `<div class="rs-quiz-explicacao"><strong>💡 Explicação:</strong> ${p.explicacao}</div>` : ''}
+            </div>`;
+    }).join('');
+
+    const overlay = document.createElement('div');
+    overlay.id = 'rs-quiz-revisao-overlay';
+    overlay.className = 'rs-quiz-overlay';
+    overlay.innerHTML = `
+        <div class="rs-quiz-modal" role="dialog" aria-modal="true" aria-label="Revisão das respostas">
+            <header id="rs-quiz-header">
+                <div class="rs-quiz-header-left">
+                    <span class="rs-quiz-badge">Quiz</span>
+                    <span>Revisão · ${numero}ª tentativa</span>
+                </div>
+                <button id="rs-quiz-hist-fechar" aria-label="Fechar">✕</button>
+            </header>
+            <div id="rs-quiz-body">
+                <div class="rs-quiz-rev-filtros">
+                    <button type="button" class="rs-quiz-rev-filtro ativo" data-filtro="todas">Todas (${itens.length})</button>
+                    <button type="button" class="rs-quiz-rev-filtro" data-filtro="erradas" ${erros === 0 ? 'disabled' : ''}>Só as que errei (${erros})</button>
+                </div>
+                ${htmlItens}
+            </div>
+            <footer id="rs-quiz-footer" style="display:flex;">
+                <button id="rs-quiz-hist-ok" type="button">Voltar</button>
+            </footer>
+        </div>
+    `;
+
+    document.body.appendChild(overlay);
+    document.body.style.overflow = 'hidden';
+
+    const fechar = () => {
+        overlay.remove();
+        document.body.style.overflow = '';
+    };
+    document.getElementById('rs-quiz-hist-fechar').addEventListener('click', fechar);
+    document.getElementById('rs-quiz-hist-ok').addEventListener('click', () => { fechar(); _abrirModalHistorico(); });
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) fechar(); });
+
+    overlay.querySelectorAll('.rs-quiz-rev-filtro').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const soErradas = btn.dataset.filtro === 'erradas';
+            overlay.querySelectorAll('.rs-quiz-rev-filtro').forEach(b => b.classList.toggle('ativo', b === btn));
+            overlay.querySelectorAll('.rs-quiz-rev-item').forEach(el => {
+                el.style.display = (soErradas && el.dataset.acertou === '1') ? 'none' : '';
+            });
+        });
+    });
 }
 
 // ────────────────────────────────────────────────────────────────────────
@@ -566,7 +705,7 @@ function _abrirModalHistorico() {
 // ────────────────────────────────────────────────────────────────────────
 
 async function _buscarHistorico(uid, nid) {
-    const idParam = _tipoQuiz === 'especial' ? 'quiz_especial_id' : 'newsletter_id';
+    const idParam = _tipoQuiz === 'especial' ? 'quizzes_especiais_id' : 'newsletter_id';
     const url = `/api/pagamentoMP?acao=quiz-historico&uid=${encodeURIComponent(uid)}&${idParam}=${encodeURIComponent(nid)}`;
     const resp = await fetch(url, { method: 'GET' });
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
@@ -581,7 +720,7 @@ async function _buscarHistorico(uid, nid) {
 
 async function _salvarNoBackend({ pontuacao, aprovado, tentativa_id }) {
   if (!_state) return;
-  const idField = _state.tipo === 'especial' ? 'quiz_especial_id' : 'newsletter_id';
+  const idField = _state.tipo === 'especial' ? 'quizzes_especiais_id' : 'newsletter_id';
   const payload = {
     uid: _state.uid,
     [idField]: _state.nid,
@@ -856,6 +995,37 @@ function injetarEstilosCSS() {
         .rs-quiz-hist-score.reprovado { color: #fbbf24; }
         .rs-quiz-hist-status { font-size: 13px; color: var(--rs-muted, #94a3b8); }
         .rs-quiz-hist-data   { font-size: 12px; color: #475569; white-space: nowrap; }
+
+                .rs-quiz-hist-item   { display: flex; flex-direction: column; gap: 6px; }
+        .rs-quiz-hist-rever {
+            align-self: flex-end; background: transparent;
+            border: 1px solid var(--rs-borda, rgba(255,255,255,0.15));
+            color: var(--rs-text, #f1f5f9); border-radius: 8px;
+            padding: 6px 12px; font-size: 12px; cursor: pointer;
+        }
+        .rs-quiz-hist-rever:hover { background: rgba(255,255,255,0.06); }
+        .rs-quiz-hist-aviso { font-size: 12px; color: var(--rs-muted, #94a3b8); margin: 0 0 12px; }
+
+        /* ── Revisão de respostas ── */
+        .rs-quiz-rev-filtros { display: flex; gap: 8px; flex-wrap: wrap; padding: 16px 0 4px; }
+        .rs-quiz-rev-filtro {
+            background: transparent; color: var(--rs-text, #f1f5f9);
+            border: 1px solid var(--rs-borda, rgba(255,255,255,0.15));
+            border-radius: 20px; padding: 6px 14px; font-size: 12px; cursor: pointer;
+        }
+        .rs-quiz-rev-filtro.ativo { background: var(--azul, #0A3D62); border-color: var(--azul, #0A3D62); color: #fff; }
+        .rs-quiz-rev-filtro:disabled { opacity: .5; cursor: default; }
+        .rs-quiz-rev-item { padding-bottom: 20px; border-bottom: 1px solid var(--rs-borda, rgba(255,255,255,0.08)); }
+        .rs-quiz-rev-item:last-child { border-bottom: none; }
+        .rs-quiz-rev-topo { display: flex; justify-content: space-between; align-items: center; padding-top: 16px; font-size: 12px; }
+        .rs-quiz-rev-item .rs-quiz-texto { padding-top: 8px; }
+        .rs-quiz-rev-num { color: #64748b; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
+        .rs-quiz-rev-resultado.ok   { color: #4ade80; }
+        .rs-quiz-rev-resultado.erro { color: #f87171; }
+        .rs-quiz-rev-tag {
+            font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 20px;
+            background: rgba(255,255,255,0.08); color: var(--rs-text, #f1f5f9); white-space: nowrap;
+        }
 
         /* ── Mobile ── */
         @media (max-width: 480px) {
