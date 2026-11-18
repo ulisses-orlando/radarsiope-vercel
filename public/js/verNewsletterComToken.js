@@ -1858,11 +1858,14 @@ async function _tentarModoAssinante(dadosSessao) {
     mostrarApp();
 
     if (typeof window.QuizManager?.init === 'function') {
-      // Aguarda próximo tick para garantir que _radarUser está disponível
       setTimeout(() => {
         const user = window._radarUser;
         if (user && newsletter) {
-          window.QuizManager.init(newsletter, user);
+          if (newsletter?.quiz?.ativo) {
+            window.QuizManager.init(newsletter, user);
+          } else {
+            window.QuizManager.destruir();
+          }
         }
       }, 0);
     }
@@ -2202,14 +2205,19 @@ async function _executarPreview(params) {
     await renderReactions(nid, 'preview');
     renderCTA(acesso, newsletter);
 
-    if (window.QuizManager && newsletter?.quiz) {
+    if (typeof window.QuizManager?.init === 'function') {
       const userParaQuiz = {
-        uid: destinatario._uid || destinatario.id || uid,
-        segmento: segmento,
+        uid: destinatario._uid || destinatario.id || 'preview',
+        segmento: 'assinantes',
         plano_slug: destinatario.plano_slug || null,
         features: destinatario.features || {}
       };
-      window.QuizManager.init(newsletter, userParaQuiz);
+      
+      if (newsletter?.quiz?.ativo) {
+        window.QuizManager.init(newsletter, userParaQuiz);
+      } else {
+        window.QuizManager.destruir();
+      }
     }
 
     // Habilita chat para testes internos (mesmo sem token de acesso válido)  
@@ -2590,14 +2598,19 @@ async function VerNewsletterComToken() {
     renderWatermark(destinatario, newsletter);
 
     // ─── INICIALIZAÇÃO DO QUIZ (após usuário e newsletter carregados) ─────────
-    if (window.QuizManager && newsletter?.quiz) {
+    if (typeof window.QuizManager?.init === 'function') {
       const userParaQuiz = {
         uid: destinatario._uid || destinatario.id || uid,
         segmento: segmento,
         plano_slug: destinatario.plano_slug || null,
         features: destinatario.features || {}
       };
-      window.QuizManager.init(newsletter, userParaQuiz);
+      
+      if (newsletter?.quiz?.ativo) {
+        window.QuizManager.init(newsletter, userParaQuiz);
+      } else {
+        window.QuizManager.destruir();
+      }
     }
 
     // 12. Exibe com fade-in
@@ -3725,6 +3738,21 @@ async function navegarParaEdicao(edicaoId) {
     await renderReactions(edicaoId, ctx.uid);
     renderCTA(acesso, newsletter);
     renderWatermark(destinatario, newsletter);
+
+    // ── Reinicializa o Quiz da edição atual ─────────────────────────────────
+    if (typeof window.QuizManager?.init === 'function') {
+      const userParaQuiz = {
+        uid: ctx.uid,
+        segmento: segmento,
+        plano_slug: destinatario.plano_slug || null,
+        features: destinatario.features || {}
+      };
+      if (newsletter?.quiz?.ativo) {
+        window.QuizManager.init(newsletter, userParaQuiz);
+      } else {
+        window.QuizManager.destruir();   // edição sem quiz → remove card antigo
+      }
+    }
 
     // ── Reseta chat ao trocar de edição ──────────────────────────────────────
     window._chatContext = {

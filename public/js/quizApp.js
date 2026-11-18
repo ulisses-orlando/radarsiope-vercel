@@ -16,7 +16,21 @@ const _localKey = (uid, nid) => `rs_quiz_${uid}_${nid}`;
 // PÚBLICO
 // ────────────────────────────────────────────────────────────────────────
 
+function destruir() {
+  _removerCardQuiz();
+  _removerSkeleton();
+  document.getElementById('rs-quiz-overlay')?.remove();
+  document.getElementById('rs-quiz-historico-overlay')?.remove();
+  document.getElementById('rs-quiz-revisao-overlay')?.remove();
+  document.body.style.overflow = '';
+  _config   = null;
+  _state    = null;
+  _historico = null;
+  _tipoQuiz = 'normal';
+}
+
 async function init(newsletter, user) {
+    destruir();
     if (!newsletter?.quiz?.ativo) return;
     if (!user?.uid) return;
 
@@ -35,6 +49,7 @@ async function init(newsletter, user) {
 // ativo/tentativas_max/pontuacao_minima/perguntas no nível raiz (sem `.quiz`
 // aninhado como a newsletter tem), por isso `_config` aponta direto pra ele.
 async function initEspecial(quizEspecial, user) {
+    destruir();
     if (!quizEspecial?.ativo) return;
     if (!user?.uid) return;
 
@@ -1052,6 +1067,7 @@ function injetarEstilosCSS() {
 window.QuizManager = {
     init,
     initEspecial, // NOVO v1.7 — Quizzes Especiais da Academia (Seção 21.7)
+    destruir,
     jaConcluiu,
     getEstatisticas,
     _getState:     () => _state,
