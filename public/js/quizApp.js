@@ -714,7 +714,8 @@ async function _buscarHistorico(uid, nid) {
     return {
         tentativas:      data.tentativas      || [],
         tentativas_total: data.tentativas_total || 0,
-        tentativas_max:  data.tentativas_max  || _config.tentativas_max || 3
+        tentativas_max:  data.tentativas_max  || _config.tentativas_max || 3,
+        revisao_liberada: data.revisao_liberada === true
     };
 }
 
