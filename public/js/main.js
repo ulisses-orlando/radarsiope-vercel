@@ -268,8 +268,8 @@ function montarQuizTravado(quizBanco, container) {
     if (!item) return q;   // não está na tela: mantém como está
 
     const texto = item.querySelector('.quiz-pergunta-texto')?.value?.trim();
-    const alts  = Array.from(item.querySelectorAll('.quiz-alternativa')).map(i => i.value.trim());
-    const expl  = item.querySelector('.quiz-explicacao')?.value?.trim();
+    const alts = Array.from(item.querySelectorAll('.quiz-alternativa')).map(i => i.value.trim());
+    const expl = item.querySelector('.quiz-explicacao')?.value?.trim();
 
     return {
       ...q,
@@ -439,7 +439,7 @@ async function abrirModalNewsletter(docId = null, isEdit = false) {
     </select>
   `;
   col1.appendChild(formatoWrap);
-  
+
   // ── Resumo bullets (modo rápido) ───────────────────────────────────────────
   const bulletsWrap = document.createElement('div');
   bulletsWrap.className = 'field';
@@ -651,7 +651,7 @@ style="flex:1;padding:6px 12px;background:#059669;color:#fff;border:none;border-
 `;
   col1.appendChild(quizSection);
 
-    // Escapa texto para value="..." e <textarea>, sem perder dados no ciclo editar → salvar
+  // Escapa texto para value="..." e <textarea>, sem perder dados no ciclo editar → salvar
   function escAttrQuiz(s) {
     return String(s ?? '')
       .replace(/&/g, '&amp;')
@@ -792,7 +792,7 @@ style="flex:1;padding:6px 12px;background:#059669;color:#fff;border:none;border-
   `;
   col1.appendChild(mapaMentalSection);
 
-//---------------------------------------------------------------------------------  
+  //---------------------------------------------------------------------------------  
   function _rsTemplateEmailFallback() {
     return [
       '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:640px;margin:0 auto;font-family:Arial,Helvetica,sans-serif;color:#1e293b">',
@@ -836,6 +836,29 @@ style="flex:1;padding:6px 12px;background:#059669;color:#fff;border:none;border-
   // ────────────────────────────────────────────────────────────────────────────
   // IMPORTAÇÃO PRINCIPAL — distribui o pacote JSON para todos os campos
   // ────────────────────────────────────────────────────────────────────────────
+
+  // ────────────────────────────────────────────────────────────────────────────
+  // REDE DE SEGURANÇA — se o modelo voltar a usar class="x" sem escapar dentro
+  // do JSON, troca só os atributos HTML simples por aspas simples. Não toca em
+  // JSON válido (\" escapado) nem em aspas de texto corrido.
+  // ────────────────────────────────────────────────────────────────────────────
+  function _rsReparoAspasAtributos(txt) {
+    return txt.replace(
+      /(\s(?:class|href|target|rel|id)=)"([^"<>\\']*)"(?=[\s>\/])/g,
+      "$1'$2'"
+    );
+  }
+
+  // Normaliza o HTML de um bloco via DOM: o navegador serializa sempre com
+  // aspas duplas, então o que é salvo fica idêntico ao padrão anterior.
+  function _rsNormalizarHtml(html) {
+    const tpl = document.createElement('template');
+    tpl.innerHTML = html;
+    return tpl.innerHTML.trim();
+  }
+
+  // ────────────────────────────────────────────────────────────────────────────
+
   async function _rsImportarEdicaoJSON(bruto) {
     const avisos = [];
     const jsonBruto = _rsExtrairJsonBruto(bruto);
@@ -848,10 +871,25 @@ style="flex:1;padding:6px 12px;background:#059669;color:#fff;border:none;border-
     let pacote;
     try {
       pacote = JSON.parse(jsonBruto);
-    } catch (e) {
-      mostrarMensagem('❌ JSON com erro de sintaxe: ' + e.message +
-        '\n\nDica: peça ao NotebookLM para reenviar apenas o bloco JSON.');
-      return false;
+    } catch (e1) {
+      // 2ª tentativa: reparo restrito a atributos HTML com aspas duplas
+      const reparado = _rsReparoAspasAtributos(jsonBruto);
+      try {
+        pacote = JSON.parse(reparado);
+        avisos.push('JSON veio com aspas duplas nos atributos HTML; corrigi automaticamente. Ajuste o prompt se isso se repetir.');
+      } catch (e2) {
+        const alvo = (reparado !== jsonBruto) ? reparado : jsonBruto;
+        const mpos = /position (\d+)/.exec(e2.message);
+        let trecho = '';
+        if (mpos) {
+          const p = parseInt(mpos[1], 10);
+          trecho = '\n\nTrecho próximo ao erro:\n…' +
+            alvo.slice(Math.max(0, p - 60), p + 60).replace(/\s+/g, ' ') + '…';
+        }
+        mostrarMensagem('❌ JSON com erro de sintaxe: ' + e2.message + trecho +
+          '\n\nDica: peça ao NotebookLM para reenviar apenas o JSON, sem aspas duplas dentro dos textos (use aspas simples nos atributos HTML e « » nas citações).');
+        return false;
+      }
     }
 
     // ── 1. METADADOS ─────────────────────────────────────────────────────────
@@ -876,7 +914,10 @@ style="flex:1;padding:6px 12px;background:#059669;color:#fff;border:none;border-
 
     // data de publicação: hoje, se vazio
     const dt = document.getElementById('data_publicacao');
-    if (dt && !dt.value) dt.value = new Date().toISOString().split('T')[0];
+    if (dt && !dt.value) {
+      const h = new Date(); // data LOCAL (toISOString usaria UTC e viraria o dia após 21h)
+      dt.value = h.getFullYear() + '-' + String(h.getMonth() + 1).padStart(2, '0') + '-' + String(h.getDate()).padStart(2, '0');
+    }
 
     // ── 2. RESUMO BULLETS ────────────────────────────────────────────────────
     if (Array.isArray(m.resumo_bullets) && m.resumo_bullets.length) {
@@ -914,7 +955,7 @@ style="flex:1;padding:6px 12px;background:#059669;color:#fff;border:none;border-
     if (Array.isArray(pacote.blocos) && pacote.blocos.length && containerBlocos) {
       containerBlocos.innerHTML = '';
       pacote.blocos.forEach((b, i) => {
-        const html = (b.html || '').toString();
+        const html = _rsNormalizarHtml((b.html || '').toString());
         if (!html.trim()) {
           avisos.push('Bloco ' + (i + 1) + ' sem HTML — ignorado.');
           return;
@@ -928,9 +969,10 @@ style="flex:1;padding:6px 12px;background:#059669;color:#fff;border:none;border-
         });
       });
 
-      // sanity checks do modo rápido do app
+      // sanity checks dos blocos
       if (!pacote.blocos.some(b => b.tipo === 'chamada'))
-        avisos.push('⚠️ Nenhum bloco-chamada: o modo rápido do app pode ficar vazio.');
+        avisos.push('⚠️ Nenhum bloco-chamada encontrado.');
+
       if (!pacote.blocos.some(b => b.tipo === 'destaque'))
         avisos.push('⚠️ Nenhum bloco-destaque encontrado.');
 
@@ -1119,7 +1161,7 @@ style="flex:1;padding:6px 12px;background:#059669;color:#fff;border:none;border-
   btnImportEdicao.onclick = () => _rsAbrirModalImport();
   col1.appendChild(btnImportEdicao);
 
-// ----------------------------------------------------------------------
+  // ----------------------------------------------------------------------
 
   // Validar JSON
   document.getElementById('mm-btn-validar').addEventListener('click', () => {
@@ -1864,7 +1906,7 @@ style="flex:1;padding:6px 12px;background:#059669;color:#fff;border:none;border-
     // ── Trava do quiz: se já foi respondido, a estrutura vem do banco, não da tela ──
     if (isEdit && docId) {
       const frescoSnap = await db.collection('newsletters').doc(docId).get();
-      const quizBanco  = frescoSnap.exists ? frescoSnap.data().quiz : null;
+      const quizBanco = frescoSnap.exists ? frescoSnap.data().quiz : null;
       if (quizBanco?.tem_respostas === true && Array.isArray(quizBanco.perguntas)) {
         payload.quiz = montarQuizTravado(quizBanco, document.getElementById('quiz-perguntas-container'));
         if (!quizTravado) {
