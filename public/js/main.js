@@ -792,6 +792,335 @@ style="flex:1;padding:6px 12px;background:#059669;color:#fff;border:none;border-
   `;
   col1.appendChild(mapaMentalSection);
 
+//---------------------------------------------------------------------------------  
+  function _rsTemplateEmailFallback() {
+    return [
+      '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:640px;margin:0 auto;font-family:Arial,Helvetica,sans-serif;color:#1e293b">',
+      '  <tr>',
+      '    <td style="padding:24px;background:#0A3D62;color:#ffffff;font-size:20px;font-weight:bold">',
+      '      Radar SIOPE',
+      '    </td>',
+      '  </tr>',
+      '  <tr>',
+      '    <td style="padding:24px;background:#ffffff">{{blocos}}</td>',
+      '  </tr>',
+      '  <tr>',
+      '    <td style="padding:16px 24px;background:#f1f5f9;font-size:12px;color:#64748b">',
+      '      <p style="font-size:12px;color:#888;margin:0 0 10px">',
+      '        👉 <a href="https://www.radarsiope.com.br/verNewsletterComToken.html?d=ENCODED">Acessar edição completa</a>',
+      '      </p>',
+      '      <p style="font-size:12px;color:#888;margin:0">',
+      '        Não deseja mais receber nossas newsletters?',
+      '        <a href="https://api.radarsiope.com.br/descadastramento.html?email={{email}}&newsletter={{newsletterId}}&titulo={{titulo}}&seg={{segmento}}">Clique aqui para se descadastrar</a>.',
+      '      </p>',
+      '    </td>',
+      '  </tr>',
+      '</table>'
+    ].join('\n');
+  }
+
+  // ────────────────────────────────────────────────────────────────────────────
+  // PARSER TOLERANTE — remove cercas de código e extrai o JSON
+  // ────────────────────────────────────────────────────────────────────────────
+  function _rsExtrairJsonBruto(texto) {
+    if (!texto) return null;
+    let t = String(texto).trim();
+    // remove cercas de código markdown (```json / ``` )
+    t = t.replace(/```(?:json)?/gi, '');
+    const ini = t.indexOf('{');
+    const fim = t.lastIndexOf('}');
+    if (ini === -1 || fim === -1 || fim <= ini) return null;
+    return t.slice(ini, fim + 1);
+  }
+
+  // ────────────────────────────────────────────────────────────────────────────
+  // IMPORTAÇÃO PRINCIPAL — distribui o pacote JSON para todos os campos
+  // ────────────────────────────────────────────────────────────────────────────
+  async function _rsImportarEdicaoJSON(bruto) {
+    const avisos = [];
+    const jsonBruto = _rsExtrairJsonBruto(bruto);
+
+    if (!jsonBruto) {
+      mostrarMensagem('❌ Não encontrei um JSON na área colada.\nCole a resposta completa do NotebookLM.');
+      return false;
+    }
+
+    let pacote;
+    try {
+      pacote = JSON.parse(jsonBruto);
+    } catch (e) {
+      mostrarMensagem('❌ JSON com erro de sintaxe: ' + e.message +
+        '\n\nDica: peça ao NotebookLM para reenviar apenas o bloco JSON.');
+      return false;
+    }
+
+    // ── 1. METADADOS ─────────────────────────────────────────────────────────
+    const m = pacote.metadados || {};
+    const setField = (name, val) => {
+      const el = body.querySelector(`[data-field-name="${name}"]`);
+      if (el && val !== undefined && val !== null && String(val).trim() !== '') {
+        el.value = String(val).trim();
+        el.dispatchEvent(new Event('input'));
+      }
+    };
+    setField('titulo', m.titulo);
+    setField('edicao', m.edicao);
+    setField('resumo', m.resumo);
+    if (m.numero) setField('numero', String(m.numero).padStart(3, '0'));
+
+    // validações dos limites do Prompt 1
+    if (m.titulo && String(m.titulo).length > 80)
+      avisos.push('Título com ' + String(m.titulo).length + ' caracteres (máx. 80).');
+    if (m.resumo && String(m.resumo).length > 200)
+      avisos.push('Resumo com ' + String(m.resumo).length + ' caracteres (máx. 200).');
+
+    // data de publicação: hoje, se vazio
+    const dt = document.getElementById('data_publicacao');
+    if (dt && !dt.value) dt.value = new Date().toISOString().split('T')[0];
+
+    // ── 2. RESUMO BULLETS ────────────────────────────────────────────────────
+    if (Array.isArray(m.resumo_bullets) && m.resumo_bullets.length) {
+      const ta = document.getElementById('campo-resumo-bullets');
+      if (ta) {
+        ta.value = m.resumo_bullets.join('\n');
+        ta.dispatchEvent(new Event('input'));
+      }
+      if (m.resumo_bullets.length < 4 || m.resumo_bullets.length > 6)
+        avisos.push('Bullets: ' + m.resumo_bullets.length + ' pontos (o padrão é 4 a 6).');
+    }
+
+    // ── 3. NÚMERO DA EDIÇÃO (auto-incremento se vazio) ───────────────────────
+    const numEl = body.querySelector('[data-field-name="numero"]');
+    if (numEl && !numEl.value.trim()) {
+      try {
+        const snap = await db.collection('newsletters').orderBy('numero', 'desc').limit(1).get();
+        let prox = 1;
+        if (!snap.empty) {
+          const ult = parseInt(snap.docs[0].data().numero, 10);
+          if (!isNaN(ult)) prox = ult + 1;
+        }
+        numEl.value = String(prox).padStart(3, '0');
+      } catch (e) {
+        avisos.push('Não consegui calcular o próximo número automaticamente.');
+      }
+    }
+
+    // ── 4. BLOCOS ────────────────────────────────────────────────────────────
+    const TIPOS_VALIDOS = ['chamada', 'destaque', 'analise', 'dados', 'cta'];
+    const ACESSOS_VALIDOS = ['todos', 'leads', 'assinantes'];
+    const DESTINOS_VALIDOS = ['email+app', 'app', 'email'];
+
+    const containerBlocos = document.getElementById('container-blocos-edicao');
+    if (Array.isArray(pacote.blocos) && pacote.blocos.length && containerBlocos) {
+      containerBlocos.innerHTML = '';
+      pacote.blocos.forEach((b, i) => {
+        const html = (b.html || '').toString();
+        if (!html.trim()) {
+          avisos.push('Bloco ' + (i + 1) + ' sem HTML — ignorado.');
+          return;
+        }
+        adicionarBlocoEdicao({
+          titulo: (b.titulo || '').toString().trim(),
+          tipo: TIPOS_VALIDOS.includes(b.tipo) ? b.tipo : '',
+          acesso: ACESSOS_VALIDOS.includes(b.acesso) ? b.acesso : 'todos',
+          destino: DESTINOS_VALIDOS.includes(b.destino) ? b.destino : 'email+app',
+          html: html
+        });
+      });
+
+      // sanity checks do modo rápido do app
+      if (!pacote.blocos.some(b => b.tipo === 'chamada'))
+        avisos.push('⚠️ Nenhum bloco-chamada: o modo rápido do app pode ficar vazio.');
+      if (!pacote.blocos.some(b => b.tipo === 'destaque'))
+        avisos.push('⚠️ Nenhum bloco-destaque encontrado.');
+
+      // CTA deve usar o href fixo
+      const cta = pacote.blocos.find(b => b.tipo === 'cta');
+      if (cta && cta.html && !String(cta.html).includes('radarsiope.com.br/assinatura.html'))
+        avisos.push('⚠️ O bloco-cta não usa o link fixo de assinatura.');
+    } else if (pacote.blocos !== undefined) {
+      avisos.push('Pacote sem blocos — os blocos atuais foram mantidos.');
+    }
+
+    // ── 5. TEMPLATES FIXOS DE E-MAIL / APP (só preenche se vazio) ────────────
+    const taHtml = document.getElementById('campo-html-newsletter');
+    const taHtmlComp = document.getElementById('campo-html-completo-newsletter');
+
+    if (taHtml && !taHtml.value.trim()) {
+      let tpl = '';
+      try {
+        const cfg = await db.collection('config').doc('email_template_padrao').get();
+        tpl = cfg.exists ? (cfg.data().html || '') : '';
+      } catch (e) { tpl = ''; }
+      if (!tpl) tpl = _rsTemplateEmailFallback();
+      taHtml.value = tpl;
+
+      // avisa (não corrige) se o template carregado não tem os links obrigatórios
+      if (!tpl.includes('verNewsletterComToken.html'))
+        avisos.push('⚠️ Template de e-mail sem link de token (verNewsletterComToken.html).');
+      if (!tpl.includes('descadastramento'))
+        avisos.push('⚠️ Template de e-mail sem link de descadastramento.');
+    }
+
+    if (taHtmlComp && !taHtmlComp.value.trim()) {
+      taHtmlComp.value = '<div id="rs-newsletter-content">{{blocos}}</div>';
+    }
+
+    // ── 6. FAQ ───────────────────────────────────────────────────────────────
+    const faqContainerEl = document.getElementById('faq-editor-container');
+    if (Array.isArray(pacote.faq) && pacote.faq.length && faqContainerEl) {
+      faqContainerEl.innerHTML = '';
+      pacote.faq.slice(0, 5).forEach(item => {
+        if (item && (item.pergunta || '').toString().trim()) {
+          renderFaqItem(item.pergunta, item.resposta || '');
+        }
+      });
+    }
+
+    // ── 7. QUIZ ──────────────────────────────────────────────────────────────
+    if (pacote.quiz && Array.isArray(pacote.quiz.perguntas) && pacote.quiz.perguntas.length) {
+      const q = pacote.quiz;
+
+      const tEl = document.getElementById('quiz-tentativas-max');
+      const pEl = document.getElementById('quiz-pontuacao-minima');
+      const vEl = document.getElementById('quiz-visivel-leads');
+      if (tEl && q.tentativas_max) tEl.value = q.tentativas_max;
+      if (pEl && q.pontuacao_minima !== undefined) pEl.value = q.pontuacao_minima;
+      if (vEl) vEl.checked = !!q.visivel_leads;
+
+      const qContainer = document.getElementById('quiz-perguntas-container');
+      if (qContainer) {
+        qContainer.innerHTML = '';
+        q.perguntas.forEach(p => {
+          renderQuizPergunta({
+            pergunta: p.enunciado || p.pergunta || '',
+            alternativas: Array.isArray(p.alternativas) ? p.alternativas : [],
+            correta: (typeof p.correta === 'number') ? p.correta : -1,
+            explicacao: p.explicacao || ''
+          });
+        });
+
+        // validações básicas do Prompt 5
+        if (q.perguntas.length !== 5)
+          avisos.push('Quiz com ' + q.perguntas.length + ' perguntas (o padrão é 5).');
+        q.perguntas.forEach((p, i) => {
+          if (!Array.isArray(p.alternativas) || p.alternativas.length !== 4)
+            avisos.push('Quiz: pergunta ' + (i + 1) + ' não tem 4 alternativas.');
+          if (typeof p.correta !== 'number' || p.correta < 0 || p.correta > 3)
+            avisos.push('Quiz: pergunta ' + (i + 1) + ' sem índice de correta válido.');
+        });
+        const dist = new Set(q.perguntas.map(p => p.correta));
+        if (dist.size < 3)
+          avisos.push('Quiz: respostas corretas muito concentradas em poucos índices.');
+      }
+    }
+
+    // ── 8. MAPA MENTAL ───────────────────────────────────────────────────────
+    if (pacote.mapa_mental && pacote.mapa_mental.raiz) {
+      const mm = document.getElementById('mm-json-input');
+      const mmAtivo = document.getElementById('mm-ativo');
+      if (mm) {
+        mm.value = JSON.stringify(pacote.mapa_mental, null, 2);
+        if (mmAtivo) mmAtivo.checked = pacote.mapa_mental.ativo !== false;
+        // dispara o validador nativo que já existe no modal
+        document.getElementById('mm-btn-validar')?.click();
+      }
+    }
+
+    // ── RESUMO FINAL ─────────────────────────────────────────────────────────
+    let msg = '✅ Edição importada!\n\nRevise os campos e clique em Salvar.';
+    if (avisos.length) {
+      msg += '\n\n⚠️ Avisos (' + avisos.length + '):\n' + avisos.map(a => '• ' + a).join('\n');
+    }
+    mostrarMensagem(msg);
+    return true;
+  }
+
+  // ────────────────────────────────────────────────────────────────────────────
+  // BOTÃO + MODAL DE COLAGEM (UI autocontida — não precisa alterar o HTML)
+  // ────────────────────────────────────────────────────────────────────────────
+  function _rsAbrirModalImport() {
+    document.getElementById('rs-modal-import-edicao')?.remove();
+
+    const overlay = document.createElement('div');
+    overlay.id = 'rs-modal-import-edicao';
+    overlay.style.cssText =
+      'position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:99999;' +
+      'display:flex;align-items:center;justify-content:center;padding:20px';
+
+    overlay.innerHTML = `
+      <div style="background:#fff;border-radius:12px;width:100%;max-width:720px;
+                  max-height:90vh;display:flex;flex-direction:column;
+                  box-shadow:0 8px 40px rgba(0,0,0,.3);overflow:hidden">
+        <div style="padding:16px 20px;background:#059669;color:#fff;
+                    display:flex;justify-content:space-between;align-items:center">
+          <div>
+            <div style="font-size:15px;font-weight:700">📥 Importar Conteúdo completo</div>
+            <div style="font-size:11px;opacity:.85;margin-top:2px">
+              Cole a resposta completa do Prompt Mestre — o JSON é extraído automaticamente.
+            </div>
+          </div>
+          <button data-act="cancelar"
+                  style="background:rgba(255,255,255,.25);border:none;color:#fff;
+                        padding:5px 12px;border-radius:6px;cursor:pointer;
+                        font-size:13px;font-weight:700">✕</button>
+        </div>
+        <div style="padding:16px 20px;flex:1;overflow:auto">
+          <textarea data-role="json" rows="14" spellcheck="false"
+            placeholder="Cole aqui a saída completa do NotebookLM (pode incluir crases, markdown e texto em volta — o parser encontra o JSON)."
+            style="width:100%;padding:10px;border:1.5px solid #d1d5db;border-radius:8px;
+                  font-family:monospace;font-size:12px;resize:vertical;
+                  box-sizing:border-box"></textarea>
+          <div style="font-size:11px;color:#94a3b8;margin-top:8px;line-height:1.5">
+            ⚠️ A importação substitui blocos, FAQ, quiz e mapa mental atuais do formulário.
+            Metadados vazios não são sobrescritos. O número da edição é incrementado
+            automaticamente se não vier no pacote.
+          </div>
+        </div>
+        <div style="padding:14px 20px;border-top:1px solid #e2e8f0;
+                    display:flex;justify-content:flex-end;gap:10px">
+          <button data-act="cancelar"
+                  style="padding:9px 18px;border-radius:8px;border:1px solid #cbd5e1;
+                        background:#fff;cursor:pointer;font-size:13px">Cancelar</button>
+          <button data-act="importar"
+                  style="padding:9px 22px;border-radius:8px;border:none;
+                        background:#059669;color:#fff;cursor:pointer;
+                        font-size:13px;font-weight:700">📥 Importar</button>
+        </div>
+      </div>`;
+
+    document.body.appendChild(overlay);
+
+    overlay.querySelectorAll('[data-act="cancelar"]').forEach(b => {
+      b.onclick = () => overlay.remove();
+    });
+    overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+
+    const btnImportar = overlay.querySelector('[data-act="importar"]');
+    const textarea = overlay.querySelector('[data-role="json"]');
+    btnImportar.onclick = async () => {
+      btnImportar.disabled = true;
+      btnImportar.textContent = '⏳ Importando...';
+      const ok = await _rsImportarEdicaoJSON(textarea.value);
+      if (ok) overlay.remove();
+      else { btnImportar.disabled = false; btnImportar.textContent = '📥 Importar'; }
+    };
+
+    textarea.focus();
+  }
+
+  // ── Renderiza o botão na coluna 1 do modal ──────────────────────────────────
+  const btnImportEdicao = document.createElement('button');
+  btnImportEdicao.type = 'button';
+  btnImportEdicao.innerText = '📥 Importar Edição (NotebookLM)';
+  btnImportEdicao.style.cssText =
+    'width:100%;margin-top:16px;padding:11px;background:#059669;color:#fff;' +
+    'border:none;border-radius:8px;cursor:pointer;font-size:13px;font-weight:700';
+  btnImportEdicao.onclick = () => _rsAbrirModalImport();
+  col1.appendChild(btnImportEdicao);
+
+// ----------------------------------------------------------------------
+
   // Validar JSON
   document.getElementById('mm-btn-validar').addEventListener('click', () => {
     const status = document.getElementById('mm-status');
