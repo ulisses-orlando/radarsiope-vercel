@@ -39,9 +39,11 @@ async function salvarVitrineGlobal() {
   if (!statusEl) return;
   
   // Valida se há itens
-  // (acessamos via window._vitrineItems que é exposto pelo vitrine.js)
-  const itens = window._vitrineItems || [];
-  if (itens.length === 0) {
+  // (usa getter exposto pelo vitrine.js via Object.defineProperty)
+  const itens = (typeof window._getVitrineItems === 'function')
+    ? window._getVitrineItems()
+    : (window._vitrineItems || []);
+  if (!itens || itens.length === 0) {
     statusEl.style.display = 'block';
     statusEl.style.background = '#fef3c7';
     statusEl.style.color = '#92400e';

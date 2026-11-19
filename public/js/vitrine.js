@@ -479,4 +479,13 @@ salvarVitrine(newsletterId)
 Chame no handler do botão "Salvar" da edição:
 await window.salvarVitrine(docId);
 */
+
+// ── Expõe estado interno para uso pelo admin (vitrine-admin.js) ────────────
+Object.defineProperty(window, '_vitrineItems', {
+  get: () => _vitrineItems,
+  configurable: true,
+  enumerable: true,
+});
+window._getVitrineItems = () => _vitrineItems; // fallback simples
+
 window.salvarVitrine = salvarVitrine;
