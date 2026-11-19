@@ -635,19 +635,27 @@ async function renderModoCompleto(newsletter, dados, segmento, acesso) {
 }
 
 // ─── Município (API v2: getResumoMunicipio + renderSecaoMunicipio) ─────────────
+
+// ─── Município (API v2: getResumoMunicipio + renderSecaoMunicipio) ─────────────
 async function renderMunicipio(destinatario, acesso, newsletter) {
   const container = document.getElementById('municipio-conteudo');
   const titulo = document.getElementById('municipio-titulo');
-
+  
+  console.log('[verNL] 🏙️ renderMunicipio iniciado', {
+    destinatario_cod: destinatario.cod_municipio,
+    destinatario_nome: destinatario.nome_municipio,
+    _municipioAtivo_atual: _municipioAtivo
+  });
+  
   // ── Lê municipios_plano da sessão ────────────────────────────────────────
   let municipiosPlano = [];
   try {
     const sess = JSON.parse(localStorage.getItem('rs_pwa_session') || '{}');
     municipiosPlano = sess.municipios_plano || [];
   } catch (_) { }
-
+  
   const temMultiplos = acesso.isAssinante && municipiosPlano.length > 1;
-
+  
   // Inicializa _municipioAtivo apenas na primeira chamada ou ao trocar de assinante
   if (!_municipioAtivo || _municipioAtivo._uid !== destinatario._uid) {
     _municipioAtivo = {
@@ -657,11 +665,13 @@ async function renderMunicipio(destinatario, acesso, newsletter) {
       cod_uf: destinatario.cod_uf || '',
     };
   }
-
+  
   const cod = _municipioAtivo.cod_municipio;
   const nome = _municipioAtivo.nome_municipio;
   const uf = _municipioAtivo.cod_uf;
-
+  
+  console.log('[verNL] 🏙️ Dados do município ativo:', { cod, nome, uf });
+  
   // ── Título ou seletor (ocupa o mesmo espaço) ──────────────────────────────
   if (titulo) {
     if (temMultiplos) {
@@ -670,62 +680,88 @@ async function renderMunicipio(destinatario, acesso, newsletter) {
       titulo.textContent = nome ? `${nome}/${uf}` : '';
     }
   }
-
-  // ── Aguarda módulo Supabase com retry robusto ─────────────────────────────
-  let SM = window.SupabaseMunicipio;
-  let tentativasModulo = 0;
-  const MAX_TENTATIVAS_MODULO = 50; // até 5s
-
-  while (!SM && tentativasModulo < MAX_TENTATIVAS_MODULO) {
-    await new Promise(r => setTimeout(r, 100));
-    SM = window.SupabaseMunicipio;
-    tentativasModulo++;
-  }
-
+  
+  // ── Aguarda módulo Supabase ───────────────────────────────────────────────
+  await new Promise(resolve => {
+    if (window.SupabaseMunicipio) return resolve();
+    let n = 0;
+    const t = setInterval(() => {
+      if (window.SupabaseMunicipio || ++n > 40) { 
+        clearInterval(t); 
+        resolve(); 
+      }
+    }, 100);
+  });
+  
+  const SM = window.SupabaseMunicipio;
   if (!SM || !container) {
-    console.warn('[verNL] Módulo SupabaseMunicipio não carregado após tentativas');
+    console.warn('[verNL] Módulo SupabaseMunicipio não disponível');
     return;
   }
-
+  
   const btn = document.getElementById('btn-toggle-historico');
   if (btn) btn.style.display = 'none';
-
+  
   SM.renderSkeleton(container);
-
-  // ── Retry para buscar dados do município ──────────────────────────────────
-  let resumo = null;
-  let tentativasDados = 0;
-  const MAX_TENTATIVAS_DADOS = 3;
-
-  while (!resumo && tentativasDados < MAX_TENTATIVAS_DADOS && cod) {
-    try {
-      resumo = await SM.getResumoMunicipio(cod);
-      if (!resumo) {
-        console.warn(`[verNL] getResumoMunicipio retornou vazio (tentativa ${tentativasDados + 1})`);
-        await new Promise(r => setTimeout(r, 600));
+  
+  // ── Busca dados do município ─────────────────────────────────────────────
+  try {
+    console.log('[verNL] 🏙️ Chamando getResumoMunicipio com cod:', cod);
+    
+    let resumo = null;
+    
+    if (cod) {
+      // Tenta até 3 vezes com delay crescente
+      for (let tentativa = 1; tentativa <= 3; tentativa++) {
+        try {
+          resumo = await SM.getResumoMunicipio(cod);
+          console.log(`[verNL] 🏙️ Tentativa ${tentativa}:`, resumo ? '✅ Dados recebidos' : '⚠️ Retornou vazio');
+          
+          if (resumo) break; // Sucesso, sai do loop
+          
+          // Se retornou vazio, aguarda antes de tentar novamente
+          if (tentativa < 3) {
+            console.log(`[verNL] 🏙️ Aguardando 1s antes da próxima tentativa...`);
+            await new Promise(r => setTimeout(r, 1000));
+          }
+        } catch (err) {
+          console.warn(`[verNL] 🏙️ Erro na tentativa ${tentativa}:`, err.message);
+          if (tentativa < 3) {
+            await new Promise(r => setTimeout(r, 1000));
+          }
+        }
       }
-    } catch (err) {
-      console.warn(`[verNL] Tentativa ${tentativasDados + 1} falhou:`, err.message);
-      await new Promise(r => setTimeout(r, 600));
+    } else {
+      console.warn('[verNL] 🏙️ cod_municipio não definido, pulando busca');
     }
-    tentativasDados++;
-  }
-
-  SM.renderSecaoMunicipio({
-    container,
-    blur: acesso.blurMunicipio,
-    resumo,
-    nomeMunicipio: nome,
-    uf
-  });
-
-  if (resumo && cod && (acesso.isAssinante || acesso.acessoProTemp)) {
-    const temFeatureMunicipios = !!destinatario.features?.max_municipios;
-    const vitrine = temFeatureMunicipios ? await _buscarVitrineGlobal() : [];
-    dadosMunicipioAtual = { cod_municipio: cod, nome, uf, vitrine };
-    if (btn) btn.style.display = 'block';
-  } else {
-    dadosMunicipioAtual = { cod_municipio: null, nome: null, uf: null, vitrine: null };
+    
+    console.log('[verNL] 🏙️ Renderizando seção município com resumo:', resumo ? 'presente' : 'ausente');
+    
+    SM.renderSecaoMunicipio({ 
+      container, 
+      blur: acesso.blurMunicipio, 
+      resumo, 
+      nomeMunicipio: nome, 
+      uf 
+    });
+    
+    if (resumo && cod && (acesso.isAssinante || acesso.acessoProTemp)) {
+      // ✅ BUSCA VITRINE GLOBAL (Supabase) — não mais da newsletter
+      const temFeatureMunicipios = !!destinatario.features?.max_municipios;
+      const vitrine = temFeatureMunicipios ? await _buscarVitrineGlobal() : [];
+      dadosMunicipioAtual = { cod_municipio: cod, nome, uf, vitrine };
+      if (btn) btn.style.display = 'block';
+    } else {
+      dadosMunicipioAtual = { cod_municipio: null, nome: null, uf: null, vitrine: null };
+    }
+  } catch (err) {
+    console.error('[verNL] 🏙️ Erro crítico em renderMunicipio:', err);
+    container.innerHTML = `<div style="padding:20px;text-align:center;color:var(--rs-muted)">
+      <div style="font-size:28px;margin-bottom:8px">⚠️</div>
+      <div style="font-size:13px;line-height:1.6">Não foi possível carregar os dados do município.<br>
+      <small style="color:#64748b">${err.message}</small></div>
+    </div>`;
+    if (btn) btn.style.display = 'none';
   }
 }
 
