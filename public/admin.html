@@ -645,6 +645,12 @@
     </div>
     <div style="margin-top:12px">
       <h2 style="font-size:14px;margin-bottom:6px">Tabelas</h2>
+    <div onclick="mostrarSecaoVitrine()" 
+        style="cursor:pointer; padding:10px 16px; border-radius:6px; transition:background .15s;"
+        onmouseover="this.style.background='rgba(255,255,255,0.08)'"
+        onmouseout="this.style.background='transparent'">
+      📊 Vitrine de Indicadores
+    </div>
       <button onclick="abrirTab('newsletters')">📰 Newsletters</button>
       <button onclick="abrirTab('template_newsletters')">📰 Templates de Newsletters</button>
       <button onclick="abrirTab('tipo-newsletters')">📂 Tipo de Newsletters</button>
@@ -2297,6 +2303,54 @@
     <section id="calendario">
       <div id="cal-admin-root"></div>
     </section>
+    <!-- ═══════════════════════════════════════════════════════════════
+        SEÇÃO: VITRINE DE INDICADORES (GLOBAL)
+    ═══════════════════════════════════════════════════════════════ -->
+    <section id="secao-vitrine" style="display:none; padding:24px;">
+      <div style="max-width:900px; margin:0 auto;">
+        
+        <!-- Cabeçalho -->
+        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:20px;">
+          <div>
+            <h2 style="margin:0; font-size:22px; color:#0A3D62;">📊 Vitrine de Indicadores</h2>
+            <p style="margin:6px 0 0; font-size:13px; color:#64748b;">
+              Configure uma vez — vale para <strong>todos os assinantes</strong> com a feature "Municípios para painéis".
+            </p>
+          </div>
+          <button id="btn-salvar-vitrine" 
+                  onclick="salvarVitrineGlobal()"
+                  style="background:linear-gradient(135deg,#667eea,#764ba2); 
+                        color:#fff; border:none; border-radius:8px; 
+                        padding:10px 20px; cursor:pointer; font-size:14px; font-weight:600;">
+            💾 Salvar Vitrine
+          </button>
+        </div>
+
+        <!-- Aviso informativo -->
+        <div style="background:#eff6ff; border-left:4px solid #3b82f6; border-radius:6px; 
+                    padding:12px 16px; margin-bottom:20px; font-size:13px; color:#1e40af;">
+          <strong>ℹ️ Como funciona:</strong> Os indicadores configurados aqui serão exibidos como gráficos 
+          no app para todos os assinantes cujo plano tenha a feature <code>max_municipios</code> ativa. 
+          A vitrine é <strong>global</strong> — não está vinculada a nenhuma edição específica.
+        </div>
+
+        <!-- Container da vitrine (preenchido pelo vitrine.js) -->
+        <div id="vitrine-admin-container" 
+            style="background:#fff; border:1px solid #e2e8f0; border-radius:10px; padding:20px;">
+          <div style="text-align:center; padding:40px; color:#94a3b8;">
+            <div style="font-size:32px; margin-bottom:12px;">⏳</div>
+            <div style="font-size:14px;">Carregando configuração da vitrine...</div>
+          </div>
+        </div>
+
+        <!-- Status de salvamento -->
+        <div id="vitrine-status-msg" 
+            style="margin-top:16px; padding:12px 16px; border-radius:8px; 
+                    font-size:13px; display:none;"></div>
+
+      </div>
+    </section>
+
   </main>
 
 
@@ -2500,6 +2554,7 @@
   <script src="js/features.js"></script>
   <script src="js/cupons.js"></script>
   <script src="js/vitrine.js"></script>
+  <script src="/js/vitrine-admin.js"></script>
   <script src="js/main.js"></script>
   <script src="js/subcollections.js"></script>
   <script src="js/drawer-usuario.js"></script>
