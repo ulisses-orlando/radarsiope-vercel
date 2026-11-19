@@ -2002,7 +2002,7 @@ style="flex:1;padding:6px 12px;background:#059669;color:#fff;border:none;border-
             </div>
             <div style="font-size:13px;color:#64748b;max-width:400px;line-height:1.6">
               Abre em nova aba renderizando a edição completa com os dados do município
-              <strong>${codMun}</strong>, incluindo os gráficos da vitrine configurados.
+              <strong>${codMun}</strong>.
             </div>
             <a href="/verNewsletterComToken.html?preview=1&nid=${docId}&mun=${codMun}"
                target="_blank"
@@ -2207,7 +2207,6 @@ style="flex:1;padding:6px 12px;background:#059669;color:#fff;border:none;border-
     const ref = db.collection('newsletters');
     if (isEdit && docId) {
       await ref.doc(docId).set(payload, { merge: true });
-      await window.salvarVitrine(docId);
     } else {
       const novoDoc = await ref.add(payload);
     }
@@ -2292,13 +2291,6 @@ style="flex:1;padding:6px 12px;background:#059669;color:#fff;border:none;border-
   // -----------------------------
   if (isEdit && docId) {
     _renderPainelAvaliacoes(body, data);
-
-    // ── VITRINE DE INDICADORES ──────────────────────────────
-    const vitrineContainer = document.createElement('div');
-    vitrineContainer.id = 'vitrine-container';
-    body.appendChild(vitrineContainer);
-    await window.inicializarVitrine(docId, vitrineContainer);
-    // ────────────────────────────────────────────────────────
   }
 }
 
@@ -5980,6 +5972,30 @@ async function _registrarAlteracaoStatus(docId, acao, motivo = '') {
     status_historico: hist
   });
 }
+
+// ─── Navegação: Vitrine de Indicadores ──────────────────────────────────────
+function mostrarSecaoVitrine() {
+  // Esconde todas as seções
+  document.querySelectorAll('section').forEach(s => s.style.display = 'none');
+  
+  // Mostra a seção da vitrine
+  const secao = document.getElementById('secao-vitrine');
+  if (secao) {
+    secao.style.display = 'block';
+    // Inicializa a vitrine (lazy load)
+    if (typeof window.inicializarVitrineAdmin === 'function') {
+      window.inicializarVitrineAdmin();
+    }
+  }
+  
+  // Atualiza menu ativo (se houver lógica de highlight)
+  document.querySelectorAll('.menu-item').forEach(m => m.classList.remove('ativo'));
+  const menuVitrine = document.querySelector('[data-secao="vitrine"]');
+  if (menuVitrine) menuVitrine.classList.add('ativo');
+}
+
+// Expõe globalmente para o onclick do menu
+window.mostrarSecaoVitrine = mostrarSecaoVitrine;
 
 /* ======================
    EXPORTAR GLOBAL

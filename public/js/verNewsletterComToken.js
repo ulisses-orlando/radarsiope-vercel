@@ -16,6 +16,44 @@ let dadosMunicipioAtual = {
   uf: null,
   vitrine: null
 };
+
+// ═══════════════════════════════════════════════════════════════════════════
+// CACHE da vitrine global (Supabase) — renova a cada 5 min
+// ═══════════════════════════════════════════════════════════════════════════
+const VITRINE_CACHE_TTL = 5 * 60 * 1000; // 5 minutos
+
+async function _buscarVitrineGlobal() {
+  // 1. Tenta cache local
+  try {
+    const cached = JSON.parse(localStorage.getItem('rs_vitrine_cache') || 'null');
+    if (cached && (Date.now() - cached.ts) < VITRINE_CACHE_TTL) {
+      return cached.data;
+    }
+  } catch {}
+  
+  // 2. Busca do Supabase
+  try {
+    const { data, error } = await window.supabase
+      .from('config_vitrine_indicadores')
+      .select('*')
+      .eq('vitrine_id', 1)
+      .order('ordem', { ascending: true });
+    
+    if (error || !data) return [];
+    
+    // 3. Salva no cache
+    localStorage.setItem('rs_vitrine_cache', JSON.stringify({
+      data: data || [],
+      ts: Date.now()
+    }));
+    
+    return data || [];
+  } catch (e) {
+    console.warn('[vitrine] Erro ao buscar config global:', e);
+    return [];
+  }
+}
+
 // ─── Contexto dinâmico para o Chat (evita referência a edição antiga) ─────
 window._chatContext = { nid: null, uid: null, edicaoNum: null };
 // ─── Município ativo no seletor multi-município ────────────────────────────
@@ -656,10 +694,14 @@ async function renderMunicipio(destinatario, acesso, newsletter) {
     SM.renderSecaoMunicipio({ container, blur: acesso.blurMunicipio, resumo, nomeMunicipio: nome, uf });
 
     if (resumo && cod && (acesso.isAssinante || acesso.acessoProTemp)) {
-      dadosMunicipioAtual = { cod_municipio: cod, nome, uf, vitrine: newsletter?.vitrine || null };
+      // ✅ BUSCA VITRINE GLOBAL (Supabase) — não mais da newsletter
+      const temFeatureMunicipios = !!destinatario.features?.max_municipios;
+      const vitrine = temFeatureMunicipios ? await _buscarVitrineGlobal() : [];
+      
+      dadosMunicipioAtual = { cod_municipio: cod, nome, uf, vitrine };
       if (btn) btn.style.display = 'block';
     } else {
-      dadosMunicipioAtual = { cod_municipio: null, nome: null, uf: null };
+      dadosMunicipioAtual = { cod_municipio: null, nome: null, uf: null, vitrine: null };
     }
 
     /*     if ((acesso.isAssinante || acesso.acessoProTemp) && resumo && cod) {
@@ -817,15 +859,19 @@ function _renderSeletorMunicipio(tituloEl, municipiosPlano, destinatario, acesso
       });
 
       if (resumo && (acesso.isAssinante || acesso.acessoProTemp)) {
+        // ✅ BUSCA VITRINE GLOBAL (Supabase) — não mais da newsletter
+        const temFeatureMunicipios = !!destinatario.features?.max_municipios;
+        const vitrine = temFeatureMunicipios ? await _buscarVitrineGlobal() : [];
+        
         dadosMunicipioAtual = {
           cod_municipio: novo.cod_municipio,
           nome: novo.nome,
           uf: novo.uf || '',
-          vitrine: newsletter?.vitrine || null,
+          vitrine,
         };
         if (btn) btn.style.display = 'block';
       } else {
-        dadosMunicipioAtual = { cod_municipio: null, nome: null, uf: null };
+        dadosMunicipioAtual = { cod_municipio: null, nome: null, uf: null, vitrine: null };
       }
       // Sincroniza o dataset do botão de relatório com o município selecionado
       const btnRel = document.getElementById('btn-relatorio-conformidade');
