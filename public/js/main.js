@@ -1112,7 +1112,7 @@ style="flex:1;padding:6px 12px;background:#059669;color:#fff;border:none;border-
   // ── Renderiza o botão na coluna 1 do modal ──────────────────────────────────
   const btnImportEdicao = document.createElement('button');
   btnImportEdicao.type = 'button';
-  btnImportEdicao.innerText = '📥 Importar Edição (NotebookLM)';
+  btnImportEdicao.innerText = '📥 Importar Conteúdo completo';
   btnImportEdicao.style.cssText =
     'width:100%;margin-top:16px;padding:11px;background:#059669;color:#fff;' +
     'border:none;border-radius:8px;cursor:pointer;font-size:13px;font-weight:700';
