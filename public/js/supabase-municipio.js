@@ -76,6 +76,30 @@ function _esc(s) {
 async function getResumoMunicipio(cod_municipio) {
   if (!cod_municipio) return null;
   try {
+    // 🔒 PASSO CRÍTICO: Aguarda a sessão de auth ser restaurada antes de consultar
+    // Isso evita que a RLS do Supabase bloqueie a query silenciosamente (retornando null)
+    // porque o token JWT ainda não foi anexado à requisição.
+    const { data: { session } } = await _sb().auth.getSession();
+    
+    // Se ainda não houver sessão, aguarda o evento de mudança de estado (máx 3s)
+    if (!session) {
+      console.warn('[SM] ⚠️ Sessão auth ausente na primeira tentativa. Aguardando INITIAL_SESSION...');
+      await new Promise(resolve => {
+        const { data: sub } = _sb().auth.onAuthStateChange((event, sess) => {
+          if (sess || event === 'SIGNED_OUT' || event === 'INITIAL_SESSION') {
+            sub.subscription.unsubscribe();
+            resolve();
+          }
+        });
+        // Fallback de segurança: se nada acontecer em 3s, prossegue mesmo assim
+        setTimeout(() => { 
+          sub.subscription.unsubscribe(); 
+          resolve(); 
+        }, 3000);
+      });
+    }
+
+    // Agora faz a query com a garantia de que a sessão (e o JWT) estão prontos
     const { data, error } = await _sb()
       .from('vw_municipio_resumo')
       .select('*')
@@ -84,9 +108,21 @@ async function getResumoMunicipio(cod_municipio) {
       .order('bimestre', { ascending: false })
       .limit(1)
       .maybeSingle();
-    if (error) { console.warn('[SM] getResumoMunicipio:', error.message); return null; }
+
+    if (error) { 
+      console.warn('[SM] getResumoMunicipio erro:', error.message); 
+      return null; 
+    }
+    
+    if (!data) {
+      console.warn('[SM] ⚠️ vw_municipio_resumo sem dados para', cod_municipio, '(mesmo com sessão)');
+    }
+    
     return data;
-  } catch (e) { console.warn('[SM] getResumoMunicipio:', e.message); return null; }
+  } catch (e) { 
+    console.warn('[SM] getResumoMunicipio exceção:', e.message); 
+    return null; 
+  }
 }
 
 // Buscar histórico completo de um município (todos os anos disponíveis)
