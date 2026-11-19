@@ -3184,7 +3184,7 @@ function _renderDrawerSemContexto() {
 // ─── Nível 1 — lista de tipos ────────────────────────────────────────────────
 async function _renderNivel1() {
   _drawer.nivel = 1;
-  _setDrawerHeader('Edições por tipo', false);
+  _setDrawerHeader('Acervo RadarTeca', false);
   const body = document.getElementById('rs-drawer-body');
   body.innerHTML = `
     <div style="padding:20px;text-align:center;color:var(--rs-muted);font-size:13px">

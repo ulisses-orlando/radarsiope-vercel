@@ -284,7 +284,7 @@
         <button class="rs-menu-item" id="rs-menu-edicoes"
           style="background:#0A3D62" role="menuitem">
           <span class="rs-menu-item-icon">📚</span>
-          <span class="rs-menu-item-label">Edições</span>
+          <span class="rs-menu-item-label">RadarTeca</span>
         </button>
         <button class="rs-menu-item" id="rs-menu-alertas"
           style="background:#1e4d78" role="menuitem">
