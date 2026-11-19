@@ -1293,11 +1293,7 @@ style="flex:1;padding:6px 12px;background:#059669;color:#fff;border:none;border-
     }
 
     if (taHtmlComp && !taHtmlComp.value.trim()) {
-      taHtmlComp.value = '<table>',
-                         '<div id="rs-newsletter-content">',
-                         '{{blocos}}',
-                         '</div>',
-                         '</table>';
+      taHtmlComp.value = '<table>  <div id="rs-newsletter-content"> {{blocos}} </div> </table>';
     }
 
     // ── 6. FAQ ───────────────────────────────────────────────────────────────
