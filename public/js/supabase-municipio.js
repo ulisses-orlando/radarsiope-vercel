@@ -74,55 +74,64 @@ function _esc(s) {
 
 // Resumo do último bimestre disponível (usa vw_municipio_resumo)
 async function getResumoMunicipio(cod_municipio) {
-  if (!cod_municipio) return null;
-  try {
-    // 🔒 PASSO CRÍTICO: Aguarda a sessão de auth ser restaurada antes de consultar
-    // Isso evita que a RLS do Supabase bloqueie a query silenciosamente (retornando null)
-    // porque o token JWT ainda não foi anexado à requisição.
-    const { data: { session } } = await _sb().auth.getSession();
-    
-    // Se ainda não houver sessão, aguarda o evento de mudança de estado (máx 3s)
-    if (!session) {
-      console.warn('[SM] ⚠️ Sessão auth ausente na primeira tentativa. Aguardando INITIAL_SESSION...');
-      await new Promise(resolve => {
-        const { data: sub } = _sb().auth.onAuthStateChange((event, sess) => {
-          if (sess || event === 'SIGNED_OUT' || event === 'INITIAL_SESSION') {
-            sub.subscription.unsubscribe();
-            resolve();
-          }
-        });
-        // Fallback de segurança: se nada acontecer em 3s, prossegue mesmo assim
-        setTimeout(() => { 
-          sub.subscription.unsubscribe(); 
-          resolve(); 
-        }, 3000);
-      });
-    }
-
-    // Agora faz a query com a garantia de que a sessão (e o JWT) estão prontos
-    const { data, error } = await _sb()
-      .from('vw_municipio_resumo')
-      .select('*')
-      .eq('cod_municipio', String(cod_municipio))
-      .order('ano', { ascending: false })
-      .order('bimestre', { ascending: false })
-      .limit(1)
-      .maybeSingle();
-
-    if (error) { 
-      console.warn('[SM] getResumoMunicipio erro:', error.message); 
-      return null; 
-    }
-    
-    if (!data) {
-      console.warn('[SM] ⚠️ vw_municipio_resumo sem dados para', cod_municipio, '(mesmo com sessão)');
-    }
-    
-    return data;
-  } catch (e) { 
-    console.warn('[SM] getResumoMunicipio exceção:', e.message); 
-    return null; 
+  if (!cod_municipio) {
+    console.warn('[SM] ❌ getResumoMunicipio: cod_municipio é nulo ou vazio');
+    return null;
   }
+  
+  const codStr = String(cod_municipio).trim();
+  console.log(`[SM] 🔍 Iniciando busca para cod_municipio: "${codStr}"`);
+
+  // Tenta até 5 vezes com delay crescente (1s, 2s, 3s, 4s)
+  for (let tentativa = 1; tentativa <= 5; tentativa++) {
+    try {
+      console.log(`[SM] 🔍 Tentativa ${tentativa}/5 consultando vw_municipio_resumo...`);
+      
+      const { data, error } = await _sb()
+        .from('vw_municipio_resumo')
+        .select('*')
+        .eq('cod_municipio', codStr)
+        .order('ano', { ascending: false })
+        .order('bimestre', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      console.log(`[SM] 🔍 Resposta da tentativa ${tentativa}:`, { 
+        temData: !!data, 
+        erro: error ? error.message : null,
+        dados: data 
+      });
+
+      if (error) {
+        console.error(`[SM] ❌ Erro no Supabase (tentativa ${tentativa}):`, error.message);
+        // Se for erro de RLS, não adianta tentar de novo do lado do cliente
+        if (error.message.toLowerCase().includes('row-level security') || error.message.toLowerCase().includes('permission')) {
+          console.error('[SM] 🚨 ERRO DE RLS: A política de segurança do Supabase está bloqueando a leitura. Verifique as policies da view vw_municipio_resumo no painel do Supabase.');
+          return null;
+        }
+      }
+
+      if (data) {
+        console.log(`[SM] ✅ SUCESSO! Dados encontrados na tentativa ${tentativa}.`);
+        return data;
+      }
+
+      // Se não deu erro mas não tem dados, aguarda antes de tentar de novo
+      if (tentativa < 5) {
+        const delay = 1000 * tentativa; // 1s, 2s, 3s, 4s
+        console.warn(`[SM] ⚠️ Nenhum dado retornado. Aguardando ${delay}ms antes da próxima tentativa (possível materialização no backend)...`);
+        await new Promise(r => setTimeout(r, delay));
+      }
+    } catch (e) {
+      console.error(`[SM] ❌ Exceção na tentativa ${tentativa}:`, e);
+      if (tentativa < 5) {
+        await new Promise(r => setTimeout(r, 1000));
+      }
+    }
+  }
+
+  console.error(`[SM] ❌ Falha após 5 tentativas. Verifique se o município ${codStr} existe na view vw_municipio_resumo e se as políticas de RLS permitem leitura pública (anon).`);
+  return null;
 }
 
 // Buscar histórico completo de um município (todos os anos disponíveis)
