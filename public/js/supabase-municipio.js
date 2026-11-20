@@ -74,82 +74,63 @@ function _esc(s) {
 
 // Resumo do último bimestre disponível (usa vw_municipio_resumo)
 async function getResumoMunicipio(cod_municipio) {
-  if (!cod_municipio) {
-    console.warn('[SM] ❌ getResumoMunicipio: cod_municipio é nulo ou vazio');
-    return null;
+  if (!cod_municipio) return null;
+  
+  // 🔧 NORMALIZAÇÃO: Remove dígito verificador se houver (7 dígitos → 6 dígitos)
+  let codNormalizado = String(cod_municipio).trim();
+  if (codNormalizado.length === 7) {
+    codNormalizado = codNormalizado.slice(0, 6);
+    console.log(`[SM] 🔧 Código normalizado: ${cod_municipio} → ${codNormalizado}`);
   }
   
-  const codStr = String(cod_municipio).trim();
-  console.log(`[SM] 🔍 Iniciando busca para cod_municipio: "${codStr}"`);
-
-  // Tenta até 5 vezes com delay crescente (1s, 2s, 3s, 4s)
-  for (let tentativa = 1; tentativa <= 5; tentativa++) {
-    try {
-      console.log(`[SM] 🔍 Tentativa ${tentativa}/5 consultando vw_municipio_resumo...`);
+  try {
+    const { data, error } = await _sb()
+      .from('vw_municipio_resumo')
+      .select('*')
+      .eq('cod_municipio', codNormalizado)
+      .order('ano', { ascending: false })
+      .order('bimestre', { ascending: false })
+      .limit(1)
+      .maybeSingle();
       
-      const { data, error } = await _sb()
-        .from('vw_municipio_resumo')
-        .select('*')
-        .eq('cod_municipio', codStr)
-        .order('ano', { ascending: false })
-        .order('bimestre', { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      console.log(`[SM] 🔍 Resposta da tentativa ${tentativa}:`, { 
-        temData: !!data, 
-        erro: error ? error.message : null,
-        dados: data 
-      });
-
-      if (error) {
-        console.error(`[SM] ❌ Erro no Supabase (tentativa ${tentativa}):`, error.message);
-        // Se for erro de RLS, não adianta tentar de novo do lado do cliente
-        if (error.message.toLowerCase().includes('row-level security') || error.message.toLowerCase().includes('permission')) {
-          console.error('[SM] 🚨 ERRO DE RLS: A política de segurança do Supabase está bloqueando a leitura. Verifique as policies da view vw_municipio_resumo no painel do Supabase.');
-          return null;
-        }
-      }
-
-      if (data) {
-        console.log(`[SM] ✅ SUCESSO! Dados encontrados na tentativa ${tentativa}.`);
-        return data;
-      }
-
-      // Se não deu erro mas não tem dados, aguarda antes de tentar de novo
-      if (tentativa < 5) {
-        const delay = 1000 * tentativa; // 1s, 2s, 3s, 4s
-        console.warn(`[SM] ⚠️ Nenhum dado retornado. Aguardando ${delay}ms antes da próxima tentativa (possível materialização no backend)...`);
-        await new Promise(r => setTimeout(r, delay));
-      }
-    } catch (e) {
-      console.error(`[SM] ❌ Exceção na tentativa ${tentativa}:`, e);
-      if (tentativa < 5) {
-        await new Promise(r => setTimeout(r, 1000));
-      }
+    if (error) { 
+      console.warn('[SM] getResumoMunicipio:', error.message); 
+      return null; 
     }
+    
+    if (!data) {
+      console.warn('[SM] ⚠️ vw_municipio_resumo sem dados para', codNormalizado);
+    }
+    
+    return data;
+  } catch (e) { 
+    console.warn('[SM] getResumoMunicipio:', e.message); 
+    return null; 
   }
-
-  console.error(`[SM] ❌ Falha após 5 tentativas. Verifique se o município ${codStr} existe na view vw_municipio_resumo e se as políticas de RLS permitem leitura pública (anon).`);
-  return null;
 }
 
 // Buscar histórico completo de um município (todos os anos disponíveis)
 async function getHistoricoCompleto(cod_municipio) {
   if (!cod_municipio) return [];
+  
+  // 🔧 NORMALIZAÇÃO: Remove dígito verificador se houver
+  let codNormalizado = String(cod_municipio).trim();
+  if (codNormalizado.length === 7) {
+    codNormalizado = codNormalizado.slice(0, 6);
+  }
+  
   try {
     const { data, error } = await _sb()
       .from('vw_municipio_resumo')
       .select('*')
-      .eq('cod_municipio', String(cod_municipio))
-      .eq('bimestre', 6) // Apenas 6º bimestre (anual)
-      .order('ano', { ascending: false }); // Mais recente primeiro
-
+      .eq('cod_municipio', codNormalizado)
+      .eq('bimestre', 6)
+      .order('ano', { ascending: false });
+      
     if (error) {
       console.warn('[SM] getHistoricoCompleto:', error.message);
       return [];
     }
-
     return data || [];
   } catch (e) {
     console.warn('[SM] getHistoricoCompleto:', e.message);
