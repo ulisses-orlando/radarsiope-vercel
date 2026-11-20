@@ -689,42 +689,24 @@ async function renderMunicipio(destinatario, acesso, newsletter) {
   SM.renderSkeleton(container);
 
   try {
-    let resumo = null;
-    
-    // ── RETRY INTELIGENTE: Se for null, tenta novamente (backend pode estar materializando a view) ──
-    if (cod) {
-      for (let tentativa = 1; tentativa <= 3; tentativa++) {
-        console.log(`[verNL] 🏙️ Buscando resumo para ${cod} (tentativa ${tentativa}/3)`);
-        resumo = await SM.getResumoMunicipio(cod);
-        
-        if (resumo) {
-          console.log(`[verNL] 🏙️ ✅ Dados encontrados na tentativa ${tentativa}`);
-          break; // Sucesso, sai do loop
-        }
-        
-        if (tentativa < 3) {
-          console.warn(`[verNL] 🏙️ ⚠️ Dados ainda não disponíveis (view em materialização?). Aguardando 1.5s...`);
-          await new Promise(r => setTimeout(r, 1500)); // Delay de 1.5s entre tentativas
-        }
-      }
-    }
-
-    SM.renderSecaoMunicipio({ 
-      container, 
-      blur: acesso.blurMunicipio, 
-      resumo, 
-      nomeMunicipio: nome, 
-      uf 
-    });
+    const resumo = cod ? await SM.getResumoMunicipio(cod) : null;
+    SM.renderSecaoMunicipio({ container, blur: acesso.blurMunicipio, resumo, nomeMunicipio: nome, uf });
 
     if (resumo && cod && (acesso.isAssinante || acesso.acessoProTemp)) {
+      // ✅ BUSCA VITRINE GLOBAL (Supabase) — não mais da newsletter
       const temFeatureMunicipios = !!destinatario.features?.max_municipios;
       const vitrine = temFeatureMunicipios ? await _buscarVitrineGlobal() : [];
+      
       dadosMunicipioAtual = { cod_municipio: cod, nome, uf, vitrine };
       if (btn) btn.style.display = 'block';
     } else {
       dadosMunicipioAtual = { cod_municipio: null, nome: null, uf: null, vitrine: null };
     }
+
+    /*     if ((acesso.isAssinante || acesso.acessoProTemp) && resumo && cod) {
+          _injetarBotaoRelatorio(cod, nome, uf, acesso.temRelatorio);
+        } */
+
   } catch (err) {
     console.warn('[verNL] Município falhou (não fatal):', err);
     container.innerHTML = '';

@@ -80,33 +80,21 @@ async function getResumoMunicipio(cod_municipio) {
   let codNormalizado = String(cod_municipio).trim();
   if (codNormalizado.length === 7) {
     codNormalizado = codNormalizado.slice(0, 6);
-    console.log(`[SM] 🔧 Código normalizado: ${cod_municipio} → ${codNormalizado}`);
   }
   
+  if (!cod_municipio) return null;
   try {
     const { data, error } = await _sb()
       .from('vw_municipio_resumo')
       .select('*')
-      .eq('cod_municipio', codNormalizado)
+      .eq('cod_municipio', String(cod_municipio))
       .order('ano', { ascending: false })
       .order('bimestre', { ascending: false })
       .limit(1)
       .maybeSingle();
-      
-    if (error) { 
-      console.warn('[SM] getResumoMunicipio:', error.message); 
-      return null; 
-    }
-    
-    if (!data) {
-      console.warn('[SM] ⚠️ vw_municipio_resumo sem dados para', codNormalizado);
-    }
-    
+    if (error) { console.warn('[SM] getResumoMunicipio:', error.message); return null; }
     return data;
-  } catch (e) { 
-    console.warn('[SM] getResumoMunicipio:', e.message); 
-    return null; 
-  }
+  } catch (e) { console.warn('[SM] getResumoMunicipio:', e.message); return null; }
 }
 
 // Buscar histórico completo de um município (todos os anos disponíveis)
