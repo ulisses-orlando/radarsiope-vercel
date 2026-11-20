@@ -113,10 +113,11 @@ async function getResumoMunicipio(cod_municipio) {
 async function getHistoricoCompleto(cod_municipio) {
   if (!cod_municipio) return [];
   
-  // 🔧 NORMALIZAÇÃO: Remove dígito verificador se houver
+  // 🔧 NORMALIZAÇÃO: Remove dígito verificador se houver (7 dígitos → 6 dígitos)
   let codNormalizado = String(cod_municipio).trim();
   if (codNormalizado.length === 7) {
     codNormalizado = codNormalizado.slice(0, 6);
+    console.log(`[SM] 🔧 Código normalizado (histórico): ${cod_municipio} → ${codNormalizado}`);
   }
   
   try {
@@ -124,8 +125,8 @@ async function getHistoricoCompleto(cod_municipio) {
       .from('vw_municipio_resumo')
       .select('*')
       .eq('cod_municipio', codNormalizado)
-      .eq('bimestre', 6)
-      .order('ano', { ascending: false });
+      .eq('bimestre', 6) // Apenas 6º bimestre (anual)
+      .order('ano', { ascending: false }); // Mais recente primeiro
       
     if (error) {
       console.warn('[SM] getHistoricoCompleto:', error.message);
