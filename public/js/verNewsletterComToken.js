@@ -681,7 +681,6 @@ async function renderMunicipio(destinatario, acesso, newsletter) {
   });
 
   const SM = window.SupabaseMunicipio;
-  dadosMunicipioAtual = { cod_municipio: SM._normalizarCod(cod), nome, uf, vitrine };
   if (!SM || !container) return;
 
   const btn = document.getElementById('btn-toggle-historico');
@@ -839,7 +838,6 @@ function _renderSeletorMunicipio(tituloEl, municipiosPlano, destinatario, acesso
     const resumoEl = document.getElementById('municipio-resumo');
     const historicoEl = document.getElementById('municipio-historico');
     const SM = window.SupabaseMunicipio;
-    dadosMunicipioAtual = { cod_municipio: SM._normalizarCod(cod), nome, uf, vitrine };
     if (!SM || !container) return;
 
     // Volta ao resumo se estava no histórico
