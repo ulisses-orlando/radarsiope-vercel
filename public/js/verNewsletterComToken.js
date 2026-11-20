@@ -681,6 +681,7 @@ async function renderMunicipio(destinatario, acesso, newsletter) {
   });
 
   const SM = window.SupabaseMunicipio;
+  dadosMunicipioAtual = { cod_municipio: SM._normalizarCod(cod), nome, uf, vitrine };
   if (!SM || !container) return;
 
   const btn = document.getElementById('btn-toggle-historico');
@@ -697,7 +698,7 @@ async function renderMunicipio(destinatario, acesso, newsletter) {
       const temFeatureMunicipios = !!destinatario.features?.max_municipios;
       const vitrine = temFeatureMunicipios ? await _buscarVitrineGlobal() : [];
       
-      dadosMunicipioAtual = { cod_municipio: cod, nome, uf, vitrine };
+      dadosMunicipioAtual = { cod_municipio: _normalizarCod(cod), nome, uf, vitrine };
       if (btn) btn.style.display = 'block';
     } else {
       dadosMunicipioAtual = { cod_municipio: null, nome: null, uf: null, vitrine: null };
@@ -838,6 +839,7 @@ function _renderSeletorMunicipio(tituloEl, municipiosPlano, destinatario, acesso
     const resumoEl = document.getElementById('municipio-resumo');
     const historicoEl = document.getElementById('municipio-historico');
     const SM = window.SupabaseMunicipio;
+    dadosMunicipioAtual = { cod_municipio: SM._normalizarCod(cod), nome, uf, vitrine };
     if (!SM || !container) return;
 
     // Volta ao resumo se estava no histórico
@@ -863,7 +865,7 @@ function _renderSeletorMunicipio(tituloEl, municipiosPlano, destinatario, acesso
         const vitrine = temFeatureMunicipios ? await _buscarVitrineGlobal() : [];
         
         dadosMunicipioAtual = {
-          cod_municipio: novo.cod_municipio,
+          cod_municipio: _normalizarCod(novo.cod_municipio),
           nome: novo.nome,
           uf: novo.uf || '',
           vitrine,

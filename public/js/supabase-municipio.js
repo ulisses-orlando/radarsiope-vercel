@@ -68,26 +68,26 @@ function _esc(s) {
     ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[m]);
 }
 
+// 🔧 Normaliza código do município: remove 7º dígito se existir (2700102 → 270010)
+function _normalizarCod(cod) {
+  if (!cod) return null;
+  const codStr = String(cod).trim();
+  return codStr.length === 7 ? codStr.slice(0, 6) : codStr;
+}
+
 // =============================================================================
 // QUERIES
 // =============================================================================
 
 // Resumo do último bimestre disponível (usa vw_municipio_resumo)
 async function getResumoMunicipio(cod_municipio) {
-  if (!cod_municipio) return null;
-  
-  // 🔧 NORMALIZAÇÃO: Remove dígito verificador se houver (7 dígitos → 6 dígitos)
-  let codNormalizado = String(cod_municipio).trim();
-  if (codNormalizado.length === 7) {
-    codNormalizado = codNormalizado.slice(0, 6);
-  }
-  
-  if (!cod_municipio) return null;
+  const cod = _normalizarCod(cod_municipio);
+  if (!cod) return null;
   try {
     const { data, error } = await _sb()
       .from('vw_municipio_resumo')
       .select('*')
-      .eq('cod_municipio', String(cod_municipio))
+      .eq('cod_municipio', cod)
       .order('ano', { ascending: false })
       .order('bimestre', { ascending: false })
       .limit(1)
@@ -99,20 +99,13 @@ async function getResumoMunicipio(cod_municipio) {
 
 // Buscar histórico completo de um município (todos os anos disponíveis)
 async function getHistoricoCompleto(cod_municipio) {
-  if (!cod_municipio) return [];
-  
-  // 🔧 NORMALIZAÇÃO: Remove dígito verificador se houver (7 dígitos → 6 dígitos)
-  let codNormalizado = String(cod_municipio).trim();
-  if (codNormalizado.length === 7) {
-    codNormalizado = codNormalizado.slice(0, 6);
-    console.log(`[SM] 🔧 Código normalizado (histórico): ${cod_municipio} → ${codNormalizado}`);
-  }
-  
+  const cod = _normalizarCod(cod_municipio);
+  if (!cod) return [];
   try {
     const { data, error } = await _sb()
       .from('vw_municipio_resumo')
       .select('*')
-      .eq('cod_municipio', codNormalizado)
+      .eq('cod_municipio', cod)
       .eq('bimestre', 6) // Apenas 6º bimestre (anual)
       .order('ano', { ascending: false }); // Mais recente primeiro
       
@@ -136,12 +129,13 @@ function calcularVariacao(valorAtual, valorAnterior) {
 
 // Todos os indicadores de um período específico (com nome e metadados)
 async function getIndicadoresPeriodo(cod_municipio, ano, bimestre) {
-  if (!cod_municipio) return [];
+  const cod = _normalizarCod(cod_municipio);
+  if (!cod) return [];
   try {
     const { data, error } = await _sb()
       .from('municipio_indicadores')
       .select('cod_indicador, valor, indicadores(nome, unidade, categoria, ordem_exibicao)')
-      .eq('cod_municipio', String(cod_municipio))
+      .eq('cod_municipio', cod)
       .eq('ano', ano)
       .eq('bimestre', bimestre)
       .order('cod_indicador', { ascending: true });
@@ -159,12 +153,13 @@ async function getIndicadoresPeriodo(cod_municipio, ano, bimestre) {
 
 // Histórico do indicador 1.1 (% MDE) nos últimos N bimestres
 async function getHistoricoMDE(cod_municipio, limite = 6) {
-  if (!cod_municipio) return [];
+  const cod = _normalizarCod(cod_municipio);
+  if (!cod) return [];
   try {
     const { data, error } = await _sb()
       .from('municipio_indicadores')
       .select('ano, bimestre, valor, siope_municipios!inner(situacao)')
-      .eq('cod_municipio', String(cod_municipio))
+      .eq('cod_municipio', cod)
       .eq('cod_indicador', IND.MDE_APLICADO)
       .order('ano', { ascending: false })
       .order('bimestre', { ascending: false })
@@ -181,12 +176,13 @@ async function getHistoricoMDE(cod_municipio, limite = 6) {
 
 // Busca qualquer indicador específico de um município no último bimestre
 async function getIndicador(cod_municipio, cod_indicador) {
-  if (!cod_municipio || !cod_indicador) return null;
+  const cod = _normalizarCod(cod_municipio);
+  if (!cod || !cod_indicador) return null;
   try {
     const { data, error } = await _sb()
       .from('municipio_indicadores')
       .select('valor, ano, bimestre')
-      .eq('cod_municipio', String(cod_municipio))
+      .eq('cod_municipio', cod)
       .eq('cod_indicador', String(cod_indicador))
       .order('ano', { ascending: false })
       .order('bimestre', { ascending: false })
@@ -688,4 +684,5 @@ window.SupabaseMunicipio = {
   IND,
   CATEGORIAS,
   SITUACAO_CONFIG,
+  _normalizarCod,
 };
