@@ -3870,6 +3870,7 @@ async function verificarEdicaoMaisRecente(newsletter) {
   try {
     const snap = await db.collection('newsletters')
       .where('tipo', '==', tipoId)
+      .where('enviada', '==', true)
       .orderBy('data_publicacao', 'desc')
       .limit(1)
       .get();
