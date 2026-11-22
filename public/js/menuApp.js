@@ -281,11 +281,17 @@
         <div id="rs-menu-total-badge" style="display:none">0</div>
       </button>
       <div id="rs-menu-dropdown" role="menu">
-        <button class="rs-menu-item" id="rs-menu-edicoes"
-          style="background:#0A3D62" role="menuitem">
-          <span class="rs-menu-item-icon">📚</span>
-          <span class="rs-menu-item-label">RadarTeca</span>
-        </button>
+        ${isAssinante ? `
+          <button class="rs-menu-item" id="rs-menu-trilha"
+            style="background:#0A3D62" role="menuitem">
+            <span class="rs-menu-item-icon">🗺️</span>
+            <span class="rs-menu-item-label">Minha Trilha</span>
+          </button>` : `
+          <button class="rs-menu-item" id="rs-menu-edicoes"
+            style="background:#0A3D62" role="menuitem">
+            <span class="rs-menu-item-icon">📚</span>
+            <span class="rs-menu-item-label">RadarTeca</span>
+          </button>`}
         <button class="rs-menu-item" id="rs-menu-alertas"
           style="background:#1e4d78" role="menuitem">
           <span class="rs-menu-item-icon">🔔</span>
@@ -337,7 +343,17 @@
     document.getElementById('rs-menu-overlay')
       ?.addEventListener('click', _fecharMenu);
 
-    // 📚 Edições — fluxo original (já validado em abrirDrawer)
+    // 🗺️ Minha Trilha — apenas para assinantes
+    document.getElementById('rs-menu-trilha')
+      ?.addEventListener('click', async () => {
+        _fecharMenu();
+        if (typeof window._checarSessaoCritica === 'function') {
+          if (!(await window._checarSessaoCritica())) return;
+        }
+        window.dispatchEvent(new CustomEvent('rs:abrirTrilha'));
+      });
+
+    // 📚 Edições (RadarTeca) — apenas para leads
     document.getElementById('rs-menu-edicoes')
       ?.addEventListener('click', () => {
         _fecharMenu();
