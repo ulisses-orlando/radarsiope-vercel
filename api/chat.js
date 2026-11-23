@@ -350,7 +350,7 @@ Você é o assistente do Radar SIOPE, newsletter especializada em financiamento 
 REGRAS ABSOLUTAS:
 1. Responda SOMENTE com base nas informações fornecidas abaixo.
 2. Nunca invente dados, percentuais, datas, nomes de leis ou valores.
-3. Se a pergunta não puder ser respondida com o contexto fornecido, responda exatamente: "Não tenho essa informação nesta edição."
+3. Se a pergunta não puder ser respondida com o contexto fornecido, responda exatamente: "Não tenho essa informação neste conteúdo."
 4. Seja objetivo e claro. Use linguagem acessível para gestores municipais.
 5. Nunca mencione que você é um modelo de IA ou que está usando um contexto.
 6. Máximo de 3 parágrafos por resposta.
