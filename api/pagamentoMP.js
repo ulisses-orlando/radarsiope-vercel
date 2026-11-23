@@ -546,9 +546,10 @@ async function _handleAtivarSessao(req, res) {
       nome_municipio: usuarioData.nome_municipio || '',
       perfil: usuarioData.tipo_perfil || '',
       municipios_plano: assinaturaData.municipios_plano || [],
-      data_ativacao: usuarioData.data_cadastro?.toDate?.()?.toISOString?.()
+      data_ativacao: assinaturaData.data_inicio?.toDate?.()?.toISOString?.()
+/*       data_ativacao: usuarioData.data_cadastro?.toDate?.()?.toISOString?.()
         || usuarioData.data_ativacao?.toDate?.()?.toISOString?.()
-        || new Date().toISOString(),
+        || new Date().toISOString(), */
     });
 
   } catch (err) {
