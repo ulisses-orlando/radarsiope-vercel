@@ -419,7 +419,7 @@
 
   // ─── Renderizar Tipo ───────────────────────────────────────────────────────
   function _renderizarTipo(tipo, edicoes, dataAtivacao) {
-    const modulos = _agruparEmModulosPorNumero(edicoes);
+    const modulos = _agruparEmModulos(edicoes);
     const icone = _iconeDoTipo(tipo);
 
     let html =
@@ -441,25 +441,16 @@
     return html;
   }
 
-  // ─── Agrupar em módulos de 12 PELO NUMERO (001-012, 013-024...) ───────────
-  function _agruparEmModulosPorNumero(edicoes) {
-    const mapa = {};
-    edicoes.forEach(function (ed) {
-      const n = parseInt(ed.numero, 10);
-      if (!n || isNaN(n)) return; // sem numero válido não entra na trilha
-      const idx = Math.floor((n - 1) / EDICOES_POR_MODULO);
-      if (!mapa[idx]) mapa[idx] = [];
-      mapa[idx].push(ed);
+  // ─── Agrupar em módulos de 12 pela SEQUÊNCIA DO TIPO (não pelo numero global) ─
+  function _agruparEmModulos(edicoes) {
+    const ordenadas = edicoes.slice().sort(function (a, b) {
+      return (parseInt(a.numero, 10) || 0) - (parseInt(b.numero, 10) || 0);
     });
-
-    return Object.keys(mapa)
-      .map(Number)
-      .sort(function (a, b) { return a - b; })
-      .map(function (k) {
-        return mapa[k].sort(function (a, b) {
-          return (parseInt(a.numero, 10) || 0) - (parseInt(b.numero, 10) || 0);
-        });
-      });
+    const modulos = [];
+    for (let i = 0; i < ordenadas.length; i += EDICOES_POR_MODULO) {
+      modulos.push(ordenadas.slice(i, i + EDICOES_POR_MODULO));
+    }
+    return modulos;
   }
 
   // ─── Renderizar Módulo ─────────────────────────────────────────────────────
