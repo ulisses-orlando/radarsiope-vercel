@@ -395,8 +395,6 @@
       _todasEdicoesCache = snap.docs.map(function (d) {
         return { id: d.id, ...d.data() };
       });
-
-      console.log('[Trilha] Total de edições carregadas:', _todasEdicoesCache.length);
       return _todasEdicoesCache;
     } catch (e) {
       console.error('[Trilha] Falha ao buscar edições:', e);
@@ -430,7 +428,7 @@
         '</div>';
 
     if (modulos.length === 0) {
-      html += '<div class="rs-trilha-vazio">Nenhuma edição encontrada para este tipo.</div>';
+      html += '<div class="rs-trilha-vazio">Nenhum conteúdo encontrada para este tipo.</div>';
     } else {
       modulos.forEach(function (modulo, idx) {
         html += _renderizarModulo(modulo, idx, dataAtivacao);
@@ -472,7 +470,7 @@
       '<div class="rs-trilha-modulo">' +
         '<div class="rs-trilha-modulo-header">' +
           '<h3 class="rs-trilha-modulo-titulo">' +
-            _esc(nomeNivel) + ' · Ed. ' + _esc(numeroInicio) + '–' + _esc(numeroFim) +
+            _esc(nomeNivel) + ' · Conteúdo ' + _esc(numeroInicio) + ' a ' + _esc(numeroFim) +
           '</h3>' +
           '<span class="rs-trilha-modulo-status ' + _esc(estado.classe) + '">' +
             _esc(estado.label) +
@@ -510,7 +508,7 @@
       const liberada = _edicaoLiberadaParaAssinante(ed, dataAtivacao);
       const bloqueado = !liberada;
       const numero = ed.numero || ed.edicao || '';
-      const titulo = ed.titulo || ('Edição ' + numero);
+      const titulo = ed.titulo || ('Conteúdo ' + numero);
 
       let badge = '';
       let dataLiberacao = '';
@@ -528,7 +526,7 @@
       html +=
         '<div class="rs-trilha-edicao-card ' + (bloqueado ? 'bloqueado' : '') + '" data-nid="' + _esc(ed.id) + '">' +
           badge +
-          '<div class="rs-trilha-edicao-numero">Ed. ' + _esc(numero) + '</div>' +
+          '<div class="rs-trilha-edicao-numero">Conteúdo ' + _esc(numero) + '</div>' +
           '<div class="rs-trilha-edicao-titulo">' + _esc(titulo) + '</div>' +
           dataLiberacao +
         '</div>';
