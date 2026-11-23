@@ -19,13 +19,12 @@
 
   // ─── Mapa de ícones por tipo (fallback quando o Firestore não tem icone) ──
   const ICONE_POR_TIPO = {
-    'fundeb': '⚖️',
-    'siope': '📊',
-    'salario-educacao': '💰',
-    'salario_educacao': '💰',
-    'cacs': '👥',
-    'conselho': '👥',
-    'parecer': '📄',
+    'Fundeb': '⚖️',
+    'Siope': '📊',
+    'Salário-educação': '💰',
+    'Cacs': '👥',
+    'Conselho': '👥',
+    'Parecer': '📄',
   };
 
   function _iconeDoTipo(tipo) {
