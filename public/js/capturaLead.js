@@ -102,13 +102,19 @@ function _gerarTokenTrial() {
     return Array.from({ length: 32 }, () => Math.floor(Math.random() * 16).toString(16)).join('');
 }
 
-// ID fixo da edição 001 — usada como vitrine do trial. Mantido em sincronia
-// com a policy de INSERT em leads_envios no Supabase ("newsletter_id = ...").
-const NEWSLETTER_VITRINE_ID = 'ahFzl1kSoGyjb7L6mGJx';
-
 async function gerarLinkAcessoTrial(leadId) {
-    const newsletterId = NEWSLETTER_VITRINE_ID;
+// Busca dinamicamente a edição configurada como vitrine para leads
+    const vitrineSnap = await db.collection("newsletters")
+    .where("vitrine_leads", "==", true)
+    .where("enviada", "==", true)
+    .limit(1)
+    .get();
 
+    if (vitrineSnap.empty) {
+    throw new Error("Nenhuma edição configurada como vitrine para leads. Peça ao administrador para ativar uma edição como vitrine.");
+    }
+
+    const newsletterId = vitrineSnap.docs[0].id;
     const token = _gerarTokenTrial();
     const expiraEm = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000); // validade do link: 3 dias
 

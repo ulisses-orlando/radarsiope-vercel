@@ -1530,6 +1530,24 @@ style="flex:1;padding:6px 12px;background:#059669;color:#fff;border:none;border-
   `;
   col1.appendChild(proTempSection);
 
+  // ── Vitrine do app para Leads ──────────────────────────────────────────
+  const vitrineSection = document.createElement('div');
+  vitrineSection.style.cssText = `margin-top:18px;padding:12px;border:1.5px solid #8b5cf6; border-radius:8px;background:#faf5ff`;
+  vitrineSection.innerHTML = `
+    <div style="font-weight:600;font-size:13px;color:#5b21b6;margin-bottom:8px">
+      🏆 Vitrine do app (Leads)
+    </div>
+    <div style="font-size:12px;color:#6b21a8;margin-bottom:10px;line-height:1.5">
+      Quando ativa, esta edição será exibida como demonstração no app para leads que solicitarem acesso trial.
+      <strong>Apenas uma edição pode ter este campo ativo por vez.</strong>
+    </div>
+    <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer">
+      <input type="checkbox" data-field-name="vitrine_leads" ${data.vitrine_leads ? 'checked' : ''} style="width:16px;height:16px">
+      Ativar como vitrine para leads
+    </label>
+  `;
+  col1.appendChild(vitrineSection);
+
   const tiposSnap = await db.collection("tipo_newsletters").get();
   const tiposDocs = tiposSnap.docs.map(doc => ({ id: doc.id, nome: doc.data().nome })).filter(t => t.nome);
   const tiposArr = tiposDocs.map(t => t.nome); // só nomes — usado no filtro de templates abaixo
@@ -2177,6 +2195,18 @@ style="flex:1;padding:6px 12px;background:#059669;color:#fff;border:none;border-
     // ── Blocos ────────────────────────────────────────────────────────────
     payload.blocos = coletarBlocosEdicao();
 
+    // ── Validação de unicidade da vitrine ──────────────────────────────
+    if (payload.vitrine_leads) {
+      const vitrineSnap = await db.collection('newsletters')
+        .where('vitrine_leads', '==', true)
+        .limit(5)
+        .get();
+      const outraVitrine = vitrineSnap.docs.find(d => d.id !== (docId || null));
+      if (outraVitrine) {
+        mostrarMensagem('⚠️ Já existe outra edição configurada como vitrine para leads. Desative a outra edição antes de ativar esta como vitrine.');
+        return;
+      }
+    }
     // ── Validações existentes ─────────────────────────────────────────────
     const htmlNewsletter = payload['html_conteudo'] || "";
     const htmlCompleto = payload['conteudo_html_completo'] || "";
@@ -2205,14 +2235,40 @@ style="flex:1;padding:6px 12px;background:#059669;color:#fff;border:none;border-
 
     // ── Salvar ────────────────────────────────────────────────────────────
     const ref = db.collection('newsletters');
+    let newsletterIdFinal = docId;
     if (isEdit && docId) {
       await ref.doc(docId).set(payload, { merge: true });
     } else {
       const novoDoc = await ref.add(payload);
+      newsletterIdFinal = novoDoc.id;
     }
 
-    closeModal('modal-newsletter-overlay');
-    carregarNewsletters();
+    // ── Sincroniza tabela newsletter_vitrine_app no Supabase ─────────────
+    // Garante que a policy de INSERT em leads_envios saiba qual é a edição vitrine.
+    try {
+      const eraVitrine = isEdit && data.vitrine_leads === true;
+      const ehVitrine  = payload.vitrine_leads === true;
+
+      if (ehVitrine && newsletterIdFinal) {
+        // Upsert: garante que só existe 1 linha (id=1) apontando para esta edição
+        await window.supabase
+          .from('newsletter_vitrine_app')
+          .upsert({ id: 1, newsletter_id: newsletterIdFinal }, { onConflict: 'id' });
+      } else if (eraVitrine && !ehVitrine && newsletterIdFinal) {
+        // Desativou a vitrine nesta edição → limpa a linha se ela ainda for a atual
+        const { data: cfg } = await window.supabase
+          .from('newsletter_vitrine_app')
+          .select('newsletter_id')
+          .eq('id', 1)
+          .maybeSingle();
+        if (cfg?.newsletter_id === newsletterIdFinal) {
+          await window.supabase.from('newsletter_vitrine_app').delete().eq('id', 1);
+        }
+      }
+    } catch (e) {
+      console.warn('[vitrine] falha ao sincronizar newsletter_vitrine_app no Supabase:', e);
+      mostrarMensagem('⚠️ Edição salva, mas houve falha ao sincronizar a vitrine no Supabase. Verifique manualmente.');
+    }
   };
 
   // -----------------------------
