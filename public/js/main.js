@@ -2203,7 +2203,14 @@ style="flex:1;padding:6px 12px;background:#059669;color:#fff;border:none;border-
         .get();
       const outraVitrine = vitrineSnap.docs.find(d => d.id !== (docId || null));
       if (outraVitrine) {
-        mostrarMensagem('⚠️ Já existe outra edição configurada como vitrine para leads. Desative a outra edição antes de ativar esta como vitrine.');
+        const dv = outraVitrine.data() || {};
+        const numVitrine = dv.numero || dv.edicao || '—';
+        const titVitrine = dv.titulo || '(sem título)';
+        mostrarMensagem(
+          `⚠️ Já existe outra edição configurada como vitrine para leads:\n\n` +
+          `📰 Edição ${numVitrine} — ${titVitrine}\n\n` +
+          `Desative o campo "Vitrine do app (Leads)" nessa edição antes de ativar esta como vitrine.`
+        );
         return;
       }
     }
@@ -2269,6 +2276,10 @@ style="flex:1;padding:6px 12px;background:#059669;color:#fff;border:none;border-
       console.warn('[vitrine] falha ao sincronizar newsletter_vitrine_app no Supabase:', e);
       mostrarMensagem('⚠️ Edição salva, mas houve falha ao sincronizar a vitrine no Supabase. Verifique manualmente.');
     }
+
+    mostrarMensagem('✅ Newsletter salva com sucesso!');
+    closeModal('modal-newsletter-overlay');
+    carregarNewsletters();
   };
 
   // -----------------------------
