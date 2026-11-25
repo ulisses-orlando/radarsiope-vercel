@@ -179,15 +179,19 @@ function _mostrarTodas(containerId) {
 // API
 // ────────────────────────────────────────────────────────────────────────
 async function _buscarResumoGeral(uid) {
-  // Adiciona timestamp para evitar cache
+  // 🔧 Adiciona timestamp para evitar cache do navegador
   const url = `/api/pagamentoMP?acao=quiz-resumo-geral&uid=${encodeURIComponent(uid)}&_t=${Date.now()}`;
   const resp = await fetch(url, { 
     method: 'GET',
-    cache: 'no-store' // Força busca fresca
+    cache: 'no-store',
+    headers: {
+      'Cache-Control': 'no-cache, no-store, must-revalidate',
+      'Pragma': 'no-cache'
+    }
   });
   if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
   const data = await resp.json();
-  if (!data.ok) throw new Error(data.message);
+  if (!data.ok) throw new Error(data.message || 'Erro ao buscar resumo geral');
   return data;
 }
 
