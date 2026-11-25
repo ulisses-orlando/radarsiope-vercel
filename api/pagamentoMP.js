@@ -19,6 +19,194 @@ if (!admin.apps.length) {
 }
 const db = admin.firestore();
 
+
+// ─── Acesso do app: link pessoal persistente + sessão por dispositivo ─────────
+// Regras (etapa 1):
+//  • O link de acesso é derivado por HMAC(uid, versão): não é gravado no banco,
+//    não vence e pode ser reenviado igual. Só muda ao "revogar" (versão + 1).
+//  • Sessão por dispositivo; vence após SESSAO_INATIVIDADE_DIAS sem uso.
+//  • Excedeu o limite de dispositivos → substitui a sessão menos usada.
+//  • Uma única definição de "assinatura ativa".
+const SESSAO_INATIVIDADE_DIAS = 45;
+const LIMITE_DISPOSITIVOS_PADRAO = 3;
+const LINK_REENVIO_INTERVALO_MIN = 20;
+const LINK_REENVIO_MAX_DIA = 3;
+const STATUS_ASSINATURA_ATIVA = ['ativa'];
+
+function _assinaturaAtiva(status) {
+  return STATUS_ASSINATURA_ATIVA.includes(status);
+}
+
+function _msDe(ts) {
+  return ts?.toMillis?.() || 0;
+}
+
+function _versaoLink(usuarioData) {
+  const v = usuarioData?.link_acesso_versao;
+  return Number.isInteger(v) && v > 0 ? v : 1;
+}
+
+function _tokenAcesso(uid, versao) {
+  const secret = process.env.LINK_ACESSO_SECRET;
+  if (!secret) throw new Error('LINK_ACESSO_SECRET não configurado.');
+  return crypto.createHmac('sha256', secret).update(`${uid}:${versao}`).digest('hex');
+}
+
+function _tokenAcessoValido(uid, usuarioData, tokenRecebido) {
+  if (typeof tokenRecebido !== 'string' || tokenRecebido.length !== 64) return false;
+  const esperado = Buffer.from(_tokenAcesso(uid, _versaoLink(usuarioData)));
+  const recebido = Buffer.from(tokenRecebido);
+  return esperado.length === recebido.length && crypto.timingSafeEqual(esperado, recebido);
+}
+
+function _montarLinkAcesso(uid, usuarioData) {
+  const base = process.env.NEXT_PUBLIC_BASE_URL || 'https://app.radarsiope.com.br';
+  return `${base}/verNewsletterComToken.html?ativar=${_tokenAcesso(uid, _versaoLink(usuarioData))}&uid=${uid}`;
+}
+
+function _mascararEmail(email) {
+  const [u, d] = String(email || '').split('@');
+  return d ? `${u.slice(0, 1)}***@${d}` : '';
+}
+
+function _escHtml(t) {
+  return String(t || '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+}
+
+// Abre uma sessão para um novo dispositivo respeitando o limite de dispositivos:
+//  1. sessões sem uso há mais de SESSAO_INATIVIDADE_DIAS são encerradas e não contam;
+//  2. se ainda não houver vaga, encerra a(s) sessão(ões) menos usada(s) recentemente.
+async function _abrirSessaoNoLimite(usuarioRef, { limiteUsuarios, assinaturaId, uaHash, origem }) {
+  const sessionId = crypto.randomUUID();
+  const limiteInativ = SESSAO_INATIVIDADE_DIAS * 24 * 60 * 60 * 1000;
+  let avisoLimite = false;
+
+  await db.runTransaction(async (tx) => {
+    const snap = await tx.get(usuarioRef.collection('sessoes').where('ativo', '==', true));
+    const agora = Date.now();
+    const vivas = [];
+
+    for (const d of snap.docs) {
+      const s = d.data();
+      const ultimo = _msDe(s.ultimo_acesso) || _msDe(s.criado_em);
+      if (ultimo && agora - ultimo > limiteInativ) {
+        tx.update(d.ref, {
+          ativo: false,
+          desativado_motivo: 'inatividade',
+          desativado_em: admin.firestore.FieldValue.serverTimestamp(),
+        });
+      } else {
+        vivas.push({ ref: d.ref, ultimo });
+      }
+    }
+
+    vivas.sort((a, b) => a.ultimo - b.ultimo); // menos usada primeiro
+    const excedentes = vivas.length - limiteUsuarios + 1; // +1 = vaga para a nova sessão
+    for (let i = 0; i < excedentes; i++) {
+      tx.update(vivas[i].ref, {
+        ativo: false,
+        desativado_motivo: 'limite_dispositivos',
+        desativado_em: admin.firestore.FieldValue.serverTimestamp(),
+      });
+      avisoLimite = true;
+    }
+
+    tx.set(usuarioRef.collection('sessoes').doc(sessionId), {
+      criado_em: admin.firestore.FieldValue.serverTimestamp(),
+      ultimo_acesso: admin.firestore.FieldValue.serverTimestamp(),
+      ua_hash: uaHash,
+      ativo: true,
+      assinaturaId,
+      acessos_ua_distintos: 0,
+      compartilhamento_suspeito: false,
+      origem,
+    });
+  });
+
+  return { sessionId, avisoLimite };
+}
+
+// E-mail com o link de acesso (usado pelo pedido do assinante e pelo admin)
+async function _enviarEmailLinkAcesso({ nome, email, link }) {
+  const assunto = 'Radar SIOPE — Seu link de acesso';
+  const mensagemHtml = `
+      <div style="font-family:sans-serif;max-width:600px;margin:0 auto">
+        <h2 style="color:#0A3D62">Olá, ${_escHtml(nome || 'Assinante')}!</h2>
+        <p>Segue seu link de acesso ao <strong>Radar SIOPE</strong>:</p>
+        <div style="margin:24px 0;text-align:center">
+          <a href="${link}"
+             style="background:#0A3D62;color:#fff;padding:14px 28px;border-radius:8px;
+                    text-decoration:none;font-weight:700;font-size:16px;display:inline-block">
+            🔗 Acessar o Radar SIOPE
+          </a>
+        </div>
+        <p style="color:#64748b;font-size:13px">
+          Este link é pessoal e vale enquanto sua assinatura estiver ativa.
+          Abra-o uma vez em cada aparelho e o app ficará disponível normalmente.
+          Não encaminhe este e-mail a outras pessoas.
+        </p>
+        <p style="color:#64748b;font-size:13px">
+          Se você não solicitou este link, ignore este e-mail com segurança.
+        </p>
+        <hr style="border:none;border-top:1px solid #e2e8f0;margin:24px 0">
+        <p style="color:#94a3b8;font-size:11px;text-align:center">
+          Radar SIOPE · Guia Digital FUNDEB e SIOPE
+        </p>
+      </div>`;
+  try {
+    await fetchWithTimeout(
+      `${process.env.NEXT_PUBLIC_BASE_URL}/api/enviarEmail`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ nome, email, assunto, mensagemHtml }),
+      },
+      8000
+    );
+    return true;
+  } catch (e) {
+    console.error('[link-acesso] Falha no envio de e-mail:', e.message);
+    return false;
+  }
+}
+
+// Reenvia o link pessoal por e-mail, com intervalo mínimo e teto diário por usuário.
+// ignorarLimite = true somente para o admin.
+async function _enviarLinkAcessoComLimite(usuarioRef, { ignorarLimite = false } = {}) {
+  const hoje = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' });
+
+  const r = await db.runTransaction(async (tx) => {
+    const snap = await tx.get(usuarioRef);
+    const data = snap.exists ? snap.data() : {};
+    const e = data.link_acesso_envios || {};
+    const agora = Date.now();
+
+    if (!ignorarLimite) {
+      const espera = LINK_REENVIO_INTERVALO_MIN * 60 * 1000 - (agora - (e.ultimo_em || 0));
+      if (espera > 0) return { ok: false, motivo: 'intervalo', aguardar_min: Math.ceil(espera / 60000) };
+      if (e.dia === hoje && (e.qtd_dia || 0) >= LINK_REENVIO_MAX_DIA) return { ok: false, motivo: 'limite_dia' };
+    }
+
+    tx.update(usuarioRef, {
+      link_acesso_envios: {
+        ultimo_em: agora,
+        dia: hoje,
+        qtd_dia: e.dia === hoje ? (e.qtd_dia || 0) + 1 : 1,
+      },
+    });
+    return { ok: true, data };
+  });
+
+  if (!r.ok) return { enviado: false, motivo: r.motivo, aguardar_min: r.aguardar_min };
+
+  const email = r.data.email;
+  if (!email) return { enviado: false, motivo: 'sem_email' };
+
+  const link = _montarLinkAcesso(usuarioRef.id, r.data);
+  const enviado = await _enviarEmailLinkAcesso({ nome: r.data.nome, email, link });
+  return { enviado, email_mascarado: _mascararEmail(email), link };
+}
+
 // ─── Utilitários ──────────────────────────────────────────────────────────────
 
 function json(res, status, payload) {
@@ -432,7 +620,9 @@ async function dispararMensagemAutomatica(momento, dados) {
   }
 }
 
-// ─── Ativação de sessão pós-pagamento ──────────────────────────────────────
+// ─── Ativação de sessão pelo link de acesso (e-mail de confirmação da assinatura) ──
+// POST ?acao=ativar-sessao  { uid, session_token }
+// O link é pessoal e persistente (HMAC) e abre uma sessão para este dispositivo.
 async function _handleAtivarSessao(req, res) {
   if (req.method !== 'POST') return json(res, 405, { ok: false, message: 'Método não permitido.' });
 
@@ -447,99 +637,57 @@ async function _handleAtivarSessao(req, res) {
   try {
     const usuarioRef = db.collection('usuarios').doc(uid);
     const usuarioSnap = await usuarioRef.get();
+    const usuarioData = usuarioSnap.exists ? usuarioSnap.data() : null;
 
-    if (!usuarioSnap.exists) {
-      return json(res, 404, { ok: false, message: 'Usuário não encontrado.' });
+    // Resposta única para usuário inexistente ou token errado (não revela qual)
+    if (!usuarioData || !_tokenAcessoValido(uid, usuarioData, session_token)) {
+      return json(res, 400, { ok: false, codigo: 'token_invalido', message: 'Link de acesso inválido.' });
     }
 
-    const usuarioData = usuarioSnap.data();
-    const pst = usuarioData.pending_session_token;
+    // Assinatura: a ativa mais recente (senão a mais recente, só para informar o status)
+    const todas = await usuarioRef.collection('assinaturas').get();
+    const chave = (d) => _msDe(d.data().ativadoEm) || _msDe(d.data().criadoEm) || _msDe(d.data().data_inicio) || 0;
+    const docs = todas.docs.sort((a, b) => chave(b) - chave(a));
+    const assinaturaDoc = docs.find(d => _assinaturaAtiva(d.data().status)) || docs[0] || null;
+    if (!assinaturaDoc) return json(res, 404, { ok: false, message: 'Assinatura não encontrada.' });
 
-    // Validações do token de ativação
-    if (!pst) {
-      return json(res, 400, { ok: false, message: 'Token de ativação não encontrado.' });
-    }
+    const assinaturaData = assinaturaDoc.data();
+    const assinaturaId = assinaturaDoc.id;
 
-    if (pst.token !== session_token) {
-      return json(res, 400, { ok: false, message: 'Token inválido.' });
-    }
-
-    if (pst.exp && Date.now() > pst.exp) {
-      return json(res, 400, { ok: false, codigo: 'token_expirado', message: 'Link de ativação expirado.' });
-    }
-
-    if (pst.usado) {
-      return json(res, 400, { ok: false, codigo: 'token_usado', message: 'Link já utilizado.' });
-    }
-
-    const { assinaturaId } = pst;
-
-    // Busca dados atuais da assinatura
-    const assinaturaSnap = await db.collection('usuarios').doc(uid)
-      .collection('assinaturas').doc(assinaturaId).get();
-    if (!assinaturaSnap.exists) {
-      return json(res, 404, { ok: false, message: 'Assinatura não encontrada.' });
-    }
-    const assinaturaData = assinaturaSnap.data();
-
-    if (assinaturaData.status !== 'ativa' && assinaturaData.status !== 'ativo') {
-      return json(res, 403, { 
-        ok: false, 
-        message: 'A assinatura vinculada a este link não está ativa.' 
+    if (!_assinaturaAtiva(assinaturaData.status)) {
+      const _msgPorStatus = {
+        pendente_pagamento: 'Seu pagamento está sendo processado. Assim que confirmado, você terá acesso completo.',
+        cancelado: 'Sua assinatura foi cancelada. Entre em contato para reativá-la.',
+        suspenso: 'Sua assinatura está suspensa. Entre em contato com o suporte.',
+        inativo: 'Sua assinatura está inativa. Entre em contato para reativá-la.',
+      };
+      return json(res, 403, {
+        ok: false,
+        codigo: 'assinatura_inativa',
+        status: assinaturaData.status,
+        message: _msgPorStatus[assinaturaData.status] || 'Assinatura inativa.',
       });
     }
 
-    // Lê max_usuarios do snapshot da assinatura (contrato no momento da compra),
-    // com fallback no map features do usuário e depois em 3.
+    // max_usuarios: snapshot da assinatura → features do usuário → padrão
     const limiteUsuarios =
       assinaturaData.features_snapshot?.max_usuarios ||
       usuarioData.features?.max_usuarios ||
-      3;
+      LIMITE_DISPOSITIVOS_PADRAO;
 
-    // Controle de sessões ativas em transação (evita race condition em double-tap/retry)
-    const sessionId = crypto.randomUUID();
-    let _avisoSessoes = false;
-
-    await db.runTransaction(async (tx) => {
-      const sessoesSnap = await tx.get(
-        usuarioRef.collection('sessoes').where('ativo', '==', true)
-      );
-
-      _avisoSessoes = sessoesSnap.size >= limiteUsuarios;
-
-      if (_avisoSessoes) {
-        const ordenadas = sessoesSnap.docs.sort((a, b) => {
-          const ta = a.data().ultimo_acesso?.toMillis?.() || 0;
-          const tb = b.data().ultimo_acesso?.toMillis?.() || 0;
-          return ta - tb;
-        });
-        tx.update(ordenadas[0].ref, {
-          ativo: false,
-          desativado_motivo: 'limite_dispositivos',
-          desativado_em: admin.firestore.FieldValue.serverTimestamp(),
-        });
-      }
-
-      tx.set(usuarioRef.collection('sessoes').doc(sessionId), {
-        criado_em: admin.firestore.FieldValue.serverTimestamp(),
-        ultimo_acesso: admin.firestore.FieldValue.serverTimestamp(),
-        ua_hash: uaHash,
-        ativo: true,
-        assinaturaId,
-        acessos_ua_distintos: 0,
-        compartilhamento_suspeito: false,
-      });
+    const { sessionId, avisoLimite } = await _abrirSessaoNoLimite(usuarioRef, {
+      limiteUsuarios,
+      assinaturaId,
+      uaHash,
+      origem: 'link_acesso',
     });
-
-    // Marca token como usado (uso único) — fora da transaction pois não é crítico para atomicidade
-    await usuarioRef.update({ 'pending_session_token.usado': true });
 
     const tiposInclusos = await _resolverTiposInclusos(assinaturaData.tipos_selecionados);
 
     return json(res, 200, {
       ok: true,
       session_id: sessionId,
-      aviso_limite_sessoes: _avisoSessoes,
+      aviso_limite_sessoes: avisoLimite,
       uid,
       assinaturaId,
       segmento: 'assinante',
@@ -553,8 +701,9 @@ async function _handleAtivarSessao(req, res) {
       nome_municipio: usuarioData.nome_municipio || '',
       perfil: usuarioData.tipo_perfil || '',
       municipios_plano: assinaturaData.municipios_plano || [],
-      data_ativacao: assinaturaData.data_inicio?.toDate?.()?.toISOString?.() 
-                    || new Date().toISOString(),
+      data_ativacao: assinaturaData.data_inicio?.toDate?.()?.toISOString?.()
+        || new Date().toISOString(),
+      validado_em: Date.now(),
     });
 
   } catch (err) {
@@ -563,79 +712,74 @@ async function _handleAtivarSessao(req, res) {
   }
 }
 
-// ─── Regeneração manual de token (self-service, máx 3×) ──────────────────────
+// ─── Pedido público de novo link (tela "receber link por e-mail") ─────────────
+// POST ?acao=solicitar-link-acesso  { email }
+// Resposta sempre neutra: não revela se o e-mail existe nem se houve envio.
+async function _handleSolicitarLinkAcesso(req, res) {
+  if (req.method !== 'POST') return json(res, 405, { ok: false, message: 'Método não permitido.' });
+
+  const neutra = {
+    ok: true,
+    message: 'Se existir uma assinatura ativa para este e-mail, enviamos o link de acesso. '
+      + 'Confira também o spam. Novos pedidos só são atendidos após '
+      + `${LINK_REENVIO_INTERVALO_MIN} minutos (máximo de ${LINK_REENVIO_MAX_DIA} por dia).`,
+  };
+
+  const bruto = String((req.body || {}).email || '').trim();
+  if (!bruto || bruto.length > 200 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(bruto)) {
+    return json(res, 400, { ok: false, message: 'Informe um e-mail válido.' });
+  }
+
+  try {
+    const candidatos = [...new Set([bruto.toLowerCase(), bruto])];
+    for (const e of candidatos) {
+      const snap = await db.collection('usuarios').where('email', '==', e).limit(5).get();
+      for (const doc of snap.docs) {
+        const ativa = await doc.ref.collection('assinaturas')
+          .where('status', 'in', STATUS_ASSINATURA_ATIVA).limit(1).get();
+        if (ativa.empty) continue;
+        await _enviarLinkAcessoComLimite(doc.ref);
+        return json(res, 200, neutra);
+      }
+    }
+  } catch (err) {
+    console.error('[solicitar-link-acesso]', err.message);
+  }
+  return json(res, 200, neutra);
+}
+
+// ─── Compatibilidade: painel do assinante (agora reenvia por e-mail) ──────────
+// POST ?acao=regenerar-token-ativacao  { uid, assinaturaId }
+// Não devolve mais o link na resposta: ele só chega pelo e-mail cadastrado.
 async function _handleRegenerarTokenAtivacao(req, res) {
   const { uid, assinaturaId } = req.body || {};
   if (!uid || !assinaturaId) {
     return json(res, 400, { ok: false, message: 'uid e assinaturaId são obrigatórios.' });
   }
 
-  const LIMITE = 3;
-
   try {
     const usuarioRef = db.collection('usuarios').doc(uid);
-    const assinaturaRef = usuarioRef.collection('assinaturas').doc(assinaturaId);
-
-    // 1. Valida usuário
-    const usuarioSnap = await usuarioRef.get();
-    if (!usuarioSnap.exists) {
-      return json(res, 404, { ok: false, message: 'Usuário não encontrado.' });
-    }
-
-    // 2. Valida assinatura
-    const assinaturaSnap = await assinaturaRef.get();
-    if (!assinaturaSnap.exists) {
-      return json(res, 404, { ok: false, message: 'Assinatura não encontrada.' });
-    }
-
-    const assinaturaData = assinaturaSnap.data();
-    if (assinaturaData.status !== 'ativa' && assinaturaData.status !== 'ativo') {
-      return json(res, 403, { ok: false, message: 'A assinatura não está ativa.' });
-    }
-
-    // 3. Verifica limite de gerações self-service
-    const count = assinaturaData.self_link_gerado_count || 0;
-    if (count >= LIMITE) {
-      return json(res, 429, {
-        ok: false,
-        codigo: 'limite_atingido',
-        message: `Limite de ${LIMITE} links automáticos atingido. Solicite via Suporte.`,
-      });
-    }
-
-    // 4. Gera novo token
-    const novoToken = crypto.randomBytes(32).toString('hex');
-    const novoCount = count + 1;
-    const expMs = Date.now() + 72 * 60 * 60 * 1000; // 72h
-
-    // 5. Persiste token e incrementa contador em paralelo
-    await Promise.all([
-      usuarioRef.update({
-        pending_session_token: {
-          token: novoToken,
-          exp: expMs,
-          assinaturaId,
-          usado: false,
-          criado_em: admin.firestore.FieldValue.serverTimestamp(),
-        },
-      }),
-      assinaturaRef.update({
-        self_link_gerado_count: novoCount,
-        self_link_ultimo_em: admin.firestore.FieldValue.serverTimestamp(),
-      }),
+    const [usuarioSnap, assinaturaSnap] = await Promise.all([
+      usuarioRef.get(),
+      usuarioRef.collection('assinaturas').doc(assinaturaId).get(),
     ]);
+    if (!usuarioSnap.exists) return json(res, 404, { ok: false, message: 'Usuário não encontrado.' });
+    if (!assinaturaSnap.exists) return json(res, 404, { ok: false, message: 'Assinatura não encontrada.' });
+    if (!_assinaturaAtiva(assinaturaSnap.data().status)) {
+      return json(res, 403, { ok: false, codigo: 'assinatura_inativa', message: 'A assinatura não está ativa.' });
+    }
 
-    // 6. Monta link de ativação
-    const usuarioData = usuarioSnap.data();
-    const link = `https://app.radarsiope.com.br/verNewsletterComToken.html`
-      + `?ativar=${novoToken}&uid=${uid}`;
+    const r = await _enviarLinkAcessoComLimite(usuarioRef);
+    if (!r.enviado) {
+      const msg = r.motivo === 'intervalo'
+        ? `Aguarde ${r.aguardar_min} min para pedir um novo envio.`
+        : r.motivo === 'limite_dia'
+          ? `Limite de ${LINK_REENVIO_MAX_DIA} envios por dia atingido. Tente amanhã ou fale com o suporte.`
+          : 'Não foi possível enviar o e-mail agora. Tente novamente em instantes.';
+      return json(res, 429, { ok: false, codigo: r.motivo || 'falha_envio', message: msg, aguardar_min: r.aguardar_min || null });
+    }
 
-    return json(res, 200, {
-      ok: true,
-      link,
-      count: novoCount,
-      restantes: LIMITE - novoCount,
-    });
+    return json(res, 200, { ok: true, enviado: true, email_mascarado: r.email_mascarado });
 
   } catch (err) {
     console.error('[regenerar-token]', err);
@@ -643,121 +787,49 @@ async function _handleRegenerarTokenAtivacao(req, res) {
   }
 }
 
-// ─── Admin: gera token e envia e-mail de link de acesso ───────────────────────
+// ─── Admin: reenvia o link de acesso (ou revoga e gera um novo) ───────────────
+// POST ?acao=admin-enviar-link-acesso  { uid, assinaturaId?, revogar? }
+// Sem limite de reenvio. "revogar" troca a versão do link: o link antigo deixa de valer.
+// ATENÇÃO: esta rota ainda não autentica o admin (tratado na trilha do admin).
 async function _handleAdminEnviarLinkAcesso(req, res) {
-  const { uid, solId, assinaturaId: assinaturaIdParam, resetarContador } = req.body || {};
+  const { uid, assinaturaId: assinaturaIdParam, revogar } = req.body || {};
   if (!uid) return json(res, 400, { ok: false, message: 'uid é obrigatório.' });
 
   try {
     const usuarioRef = db.collection('usuarios').doc(uid);
-
-    // 1. Valida usuário e obtém e-mail
     const usuarioSnap = await usuarioRef.get();
-    if (!usuarioSnap.exists) {
-      return json(res, 404, { ok: false, message: 'Usuário não encontrado.' });
-    }
-    const usuarioData = usuarioSnap.data();
-    const email = usuarioData.email;
-    const nome = usuarioData.nome || 'Assinante';
-    if (!email) return json(res, 400, { ok: false, message: 'Usuário sem e-mail cadastrado.' });
+    if (!usuarioSnap.exists) return json(res, 404, { ok: false, message: 'Usuário não encontrado.' });
+    let usuarioData = usuarioSnap.data();
+    if (!usuarioData.email) return json(res, 400, { ok: false, message: 'Usuário sem e-mail cadastrado.' });
 
-    // 2. Determina assinaturaId: usa o parâmetro enviado ou busca a ativa
+    // Assinatura: a informada ou a ativa
     let assinaturaId = assinaturaIdParam;
     if (!assinaturaId) {
       const assSnap = await usuarioRef.collection('assinaturas')
-        .where('status', 'in', ['ativa', 'ativo']).limit(1).get();
-      if (assSnap.empty) {
-        return json(res, 403, { ok: false, message: 'Nenhuma assinatura ativa encontrada.' });
-      }
+        .where('status', 'in', STATUS_ASSINATURA_ATIVA).limit(1).get();
+      if (assSnap.empty) return json(res, 403, { ok: false, message: 'Nenhuma assinatura ativa encontrada.' });
       assinaturaId = assSnap.docs[0].id;
     }
-
-    // 3. Valida a assinatura
-    const assinaturaRef = usuarioRef.collection('assinaturas').doc(assinaturaId);
-    const assinaturaSnap = await assinaturaRef.get();
-    if (!assinaturaSnap.exists) {
-      return json(res, 404, { ok: false, message: 'Assinatura não encontrada.' });
-    }
-    const assinaturaData = assinaturaSnap.data();
-    if (assinaturaData.status !== 'ativa' && assinaturaData.status !== 'ativo') {
+    const assinaturaSnap = await usuarioRef.collection('assinaturas').doc(assinaturaId).get();
+    if (!assinaturaSnap.exists) return json(res, 404, { ok: false, message: 'Assinatura não encontrada.' });
+    if (!_assinaturaAtiva(assinaturaSnap.data().status)) {
       return json(res, 403, { ok: false, message: 'Assinatura não está ativa.' });
     }
 
-    // 4. Gera novo token
-    const novoToken = crypto.randomBytes(32).toString('hex');
-    const expMs = Date.now() + 72 * 60 * 60 * 1000; // 72h
-
-    // 5. Persiste token + reseta contador se solicitado (em paralelo)
-    const updates = [
-      usuarioRef.update({
-        pending_session_token: {
-          token: novoToken,
-          exp: expMs,
-          assinaturaId,
-          usado: false,
-          criado_em: admin.firestore.FieldValue.serverTimestamp(),
-          gerado_por: 'admin',
-        },
-      }),
-    ];
-
-    if (resetarContador) {
-      updates.push(
-        assinaturaRef.update({
-          self_link_gerado_count: 0,
-          self_link_reset_em: admin.firestore.FieldValue.serverTimestamp(),
-        })
-      );
+    if (revogar) {
+      const novaVersao = _versaoLink(usuarioData) + 1;
+      await usuarioRef.update({
+        link_acesso_versao: novaVersao,
+        link_acesso_revogado_em: admin.firestore.FieldValue.serverTimestamp(),
+      });
+      usuarioData = { ...usuarioData, link_acesso_versao: novaVersao };
     }
 
-    await Promise.all(updates);
+    const link = _montarLinkAcesso(uid, usuarioData);
+    const enviado = await _enviarEmailLinkAcesso({ nome: usuarioData.nome, email: usuarioData.email, link });
 
-    // 6. Monta o link de ativação
-    const link = `https://app.radarsiope.com.br/verNewsletterComToken.html`
-      + `?ativar=${novoToken}&uid=${uid}`;
-
-    // 7. Envia e-mail via /api/enviarEmail (mesmo padrão de dispararMensagemAutomatica)
-    const assunto = 'Radar SIOPE — Seu novo link de acesso';
-    const mensagemHtml = `
-      <div style="font-family:sans-serif;max-width:600px;margin:0 auto">
-        <h2 style="color:#0A3D62">Olá, ${nome}!</h2>
-        <p>Conforme solicitado, segue seu novo link de acesso ao <strong>Radar SIOPE</strong>:</p>
-        <div style="margin:24px 0;text-align:center">
-          <a href="${link}"
-             style="background:#0A3D62;color:#fff;padding:14px 28px;border-radius:8px;
-                    text-decoration:none;font-weight:700;font-size:16px;display:inline-block">
-            🔗 Acessar o Radar SIOPE
-          </a>
-        </div>
-        <p style="color:#64748b;font-size:13px">
-          ⏰ <strong>Válido por 72 horas</strong> a partir do recebimento deste e-mail.<br>
-          Após clicar, o app ficará disponível normalmente no seu dispositivo.
-        </p>
-        <p style="color:#64748b;font-size:13px">
-          Se você não solicitou este link, ignore este e-mail com segurança.
-        </p>
-        <hr style="border:none;border-top:1px solid #e2e8f0;margin:24px 0">
-        <p style="color:#94a3b8;font-size:11px;text-align:center">
-          Radar SIOPE · Guia Digital FUNDEB e SIOPE
-        </p>
-      </div>`;
-
-    try {
-      await fetchWithTimeout(
-        `${process.env.NEXT_PUBLIC_BASE_URL}/api/enviarEmail`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ nome, email, assunto, mensagemHtml }),
-        },
-        8000
-      );
-    } catch (emailErr) {
-      // E-mail falhou mas token já foi gravado — logar e continuar
-      console.error('[admin-enviar-link-acesso] Falha no envio de e-mail:', emailErr.message);
-    }
-
-    return json(res, 200, { ok: true, link });
+    // O link NÃO é devolvido na resposta: ele só chega pelo e-mail cadastrado do assinante.
+    return json(res, 200, { ok: true, enviado, revogado: !!revogar });
 
   } catch (err) {
     console.error('[admin-enviar-link-acesso]', err);
@@ -795,14 +867,28 @@ async function _handleValidarSessao(req, res) {
 
     const sessaoData = sessaoSnap.data();
 
-    if (!sessaoData.ativo) {
+        if (!sessaoData.ativo) {
+      // Devolve o motivo real (limite_dispositivos, logout_usuario, revogado_admin,
+      // cancelamento_admin, inatividade, assinatura_inativa) para o app explicar ao usuário
       return json(res, 200, {
         valido: false,
-        motivo: 'sessao_invalida',
+        motivo: sessaoData.desativado_motivo || 'sessao_invalida',
       });
     }
 
     const agora = Date.now();
+
+    // Inatividade: sem uso há mais de SESSAO_INATIVIDADE_DIAS → encerra
+    const ultimoMs = _msDe(sessaoData.ultimo_acesso) || _msDe(sessaoData.criado_em);
+    if (ultimoMs && agora - ultimoMs > SESSAO_INATIVIDADE_DIAS * 24 * 60 * 60 * 1000) {
+      await sessaoRef.update({
+        ativo: false,
+        desativado_motivo: 'inatividade',
+        desativado_em: admin.firestore.FieldValue.serverTimestamp(),
+      });
+      return json(res, 200, { valido: false, motivo: 'inatividade' });
+    }
+
     const updates = { ultimo_acesso: admin.firestore.FieldValue.serverTimestamp() };
 
     // Detecção de compartilhamento: UA diferente em menos de 1h
@@ -826,6 +912,8 @@ async function _handleValidarSessao(req, res) {
     let features = {};
     let tiposInclusos = [];
     let statusAss = null;
+    let assinaturaLida = false;     // true só se a leitura da assinatura funcionou
+    let assinaturaExiste = false;
 
     if (assinaturaId) {
       try {
@@ -833,6 +921,8 @@ async function _handleValidarSessao(req, res) {
           db.collection('usuarios').doc(uid).get(),
           db.collection('usuarios').doc(uid).collection('assinaturas').doc(assinaturaId).get()
         ]);
+        assinaturaLida = true;
+        assinaturaExiste = assnSnap.exists;
         const userData = usuarioSnap.exists ? usuarioSnap.data() : {};
 
         if (assnSnap.exists) {
@@ -846,11 +936,11 @@ async function _handleValidarSessao(req, res) {
       } catch (e) { /* não fatal */ }
     }
 
-    // Assinatura inativa → invalida sessão
-    const statusAtivos = ['ativa', 'aprovada', 'pago'];
-    if (statusAss && !statusAtivos.includes(statusAss)) {
-      await sessaoRef.update({ ativo: false, desativado_motivo: 'assinatura_inativa' });
-      return json(res, 200, {
+    // Assinatura inexistente ou inativa → invalida sessão
+    // (falha de leitura NÃO invalida: mantém o benefício da dúvida)
+    if (assinaturaLida && (!assinaturaExiste || !_assinaturaAtiva(statusAss))) {
+        await sessaoRef.update({ ativo: false, desativado_motivo: 'assinatura_inativa' });
+        return json(res, 200, {
         valido: false,
         motivo: 'assinatura_inativa',
       });
@@ -869,119 +959,6 @@ async function _handleValidarSessao(req, res) {
   } catch (err) {
     console.error('[validar-sessao] Erro:', err.message);
     return json(res, 500, { ok: false, message: 'Erro interno ao validar sessão.' });
-  }
-}
-
-// ─── Criação de sessão para assinante autenticado via link de edição ──────────
-// Chamado quando o assinante chega via link direto sem session_id no localStorage.
-// Verifica que a assinatura está ativa e cria o documento de sessão no Firestore.
-async function _handleCriarSessao(req, res) {
-  if (req.method !== 'POST') return json(res, 405, { ok: false, message: 'Método não permitido.' });
-
-  const { uid, assinaturaId } = req.body || {};
-  if (!uid || !assinaturaId) {
-    return json(res, 400, { ok: false, message: 'uid e assinaturaId obrigatórios.' });
-  }
-
-  const ua = req.headers['user-agent'] || '';
-  const uaHash = crypto.createHash('md5').update(ua.slice(0, 80)).digest('hex').slice(0, 8);
-
-  try {
-    const usuarioRef = db.collection('usuarios').doc(uid);
-    const assinaturaRef = usuarioRef.collection('assinaturas').doc(assinaturaId);
-
-    const [usuarioSnap, assinaturaSnap] = await Promise.all([
-      usuarioRef.get(),
-      assinaturaRef.get(),
-    ]);
-
-    if (!usuarioSnap.exists) return json(res, 404, { ok: false, message: 'Usuário não encontrado.' });
-    if (!assinaturaSnap.exists) return json(res, 404, { ok: false, message: 'Assinatura não encontrada.' });
-
-    const assinaturaData = assinaturaSnap.data();
-    const usuarioData = usuarioSnap.data();
-
-    if (assinaturaData.status !== 'ativa') {
-      const _msgPorStatus = {
-        pendente_pagamento: 'Seu pagamento está sendo processado. Assim que confirmado, você terá acesso completo.',
-        cancelado: 'Sua assinatura foi cancelada. Entre em contato para reativá-la.',
-        suspenso: 'Sua assinatura está suspensa. Entre em contato com o suporte.',
-        inativo: 'Sua assinatura está inativa. Entre em contato para reativá-la.',
-      };
-      const _msg = _msgPorStatus[assinaturaData.status] || 'Assinatura inativa.';
-      return json(res, 403, { ok: false, status: assinaturaData.status, message: _msg });
-    }
-
-    // Lê max_usuarios do snapshot da assinatura (contrato no momento da compra),
-    // com fallback no map features do usuário e depois em 3.
-    const limiteUsuarios =
-      assinaturaData.features_snapshot?.max_usuarios ||
-      usuarioData.features?.max_usuarios ||
-      3;
-
-    // Controle de sessões ativas em transação (evita race condition em double-tap/retry)
-    const sessionId = crypto.randomUUID();
-    let _avisoSessoes = false;
-
-    await db.runTransaction(async (tx) => {
-      const sessoesSnap = await tx.get(
-        usuarioRef.collection('sessoes').where('ativo', '==', true)
-      );
-
-      _avisoSessoes = sessoesSnap.size >= limiteUsuarios;
-
-      if (_avisoSessoes) {
-        const ordenadas = sessoesSnap.docs.sort((a, b) => {
-          const ta = a.data().ultimo_acesso?.toMillis?.() || a.data().criado_em?.toMillis?.() || 0;
-          const tb = b.data().ultimo_acesso?.toMillis?.() || b.data().criado_em?.toMillis?.() || 0;
-          return ta - tb; // mais antiga primeiro
-        });
-        tx.update(ordenadas[0].ref, {
-          ativo: false,
-          desativado_motivo: 'limite_dispositivos',
-          desativado_em: admin.firestore.FieldValue.serverTimestamp(),
-        });
-      }
-
-      tx.set(usuarioRef.collection('sessoes').doc(sessionId), {
-        criado_em: admin.firestore.FieldValue.serverTimestamp(),
-        ultimo_acesso: admin.firestore.FieldValue.serverTimestamp(),
-        ua_hash: uaHash,
-        ativo: true,
-        assinaturaId,
-        acessos_ua_distintos: 0,
-        compartilhamento_suspeito: false,
-        origem: 'link_edicao',
-      });
-    });
-
-    const tiposInclusos = await _resolverTiposInclusos(assinaturaData.tipos_selecionados);
-
-    return json(res, 200, {
-      ok: true,
-      session_id: sessionId,
-      aviso_limite_sessoes: _avisoSessoes,
-      uid,
-      assinaturaId,
-      segmento: 'assinante',
-      plano_slug: assinaturaData.plano_slug || null,
-      features: usuarioData.features || assinaturaData.features_snapshot || {},
-      tiposInclusos,
-      municipios_plano: assinaturaData.municipios_plano || [],
-      nome: usuarioData.nome || '',
-      email: usuarioData.email || '',
-      cod_uf: usuarioData.cod_uf || '',
-      cod_municipio: usuarioData.cod_municipio || '',
-      nome_municipio: usuarioData.nome_municipio || '',
-      perfil: usuarioData.tipo_perfil || '',
-      data_ativacao: assinaturaData.data_inicio?.toDate?.()?.toISOString?.()
-          || new Date().toISOString(),
-      validado_em: Date.now(),
-    });
-
-  } catch (err) {
-    console.error('[criar-sessao] Erro:', err.message);
-    return json(res, 500, { ok: false, message: 'Erro interno ao criar sessão.' });
   }
 }
 
@@ -1670,9 +1647,9 @@ export default async function handler(req, res) {
     // Validar assinatura apenas para webhooks (não para criar-pedido / status-pedido)
     const acao = (req.query && req.query.acao) ? String(req.query.acao) : null;
     const acoesPublicas = [
-      'criar-pedido', 'status-pedido', 'ativar-sessao', 'validar-sessao', 'criar-sessao', 
+      'criar-pedido', 'status-pedido', 'ativar-sessao', 'validar-sessao',
       'encerrar-sessao', 'cancelar-assinatura', 'gerar-cobranca-cancelamento', 'salvar-quiz', 
-      'quiz-historico', 'quiz-resumo-geral', 'regenerar-token-ativacao', 'admin-enviar-link-acesso',
+      'quiz-historico', 'quiz-resumo-geral', 'regenerar-token-ativacao', 'admin-enviar-link-acesso', 'solicitar-link-acesso',
       'quiz-iniciar', 'quiz-abandonar'
     ];
 
@@ -1719,6 +1696,8 @@ export default async function handler(req, res) {
 
     if (acao === 'regenerar-token-ativacao') return _handleRegenerarTokenAtivacao(req, res);
 
+    if (acao === 'solicitar-link-acesso') return _handleSolicitarLinkAcesso(req, res);
+
     if (acao === 'admin-enviar-link-acesso') return _handleAdminEnviarLinkAcesso(req, res);
 
     if (req.method === 'GET' && acao === 'quiz-historico') {
@@ -1747,11 +1726,6 @@ export default async function handler(req, res) {
     // ── POST ?acao=validar-sessao ─────────────────────────────────────────
     if (req.method === 'POST' && acao === 'validar-sessao') {
       return _handleValidarSessao(req, res);
-    }
-
-    // ── POST ?acao=criar-sessao ───────────────────────────────────────────
-    if (req.method === 'POST' && acao === 'criar-sessao') {
-      return _handleCriarSessao(req, res);
     }
 
     // ── POST ?acao=encerrar-sessao ────────────────────────────────────────────
@@ -1859,14 +1833,13 @@ export default async function handler(req, res) {
 
         await db.collection('usuarios').doc(userId).update({ ativo: true });
 
-        const _sessionToken = crypto.randomBytes(32).toString('hex');
-        await db.collection('usuarios').doc(userId).set({ pending_session_token: { token: _sessionToken, exp: Date.now() + 72 * 60 * 60 * 1000, assinaturaId, usado: false, criado_em: admin.firestore.FieldValue.serverTimestamp() } }, { merge: true });
-
         const usuarioData = (await db.collection('usuarios').doc(userId).get()).data() || {};
         const assinaturaData = (await assinRef.get()).data() || {};
         let nomePlano = '(plano não informado)';
+
         if (assinaturaData.planId) { try { const pd = await db.collection('planos').doc(assinaturaData.planId).get(); if (pd.exists) nomePlano = pd.data().nome || nomePlano; } catch (e) { } }
-        const linkAtivacao = `${process.env.NEXT_PUBLIC_BASE_URL}/verNewsletterComToken.html?ativar=${_sessionToken}&uid=${userId}`;
+
+        const linkAtivacao = _montarLinkAcesso(userId, usuarioData);
         await dispararMensagemAutomatica('pos_cadastro_assinante', { userId, assinaturaId, nome: usuarioData.nome || nome, email: usuarioData.email || email, plano: nomePlano, data_assinatura: new Date(), link_ativacao: linkAtivacao });
 
         return json(res, 200, { ok: true, redirectUrl: null, pedidoId: novoPedidoRef.id, ativadoDireto: true, redirectSucesso: backUrlSuccess });
@@ -2142,18 +2115,8 @@ export default async function handler(req, res) {
         // Ativar o campo "ativo" no documento principal do usuário
         await db.collection('usuarios').doc(userId).update({ ativo: true });
 
-        // Gera token de ativação de sessão (uso único, válido 72h)
-        // Será incluído no link de boas-vindas enviado ao assinante
-        const _sessionToken = crypto.randomBytes(32).toString('hex');
-        await db.collection('usuarios').doc(userId).set({
-          pending_session_token: {
-            token: _sessionToken,
-            exp: Date.now() + 72 * 60 * 60 * 1000, // 72h em ms
-            assinaturaId,
-            usado: false,
-            criado_em: admin.firestore.FieldValue.serverTimestamp(),
-          }
-        }, { merge: true });
+        // O link de acesso é derivado (HMAC) e não é gravado: reentregas do webhook
+        // não trocam o link já enviado por e-mail.
 
         // Buscar dados para e-mail de confirmação
         const assinaturaDoc = await assinRef.get();
@@ -2193,7 +2156,7 @@ export default async function handler(req, res) {
         }
 
         if (devoEnviar) {
-          const linkAtivacao = `${process.env.NEXT_PUBLIC_BASE_URL}/verNewsletterComToken.html?ativar=${_sessionToken}&uid=${userId}`;
+          const linkAtivacao = _montarLinkAcesso(userId, usuarioData);
           const nomeAssinante = usuarioData?.nome || mpData.payer?.first_name || assinaturaData?.nome || '';
           const emailAssinante = usuarioData?.email || mpData.payer?.email || '(email não informado)';
           const whatsappAssinante = usuarioData?.whatsapp || null;
