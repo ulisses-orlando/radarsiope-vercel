@@ -1355,7 +1355,7 @@ async function _handleQuizAbandonar(req, res) {
 
     // Atualiza resumo geral (best-effort) se for quiz normal
     if (data.tipo === 'normal') {
-      _atualizarResumoQuiz(uid).catch(e => console.warn('[abandonar] resumo:', e.message));
+      await _atualizarResumoQuiz(uid).catch(e => console.warn('[abandonar] resumo:', e.message));
     }
 
     return json(res, 200, { ok: true, message: 'Tentativa registrada como abandonada.' });
@@ -1450,7 +1450,7 @@ async function _handleSalvarResultadoQuiz(req, res) {
     const historico = _montarHistoricoQuiz(atualizados.docs, tentativas_max);
 
     if (tipo === 'normal') {
-      _atualizarResumoQuiz(uid).catch(() => {});
+     await _atualizarResumoQuiz(uid).catch(() => {});
     }
 
     return json(res, 200, {
@@ -1580,25 +1580,23 @@ async function _atualizarResumoQuiz(uid) {
 // ─── GET: resumo geral de quiz (todas as edições) ────────────────────────────
 async function _handleQuizResumoGeral(req, res) {
   if (req.method !== 'GET') return json(res, 405, { ok: false, message: 'Método não permitido.' });
-  const { uid, recalcular } = req.query || {};
+  const { uid } = req.query || {};
   if (!uid) return json(res, 400, { ok: false, message: 'uid é obrigatório.' });
   
   try {
-    const userDoc = await db.collection('usuarios').doc(uid).get();
-    let resumo = userDoc.exists ? userDoc.data()?.resumo_quiz : null;
+    // 🔧 SEMPRE recalcular do zero - não usar cache denormalizado
+    const resumo = await _computarResumoQuiz(uid);
     
-    // 🔧 Força recálculo se solicitado ou se não existir
-    if (!resumo || recalcular === 'true') {
-      resumo = await _computarResumoQuiz(uid);
-      await db.collection('usuarios').doc(uid).set({
-        resumo_quiz: { ...resumo, atualizado_em: admin.firestore.FieldValue.serverTimestamp() }
-      }, { merge: true });
-    }
- 
+    // Atualizar o denormalizado (best-effort)
+    db.collection('usuarios').doc(uid)
+      .set({ 
+        resumo_quiz: { ...resumo, atualizado_em: admin.firestore.FieldValue.serverTimestamp() } 
+      }, { merge: true })
+      .catch(e => console.warn('[resumo-geral] Falha ao persistir:', e.message));
+    
     const nids = Object.keys(resumo.edicoes || {});
     const titulos = {};
     if (nids.length) {
-      // Firestore 'in' limita a 10 — busca em lotes (mesmo padrão de _resolverTiposInclusos)
       const lotes = [];
       for (let i = 0; i < nids.length; i += 10) lotes.push(nids.slice(i, i + 10));
       const snaps = await Promise.all(lotes.map(lote =>
@@ -1608,13 +1606,11 @@ async function _handleQuizResumoGeral(req, res) {
       ));
       snaps.forEach(snap => snap.docs.forEach(d => { titulos[d.id] = d.data().titulo || d.id; }));
     }
- 
     const edicoes = nids.map(nid => ({
       newsletter_id: nid,
       titulo: titulos[nid] || nid,
       ...resumo.edicoes[nid]
     }));
- 
     return json(res, 200, {
       ok: true,
       edicoes,
