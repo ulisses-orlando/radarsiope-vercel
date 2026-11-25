@@ -373,11 +373,18 @@ async function _renderResumo() {
             " style="font-size:11px;padding:3px 10px;border-radius:6px;border:1px solid #cbd5e1;background:#fff;cursor:pointer;color:#0A3D62;font-weight:600">
               ⚙️ Editar features
             </button>
-            ${a.status === 'ativa' || a.status === 'ativo' ? `
+            ${a.status === 'ativa' ? `
             <button onclick="_gerarEnviarLinkProativo('${uid}','${assinId}',this)"
+              title="Reenvia o mesmo link de acesso por e-mail e avisa no app"
               style="font-size:11px;padding:3px 10px;border-radius:6px;border:1px solid #0284c7;
                      background:#e0f2fe;cursor:pointer;color:#0284c7;font-weight:600;margin-left:6px">
-              🔗 Gerar e enviar link (e-mail e app)
+              🔗 Reenviar link (e-mail e app)
+            </button>
+            <button onclick="_enviarLinkAcessoAdmin('${uid}',null,'${assinId}',true)"
+              title="O link atual deixa de funcionar e um novo é enviado por e-mail"
+              style="font-size:11px;padding:3px 10px;border-radius:6px;border:1px solid #7c3aed;
+                     background:#f5f3ff;cursor:pointer;color:#7c3aed;font-weight:600;margin-left:6px">
+              🔄 Revogar link e enviar novo
             </button>` : ''}
             <div style="display:none;margin-top:8px" id="feat-panel-${assinId}">
               <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px">
@@ -879,29 +886,25 @@ async function _renderSolicitacoes() {
       const isLinkAcesso = s.tipo === 'solicitar_link_acesso';
       if (isLinkAcesso) {
         const assinaturaId = s.assinaturaId || '';
-        const selfCount = s.self_count_no_momento != null ? s.self_count_no_momento : '—';
 
         if (status === 'aberta' || status === 'pendente') {
           acoes = `
             <div style="margin-top:8px;padding:10px;background:#fffbeb;border:1px solid #fde68a;
               border-radius:6px;font-size:12px">
-              <div style="font-weight:600;margin-bottom:4px;color:#92400e">
+              <div style="font-weight:600;margin-bottom:8px;color:#92400e">
                 🔗 Solicitação de Link de Acesso
-              </div>
-              <div style="color:#78350f;font-size:11px;margin-bottom:8px">
-                Uso self-service no momento da solicitação: <strong>${selfCount}/3</strong>
               </div>
               <div style="display:flex;gap:6px;flex-wrap:wrap">
                 <button class="btn-drawer-sm btn-verde"
                   onclick="_enviarLinkAcessoAdmin('${uid}','${doc.id}','${assinaturaId}',false)"
-                  title="Gera novo token e envia e-mail. Contador permanece em 3.">
-                  🔗 Enviar novo link
+                  title="Reenvia o mesmo link de acesso por e-mail.">
+                  🔗 Reenviar link
                 </button>
                 <button class="btn-drawer-sm"
                   style="background:#7c3aed;color:#fff;border:none"
                   onclick="_enviarLinkAcessoAdmin('${uid}','${doc.id}','${assinaturaId}',true)"
-                  title="Zera o contador self-service, gera novo token e envia e-mail.">
-                  🔄 Resetar contador + enviar link
+                  title="O link atual deixa de funcionar e um novo é enviado por e-mail.">
+                  🔄 Revogar e enviar novo
                 </button>
               </div>
             </div>`;
@@ -1484,13 +1487,18 @@ async function _revogarTodasSessoes() {
 }
 
 // ─── Admin: Enviar link de acesso por e-mail ──────────────────────────────────
-// Retorna o link gerado (string) em caso de sucesso, ou null em caso de erro/cancelamento.
-async function _enviarLinkAcessoAdmin(uid, solId, assinaturaId, resetarContador) {
-  const acao = resetarContador
-    ? 'Resetar contador (self-service volta a 0) e enviar novo link'
-    : 'Gerar e enviar novo link (contador permanece em 3)';
+// Reenvia o link pessoal do assinante (o mesmo link) ou, com `revogar = true`, troca o link:
+// o antigo deixa de funcionar (as sessões já abertas continuam). O link NÃO volta para a tela.
+// Retorna true em caso de sucesso, ou false em caso de erro/cancelamento.
+async function _enviarLinkAcessoAdmin(uid, solId, assinaturaId, revogar) {
+  const acao = revogar
+    ? 'Revogar o link atual e enviar um novo link'
+    : 'Reenviar o link de acesso';
+  const aviso = revogar
+    ? 'O link antigo deixará de funcionar. As sessões já abertas continuam ativas.'
+    : 'O e-mail com o link de acesso será enviado ao assinante.';
 
-  if (!confirm(`${acao}?\n\nUm e-mail com o link de ativação será enviado ao assinante.`)) return null;
+  if (!confirm(`${acao}?\n\n${aviso}`)) return false;
 
   // Desabilita os botões do card de solicitação (apenas se veio de um card existente)
   const card = solId ? document.getElementById(`sol-card-${solId}`) : null;
@@ -1501,19 +1509,24 @@ async function _enviarLinkAcessoAdmin(uid, solId, assinaturaId, resetarContador)
     const resp = await fetch('/api/pagamentoMP?acao=admin-enviar-link-acesso', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ uid, solId, assinaturaId, resetarContador }),
+      body: JSON.stringify({ uid, solId, assinaturaId, revogar }),
     });
 
     const data = await resp.json().catch(() => ({}));
     if (!resp.ok || !data.ok) throw new Error(data.message || 'Erro ao processar.');
+    if (data.enviado === false) {
+      throw new Error(data.revogado
+        ? 'O link anterior foi revogado, mas o e-mail não foi enviado. Use "Reenviar link".'
+        : 'Não foi possível enviar o e-mail. Tente novamente.');
+    }
 
     // Atualiza a solicitação como atendida (apenas quando veio de uma solicitação)
     if (solId) {
       await db.collection('usuarios').doc(uid).collection('solicitacoes').doc(solId).update({
         status: 'atendida',
-        resposta: resetarContador
-          ? 'Contador resetado e novo link de acesso enviado por e-mail pelo administrador.'
-          : 'Novo link de acesso enviado por e-mail pelo administrador.',
+        resposta: revogar
+          ? 'Link anterior revogado e novo link de acesso enviado por e-mail pelo administrador.'
+          : 'Link de acesso reenviado por e-mail pelo administrador.',
         data_resposta: new Date().toISOString(),
         atualizadoEm: new Date().toISOString(),
       });
@@ -1522,39 +1535,39 @@ async function _enviarLinkAcessoAdmin(uid, solId, assinaturaId, resetarContador)
       _ativarDrawerTab('solicitacoes');
     }
 
-    const msg = resetarContador
-      ? '✅ Contador zerado e link enviado por e-mail!'
-      : '✅ Link enviado por e-mail com sucesso!';
-    mostrarMensagem(msg);
+    mostrarMensagem(revogar
+      ? '✅ Link revogado e novo link enviado por e-mail!'
+      : '✅ Link reenviado por e-mail com sucesso!');
 
-    return data.link || null;
+    return true;
 
   } catch (err) {
     mostrarMensagem('❌ Erro: ' + err.message);
     btns?.forEach(b => { b.disabled = false; });
-    return null;
+    return false;
   }
 }
 
-// ─── Admin: Gerar e enviar link proativamente (aba Resumo) ───────────────────
-// Gera o link, envia por e-mail E entrega via mensagem_admin no app do assinante.
+// ─── Admin: Reenviar link proativamente (aba Resumo) ─────────────────────────
+// Reenvia o link por e-mail E avisa no app do assinante (mensagem_admin).
+// A mensagem do app NÃO leva o link: ele só trafega pelo e-mail cadastrado.
 async function _gerarEnviarLinkProativo(uid, assinaturaId, btnEl) {
-  if (btnEl) { btnEl.disabled = true; btnEl.textContent = '⏳ Gerando...'; }
+  if (btnEl) { btnEl.disabled = true; btnEl.textContent = '⏳ Enviando...'; }
 
   try {
-    // 1. Gera + envia por e-mail (reutiliza função existente, solId = null)
-    const link = await _enviarLinkAcessoAdmin(uid, null, assinaturaId, false);
-    if (!link) {
+    // 1. Reenvia por e-mail (reutiliza função existente, solId = null)
+    const ok = await _enviarLinkAcessoAdmin(uid, null, assinaturaId, false);
+    if (!ok) {
       // Usuário cancelou no confirm ou ocorreu erro (já exibido por _enviarLinkAcessoAdmin)
       return;
     }
 
-    // 2. Envia também via mensagem_admin no app
+    // 2. Avisa também via mensagem_admin no app
     const admin = JSON.parse(localStorage.getItem('usuarioLogado') || '{}');
     await db.collection('usuarios').doc(uid).collection('solicitacoes').add({
       tipo: 'mensagem_admin',
-      titulo: '🔗 Seu novo link de acesso ao Radar SIOPE',
-      descricao: `Seu novo link de acesso foi gerado e enviado também por e-mail.\n\n${link}\n\n⏰ Válido por 72 horas.`,
+      titulo: '🔗 Enviamos seu link de acesso por e-mail',
+      descricao: 'Reenviamos o link de acesso ao Radar SIOPE para o e-mail da sua assinatura. Confira também a caixa de spam.\n\nO link é pessoal: não o compartilhe com outras pessoas.',
       status: 'atendida',
       permite_resposta: false,
       lida: false,
@@ -1562,14 +1575,15 @@ async function _gerarEnviarLinkProativo(uid, assinaturaId, btnEl) {
       data_solicitacao: new Date().toISOString(),
     });
 
-    mostrarMensagem('✅ Link enviado por e-mail e notificação enviada no app!');
+    mostrarMensagem('✅ Link enviado por e-mail e aviso enviado no app!');
 
   } catch (err) {
     mostrarMensagem('❌ Erro: ' + err.message);
   } finally {
-    if (btnEl) { btnEl.disabled = false; btnEl.textContent = '🔗 Gerar e enviar link'; }
+    if (btnEl) { btnEl.disabled = false; btnEl.textContent = '🔗 Reenviar link (e-mail e app)'; }
   }
 }
+
 window._gerarEnviarLinkProativo = _gerarEnviarLinkProativo;
 
 // ─── Reset de feedback por envio ─────────────────────────────────────────────

@@ -192,9 +192,9 @@ async function carregarAssinaturas(uid) {
         </div>`;
 
       // Renderiza o card de novo link SOMENTE para a primeira assinatura ativa
-      if ((a.status === 'ativa' || a.status === 'ativo') && !_cardLinkRendered) {
+      if (a.status === 'ativa' && !_cardLinkRendered) {
         _cardLinkRendered = true;
-        _renderCardNovoLink(uid, assinaturaId, a.self_link_gerado_count || 0);
+        _renderCardNovoLink(uid, assinaturaId);
       }
     }
 
@@ -511,7 +511,7 @@ async function _processarSolicitacaoLinkAcesso(uid, descricao) {
     // Busca assinatura ativa para incluir o assinaturaId na solicitação
     const snap = await db.collection('usuarios').doc(uid)
       .collection('assinaturas')
-      .where('status', 'in', ['ativa', 'ativo'])
+      .where('status', '==', 'ativa')
       .limit(1).get();
 
     if (snap.empty) {
@@ -520,14 +520,12 @@ async function _processarSolicitacaoLinkAcesso(uid, descricao) {
     }
 
     const assinaturaId = snap.docs[0].id;
-    const selfCount    = snap.docs[0].data().self_link_gerado_count || 0;
 
     await db.collection('usuarios').doc(uid).collection('solicitacoes').add({
       tipo:              'solicitar_link_acesso',
       descricao:         descricao || 'Solicitação de novo link de acesso ao app.',
       status:            'aberta',
       assinaturaId,
-      self_count_no_momento: selfCount,   // informativo para o admin
       data_solicitacao:  new Date().toISOString(),
     });
 
@@ -777,35 +775,11 @@ function expandirMensagem(id, mensagemEncoded) {
 }
 
 // ─── Card de Novo Link de Acesso ──────────────────────────────────────────────
-const LIMITE_SELF_LINK = 3;
-
-function _renderCardNovoLink(uid, assinaturaId, count) {
+// O link é reenviado por e-mail (o servidor limita: 1 envio a cada 20 min e 3 por dia).
+// O link NÃO aparece na tela: só chega ao e-mail cadastrado da assinatura.
+function _renderCardNovoLink(uid, assinaturaId) {
   const card = document.getElementById('card-link-acesso');
   if (!card) return;
-
-  const restantes = LIMITE_SELF_LINK - count;
-  const esgotado  = restantes <= 0;
-
-  if (esgotado) {
-    card.innerHTML = `
-      <div class="card-link-wrap">
-        <div class="card-link-corpo">
-          <div class="card-link-icone">🔗</div>
-          <div>
-            <div class="card-link-titulo">Precisa de um novo link de acesso?</div>
-            <div class="card-link-sub">
-              Você atingiu o limite de ${LIMITE_SELF_LINK} gerações automáticas.
-              Para obter um novo link, solicite pelo <strong>Suporte</strong> na Central.
-            </div>
-          </div>
-        </div>
-        <div class="card-link-rodape">
-          <span class="card-link-badge">⛔ Limite atingido</span>
-          <button class="btn-gerar-link" disabled>Limite atingido</button>
-        </div>
-      </div>`;
-    return;
-  }
 
   card.innerHTML = `
     <div class="card-link-wrap">
@@ -814,29 +788,36 @@ function _renderCardNovoLink(uid, assinaturaId, count) {
         <div>
           <div class="card-link-titulo">Precisa de um novo link de acesso?</div>
           <div class="card-link-sub">
+            Enviamos o link para o <strong>e-mail da sua assinatura</strong>.
             Use quando quiser acessar o app em um <strong>novo dispositivo</strong>
             ou após limpar o navegador.
           </div>
         </div>
       </div>
       <div class="card-link-rodape">
-        <span class="card-link-badge">${restantes} de ${LIMITE_SELF_LINK} uso${restantes !== 1 ? 's' : ''} disponível${restantes !== 1 ? 'is' : ''}</span>
+        <span class="card-link-badge" id="link-acesso-status" style="display:none"></span>
         <button class="btn-gerar-link" id="btn-gerar-link"
-          onclick="gerarNovoLinkAcesso('${uid}', '${assinaturaId}', ${count})">
-          🔗 Gerar link
+          onclick="gerarNovoLinkAcesso('${uid}', '${assinaturaId}')">
+          📧 Reenviar link por e-mail
         </button>
       </div>
     </div>`;
 }
 
-async function gerarNovoLinkAcesso(uid, assinaturaId, countAtual) {
-  const restantes = LIMITE_SELF_LINK - countAtual;
-  if (restantes <= 0) return;
-
+async function gerarNovoLinkAcesso(uid, assinaturaId) {
   const btn = document.getElementById('btn-gerar-link');
-  if (btn) { btn.disabled = true; btn.textContent = 'Gerando...'; }
+  const status = document.getElementById('link-acesso-status');
+  const _status = (texto, erro) => {
+    if (!status) return;
+    status.style.display = 'inline-block';
+    status.style.color = erro ? '#b91c1c' : '';
+    status.textContent = texto;
+  };
+
+  if (btn) { btn.disabled = true; btn.textContent = 'Enviando...'; }
 
   try {
+    // A rota mantém o nome antigo, mas agora só reenvia o link por e-mail
     const resp = await fetch('/api/pagamentoMP?acao=regenerar-token-ativacao', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -846,29 +827,19 @@ async function gerarNovoLinkAcesso(uid, assinaturaId, countAtual) {
     const data = await resp.json().catch(() => ({}));
 
     if (!resp.ok || !data.ok) {
-      alert('❌ ' + (data.message || 'Não foi possível gerar o link. Tente novamente.'));
-      if (btn) { btn.disabled = false; btn.textContent = '🔗 Gerar link'; }
+      _status(data.message || 'Não foi possível enviar o link. Tente novamente.', true);
+      if (btn) { btn.disabled = false; btn.textContent = '📧 Reenviar link por e-mail'; }
       return;
     }
 
-    // Exibe o link no modal
-    document.getElementById('link-acesso-gerado').textContent = data.link;
-
-    const novoRestantes = LIMITE_SELF_LINK - data.count;
-    const msgRestantes = novoRestantes > 0
-      ? `Você ainda pode gerar mais ${novoRestantes} link${novoRestantes !== 1 ? 's' : ''} automaticamente.`
-      : `Você utilizou todos os ${LIMITE_SELF_LINK} links automáticos. Próximas solicitações devem ser feitas pelo Suporte.`;
-    document.getElementById('card-link-restantes-modal').textContent = msgRestantes;
-
-    document.getElementById('modal-link-acesso').classList.add('show');
-
-    // Atualiza o card imediatamente com o novo contador
-    _renderCardNovoLink(uid, assinaturaId, data.count);
+    _status(`✅ Enviado para ${data.email_mascarado || 'o e-mail da assinatura'}. Confira também o spam.`, false);
+    // Mantém o botão travado: o servidor só aceita novo envio após o intervalo mínimo
+    if (btn) btn.textContent = '✅ Link enviado';
 
   } catch (err) {
     console.error('[link-acesso]', err);
-    alert('❌ Erro de conexão. Verifique sua internet e tente novamente.');
-    if (btn) { btn.disabled = false; btn.textContent = '🔗 Gerar link'; }
+    _status('Erro de conexão. Verifique sua internet e tente novamente.', true);
+    if (btn) { btn.disabled = false; btn.textContent = '📧 Reenviar link por e-mail'; }
   }
 }
 

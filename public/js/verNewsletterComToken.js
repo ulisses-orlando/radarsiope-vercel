@@ -1700,7 +1700,7 @@ function _bloquearAcessoPorSessaoInativa(motivo) {
 function _mostrarSheetSessaoBloqueada(motivo) {
   document.getElementById('rs-sheet-sessao')?.remove();
 
-  const isInativa = motivo === 'assinatura_inativa';
+  const t = _textosSessao(motivo);
 
   const sheet = document.createElement('div');
   sheet.id = 'rs-sheet-sessao';
@@ -1712,37 +1712,32 @@ function _mostrarSheetSessaoBloqueada(motivo) {
     'animation:rsFadeIn .2s ease;padding:16px;box-sizing:border-box',
   ].join(';');
 
+  const btnPrimario = 'display:block;width:100%;padding:13px;background:var(--azul,#0A3D62);'
+    + 'color:#fff;border-radius:10px;font-size:14px;font-weight:700;border:none;'
+    + 'cursor:pointer;margin-bottom:10px;text-decoration:none;box-sizing:border-box';
+
   sheet.innerHTML = `
     <div style="background:var(--rs-card,#fff);border-radius:16px;
                 padding:28px 24px 24px;width:100%;max-width:380px;
                 box-shadow:0 8px 32px rgba(0,0,0,.2);
                 animation:rsScaleIn .2s cubic-bezier(.34,1.56,.64,1);
                 text-align:center">
-      <div style="font-size:32px;margin-bottom:12px">${isInativa ? '⚠️' : '📱'}</div>
+      <div style="font-size:32px;margin-bottom:12px">${t.icone}</div>
       <h3 style="margin:0 0 10px;font-size:16px;font-weight:700;
-                 color:var(--rs-texto,#0f172a)">
-        ${isInativa ? 'Assinatura encerrada' : 'Sessão desativada'}
-      </h3>
+                 color:var(--rs-texto,#0f172a)">${t.titulo}</h3>
       <p style="margin:0 0 22px;font-size:13px;line-height:1.7;
-                color:var(--rs-muted,#64748b)">
-        ${isInativa
-      ? 'Sua assinatura foi encerrada. Entre em contato com o suporte para reativar.'
-      : 'Você abriu o Radar SIOPE em muitos dispositivos simultaneamente e esta sessão foi desativada.<br><br>Para retomar o acesso completo, abra o link recebido por e-mail.'}
-      </p>
-      ${isInativa
-      ? `<a href="/contato.html" target="_blank" rel="noopener"
-              style="display:block;padding:13px;background:var(--azul,#0A3D62);
-                     color:#fff;border-radius:10px;font-size:14px;font-weight:700;
-                     text-decoration:none;margin-bottom:10px">
-             Falar com o suporte →
-           </a>`
-      : `<button onclick="_abrirEmailAcesso()"
-                  style="display:block;width:100%;padding:13px;
-                         background:var(--azul,#0A3D62);color:#fff;border-radius:10px;
-                         font-size:14px;font-weight:700;border:none;cursor:pointer;
-                         margin-bottom:10px">
-             📧 Abrir meu e-mail para novo acesso
-           </button>`}
+                color:var(--rs-muted,#64748b)">${t.texto}</p>
+      ${t.link ? `
+      <button id="rs-sheet-btn-link" onclick="_sheetReceberLink()" style="${btnPrimario}">
+        📧 Receber novo link por e-mail
+      </button>
+      <p id="rs-sheet-link-msg"
+         style="display:none;margin:0 0 12px;font-size:12px;line-height:1.6;
+                color:var(--rs-muted,#64748b)"></p>` : ''}
+      ${t.suporte ? `
+      <a href="/contato.html" target="_blank" rel="noopener" style="${btnPrimario}">
+        Falar com o suporte →
+      </a>` : ''}
       <button onclick="_fecharSheetSessao()"
               style="display:block;width:100%;padding:11px;
                      background:transparent;color:var(--rs-muted,#64748b);
@@ -1772,6 +1767,193 @@ function _abrirEmailAcesso(e) {
 
 window._fecharSheetSessao = _fecharSheetSessao;
 window._abrirEmailAcesso = _abrirEmailAcesso;
+
+
+// ─── Acesso por link: textos por motivo, pedido de novo link e tela de entrada ─────
+// Motivos devolvidos por validar-sessao (desativado_motivo) → texto e ações da folha.
+function _textosSessao(motivo) {
+  switch (motivo) {
+    case 'limite_dispositivos':
+      return {
+        icone: '📱', titulo: 'Acesso substituído',
+        texto: 'Sua assinatura atingiu o limite de aparelhos e este era o menos usado recentemente.<br><br>Peça um novo link para voltar a usar o Radar SIOPE aqui.',
+        link: true, suporte: false,
+      };
+    case 'inatividade':
+      return {
+        icone: '⏳', titulo: 'Sessão encerrada por inatividade',
+        texto: 'Por segurança, o acesso de um aparelho é encerrado após 45 dias sem uso.<br><br>Peça um novo link para continuar.',
+        link: true, suporte: false,
+      };
+    case 'logout_usuario':
+      return {
+        icone: '👋', titulo: 'Você saiu deste aparelho',
+        texto: 'Para entrar novamente, peça um novo link de acesso por e-mail.',
+        link: true, suporte: false,
+      };
+    case 'revogado_admin':
+      return {
+        icone: '🔒', titulo: 'Acesso encerrado pelo suporte',
+        texto: 'O acesso deste aparelho foi encerrado pela nossa equipe. Você pode pedir um novo link ou falar com o suporte.',
+        link: true, suporte: true,
+      };
+    case 'cancelamento_admin':
+      return {
+        icone: '🔒', titulo: 'Acesso encerrado pelo suporte',
+        texto: 'O acesso deste aparelho foi encerrado pela nossa equipe. Fale com o suporte para entender o motivo.',
+        link: false, suporte: true,
+      };
+    case 'assinatura_inativa':
+      return {
+        icone: '⚠️', titulo: 'Assinatura encerrada',
+        texto: 'Sua assinatura foi encerrada. Entre em contato com o suporte para reativar.',
+        link: false, suporte: true,
+      };
+    default:
+      return {
+        icone: '📱', titulo: 'Não foi possível confirmar sua sessão',
+        texto: 'Peça um novo link de acesso por e-mail para continuar.',
+        link: true, suporte: false,
+      };
+  }
+}
+
+function _emailSalvo() {
+  try { return JSON.parse(localStorage.getItem('rs_pwa_session') || '{}')?.email || ''; }
+  catch (e) { return ''; }
+}
+
+// Pede ao servidor o link de acesso por e-mail (resposta neutra: não revela se o e-mail existe)
+async function _enviarLinkPorEmail(email, msgEl, btnEl) {
+  const _msg = (texto, erro) => {
+    if (!msgEl) return;
+    msgEl.style.display = 'block';
+    msgEl.style.color = erro ? '#b91c1c' : 'var(--rs-muted,#64748b)';
+    msgEl.textContent = texto;
+  };
+
+  const e = String(email || '').trim();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)) {
+    _msg('Informe um e-mail válido.', true);
+    return;
+  }
+
+  if (btnEl) { btnEl.disabled = true; btnEl.style.opacity = '.6'; }
+  try {
+    const resp = await fetch('/api/pagamentoMP?acao=solicitar-link-acesso', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: e }),
+    });
+    const data = await resp.json().catch(() => ({}));
+    if (resp.ok && data.ok) {
+      _msg(data.message || 'Se existir uma assinatura ativa para este e-mail, enviamos o link de acesso.', false);
+      // mantém o botão travado: o servidor só aceita novo envio após o intervalo mínimo
+    } else {
+      _msg(data.message || 'Não foi possível enviar agora. Tente novamente em instantes.', true);
+      if (btnEl) { btnEl.disabled = false; btnEl.style.opacity = '1'; }
+    }
+  } catch (err) {
+    _msg('Sem conexão. Verifique sua internet e tente novamente.', true);
+    if (btnEl) { btnEl.disabled = false; btnEl.style.opacity = '1'; }
+  }
+}
+
+// Botão "Receber novo link" da folha de bloqueio: usa o e-mail já salvo no aparelho
+async function _sheetReceberLink() {
+  const email = _emailSalvo();
+  if (!email) {
+    // Sem e-mail salvo: troca a folha pela tela de entrada (que pede o e-mail)
+    document.getElementById('rs-sheet-sessao')?.remove();
+    document.body.style.overflow = '';
+    _mostrarTelaAcesso({});
+    return;
+  }
+  await _enviarLinkPorEmail(
+    email,
+    document.getElementById('rs-sheet-link-msg'),
+    document.getElementById('rs-sheet-btn-link')
+  );
+}
+
+async function _telaAcessoEnviar() {
+  await _enviarLinkPorEmail(
+    document.getElementById('rs-acesso-email')?.value,
+    document.getElementById('rs-acesso-msg'),
+    document.getElementById('rs-acesso-btn')
+  );
+}
+
+// Tela de entrada: aparece quando não há sessão neste aparelho (ou o link não vale mais)
+function _mostrarTelaAcesso(opts = {}) {
+  mostrarLoading(false);
+  document.getElementById('rs-sheet-sessao')?.remove();
+  document.getElementById('rs-tela-acesso')?.remove();
+
+  const _attr = (v) => String(v || '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+  const email = opts.email || _emailSalvo() || '';
+  const titulo = opts.titulo || 'Acesse sua conta';
+  const texto = opts.texto
+    || 'Informe o e-mail da sua assinatura e enviamos um link de acesso.<br>'
+    + 'Se você está no período de teste, abra novamente o link que recebeu por e-mail.';
+
+  const el = document.createElement('div');
+  el.id = 'rs-tela-acesso';
+  el.style.cssText = [
+    'position:fixed;inset:0;z-index:9990',
+    'display:flex;align-items:center;justify-content:center',
+    'background:var(--rs-bg,#f1f5f9);padding:16px;box-sizing:border-box',
+  ].join(';');
+
+  el.innerHTML = `
+    <div style="background:var(--rs-card,#fff);border-radius:16px;
+                padding:28px 24px 24px;width:100%;max-width:380px;
+                box-shadow:0 8px 32px rgba(0,0,0,.12);text-align:center">
+      <div style="font-size:32px;margin-bottom:12px">🔑</div>
+      <h3 style="margin:0 0 10px;font-size:16px;font-weight:700;
+                 color:var(--rs-texto,#0f172a)">${titulo}</h3>
+      <p style="margin:0 0 18px;font-size:13px;line-height:1.7;
+                color:var(--rs-muted,#64748b)">${texto}</p>
+      <input id="rs-acesso-email" type="email" inputmode="email" autocomplete="email"
+             placeholder="E-mail da sua assinatura" value="${_attr(email)}"
+             style="width:100%;box-sizing:border-box;padding:12px;margin-bottom:12px;
+                    border:1px solid var(--rs-borda,#cbd5e1);border-radius:10px;
+                    font-size:14px;background:transparent;color:var(--rs-texto,#0f172a)">
+      <button id="rs-acesso-btn" onclick="_telaAcessoEnviar()"
+              style="display:block;width:100%;padding:13px;background:var(--azul,#0A3D62);
+                     color:#fff;border-radius:10px;font-size:14px;font-weight:700;
+                     border:none;cursor:pointer;margin-bottom:10px">
+        📧 Receber link por e-mail
+      </button>
+      <p id="rs-acesso-msg"
+         style="display:none;margin:0 0 12px;font-size:12px;line-height:1.6;
+                color:var(--rs-muted,#64748b)"></p>
+      <a href="/assinatura.html"
+         style="font-size:12px;color:var(--rs-muted,#64748b)">Ainda não é assinante? Conheça os planos</a>
+    </div>`;
+  document.body.appendChild(el);
+}
+
+// Valida a sessão local sem exibir nada (usado ao abrir um link de acesso no aparelho
+// que já tem sessão). Em dúvida (rede/servidor), considera válida.
+async function _validarSessaoSilencioso(sess) {
+  try {
+    const resp = await fetch('/api/pagamentoMP?acao=validar-sessao', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ uid: sess.uid, session_id: sess.session_id }),
+    });
+    if (!resp.ok && resp.status >= 500) return true;
+    const data = await resp.json().catch(() => null);
+    return !data ? true : data.valido === true;
+  } catch (e) {
+    return true;
+  }
+}
+
+window._sheetReceberLink = _sheetReceberLink;
+window._telaAcessoEnviar = _telaAcessoEnviar;
+window._mostrarTelaAcesso = _mostrarTelaAcesso;
 
 // ─── Validação de sessão em background (uma vez a cada 4h) ───────────────
 async function _validarSessaoBackground(sessao) {
@@ -1991,6 +2173,23 @@ function _mostrarAvisoSessoes() {
 async function _executarAtivacaoSessao(token, uid) {
   mostrarLoading(true);
   try {
+    // Já existe sessão válida deste usuário neste aparelho → só entra (não cria outra)
+    try {
+      const _sessLocal = JSON.parse(localStorage.getItem('rs_pwa_session') || 'null');
+      if (_sessLocal?.segmento === 'assinante' && _sessLocal?.session_id && _sessLocal?.uid === uid
+        && await _validarSessaoSilencioso(_sessLocal)) {
+        try { sessionStorage.setItem('rs_tab_session_id', _sessLocal.session_id); } catch (e) { }
+        try {
+          const url = new URL(window.location.href);
+          url.searchParams.delete('ativar');
+          url.searchParams.delete('uid');
+          window.history.replaceState({}, '', url.toString());
+        } catch (e) { /* ignora */ }
+        await _tentarModoAssinante(_sessLocal);
+        return;
+      }
+    } catch (e) { /* sem sessão local utilizável: segue e abre uma nova com o link */ }
+
     const resp = await fetch('/api/pagamentoMP?acao=ativar-sessao', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -2001,26 +2200,23 @@ async function _executarAtivacaoSessao(token, uid) {
 
     if (!resp.ok || !data.ok) {
       const _codigoErro = data.codigo || '';
-      const _precisaNovoLink = _codigoErro === 'token_expirado' || _codigoErro === 'token_usado';
 
-      if (_precisaNovoLink) {
+      if (_codigoErro === 'assinatura_inativa') {
         mostrarErro(
-          '<strong>Este link de acesso não está mais disponível.</strong>',
-          _codigoErro === 'token_usado'
-            ? 'Este link já foi utilizado. Se você precisa acessar de um novo dispositivo, '
-            + '<a href="/login.html" style="color:var(--rs-gold,#c9a84c);font-weight:600">'
-            + 'acesse a Área do Assinante</a> e solicite um novo link.'
-            : 'O link expirou (válido por 72h após o pagamento). Para gerar um novo, '
-            + '<a href="/login.html" style="color:var(--rs-gold,#c9a84c);font-weight:600">'
-            + 'acesse a Área do Assinante</a>.'
+          '<strong>Assinatura indisponível.</strong>',
+          (data.message || 'Entre em contato com o suporte.')
+          + ' <a href="/contato.html" style="color:var(--rs-gold,#c9a84c);font-weight:600">'
+          + 'Falar com o suporte</a>.'
         );
+      } else if (resp.status >= 500 || !_codigoErro) {
+        mostrarErro('<strong>Não foi possível ativar seu acesso agora.</strong>', 'Verifique sua conexão e tente novamente em instantes.');
       } else {
-        mostrarErro(
-          '<strong>Link de ativação inválido.</strong>',
-          (data.message || '') + ' Se o problema persistir, acesse a '
-          + '<a href="/login.html" style="color:var(--rs-gold,#c9a84c);font-weight:600">'
-          + 'Área do Assinante</a>.'
-        );
+        // token_invalido: link errado ou substituído (ex.: revogado pelo suporte)
+        _mostrarTelaAcesso({
+          titulo: 'Este link não é mais válido',
+          texto: 'Ele pode ter sido substituído por um mais recente. '
+            + 'Informe o e-mail da sua assinatura e enviamos um novo link.',
+        });
       }
       return;
     }
@@ -2039,7 +2235,7 @@ async function _executarAtivacaoSessao(token, uid) {
         cod_uf: data.cod_uf,
         cod_municipio: data.cod_municipio,
         nome_municipio: data.nome_municipio,
-        perfil: data.tipo_perfil,
+        perfil: data.perfil,
         municipios_plano: data.municipios_plano || [],
         data_ativacao: data.data_ativacao || new Date().toISOString(),
         validado_em: Date.now(),
@@ -2082,10 +2278,7 @@ async function _tentarModoAlerta() {
   } catch (e) { /* ignora */ }
 
   if (!sessao || !sessao.uid) {
-    mostrarErro(
-      '<strong>Link inválido ou incompleto.</strong>',
-      'Verifique o link recebido por WhatsApp ou e-mail.'
-    );
+    _mostrarTelaAcesso({});
     return;
   }
 
@@ -2102,56 +2295,10 @@ async function _tentarModoAlerta() {
     return;
   }
 
-  // ── Assinante sem session_id (sessão mínima pós-cadastro) ─────────────────
-  // Cria sessão no servidor — ele já valida status e retorna mensagem específica.
-  if (sessao.segmento === 'assinante' && sessao.assinaturaId) {
-    try {
-      const _respSessao = await fetch('/api/pagamentoMP?acao=criar-sessao', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ uid: sessao.uid, assinaturaId: sessao.assinaturaId }),
-      });
-
-      if (!_respSessao.ok) {
-        const _errData = await _respSessao.json().catch(() => ({}));
-        // 403 = status bloqueado (pendente_pagamento, inativo, etc.)
-        mostrarErro(
-          '<strong>Acesso indisponível.</strong>',
-          _errData.message || 'Entre em contato com o suporte.'
-        );
-        return;
-      }
-
-      const _sessaoNova = await _respSessao.json();
-      if (_sessaoNova.ok) {
-        const _sessaoCompleta = {
-          uid: _sessaoNova.uid,
-          assinaturaId: _sessaoNova.assinaturaId,
-          segmento: 'assinante',
-          session_id: _sessaoNova.session_id,
-          plano_slug: _sessaoNova.plano_slug,
-          features: _sessaoNova.features,
-          municipios_plano: _sessaoNova.municipios_plano || [],
-          nome: _sessaoNova.nome,
-          email: _sessaoNova.email,
-          cod_uf: _sessaoNova.cod_uf,
-          cod_municipio: _sessaoNova.cod_municipio,
-          nome_municipio: _sessaoNova.nome_municipio,
-          perfil: _sessaoNova.perfil,
-          data_ativacao: _sessaoNova.data_ativacao || new Date().toISOString(),
-          validado_em: Date.now(),
-        };
-        try { localStorage.setItem('rs_pwa_session', JSON.stringify(_sessaoCompleta)); } catch (e) { /* ignora */ }
-        if (_sessaoNova.aviso_limite_sessoes) _mostrarAvisoSessoes();
-        const ok = await _tentarModoAssinante(_sessaoCompleta);
-        if (!ok) mostrarErro('Erro ao carregar sua área.', 'Tente novamente em instantes.');
-      } else {
-        mostrarErro('<strong>Não foi possível iniciar sua sessão.</strong>', 'Tente novamente em instantes.');
-      }
-    } catch (err) {
-      console.error('[verNL] Erro ao criar sessão (modo alerta):', err);
-      mostrarErro('Erro ao carregar seus dados.', err.message);
-    }
+  // ── Assinante sem session_id (sessão incompleta) ──────────────────────────
+  // Não há mais criação de sessão sem o link de acesso: pede um novo link por e-mail.
+  if (sessao.segmento === 'assinante') {
+    _mostrarTelaAcesso({ email: sessao.email });
     return;
   }
 
@@ -2372,48 +2519,14 @@ async function VerNewsletterComToken() {
         })();
 
         if (!_sessaoAtual?.session_id) {
-          // Sem sessão ativa — cria uma nova (o servidor verifica se a assinatura está ativa)
-          const _respSessao = await fetch('/api/pagamentoMP?acao=criar-sessao', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ uid, assinaturaId }),
+          // Sem sessão neste aparelho: o acesso só abre pelo link de acesso do e-mail
+          // (ou por um novo link pedido na tela de entrada).
+          _mostrarTelaAcesso({
+            titulo: 'Acesse sua conta',
+            texto: 'Para ler esta edição, abra o link de acesso enviado ao seu e-mail '
+              + 'ou peça um novo abaixo.',
           });
-
-          if (!_respSessao.ok) {
-            const _errData = await _respSessao.json().catch(() => ({}));
-            if (_respSessao.status === 403) {
-              // 403 = assinatura bloqueada → mensagem específica do servidor
-              const _msgErr = _errData.message || 'Para reativar sua assinatura, entre em contato com o suporte.';
-              mostrarErro('<strong>Acesso indisponível.</strong>', _msgErr);
-              return;
-            }
-            // 4xx/5xx inesperado: continua sem sessão (benefício da dúvida)
-            console.warn('[verNL] Falha ao criar sessão (não fatal):', _errData.message);
-          } else {
-            const _sessaoNova = await _respSessao.json();
-            if (_sessaoNova.ok) {
-              try {
-                localStorage.setItem('rs_pwa_session', JSON.stringify({
-                  uid: _sessaoNova.uid,
-                  assinaturaId: _sessaoNova.assinaturaId,
-                  segmento: 'assinante',
-                  session_id: _sessaoNova.session_id,
-                  plano_slug: _sessaoNova.plano_slug,
-                  features: _sessaoNova.features,
-                  municipios_plano: _sessaoNova.municipios_plano || [],
-                  nome: _sessaoNova.nome,
-                  email: _sessaoNova.email,
-                  cod_uf: _sessaoNova.cod_uf,
-                  cod_municipio: _sessaoNova.cod_municipio,
-                  nome_municipio: _sessaoNova.nome_municipio,
-                  perfil: _sessaoNova.perfil,
-                  data_ativacao: _sessaoNova.data_ativacao || new Date().toISOString(),
-                  validado_em: Date.now(),
-                }));
-              } catch (e) { /* ignora se localStorage bloqueado */ }
-              if (_sessaoNova.aviso_limite_sessoes) _mostrarAvisoSessoes();
-            }
-          }
+          return;
         } else {
           // Sessão existente: dispara validação em background para atualizar features
           _validarSessaoBackground(_sessaoAtual);
@@ -2423,11 +2536,9 @@ async function VerNewsletterComToken() {
             try { sessionStorage.setItem('rs_tab_session_id', _sessaoAtual.session_id); } catch (e) { }
           }
           if (!(await _checarSessaoCritica())) {
-            const _msg = _sessaoAtual.status === 'cancelado'
-              ? 'Sua assinatura foi cancelada.'
-              : 'Sua sessão expirou. Acesse novamente pelo link enviado por e-mail.';
-            mostrarErro('<strong>Acesso encerrado.</strong>', _msg);
-            localStorage.removeItem('rs_pwa_session');
+            // A folha de bloqueio já explica o motivo e oferece um novo link por e-mail.
+            // Mantém a sessão local: o e-mail dela é usado para pedir o novo link.
+            mostrarErro('<strong>Acesso indisponível neste aparelho.</strong>', 'Peça um novo link por e-mail para continuar.');
             return;
           }
         }
