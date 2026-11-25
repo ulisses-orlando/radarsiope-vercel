@@ -1580,20 +1580,19 @@ async function _atualizarResumoQuiz(uid) {
 // ─── GET: resumo geral de quiz (todas as edições) ────────────────────────────
 async function _handleQuizResumoGeral(req, res) {
   if (req.method !== 'GET') return json(res, 405, { ok: false, message: 'Método não permitido.' });
-  const { uid } = req.query || {};
+  const { uid, recalcular } = req.query || {};
   if (!uid) return json(res, 400, { ok: false, message: 'uid é obrigatório.' });
- 
+  
   try {
     const userDoc = await db.collection('usuarios').doc(uid).get();
     let resumo = userDoc.exists ? userDoc.data()?.resumo_quiz : null;
- 
-    // Fallback: usuário sem resumo_quiz denormalizado ainda (ex.: nunca salvou
-    // após esta mudança, ou dados legados) — computa na hora e tenta persistir.
-    if (!resumo) {
+    
+    // 🔧 Força recálculo se solicitado ou se não existir
+    if (!resumo || recalcular === 'true') {
       resumo = await _computarResumoQuiz(uid);
-      db.collection('usuarios').doc(uid)
-        .set({ resumo_quiz: { ...resumo, atualizado_em: admin.firestore.FieldValue.serverTimestamp() } }, { merge: true })
-        .catch(() => {});
+      await db.collection('usuarios').doc(uid).set({
+        resumo_quiz: { ...resumo, atualizado_em: admin.firestore.FieldValue.serverTimestamp() }
+      }, { merge: true });
     }
  
     const nids = Object.keys(resumo.edicoes || {});
