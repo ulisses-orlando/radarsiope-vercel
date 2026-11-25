@@ -842,24 +842,3 @@ async function gerarNovoLinkAcesso(uid, assinaturaId) {
     if (btn) { btn.disabled = false; btn.textContent = '📧 Reenviar link por e-mail'; }
   }
 }
-
-function copiarLinkAcesso() {
-  const link = document.getElementById('link-acesso-gerado')?.textContent || '';
-  if (!link || link === '—') return;
-  navigator.clipboard.writeText(link)
-    .then(() => {
-      const fb = document.getElementById('feedback-copia');
-      if (fb) { fb.style.display = 'inline'; setTimeout(() => fb.style.display = 'none', 2500); }
-    })
-    .catch(() => {
-      // Fallback para iOS/Safari
-      const el = document.getElementById('link-acesso-gerado');
-      if (!el) return;
-      const range = document.createRange();
-      range.selectNodeContents(el);
-      const sel = window.getSelection();
-      sel.removeAllRanges();
-      sel.addRange(range);
-      document.execCommand('copy');
-    });
-}
