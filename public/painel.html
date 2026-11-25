@@ -1134,41 +1134,6 @@
       transform: none;
     }
 
-    /* Modal de link gerado */
-    #modal-link-acesso .modal-content {
-      max-width: 460px;
-    }
-
-    .link-box {
-      background: var(--card2);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 10px 14px;
-      margin: 10px 0;
-      font-size: 12px;
-      color: var(--text);
-      word-break: break-all;
-      line-height: 1.6;
-      font-family: monospace;
-    }
-
-    .btn-copiar-link {
-      padding: 8px 14px;
-      border-radius: 8px;
-      border: 1px solid var(--accent);
-      background: transparent;
-      color: var(--accent);
-      font-family: var(--font-head);
-      font-weight: 700;
-      font-size: 12px;
-      cursor: pointer;
-      transition: .15s;
-    }
-
-    .btn-copiar-link:hover {
-      background: var(--accent);
-      color: #fff;
-    }
   </style>
 </head>
 
@@ -1333,31 +1298,6 @@
       </section>
 
     </main>
-  </div>
-
-  <!-- Modal: link de acesso gerado -->
-  <div id="modal-link-acesso" class="modal-overlay" role="dialog" aria-modal="true">
-    <div class="modal-content">
-      <h3>🔗 Novo link de acesso gerado</h3>
-      <p style="font-size:13px;color:var(--muted);margin:8px 0 4px;line-height:1.6">
-        Copie o link abaixo e abra-o no dispositivo que deseja usar.<br>
-        <strong>Válido por 72 horas.</strong> Após esse prazo, gere um novo link aqui.
-      </p>
-      <div id="link-acesso-gerado" class="link-box">—</div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px">
-        <button class="btn-copiar-link" onclick="copiarLinkAcesso()">📋 Copiar link</button>
-        <span id="feedback-copia" style="font-size:12px;color:#22c55e;align-self:center;display:none">✅ Copiado!</span>
-      </div>
-      <p id="card-link-restantes-modal"
-        style="font-size:11px;color:var(--muted);margin-top:12px;font-family:var(--font-head)"></p>
-      <div class="modal-btns">
-        <button onclick="document.getElementById('modal-link-acesso').classList.remove('show')" style="padding:8px 14px;border-radius:8px;border:1px solid var(--border);
-                       background:var(--card2);color:var(--text);cursor:pointer;
-                       font-family:var(--font-head);font-size:13px">
-          Fechar
-        </button>
-      </div>
-    </div>
   </div>
 
   <!-- Modal edição de solicitação -->
