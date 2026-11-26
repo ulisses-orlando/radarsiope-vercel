@@ -341,7 +341,7 @@ async function carregarBibliotecaNewsletters(uid) {
         if (_dataAtivacao && !_edicaoLiberadaParaAssinante(nl, _dataAtivacao)) return false;
         // Filtra por tipo se a assinatura tem tipos_selecionados
         if (!tiposSel.length) return true;
-        const tipo = nl.tipo || nl.Tipo;
+        const tipo = nl.tipo;
         return !tipo || tiposSel.includes(String(tipo));
       })
       .map(doc => {
