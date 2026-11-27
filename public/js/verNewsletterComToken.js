@@ -2617,6 +2617,10 @@ async function VerNewsletterComToken() {
       newsletter = await buscarPorNumero(edicaoNum);
       if (!newsletter) { mostrarErro(`Edição "${edicaoNum}" não encontrada.`); return; }
     }
+
+    // ── Salva newsletter em variável global (para o chat) ──
+    window._newsletterAtual = newsletter;
+    
     const nid = newsletter.id;
 
     // 7. Buscar destinatário
@@ -4714,6 +4718,18 @@ async function iniciarChatFAB(newsletter, uid, acesso) {
 
     try {
       const ctx = window._chatContext;
+      // ── Extrai contexto da newsletter (texto puro + FAQ + bullets) ──
+      const newsletterAtual = window._newsletterAtual || {};
+      const contexto_edicao = {
+        texto_edicao: newsletterAtual.conteudo_semantico?.texto_completo || '',
+        faq: newsletterAtual.faq || [],
+        bullets: newsletterAtual.resumo_bullets || [],
+        metadados: {
+          numero: newsletterAtual.numero || newsletterAtual.edicao || '',
+          titulo: newsletterAtual.titulo || '',
+        }
+      };
+
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -4725,6 +4741,7 @@ async function iniciarChatFAB(newsletter, uid, acesso) {
           segmento: window._radarUser?.segmento || '',
           acesso_pro_temp: window._leadAcessoProTemp === true,
           historico: window._chatMensagens.slice(-6),
+          contexto_edicao: contexto_edicao, // ← NOVO
         }),
       });
 

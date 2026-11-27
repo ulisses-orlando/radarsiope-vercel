@@ -286,6 +286,23 @@ function montarQuizTravado(quizBanco, container) {
   };
 }
 
+// ═══════════════════════════════════════════════════════════════════════
+// GERAÇÃO DE CONTEÚDO SEMÂNTICO (para o "Pergunte ao Radar")
+// ═══════════════════════════════════════════════════════════════════════
+function extrairTextoDosBlocos(blocos) {
+  const div = document.createElement('div');
+  return (blocos || [])
+    .filter(b => b.destino !== 'email') // ignora blocos só de e-mail
+    .map(b => {
+      div.innerHTML = b.html || '';
+      const texto = div.textContent.trim();
+      return b.titulo ? `[${b.titulo}]\n${texto}` : texto;
+    })
+    .filter(t => t.length > 20)
+    .join('\n\n')
+    .slice(0, 30000); // limita a 30KB
+}
+
 /* ======================
    MODAL NEWSLETTERS
    ====================== */
@@ -2194,6 +2211,12 @@ style="flex:1;padding:6px 12px;background:#059669;color:#fff;border:none;border-
 
     // ── Blocos ────────────────────────────────────────────────────────────
     payload.blocos = coletarBlocosEdicao();
+
+    // ── Conteúdo semântico (para o chat) ──────────────────────────────────
+    payload.conteudo_semantico = {
+      texto_completo: extrairTextoDosBlocos(payload.blocos),
+      gerado_em: new Date().toISOString(),
+    };
 
     // ── Validação de unicidade da vitrine ──────────────────────────────
     if (payload.vitrine_leads) {
