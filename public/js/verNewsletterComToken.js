@@ -4217,58 +4217,11 @@ function _rsGerarChipsSugestoes(newsletter, acesso) {
   
   // Limita a 4 chips no total
   return [...new Set(chips)].slice(0, 4); // remove duplicatas
-
-  // ═══════════════════════════════════════════════════════════════════════════
-  // CAMADA 0 — Busca local no FAQ (CUSTO ZERO, <50ms)
-  // ═══════════════════════════════════════════════════════════════════════════
-  function _rsBuscarNoFaqLocal(pergunta, faq) {
-    if (!faq?.length) return null;
-    
-    // Normaliza a pergunta do usuário
-    const perguntaNorm = pergunta.toLowerCase()
-      .normalize('NFD').replace(/[\u0300-\u036f]/g, '') // remove acentos
-      .replace(/[^\w\s]/g, ' ') // remove pontuação
-      .replace(/\s+/g, ' ')
-      .trim();
-    
-    // Extrai palavras significativas (≥4 caracteres, ignora stopwords)
-    const stopwords = new Set(['para', 'como', 'qual', 'que', 'este', 'essa', 'isso', 
-                              'pelo', 'pela', 'com', 'seu', 'sua', 'quando', 'onde', 
-                              'quem', 'mais', 'pode', 'deve', 'seria', 'sobre', 'entre']);
-    const palavrasPergunta = perguntaNorm.split(' ')
-      .filter(p => p.length >= 4 && !stopwords.has(p));
-    
-    if (palavrasPergunta.length === 0) return null;
-    
-    // Busca o FAQ com maior sobreposição de palavras
-    let melhorMatch = null;
-    let melhorScore = 0;
-    
-    for (const item of faq) {
-      const perguntaFaqNorm = item.pergunta.toLowerCase()
-        .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-        .replace(/[^\w\s]/g, ' ');
-      
-      // Score: quantas palavras da pergunta aparecem no FAQ
-      const score = palavrasPergunta.filter(p => perguntaFaqNorm.includes(p)).length;
-      
-      // Threshold: pelo menos 50% das palavras devem bater
-      const threshold = Math.max(1, Math.floor(palavrasPergunta.length * 0.5));
-      
-      if (score >= threshold && score > melhorScore) {
-        melhorScore = score;
-        melhorMatch = item;
-      }
-    }
-    
-    return melhorMatch;
-  }
-
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════════
 // CAMADA 0 — Busca local no FAQ (CUSTO ZERO, resposta instantânea)
-// ═══════════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════════
 function _rsBuscarNoFaqLocal(pergunta, faq) {
   if (!faq?.length) return null;
   const norm = s => String(s || '').toLowerCase()
@@ -4829,7 +4782,7 @@ async function iniciarChatFAB(newsletter, uid, acesso) {
         " onmouseover="this.style.background='var(--azul,#0A3D62)';this.style.color='#fff';this.style.borderColor='var(--azul,#0A3D62)'"
           onmouseout="this.style.background='var(--rs-card,#fff)';this.style.color='var(--rs-chat-texto,#0f172a)';this.style.borderColor='var(--rs-borda,#e2e8f0)'"
           onclick="if(window._chatDigitando){return;} var _ci=document.getElementById('rs-chat-input'); _ci.value='${_esc(chip).replace(/'/g, "\\'")}'; _ci.dispatchEvent(new Event('input')); document.getElementById('rs-chat-send')?.click()">
-          ${_esc(chip)}
+            ${_esc(chip)}
         </button>
       `).join('');
       
@@ -4893,6 +4846,40 @@ async function iniciarChatFAB(newsletter, uid, acesso) {
     document.getElementById('rs-chat-backdrop')?.remove();
     // 🔓 Restaura scroll do fundo
     document.body.style.overflow = '';
+  }
+
+  // ── Navegação para edição sugerida pelo roteador (era código de servidor) ──
+  function _rsNavegarParaEdicaoSugerida(edicaoSugerida) {
+    if (!edicaoSugerida?.id) return;
+    const ctx = window._radarUser;
+    if (ctx?.segmento !== 'assinante') { _solicitarUpgrade('chat', false); return; }
+
+    let liberada = false, dataLiberacao = null;
+    try {
+      const sess = JSON.parse(localStorage.getItem('rs_pwa_session') || '{}');
+      const dataAtivacao = sess.data_ativacao ? new Date(sess.data_ativacao) : null;
+      if (String(edicaoSugerida.formato || '').toLowerCase() === 'extra') {
+        liberada = true;
+      } else {
+        const numero = parseInt(edicaoSugerida.numero, 10);
+        if (dataAtivacao && numero) {
+          const msAtivacao = dataAtivacao.getTime();
+          const semanas = Math.floor((Date.now() - msAtivacao) / (7*24*60*60*1000));
+          liberada = numero <= semanas + 1;
+          if (!liberada) dataLiberacao = new Date(msAtivacao + (numero - 1) * 7*24*60*60*1000);
+        } else { liberada = true; }
+      }
+    } catch (e) { liberada = true; }
+
+    if (liberada) {
+      _fecharChat();
+      if (typeof window.navegarParaEdicao === 'function') window.navegarParaEdicao(edicaoSugerida.id);
+    } else {
+      const dataFmt = dataLiberacao
+        ? dataLiberacao.toLocaleDateString('pt-BR', { day: '2-digit', month: 'long' })
+        : 'em breve';
+      _adicionarMensagem('assistant', `📅 Esta edição será disponibilizada para você em ${dataFmt} (drip semanal).`);
+    }
   }
 
   function _adicionarMensagem(role, text) {
@@ -5033,31 +5020,10 @@ async function iniciarChatFAB(newsletter, uid, acesso) {
         _adicionarMensagem('assistant', data.erro || 'Não consegui processar.');
         return;
       }
+
       // ── 3. Sucesso ───────────────────────────────────────────────────────
       _adicionarMensagem('assistant', data.resposta);
-
-      // ── NOVO: Se veio redirecionamento, adiciona botão de navegação ──────
-      if (data.edicao_sugerida) {
-        const wrap = document.getElementById('rs-chat-messages');
-        if (wrap) {
-          const btnRow = document.createElement('div');
-          btnRow.className = 'rs-chat-msg-row assistant';
-          const edJson = JSON.stringify(data.edicao_sugerida).replace(/"/g, '&quot;');
-          btnRow.innerHTML = `
-            <div class="rs-chat-avatar-mini">✦</div>
-            <button onclick="window._rsNavegarParaEdicaoSugerida(${edJson})"
-                    style="background:var(--azul,#0A3D62);color:#fff;border:none;
-                          padding:10px 16px;border-radius:12px;font-size:13px;
-                          font-weight:600;cursor:pointer;box-shadow:0 2px 8px rgba(10,61,98,.2)">
-              📖 Ir para Edição ${data.edicao_sugerida.numero} →
-            </button>
-          `;
-          wrap.appendChild(btnRow);
-          btnRow.scrollIntoView({ behavior: 'smooth', block: 'end' });
-        }
-      }
-      
-      // ── NOVO: Se veio redirecionamento, adiciona botão de navegação ──────
+      // ── Botão de redirecionamento quando o roteador aponta outra edição ──
       if (data.edicao_sugerida) {
         const wrap = document.getElementById('rs-chat-messages');
         if (wrap) {
@@ -5103,112 +5069,36 @@ async function iniciarChatFAB(newsletter, uid, acesso) {
   };
 
   // ═══════════════════════════════════════════════════════════════════════
-  // UX DO REDIRECIONAMENTO ENTRE EDIÇÕES
+  // UX DO REDIRECIONAMENTO ENTRE EDIÇÕES (única versão)
   // ═══════════════════════════════════════════════════════════════════════
   window._rsNavegarParaEdicaoSugerida = async function(edicaoSugerida) {
     if (!edicaoSugerida?.id) return;
-    
     const ctx = window._radarUser;
-    const isAssinante = ctx?.segmento === 'assinante';
-    
-    if (!isAssinante) {
-      _solicitarUpgrade('chat', false);
-      return;
-    }
-    
-    let liberada = false;
-    let dataLiberacao = null;
-    
+    if (ctx?.segmento !== 'assinante') { _solicitarUpgrade('chat', false); return; }
+    let liberada = false, dataLiberacao = null;
     try {
       const sess = JSON.parse(localStorage.getItem('rs_pwa_session') || '{}');
       const dataAtivacao = sess.data_ativacao ? new Date(sess.data_ativacao) : null;
-      
       if (String(edicaoSugerida.formato || '').toLowerCase() === 'extra') {
         liberada = true;
       } else {
         const numero = parseInt(edicaoSugerida.numero, 10);
         if (dataAtivacao && numero) {
           const msAtivacao = dataAtivacao.getTime();
-          const semanasDesdeAtivacao = Math.floor((Date.now() - msAtivacao) / (7 * 24 * 60 * 60 * 1000));
-          liberada = numero <= semanasDesdeAtivacao + 1;
-          if (!liberada) {
-            dataLiberacao = new Date(msAtivacao + (numero - 1) * 7 * 24 * 60 * 60 * 1000);
-          }
-        } else {
-          liberada = true;
-        }
+          const semanas = Math.floor((Date.now() - msAtivacao) / (7*24*60*60*1000));
+          liberada = numero <= semanas + 1;
+          if (!liberada) dataLiberacao = new Date(msAtivacao + (numero - 1) * 7*24*60*60*1000);
+        } else { liberada = true; }
       }
-    } catch (e) {
-      console.warn('[chat] Falha ao calcular liberação:', e);
-      liberada = true;
-    }
-    
+    } catch (e) { liberada = true; }
     if (liberada) {
-      if (typeof window.navegarParaEdicao === 'function') {
-        window.navegarParaEdicao(edicaoSugerida.id);
-      }
+      _fecharChat();
+      if (typeof window.navegarParaEdicao === 'function') window.navegarParaEdicao(edicaoSugerida.id);
     } else {
       const dataFmt = dataLiberacao
         ? dataLiberacao.toLocaleDateString('pt-BR', { day: '2-digit', month: 'long' })
         : 'em breve';
-      _adicionarMensagem('assistant', `📅 Esta edição será disponibilizada para você em **${dataFmt}** (drip semanal).`);
-    }
-  };
-
-  // ═══════════════════════════════════════════════════════════════════════
-  // UX DO REDIRECIONAMENTO ENTRE EDIÇÕES
-  // ═══════════════════════════════════════════════════════════════════════
-  window._rsNavegarParaEdicaoSugerida = async function(edicaoSugerida) {
-    if (!edicaoSugerida?.id) return;
-    
-    const ctx = window._radarUser;
-    const isAssinante = ctx?.segmento === 'assinante';
-    
-    if (!isAssinante) {
-      // Lead → modal upsell
-      _solicitarUpgrade('chat', false);
-      return;
-    }
-    
-    // Calcula se a edição está liberada para o assinante (drip semanal)
-    let liberada = false;
-    let dataLiberacao = null;
-    
-    try {
-      const sess = JSON.parse(localStorage.getItem('rs_pwa_session') || '{}');
-      const dataAtivacao = sess.data_ativacao ? new Date(sess.data_ativacao) : null;
-      
-      if (String(edicaoSugerida.formato || '').toLowerCase() === 'extra') {
-        liberada = true;
-      } else {
-        const numero = parseInt(edicaoSugerida.numero, 10);
-        if (dataAtivacao && numero) {
-          const msAtivacao = dataAtivacao.getTime();
-          const semanasDesdeAtivacao = Math.floor((Date.now() - msAtivacao) / (7 * 24 * 60 * 60 * 1000));
-          liberada = numero <= semanasDesdeAtivacao + 1;
-          if (!liberada) {
-            dataLiberacao = new Date(msAtivacao + (numero - 1) * 7 * 24 * 60 * 60 * 1000);
-          }
-        } else {
-          liberada = true; // sem data de ativação → libera tudo
-        }
-      }
-    } catch (e) {
-      console.warn('[chat] Falha ao calcular liberação:', e);
-      liberada = true; // benefício da dúvida
-    }
-    
-    if (liberada) {
-      // Assinante com acesso → navega
-      if (typeof window.navegarParaEdicao === 'function') {
-        window.navegarParaEdicao(edicaoSugerida.id);
-      }
-    } else {
-      // Assinante sem acesso → mostra data de liberação
-      const dataFmt = dataLiberacao
-        ? dataLiberacao.toLocaleDateString('pt-BR', { day: '2-digit', month: 'long' })
-        : 'em breve';
-      _adicionarMensagem('assistant', `📅 Esta edição será disponibilizada para você em **${dataFmt}** (drip semanal).`);
+      _adicionarMensagem('assistant', `📅 Esta edição será disponibilizada para você em ${dataFmt} (drip semanal).`);
     }
   };
 
