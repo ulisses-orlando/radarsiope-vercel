@@ -400,60 +400,6 @@ export default async function handler(req, res) {
     const conteudoTexto = texto_edicao;
 
     // ═══════════════════════════════════════════════════════════════════════
-    // UX DO REDIRECIONAMENTO ENTRE EDIÇÕES
-    // ═══════════════════════════════════════════════════════════════════════
-    window._rsNavegarParaEdicaoSugerida = async function(edicaoSugerida) {
-      if (!edicaoSugerida?.id) return;
-      
-      const ctx = window._radarUser;
-      const isAssinante = ctx?.segmento === 'assinante';
-      
-      if (!isAssinante) {
-        _solicitarUpgrade('chat', false);
-        return;
-      }
-      
-      let liberada = false;
-      let dataLiberacao = null;
-      
-      try {
-        const sess = JSON.parse(localStorage.getItem('rs_pwa_session') || '{}');
-        const dataAtivacao = sess.data_ativacao ? new Date(sess.data_ativacao) : null;
-        
-        if (String(edicaoSugerida.formato || '').toLowerCase() === 'extra') {
-          liberada = true;
-        } else {
-          const numero = parseInt(edicaoSugerida.numero, 10);
-          if (dataAtivacao && numero) {
-            const msAtivacao = dataAtivacao.getTime();
-            const semanasDesdeAtivacao = Math.floor((Date.now() - msAtivacao) / (7 * 24 * 60 * 60 * 1000));
-            liberada = numero <= semanasDesdeAtivacao + 1;
-            if (!liberada) {
-              dataLiberacao = new Date(msAtivacao + (numero - 1) * 7 * 24 * 60 * 60 * 1000);
-            }
-          } else {
-            liberada = true;
-          }
-        }
-      } catch (e) {
-        console.warn('[chat] Falha ao calcular liberação:', e);
-        liberada = true;
-      }
-      
-      if (liberada) {
-        if (typeof window.navegarParaEdicao === 'function') {
-          window.navegarParaEdicao(edicaoSugerida.id);
-        }
-      } else {
-        const dataFmt = dataLiberacao
-          ? dataLiberacao.toLocaleDateString('pt-BR', { day: '2-digit', month: 'long' })
-          : 'em breve';
-        _adicionarMensagem('assistant', `📅 Esta edição será disponibilizada para você em **${dataFmt}** (drip semanal).`);
-      }
-    };
-
-    
-    // ═══════════════════════════════════════════════════════════════════════
     // ROTEADOR DE INTENÇÕES (Camada 1)
     // ═══════════════════════════════════════════════════════════════════════
     const indices = await _buscarIndicesEdicoes();
