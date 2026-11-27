@@ -65,7 +65,7 @@ function _rsGerarIndiceBusca(payload) {
     `Edição ${payload.numero || payload.edicao || '?'}: ${payload.titulo || 'Sem título'}.`,
     `Temas: ${_rsExtrairTemas(textoBlocos).join(', ') || 'não identificados'}.`,
     `Destaques: ${(payload.resumo_bullets || []).slice(0, 3).join('; ')}`,
-  ].join(' ').slice(0, 200);
+  ].join(' ').slice(0, 400);
 
   return {
     newsletter_id: null,
