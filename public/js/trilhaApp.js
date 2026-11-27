@@ -276,7 +276,6 @@
         .get();
       _todasEdicoesCache = snap.docs.map(function (d) { return { id: d.id, ...d.data() }; });
       _todasEdicoesCacheTs = Date.now();
-      console.log('[Trilha] Total de edições carregadas:', _todasEdicoesCache.length);
       return _todasEdicoesCache;
     } catch (e) {
       console.error('[Trilha] Falha ao buscar edições:', e);
