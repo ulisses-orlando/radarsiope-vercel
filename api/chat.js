@@ -140,6 +140,22 @@ async function chamarGemini(systemPrompt, historico, pergunta, tentativas = 3) {
   throw lastError || new Error('Falha após múltiplas tentativas na Gemini API');
 }
 
+// ── Limpa HTML para texto plano ───────────────────────────────────────────
+function htmlParaTexto(html = '') {
+  return html
+    .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+    .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&/g, ' &')
+    .replace(/</g, ' <')
+    .replace(/>/g, ' >')
+    .replace(/'/g, "' ")
+    .replace(/"/g, ' "')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+}
+
 // ── Handler principal ─────────────────────────────────────────────────────────
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -228,25 +244,46 @@ export default async function handler(req, res) {
 
     const perguntasRestantes = limiteChat - (contadorAtual + 1);
 
-    // ── 1. Usa contexto enviado pelo app (não reler do Firestore) ─────────
+        // ── 1. Contexto enviado pelo app (com fallback no servidor) ───────────
     const contexto = req.body.contexto_edicao || {};
-    const {
-      texto_edicao = '',
-      faq = [],
-      bullets = [],
-      metadados = {}
-    } = contexto;
+    let texto_edicao = String(contexto.texto_edicao || '');
+    let faq          = Array.isArray(contexto.faq) ? contexto.faq : [];
+    let bullets      = Array.isArray(contexto.bullets) ? contexto.bullets : [];
+    let metadados    = contexto.metadados || {};
 
-    // Validação mínima
-    if (!texto_edicao || texto_edicao.length < 50) {
-      return res.status(400).json({ erro: 'Contexto da edição inválido.' });
+    // Fallback: app não mandou contexto útil → monta a partir do Firestore
+    const contextoVazio = texto_edicao.length < 30 && !faq.length && !bullets.length;
+    if (contextoVazio) {
+      console.warn('[chat] Contexto vazio no body — usando fallback do Firestore. nid:', nid);
+      const snap = await firestore.collection('newsletters').doc(nid).get();
+      if (!snap.exists) {
+        return res.status(404).json({ erro: 'Edição não encontrada.' });
+      }
+      const nl = snap.data();
+      metadados = { numero: nl.numero || nl.edicao || '', titulo: nl.titulo || '' };
+      bullets   = nl.resumo_bullets || [];
+      faq       = nl.faq || [];
+      texto_edicao = nl.conteudo_semantico?.texto_completo
+        || (nl.blocos || [])
+            .filter(b => b.destino !== 'email')
+            .map(b => `${b.titulo ? '[' + b.titulo + ']\n' : ''}${htmlParaTexto(b.html || '')}`)
+            .join('\n\n')
+            .slice(0, 30000)
+        || htmlParaTexto(nl.conteudo_html_completo || '').slice(0, 30000);
     }
 
-    const numEdicao = metadados.numero || '';
+    // Só rejeita se REALMENTE não houver nada para responder
+    if (texto_edicao.length < 30 && !faq.length && !bullets.length) {
+      return res.status(422).json({
+        erro: 'Esta edição ainda não tem conteúdo disponível para perguntas. Tente outra edição.',
+      });
+    }
+
+    const numEdicao    = metadados.numero || '';
     const tituloEdicao = metadados.titulo || '';
-    const faqTexto = faq.map(f => `P: ${f.pergunta}\nR: ${f.resposta}`).join('\n\n');
-    const bulletsList = bullets.join('\n- ');
-    const conteudoTexto = texto_edicao; // ← já vem limpo do app
+    const faqTexto     = faq.map(f => `P: ${f.pergunta}\nR: ${f.resposta}`).join('\n\n');
+    const bulletsList  = bullets.join('\n- ');
+    const conteudoTexto = texto_edicao;
 
     // ── 2. Dados do município via Supabase ────────────────────────────────
     let dadosMunicipio = '';
