@@ -81,10 +81,10 @@ async function _buscarIndicesEdicoes() {
   if (cacheIndices.data && (Date.now() - cacheIndices.ts) < CACHE_INDICES_TTL) {
     return cacheIndices.data;
   }
-  const sbUrl = process.env.SUPABASE_URL;
-  const sbKey = process.env.SUPABASE_SERVICE_KEY;
+  const sbUrl = process.env.VITE_SUPABASE_URL;
+  const sbKey = process.env.VITE_SUPABASE_SERVICE_KEY;
   if (!sbUrl || !sbKey) {
-    console.warn('[chat] SUPABASE_URL/SERVICE_KEY ausentes');
+    console.warn('[chat] VITE_SUPABASE_URL/SERVICE_KEY ausentes');
     return [];
   }
   try {
@@ -464,8 +464,8 @@ export default async function handler(req, res) {
     let dadosMunicipio = '';
     if (municipio_cod) {
       try {
-        const sbUrl = process.env.SUPABASE_URL;
-        const sbKey = process.env.SUPABASE_SERVICE_KEY;
+        const sbUrl = process.env.VITE_SUPABASE_URL;
+        const sbKey = process.env.VITE_SUPABASE_SERVICE_KEY;
         if (sbUrl && sbKey) {
           const mRes = await fetch(
             `${sbUrl}/rest/v1/vw_municipio_resumo` +
