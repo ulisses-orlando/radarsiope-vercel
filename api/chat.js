@@ -140,75 +140,6 @@ async function chamarGemini(systemPrompt, historico, pergunta, tentativas = 3) {
   throw lastError || new Error('Falha após múltiplas tentativas na Gemini API');
 }
 
-// ── Limpa HTML para texto plano ───────────────────────────────────────────────
-function htmlParaTexto(html = '') {
-  return html
-    .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
-    .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
-    .replace(/<[^>]+>/g, ' ')
-    .replace(/&nbsp;/g, ' ')
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&#39;/g, "'")
-    .replace(/&quot;/g, '"')
-    .replace(/\s{2,}/g, ' ')
-    .trim();
-}
-
-// ── Extrai trechos mais relevantes para a pergunta (RAG simples) ─────────────
-function extrairTrechosRelevantes(texto, pergunta, maxChars = 20000) {
-  if (!texto || texto.length <= maxChars) return texto;
-
-  // Tokeniza a pergunta em palavras significativas (≥4 chars)
-  const stopwords = new Set([
-    'para', 'como', 'qual', 'que', 'este', 'essa', 'este', 'isso', 'pelo', 'pela',
-    'com', 'seu', 'sua', 'quando', 'onde', 'quem', 'mais', 'pode', 'deve', 'seria',
-    'sobre', 'entre', 'ainda', 'também', 'após', 'antes', 'uma', 'com', 'do', 'da'
-  ]);
-
-  const palavras = pergunta
-    .toLowerCase()
-    .replace(/[^a-záéíóúâêîôûãõç\s]/g, ' ')
-    .split(/\s+/)
-    .filter(w => w.length >= 4 && !stopwords.has(w));
-
-  if (palavras.length === 0) return texto.slice(0, maxChars);
-
-  // Divide em parágrafos/sentenças - regex CORRIGIDO
-  const paragrafos = texto
-    .split(/(?<=[.!?])\s+|\n{2,}/)  // ✅ \n{2,} em vez de {2,}
-    .map(p => p.trim())
-    .filter(p => p.length > 40);
-
-  if (paragrafos.length === 0) return texto.slice(0, maxChars);
-
-  // Pontua cada parágrafo por sobreposição de palavras-chave, mantendo índice original
-  const pontuados = paragrafos.map((p, idx) => {
-    const pLower = p.toLowerCase();
-    const score = palavras.reduce((acc, w) => acc + (pLower.includes(w) ? 1 : 0), 0);
-    return { p, score, idx };
-  });
-
-  // 1. Seleciona os parágrafos mais relevantes por score até preencher maxChars
-  const selecionados = [...pontuados]
-    .sort((a, b) => b.score - a.score)   // mais relevantes primeiro
-    .reduce((acc, item) => {
-      if (acc.chars + item.p.length + 2 <= maxChars) {
-        acc.items.push(item);
-        acc.chars += item.p.length + 2;
-      }
-      return acc;
-    }, { items: [], chars: 0 })
-    .items;
-
-  // 2. Reordena pela posição original do documento antes de montar o contexto
-  selecionados.sort((a, b) => a.idx - b.idx);
-
-  const resultado = selecionados.map(({ p }) => p).join('\n\n');
-  return resultado.trim() || texto.slice(0, maxChars);
-}
-
 // ── Handler principal ─────────────────────────────────────────────────────────
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -297,20 +228,25 @@ export default async function handler(req, res) {
 
     const perguntasRestantes = limiteChat - (contadorAtual + 1);
 
-    // ── 1. Busca edição no Firestore ──────────────────────────────────────
-    const snap = await firestore.collection('newsletters').doc(nid).get();
-    if (!snap.exists) {
-      return res.status(404).json({ erro: 'Edição não encontrada.' });
+    // ── 1. Usa contexto enviado pelo app (não reler do Firestore) ─────────
+    const contexto = req.body.contexto_edicao || {};
+    const {
+      texto_edicao = '',
+      faq = [],
+      bullets = [],
+      metadados = {}
+    } = contexto;
+
+    // Validação mínima
+    if (!texto_edicao || texto_edicao.length < 50) {
+      return res.status(400).json({ erro: 'Contexto da edição inválido.' });
     }
 
-    const newsletter = snap.data();
-    const numEdicao = newsletter.numero || newsletter.edicao || '';
-    const tituloEdicao = newsletter.titulo || '';
-    const conteudoTexto = extrairTrechosRelevantes(htmlParaTexto(newsletter.conteudo_html_completo || ''), pergunta);
-    const bulletsList = (newsletter.resumo_bullets || []).join('\n- ');
-    const faqTexto = (newsletter.faq || [])
-      .map(f => `P: ${f.pergunta}\nR: ${f.resposta}`)
-      .join('\n\n');
+    const numEdicao = metadados.numero || '';
+    const tituloEdicao = metadados.titulo || '';
+    const faqTexto = faq.map(f => `P: ${f.pergunta}\nR: ${f.resposta}`).join('\n\n');
+    const bulletsList = bullets.join('\n- ');
+    const conteudoTexto = texto_edicao; // ← já vem limpo do app
 
     // ── 2. Dados do município via Supabase ────────────────────────────────
     let dadosMunicipio = '';
