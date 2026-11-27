@@ -71,7 +71,9 @@ function getFirestore() {
   return db;
 }
 
-// ── Cache de índices do Supabase (TTL 5 min) ─────────────────────────
+// ═══════════════════════════════════════════════════════════════════════
+// ROTEADOR: Cache de índices + Busca local + Gemini fallback
+// ═══════════════════════════════════════════════════════════════════════
 const cacheIndices = { data: null, ts: 0 };
 const CACHE_INDICES_TTL = 5 * 60 * 1000;
 
@@ -79,21 +81,22 @@ async function _buscarIndicesEdicoes() {
   if (cacheIndices.data && (Date.now() - cacheIndices.ts) < CACHE_INDICES_TTL) {
     return cacheIndices.data;
   }
-  
   const sbUrl = process.env.SUPABASE_URL;
   const sbKey = process.env.SUPABASE_SERVICE_KEY;
   if (!sbUrl || !sbKey) {
-    console.warn('[chat] SUPABASE_URL/SERVICE_KEY ausentes — roteador desabilitado');
+    console.warn('[chat] SUPABASE_URL/SERVICE_KEY ausentes');
     return [];
   }
-  
   try {
-    const res = await fetch(
-      `${sbUrl}/rest/v1/chat_edicoes_indices` +
-      `?enviada=eq.true&order=data_publicacao.desc&limit=100`,
-      { headers: { apikey: sbKey, Authorization: `Bearer ${sbKey}` } }
-    );
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const url = sbUrl + '/rest/v1/chat_edicoes_indices'
+      + '?enviada=eq.true&order=data_publicacao.desc&limit=100';
+    const res = await fetch(url, {
+      headers: {
+        apikey: sbKey,
+        Authorization: 'Bearer ' + sbKey
+      }
+    });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
     const data = await res.json();
     cacheIndices.data = data || [];
     cacheIndices.ts = Date.now();
@@ -104,69 +107,72 @@ async function _buscarIndicesEdicoes() {
   }
 }
 
-// ── Busca local por keywords (CUSTO ZERO) ────────────────────────────
 function _rsBuscaLocal(pergunta, indices, nidAtual) {
-  const norm = s => String(s || '').toLowerCase()
-    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-    .replace(/[^\w\s]/g, ' ').replace(/\s+/g, ' ').trim();
-  
+  const norm = function(s) {
+    return String(s || '').toLowerCase()
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^\w\s]/g, ' ').replace(/\s+/g, ' ').trim();
+  };
+  const stopwords = ['para','como','qual','esse','essa','isso','pelo','pela',
+    'sobre','mais','pode','seria','entre','fale','fundo','natureza',
+    'edicao','edição','radar','siope'];
   const palavras = norm(pergunta).split(' ')
-    .filter(p => p.length >= 4 && !['para','como','qual','esse','essa','isso','pelo','pela','sobre','mais','pode','seria','entre','fale','fundo','natureza','edicao','edição','radar','siope'].includes(p));
-  
+    .filter(function(p) { return p.length >= 4 && stopwords.indexOf(p) === -1; });
   if (palavras.length === 0) return null;
-  
   let melhorMatch = null;
   let melhorScore = 0;
-  
-  for (const idx of indices) {
+  for (let i = 0; i < indices.length; i++) {
+    const idx = indices[i];
     if (idx.newsletter_id === nidAtual) continue;
-    
     const textoBusca = [
       idx.titulo || '',
-      (idx.keywords || ''),
+      idx.keywords || '',
       (idx.temas || []).join(' '),
       (idx.municipios_citados || []).join(' '),
-      idx.resumo_curto || '',
+      idx.resumo_curto || ''
     ].join(' ').toLowerCase();
-    
-    const score = palavras.filter(p => textoBusca.includes(p)).length;
+    let score = 0;
+    for (let j = 0; j < palavras.length; j++) {
+      if (textoBusca.indexOf(palavras[j]) !== -1) score++;
+    }
     const threshold = Math.max(2, Math.ceil(palavras.length * 0.5));
-    
     if (score >= threshold && score > melhorScore) {
       melhorScore = score;
       melhorMatch = idx;
     }
   }
-  
   return melhorScore >= 2 ? melhorMatch : null;
 }
 
-// ── Roteador Gemini (fallback quando busca local é ambígua) ──────────
 async function _rsRoteadorGemini(pergunta, indices, nidAtual) {
   const listaEdicoes = indices
-    .filter(idx => idx.newsletter_id !== nidAtual)
-    .map(idx => `- Edição ${idx.numero}: ${idx.titulo}. Temas: ${(idx.temas || []).join(', ') || 'N/A'}`)
+    .filter(function(idx) { return idx.newsletter_id !== nidAtual; })
+    .map(function(idx) {
+      return '- Edição ' + idx.numero + ': ' + idx.titulo
+        + '. Temas: ' + ((idx.temas || []).join(', ') || 'N/A');
+    })
     .join('\n');
-  
   if (!listaEdicoes) return { categoria: 'ATUAL', confianca: 0.5 };
-  
-  const promptRoteador = `Você é um roteador. Classifique a pergunta do usuário em UMA das categorias:
-
-EDIÇÕES DISPONÍVEIS:
-${listaEdicoes}
-
-EDIÇÃO ATUAL (onde o usuário está): ${indices.find(i => i.newsletter_id === nidAtual)?.numero || '?'}
-
-PERGUNTA: "${pergunta}"
-
-Responda APENAS em JSON válido:
-{"categoria": "ATUAL|EDICAO_X|FORA", "edicao_numero": "XXX ou null", "confianca": 0.0-1.0, "tema_detectado": "tema principal"}
-
-Regras:
-- ATUAL = a pergunta claramente se refere à edição atual
-- EDICAO_X = a pergunta se refere a uma edição específica (use o número exato da lista)
-- FORA = pergunta genérica, fora do escopo das edições`;
-
+  const edicaoAtual = indices.find(function(i) { return i.newsletter_id === nidAtual; });
+  const numAtual = edicaoAtual ? edicaoAtual.numero : '?';
+  const promptRoteador = [
+    'Você é um roteador. Classifique a pergunta do usuário em UMA das categorias:',
+    '',
+    'EDIÇÕES DISPONÍVEIS:',
+    listaEdicoes,
+    '',
+    'EDIÇÃO ATUAL (onde o usuário está): ' + numAtual,
+    '',
+    'PERGUNTA: "' + pergunta + '"',
+    '',
+    'Responda APENAS em JSON válido:',
+    '{"categoria": "ATUAL|EDICAO_X|FORA", "edicao_numero": "XXX ou null", "confianca": 0.0-1.0}',
+    '',
+    'Regras:',
+    '- ATUAL = a pergunta claramente se refere à edição atual',
+    '- EDICAO_X = a pergunta se refere a uma edição específica (use o número exato da lista)',
+    '- FORA = pergunta genérica, fora do escopo das edições'
+  ].join('\n');
   try {
     const resposta = await chamarGemini(promptRoteador, [], pergunta, 1);
     const jsonMatch = resposta.match(/\{[\s\S]*\}/);
@@ -393,6 +399,60 @@ export default async function handler(req, res) {
     const bulletsList  = bullets.join('\n- ');
     const conteudoTexto = texto_edicao;
 
+    // ═══════════════════════════════════════════════════════════════════════
+    // UX DO REDIRECIONAMENTO ENTRE EDIÇÕES
+    // ═══════════════════════════════════════════════════════════════════════
+    window._rsNavegarParaEdicaoSugerida = async function(edicaoSugerida) {
+      if (!edicaoSugerida?.id) return;
+      
+      const ctx = window._radarUser;
+      const isAssinante = ctx?.segmento === 'assinante';
+      
+      if (!isAssinante) {
+        _solicitarUpgrade('chat', false);
+        return;
+      }
+      
+      let liberada = false;
+      let dataLiberacao = null;
+      
+      try {
+        const sess = JSON.parse(localStorage.getItem('rs_pwa_session') || '{}');
+        const dataAtivacao = sess.data_ativacao ? new Date(sess.data_ativacao) : null;
+        
+        if (String(edicaoSugerida.formato || '').toLowerCase() === 'extra') {
+          liberada = true;
+        } else {
+          const numero = parseInt(edicaoSugerida.numero, 10);
+          if (dataAtivacao && numero) {
+            const msAtivacao = dataAtivacao.getTime();
+            const semanasDesdeAtivacao = Math.floor((Date.now() - msAtivacao) / (7 * 24 * 60 * 60 * 1000));
+            liberada = numero <= semanasDesdeAtivacao + 1;
+            if (!liberada) {
+              dataLiberacao = new Date(msAtivacao + (numero - 1) * 7 * 24 * 60 * 60 * 1000);
+            }
+          } else {
+            liberada = true;
+          }
+        }
+      } catch (e) {
+        console.warn('[chat] Falha ao calcular liberação:', e);
+        liberada = true;
+      }
+      
+      if (liberada) {
+        if (typeof window.navegarParaEdicao === 'function') {
+          window.navegarParaEdicao(edicaoSugerida.id);
+        }
+      } else {
+        const dataFmt = dataLiberacao
+          ? dataLiberacao.toLocaleDateString('pt-BR', { day: '2-digit', month: 'long' })
+          : 'em breve';
+        _adicionarMensagem('assistant', `📅 Esta edição será disponibilizada para você em **${dataFmt}** (drip semanal).`);
+      }
+    };
+
+    
     // ═══════════════════════════════════════════════════════════════════════
     // ROTEADOR DE INTENÇÕES (Camada 1)
     // ═══════════════════════════════════════════════════════════════════════
