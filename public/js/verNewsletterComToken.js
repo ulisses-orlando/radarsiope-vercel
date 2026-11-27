@@ -4877,7 +4877,7 @@ async function iniciarChatFAB(newsletter, uid, acesso) {
       // Ainda tem perguntas e é a primeira abertura: boas-vindas
       const ctx = window._chatContext || {};
       _adicionarMensagem('assistant',
-        `Olá! Pode perguntar sobre qualquer tema da Edição ${ctx.edicaoNum || '—'}. Estou aqui para ajudar.`
+        `Olá! Estou aqui para te ajudar.`
       );
     } else {
       // Ainda tem perguntas e já existe histórico: re-renderiza
@@ -4982,7 +4982,6 @@ async function iniciarChatFAB(newsletter, uid, acesso) {
       const _faq = (_nl && _nl.id === ctx.nid && (_nl.faq || [])).length ? _nl.faq : [];
       const _match = _rsBuscarNoFaqLocal(texto, _faq);
       if (_match) {
-        console.log('[chat] ✅ Camada 0 — resposta do FAQ local');
         _liberar();
         _adicionarMensagem('assistant', _match.resposta);
         _chatContador.usado += 1;
