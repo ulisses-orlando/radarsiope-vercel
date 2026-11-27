@@ -4848,40 +4848,6 @@ async function iniciarChatFAB(newsletter, uid, acesso) {
     document.body.style.overflow = '';
   }
 
-  // ── Navegação para edição sugerida pelo roteador (era código de servidor) ──
-  function _rsNavegarParaEdicaoSugerida(edicaoSugerida) {
-    if (!edicaoSugerida?.id) return;
-    const ctx = window._radarUser;
-    if (ctx?.segmento !== 'assinante') { _solicitarUpgrade('chat', false); return; }
-
-    let liberada = false, dataLiberacao = null;
-    try {
-      const sess = JSON.parse(localStorage.getItem('rs_pwa_session') || '{}');
-      const dataAtivacao = sess.data_ativacao ? new Date(sess.data_ativacao) : null;
-      if (String(edicaoSugerida.formato || '').toLowerCase() === 'extra') {
-        liberada = true;
-      } else {
-        const numero = parseInt(edicaoSugerida.numero, 10);
-        if (dataAtivacao && numero) {
-          const msAtivacao = dataAtivacao.getTime();
-          const semanas = Math.floor((Date.now() - msAtivacao) / (7*24*60*60*1000));
-          liberada = numero <= semanas + 1;
-          if (!liberada) dataLiberacao = new Date(msAtivacao + (numero - 1) * 7*24*60*60*1000);
-        } else { liberada = true; }
-      }
-    } catch (e) { liberada = true; }
-
-    if (liberada) {
-      _fecharChat();
-      if (typeof window.navegarParaEdicao === 'function') window.navegarParaEdicao(edicaoSugerida.id);
-    } else {
-      const dataFmt = dataLiberacao
-        ? dataLiberacao.toLocaleDateString('pt-BR', { day: '2-digit', month: 'long' })
-        : 'em breve';
-      _adicionarMensagem('assistant', `📅 Esta edição será disponibilizada para você em ${dataFmt} (drip semanal).`);
-    }
-  }
-
   function _adicionarMensagem(role, text) {
     window._chatMensagens.push({ role, text });
     const wrap = document.getElementById('rs-chat-messages');
@@ -5067,9 +5033,9 @@ async function iniciarChatFAB(newsletter, uid, acesso) {
     fab.querySelector('.rs-chat-badge')?.remove();
     _abrirChat();
   };
-
+  
   // ═══════════════════════════════════════════════════════════════════════
-  // UX DO REDIRECIONAMENTO ENTRE EDIÇÕES (única versão)
+  // UX DO REDIRECIONAMENTO ENTRE EDIÇÕES (única versão — global)
   // ═══════════════════════════════════════════════════════════════════════
   window._rsNavegarParaEdicaoSugerida = async function(edicaoSugerida) {
     if (!edicaoSugerida?.id) return;
