@@ -2052,6 +2052,7 @@ async function _tentarModoAssinante(dadosSessao) {
 
     const newsletter = edicoesLiberadas[0]; // já ordenado desc → mais recente liberada
     const nid = newsletter.id;
+    window._newsletterAtual = newsletter;
     const segmento = 'assinantes';
 
     // Acesso sem envio — objeto mínimo (token não necessário para assinante via sessão)
@@ -2340,6 +2341,7 @@ async function _executarPreview(params) {
     const snap = await db.collection('newsletters').doc(nid).get();
     if (!snap.exists) { mostrarErro('Edição não encontrada.'); return; }
     const newsletter = { id: snap.id, ...snap.data() };
+    window._newsletterAtual = newsletter;
 
     // Tenta buscar nome do município via vw_municipio_resumo
     let nomeMun = mun;
@@ -2619,9 +2621,8 @@ async function VerNewsletterComToken() {
     }
 
     // ── Salva newsletter em variável global (para o chat) ──
-    window._newsletterAtual = newsletter;
-    
     const nid = newsletter.id;
+    window._newsletterAtual = newsletter;
 
     // 7. Buscar destinatário
     let destinatario = null;
@@ -3874,6 +3875,8 @@ async function navegarParaEdicao(edicaoId) {
       plano: destinatario.plano_slug,
     };
 
+    window._newsletterAtual = newsletter;
+
     // Atualizar edição atual no estado do drawer
     _drawer.edicaoAtual = edicaoId;
     _drawer.tipoAtual = newsletter.Tipo || newsletter.tipo || null;
@@ -4099,6 +4102,76 @@ async function enviarFeedback(nid) {
 }
 
 window.enviarFeedback = enviarFeedback;
+
+// ═══════════════════════════════════════════════════════════════════════════
+// CONTEXTO DO CHAT — resolve a edição atual de forma robusta
+// ═══════════════════════════════════════════════════════════════════════════
+window._newsletterAtual = window._newsletterAtual || null;
+
+function _rsHtmlParaTexto(html) {
+  const div = document.createElement('div');
+  div.innerHTML = String(html || '');
+  div.querySelectorAll('style,script').forEach(el => el.remove());
+  return (div.textContent || '').replace(/[ \t]{2,}/g, ' ').replace(/\n{3,}/g, '\n\n').trim();
+}
+
+// Fallback: extrai texto dos blocos em memória (edições sem conteudo_semantico)
+function _rsExtrairTextoBlocos(blocos, segmento) {
+  const isAssinante = segmento === 'assinante' || window._leadAcessoProTemp === true;
+  return (blocos || [])
+    .filter(b => b.destino !== 'email')
+    .filter(b => isAssinante || !b.acesso || b.acesso === 'todos' || b.acesso === 'leads')
+    .map(b => {
+      const txt = _rsHtmlParaTexto(b.html);
+      return b.titulo ? `[${b.titulo}]\n${txt}` : txt;
+    })
+    .filter(t => t.length > 20)
+    .join('\n\n')
+    .slice(0, 30000);
+}
+
+async function _rsMontarContextoChat(nid) {
+  const segmento = window._radarUser?.segmento || '';
+  const isAssinante = segmento === 'assinante' || window._leadAcessoProTemp === true;
+
+  // 1. Usa a newsletter em memória, se for a mesma edição do chat
+  let nl = window._newsletterAtual;
+
+  // 2. Se não existir ou for de outra edição, busca (1 leitura, só quando precisa)
+  if (!nl || nl.id !== nid) {
+    try {
+      const snap = await db.collection('newsletters').doc(nid).get();
+      if (snap.exists) {
+        nl = { id: snap.id, ...snap.data() };
+        window._newsletterAtual = nl;
+      }
+    } catch (e) {
+      console.warn('[chat] Falha ao buscar edição para contexto:', e);
+    }
+  }
+  if (!nl) return null;
+
+  // 3. Texto: usa o campo pronto do admin; se não tiver, extrai dos blocos
+  //    Leads sempre extraem filtrado (não vaza bloco de assinante)
+  let texto = isAssinante ? (nl.conteudo_semantico?.texto_completo || '') : '';
+  if (!texto) texto = _rsExtrairTextoBlocos(nl.blocos, segmento);
+  if (!texto) texto = _rsHtmlParaTexto(nl.conteudo_html_completo).slice(0, 30000);
+
+  const faq = (nl.faq || [])
+    .filter(f => f.pergunta)
+    .map(f => ({ pergunta: f.pergunta, resposta: f.resposta || '' }));
+
+  return {
+    texto_edicao: texto,
+    faq: isAssinante ? faq : faq.slice(0, 1),
+    bullets: nl.resumo_bullets || [],
+    metadados: {
+      numero: nl.numero || nl.edicao || '',
+      titulo: nl.titulo || '',
+    },
+    _origem: nl.conteudo_semantico?.texto_completo ? 'semantico' : 'fallback_blocos',
+  };
+}
 
 // ─── Chat FAB — Pergunte ao Radar ────────────────────────────────────────────
 
@@ -4718,17 +4791,15 @@ async function iniciarChatFAB(newsletter, uid, acesso) {
 
     try {
       const ctx = window._chatContext;
-      // ── Extrai contexto da newsletter (texto puro + FAQ + bullets) ──
-      const newsletterAtual = window._newsletterAtual || {};
-      const contexto_edicao = {
-        texto_edicao: newsletterAtual.conteudo_semantico?.texto_completo || '',
-        faq: newsletterAtual.faq || [],
-        bullets: newsletterAtual.resumo_bullets || [],
-        metadados: {
-          numero: newsletterAtual.numero || newsletterAtual.edicao || '',
-          titulo: newsletterAtual.titulo || '',
-        }
-      };
+      // ── Monta contexto da edição (campo pronto ou fallback dos blocos) ──
+      const contexto_edicao = await _rsMontarContextoChat(ctx.nid);
+      console.log('[chat] contexto:', {
+        nid: ctx.nid,
+        origem: contexto_edicao?._origem,
+        chars: contexto_edicao?.texto_edicao?.length || 0,
+        faq: contexto_edicao?.faq?.length || 0,
+        bullets: contexto_edicao?.bullets?.length || 0,
+      });
 
       const res = await fetch('/api/chat', {
         method: 'POST',
