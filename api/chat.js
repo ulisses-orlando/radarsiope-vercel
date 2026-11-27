@@ -71,6 +71,113 @@ function getFirestore() {
   return db;
 }
 
+// ── Cache de índices do Supabase (TTL 5 min) ─────────────────────────
+const cacheIndices = { data: null, ts: 0 };
+const CACHE_INDICES_TTL = 5 * 60 * 1000;
+
+async function _buscarIndicesEdicoes() {
+  if (cacheIndices.data && (Date.now() - cacheIndices.ts) < CACHE_INDICES_TTL) {
+    return cacheIndices.data;
+  }
+  
+  const sbUrl = process.env.SUPABASE_URL;
+  const sbKey = process.env.SUPABASE_SERVICE_KEY;
+  if (!sbUrl || !sbKey) {
+    console.warn('[chat] SUPABASE_URL/SERVICE_KEY ausentes — roteador desabilitado');
+    return [];
+  }
+  
+  try {
+    const res = await fetch(
+      `${sbUrl}/rest/v1/chat_edicoes_indices` +
+      `?enviada=eq.true&order=data_publicacao.desc&limit=100`,
+      { headers: { apikey: sbKey, Authorization: `Bearer ${sbKey}` } }
+    );
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    cacheIndices.data = data || [];
+    cacheIndices.ts = Date.now();
+    return cacheIndices.data;
+  } catch (e) {
+    console.warn('[chat] Falha ao buscar índices:', e.message);
+    return cacheIndices.data || [];
+  }
+}
+
+// ── Busca local por keywords (CUSTO ZERO) ────────────────────────────
+function _rsBuscaLocal(pergunta, indices, nidAtual) {
+  const norm = s => String(s || '').toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^\w\s]/g, ' ').replace(/\s+/g, ' ').trim();
+  
+  const palavras = norm(pergunta).split(' ')
+    .filter(p => p.length >= 4 && !['para','como','qual','esse','essa','isso','pelo','pela','sobre','mais','pode','seria','entre','fale','fundo','natureza','edicao','edição','radar','siope'].includes(p));
+  
+  if (palavras.length === 0) return null;
+  
+  let melhorMatch = null;
+  let melhorScore = 0;
+  
+  for (const idx of indices) {
+    if (idx.newsletter_id === nidAtual) continue;
+    
+    const textoBusca = [
+      idx.titulo || '',
+      (idx.keywords || ''),
+      (idx.temas || []).join(' '),
+      (idx.municipios_citados || []).join(' '),
+      idx.resumo_curto || '',
+    ].join(' ').toLowerCase();
+    
+    const score = palavras.filter(p => textoBusca.includes(p)).length;
+    const threshold = Math.max(2, Math.ceil(palavras.length * 0.5));
+    
+    if (score >= threshold && score > melhorScore) {
+      melhorScore = score;
+      melhorMatch = idx;
+    }
+  }
+  
+  return melhorScore >= 2 ? melhorMatch : null;
+}
+
+// ── Roteador Gemini (fallback quando busca local é ambígua) ──────────
+async function _rsRoteadorGemini(pergunta, indices, nidAtual) {
+  const listaEdicoes = indices
+    .filter(idx => idx.newsletter_id !== nidAtual)
+    .map(idx => `- Edição ${idx.numero}: ${idx.titulo}. Temas: ${(idx.temas || []).join(', ') || 'N/A'}`)
+    .join('\n');
+  
+  if (!listaEdicoes) return { categoria: 'ATUAL', confianca: 0.5 };
+  
+  const promptRoteador = `Você é um roteador. Classifique a pergunta do usuário em UMA das categorias:
+
+EDIÇÕES DISPONÍVEIS:
+${listaEdicoes}
+
+EDIÇÃO ATUAL (onde o usuário está): ${indices.find(i => i.newsletter_id === nidAtual)?.numero || '?'}
+
+PERGUNTA: "${pergunta}"
+
+Responda APENAS em JSON válido:
+{"categoria": "ATUAL|EDICAO_X|FORA", "edicao_numero": "XXX ou null", "confianca": 0.0-1.0, "tema_detectado": "tema principal"}
+
+Regras:
+- ATUAL = a pergunta claramente se refere à edição atual
+- EDICAO_X = a pergunta se refere a uma edição específica (use o número exato da lista)
+- FORA = pergunta genérica, fora do escopo das edições`;
+
+  try {
+    const resposta = await chamarGemini(promptRoteador, [], pergunta, 1);
+    const jsonMatch = resposta.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) return { categoria: 'ATUAL', confianca: 0.5 };
+    return JSON.parse(jsonMatch[0]);
+  } catch (e) {
+    console.warn('[chat] Roteador Gemini falhou:', e.message);
+    return { categoria: 'ATUAL', confianca: 0.5 };
+  }
+}
+
 // ── Gemini API via fetch puro ───────────────────────────────────────────────
 const GEMINI_URL =
   'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent';
@@ -285,6 +392,67 @@ export default async function handler(req, res) {
     const faqTexto     = faq.map(f => `P: ${f.pergunta}\nR: ${f.resposta}`).join('\n\n');
     const bulletsList  = bullets.join('\n- ');
     const conteudoTexto = texto_edicao;
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // ROTEADOR DE INTENÇÕES (Camada 1)
+    // ═══════════════════════════════════════════════════════════════════════
+    const indices = await _buscarIndicesEdicoes();
+    const edicaoAtualIdx = indices.find(i => i.newsletter_id === nid);
+
+    // 1. Busca local (CUSTO ZERO)
+    const matchLocal = _rsBuscaLocal(pergunta, indices, nid);
+
+    let roteamento = null;
+
+    if (matchLocal) {
+      roteamento = {
+        categoria: 'EDICAO_X',
+        edicao_numero: matchLocal.numero,
+        confianca: 0.9,
+        tema_detectado: matchLocal.temas?.[0] || '',
+        _edicao: matchLocal,
+      };
+      console.log(`[chat] ✅ Roteador local: Edição ${matchLocal.numero} (confiança: 0.9)`);
+    } else {
+      const roteadorRes = await _rsRoteadorGemini(pergunta, indices, nid);
+      roteamento = {
+        ...roteadorRes,
+        _edicao: indices.find(i => String(i.numero) === String(roteadorRes.edicao_numero)),
+      };
+      console.log(`[chat] 🔀 Roteador Gemini: ${roteamento.categoria} (confiança: ${roteamento.confianca})`);
+    }
+
+    // 2. Se for de outra edição, prepara resposta de redirecionamento
+    if (roteamento.categoria === 'EDICAO_X' && roteamento._edicao) {
+      const edSugerida = roteamento._edicao;
+      
+      return res.status(200).json({
+        resposta: `Essa pergunta é respondida na **Edição ${edSugerida.numero}: ${edSugerida.titulo}**.\n\nClique abaixo para acessar o conteúdo completo.`,
+        origem: 'roteador_redirecionamento',
+        cache: false,
+        perguntas_restantes: perguntasRestantes,
+        edicao_sugerida: {
+          id: edSugerida.newsletter_id,
+          numero: edSugerida.numero,
+          titulo: edSugerida.titulo,
+          formato: edSugerida.formato || 'regular',
+          data_publicacao: edSugerida.data_publicacao,
+        },
+      });
+    }
+
+    // 3. Se FORA do escopo, resposta genérica (não gasta token com contexto)
+    if (roteamento.categoria === 'FORA' && roteamento.confianca > 0.7) {
+      const temasAtuais = edicaoAtualIdx?.temas?.slice(0, 3).join(', ') || 'os temas desta edição';
+      return res.status(200).json({
+        resposta: `Sou um especialista em financiamento da educação pública municipal, mas respondo apenas sobre os conteúdos das edições do Radar SIOPE.\n\nQue tal perguntar sobre **${temasAtuais}**?`,
+        origem: 'roteador_fora_escopo',
+        cache: false,
+        perguntas_restantes: perguntasRestantes,
+      });
+    }
+
+    // 4. ATUAL ou ambíguo → segue para a Camada 2 (Gemini com contexto completo)
 
     // ── 2. Dados do município via Supabase ────────────────────────────────
     let dadosMunicipio = '';
