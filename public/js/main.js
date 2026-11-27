@@ -41,6 +41,7 @@ function _rsExtrairMunicipios(texto) {
 }
 
 function _rsGerarIndiceBusca(payload) {
+  // Texto completo dos blocos (para extrair temas/municípios)
   const div = document.createElement('div');
   const textoBlocos = (payload.blocos || [])
     .filter(b => b.destino !== 'email')
@@ -53,6 +54,7 @@ function _rsGerarIndiceBusca(payload) {
     .join('\n')
     .toUpperCase();
 
+  // Keywords: título + bullets + perguntas do FAQ (tudo lowercase para busca)
   const bullets = Array.isArray(payload.resumo_bullets) ? payload.resumo_bullets.join(' ') : '';
   const faqPerguntas = (payload.faq || []).map(f => f.pergunta || '').join(' ');
   const keywords = [
@@ -61,11 +63,15 @@ function _rsGerarIndiceBusca(payload) {
     faqPerguntas,
   ].join(' ').toLowerCase().slice(0, 2000);
 
+  // ✅ NOVO: Texto combinado para extrair temas (blocos + keywords)
+  const textoCombinado = textoBlocos + '\n' + keywords.toUpperCase();
+
+  // Resumo curto (~800 chars) para o prompt do roteador Gemini
   const resumoCurto = [
     `Edição ${payload.numero || payload.edicao || '?'}: ${payload.titulo || 'Sem título'}.`,
-    `Temas: ${_rsExtrairTemas(textoBlocos).join(', ') || 'não identificados'}.`,
+    `Temas: ${_rsExtrairTemas(textoCombinado).join(', ') || 'não identificados'}.`,
     `Destaques: ${(payload.resumo_bullets || []).slice(0, 3).join('; ')}`,
-  ].join(' ').slice(0, 400);
+  ].join(' ').slice(0, 800);
 
   return {
     newsletter_id: null,
@@ -76,8 +82,8 @@ function _rsGerarIndiceBusca(payload) {
     enviada: !!payload.enviada,
     formato: payload.formato || 'regular',
     data_publicacao: payload.data_publicacao?.toDate?.()?.toISOString() || null,
-    temas: _rsExtrairTemas(textoBlocos),
-    municipios_citados: _rsExtrairMunicipios(textoBlocos),
+    temas: _rsExtrairTemas(textoCombinado),  // ✅ Usa texto combinado
+    municipios_citados: _rsExtrairMunicipios(textoCombinado),  // ✅ Usa texto combinado
     keywords,
     resumo_curto: resumoCurto,
     atualizado_em: new Date().toISOString(),
