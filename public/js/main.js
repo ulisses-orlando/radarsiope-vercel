@@ -14,6 +14,76 @@ let totalUsuarios = 0;
 let totalPaginas = 0;
 let termoBuscaUsuario = "";
 const limitePorPagina = 10;
+
+// ═══════════════════════════════════════════════════════════════════════
+// ÍNDICE DE BUSCA PARA O ROTEADOR DO CHAT (Supabase)
+// ═══════════════════════════════════════════════════════════════════════
+function _rsExtrairTemas(texto) {
+  const t = texto.toUpperCase();
+  const temasConhecidos = [
+    'FUNDEB', 'SIOPE', 'CAUC', 'CACS', 'SALÁRIO-EDUCAÇÃO', 'SALARIO-EDUCACAO',
+    'MDE', 'PRECATÓRIO', 'RPC', 'VALOR ALUNO/ANO', '70%', '30%', '15%','IEI', '10%', '4%', 'VAAT', 'VAAF', 'VAAR', 
+    'FPM', 'ICMS', 'IPVA', 'ISS', 'TRANSFERÊNCIAS CONSTITUCIONAIS', 'TRANSFERENCIAS CONSTITUCIONAIS',
+    'CERTIDÃO', 'PRESTAÇÃO DE CONTAS', 'TRANSPARÊNCIA', 'PNE', 'IDEB',
+    'PROFESSOR', 'MAGISTÉRIO', 'AVALIAÇÃO', 'CONSELHO', 'CENSO ESCOLAR'
+  ];
+  return temasConhecidos.filter(tema => t.includes(tema));
+}
+
+function _rsExtrairMunicipios(texto) {
+  const municipios = [];
+  const regex = /(?:município|municípios|cidade|prefeitura)\s+(?:de|do|da)\s+([A-ZÁÉÍÓÚÂÊÎÔÛÃÕÇ][a-záéíóúâêîôûãõç\s]+?)(?=[\.,;]|\s+de\s|\s+para\s|\s+e\s)/gi;
+  let match;
+  while ((match = regex.exec(texto)) !== null) {
+    municipios.push(match[1].trim());
+  }
+  return [...new Set(municipios)].slice(0, 10);
+}
+
+function _rsGerarIndiceBusca(payload) {
+  const div = document.createElement('div');
+  const textoBlocos = (payload.blocos || [])
+    .filter(b => b.destino !== 'email')
+    .map(b => {
+      div.innerHTML = b.html || '';
+      div.querySelectorAll('style,script').forEach(el => el.remove());
+      const txt = (div.textContent || '').replace(/\s{2,}/g, ' ').trim();
+      return b.titulo ? `[${b.titulo}] ${txt}` : txt;
+    })
+    .join('\n')
+    .toUpperCase();
+
+  const bullets = Array.isArray(payload.resumo_bullets) ? payload.resumo_bullets.join(' ') : '';
+  const faqPerguntas = (payload.faq || []).map(f => f.pergunta || '').join(' ');
+  const keywords = [
+    payload.titulo || '',
+    bullets,
+    faqPerguntas,
+  ].join(' ').toLowerCase().slice(0, 2000);
+
+  const resumoCurto = [
+    `Edição ${payload.numero || payload.edicao || '?'}: ${payload.titulo || 'Sem título'}.`,
+    `Temas: ${_rsExtrairTemas(textoBlocos).join(', ') || 'não identificados'}.`,
+    `Destaques: ${(payload.resumo_bullets || []).slice(0, 3).join('; ')}`,
+  ].join(' ').slice(0, 200);
+
+  return {
+    newsletter_id: null,
+    numero: String(payload.numero || payload.edicao || ''),
+    edicao: String(payload.edicao || ''),
+    titulo: payload.titulo || '',
+    tipo: payload.tipo || '',
+    enviada: !!payload.enviada,
+    formato: payload.formato || 'regular',
+    data_publicacao: payload.data_publicacao?.toDate?.()?.toISOString() || null,
+    temas: _rsExtrairTemas(textoBlocos),
+    municipios_citados: _rsExtrairMunicipios(textoBlocos),
+    keywords,
+    resumo_curto: resumoCurto,
+    atualizado_em: new Date().toISOString(),
+  };
+}
+
 const backlogRef = db.collection("backlog");
 
 const momentosEnvio = [
@@ -2146,6 +2216,10 @@ style="flex:1;padding:6px 12px;background:#059669;color:#fff;border:none;border-
     };
 
     payload.quiz = coletarQuiz();
+
+    // ── Índice de busca para o roteador do chat ──────────────────────────
+    const indiceBusca = _rsGerarIndiceBusca(payload);
+
     if (semGabarito.length) {
       alert(`❌ Marque a resposta correta nas perguntas: ${semGabarito.join(', ')}.`);
       return;
@@ -2230,6 +2304,16 @@ style="flex:1;padding:6px 12px;background:#059669;color:#fff;border:none;border-
       newsletterIdFinal = novoDoc.id;
     }
 
+    // ── Sincroniza índice no Supabase (para o roteador do chat) ──────────
+    try {
+      indiceBusca.newsletter_id = newsletterIdFinal;
+      await window.supabase
+        .from('chat_edicoes_indices')
+        .upsert(indiceBusca, { onConflict: 'newsletter_id' });
+    } catch (e) {
+      console.warn('[chat] Falha ao sincronizar índice no Supabase:', e.message);
+    }
+
     // ── Sincroniza tabela newsletter_vitrine_app no Supabase ─────────────
     // Garante que a policy de INSERT em leads_envios saiba qual é a edição vitrine.
     try {
@@ -2284,6 +2368,15 @@ style="flex:1;padding:6px 12px;background:#059669;color:#fff;border:none;border-
         data_publicacao_app: firebase.firestore.Timestamp.now(),
         data_publicacao: firebase.firestore.Timestamp.now()
       });
+      
+      // Sincroniza índice no Supabase
+      try {
+        await window.supabase
+          .from('chat_edicoes_indices')
+          .update({ enviada: true, data_publicacao: new Date().toISOString(), atualizado_em: new Date().toISOString() })
+          .eq('newsletter_id', docId);
+      } catch (e) { console.warn('[chat] sync publicada:', e.message); }
+
       await _registrarAlteracaoStatus(docId, 'Marcada como Publicada', motivo);
       mostrarMensagem('✅ Edição marcada como publicada no app.');
       // Atualiza o objeto local para refletir no badge
@@ -2318,6 +2411,15 @@ style="flex:1;padding:6px 12px;background:#059669;color:#fff;border:none;border-
         enviada: false,
         enviada_email: false
       });
+
+      // Sincroniza índice no Supabase
+      try {
+        await window.supabase
+          .from('chat_edicoes_indices')
+          .update({ enviada: false, atualizado_em: new Date().toISOString() })
+          .eq('newsletter_id', docId);
+      } catch (e) { console.warn('[chat] sync rascunho:', e.message); }
+
       await _registrarAlteracaoStatus(docId, 'Revertida para Rascunho', motivo);
       mostrarMensagem('🚫 Edição revertida para rascunho.');
       data.enviada = false;
