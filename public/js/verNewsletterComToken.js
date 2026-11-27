@@ -4260,6 +4260,28 @@ function _rsGerarChipsSugestoes(newsletter, acesso) {
 
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// CAMADA 0 — Busca local no FAQ (CUSTO ZERO, resposta instantânea)
+// ═══════════════════════════════════════════════════════════════════════════
+function _rsBuscarNoFaqLocal(pergunta, faq) {
+  if (!faq?.length) return null;
+  const norm = s => String(s || '').toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^\w\s]/g, ' ').replace(/\s+/g, ' ').trim();
+  const palavras = norm(pergunta).split(' ')
+    .filter(p => p.length >= 4 && !['para','como','qual','esse','essa','isso','pelo','pela','sobre','mais','pode','seria','entre','fale','fundo','natureza'].includes(p));
+  if (!palavras.length) return null;
+  let melhor = null, melhorScore = 0;
+  for (const item of faq) {
+    const alvo = norm(item.pergunta);
+    const score = palavras.filter(p => alvo.includes(p)).length;
+    if (score >= Math.max(2, Math.ceil(palavras.length * 0.5)) && score > melhorScore) {
+      melhorScore = score; melhor = item;
+    }
+  }
+  return melhor;
+}
+
 // ─── Chat FAB — Pergunte ao Radar ────────────────────────────────────────────
 
 async function iniciarChatFAB(newsletter, uid, acesso) {
@@ -4800,8 +4822,7 @@ async function iniciarChatFAB(newsletter, uid, acesso) {
           font-family:inherit;
         " onmouseover="this.style.background='var(--azul,#0A3D62)';this.style.color='#fff';this.style.borderColor='var(--azul,#0A3D62)'"
           onmouseout="this.style.background='var(--rs-card,#fff)';this.style.color='var(--rs-chat-texto,#0f172a)';this.style.borderColor='var(--rs-borda,#e2e8f0)'"
-          onclick="document.getElementById('rs-chat-input').value='${_esc(chip).replace(/'/g, "\\'")}';document.getElementById('rs-chat-send')?.click()">
-          ${_esc(chip)}
+          onclick="if(window._chatDigitando){return;} var _ci=document.getElementById('rs-chat-input'); _ci.value='${_esc(chip).replace(/'/g, "\\'")}'; _ci.dispatchEvent(new Event('input')); document.getElementById('rs-chat-send')?.click()"          ${_esc(chip)}
         </button>
       `).join('');
       
@@ -4916,10 +4937,8 @@ async function iniciarChatFAB(newsletter, uid, acesso) {
     const input = document.getElementById('rs-chat-input');
     const sendBtn = document.getElementById('rs-chat-send');
     if (!input) return;
-
     const texto = input.value.trim();
     if (!texto || _digitando) return;
-
     // ── 1. Valida limite local antes de enviar ─────────────────────────────
     const restantesEnvio = Math.max(0, _chatContador.limite - _chatContador.usado);
     if (restantesEnvio <= 0 && _chatContador.limite > 0) {
@@ -4927,13 +4946,11 @@ async function iniciarChatFAB(newsletter, uid, acesso) {
       setTimeout(() => _solicitarUpgrade('chat', acesso.isAssinante), 400);
       return;
     }
-
     input.value = '';
     sendBtn?.classList.remove('ativo');
-
     _adicionarMensagem('user', texto);
     _digitando = true;
-
+    window._chatDigitando = true;   // ← flag global para os chips consultarem
     const wrap = document.getElementById('rs-chat-messages');
     const typing = document.createElement('div');
     typing.className = 'rs-chat-msg-row assistant';
@@ -4945,51 +4962,54 @@ async function iniciarChatFAB(newsletter, uid, acesso) {
     wrap?.appendChild(typing);
     typing?.scrollIntoView({ behavior: 'smooth' });
 
-    // ── CAMADA 0: Busca local no FAQ (CUSTO ZERO) ─────────────────────────
-    const newsletterAtual = window._newsletterAtual || {};
-    const faqCompleto = newsletterAtual.faq || [];
-    const matchFaq = _rsBuscarNoFaqLocal(texto, faqCompleto);
-
-    if (matchFaq) {
-      console.log('[chat] ✅ Resposta servida do FAQ local (Camada 0)');
-      _digitando = false;
-      typing?.remove();
-      _adicionarMensagem('assistant', matchFaq.resposta);
-      _chatContador.usado += 1; // conta como pergunta usada
-      const novosRestantes = Math.max(0, _chatContador.limite - _chatContador.usado);
-      _atualizarTituloChat(novosRestantes);
-      return; // ← sai da função, não chama a API
-    }
+    // ── Helper: libera o estado de envio em TODOS os caminhos ──
+    const _liberar = () => { _digitando = false; window._chatDigitando = false; typing?.remove(); };
 
     try {
       const ctx = window._chatContext;
-      // ── Monta contexto da edição (campo pronto ou fallback dos blocos) ──
-      const contexto_edicao = await _rsMontarContextoChat(ctx.nid);
 
-      const res = await fetch('/api/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          pergunta: texto,
-          nid: ctx.nid,
-          municipio_cod: window._radarUser?.municipio_cod || '',
-          uid: ctx.uid,
-          segmento: window._radarUser?.segmento || '',
-          acesso_pro_temp: window._leadAcessoProTemp === true,
-          historico: window._chatMensagens.slice(-6),
-          contexto_edicao: contexto_edicao, // ← NOVO
-        }),
-      });
-
-      let data;
-      try {
-        data = await res.json();
-      } catch {
-        throw new Error('Falha ao interpretar resposta do servidor.');
+      // ══════════════════════════════════════════════════════════════════
+      // CAMADA 0 — FAQ local (instantâneo, sem API, sem token)
+      // ══════════════════════════════════════════════════════════════════
+      const _nl = window._newsletterAtual;
+      const _faq = (_nl && _nl.id === ctx.nid && (_nl.faq || [])).length ? _nl.faq : [];
+      const _match = _rsBuscarNoFaqLocal(texto, _faq);
+      if (_match) {
+        console.log('[chat] ✅ Camada 0 — resposta do FAQ local');
+        _liberar();
+        _adicionarMensagem('assistant', _match.resposta);
+        _chatContador.usado += 1;
+        _atualizarTituloChat(Math.max(0, _chatContador.limite - _chatContador.usado));
+        return;
       }
 
-      _digitando = false;
-      typing?.remove();
+      // ══════════════════════════════════════════════════════════════════
+      // CAMADA 2 — API com TIMEOUT de 25s (nunca mais fica "rodando" preso)
+      // ══════════════════════════════════════════════════════════════════
+      const ctrl = new AbortController();
+      const tmo = setTimeout(() => ctrl.abort(), 25000);
+      let res, data;
+      try {
+        res = await fetch('/api/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          signal: ctrl.signal,
+          body: JSON.stringify({
+            pergunta: texto,
+            nid: ctx.nid,
+            municipio_cod: window._radarUser?.municipio_cod || '',
+            uid: ctx.uid,
+            segmento: window._radarUser?.segmento || '',
+            acesso_pro_temp: window._leadAcessoProTemp === true,
+            historico: window._chatMensagens.slice(-6),
+            contexto_edicao: await _rsMontarContextoChat(ctx.nid),
+          }),
+        });
+        data = await res.json().catch(() => { throw new Error('Falha ao interpretar resposta do servidor.'); });
+      } finally {
+        clearTimeout(tmo);
+      }
+      _liberar();
 
       // ── 2. Erro retornado pela API ───────────────────────────────────────
       if (!res.ok || data.erro) {
@@ -5000,34 +5020,31 @@ async function iniciarChatFAB(newsletter, uid, acesso) {
           const sendEl = document.getElementById('rs-chat-send');
           if (inputEl) { inputEl.disabled = true; inputEl.placeholder = 'Limite atingido.'; }
           if (sendEl) sendEl.disabled = true;
-
           setTimeout(() => _solicitarUpgrade('chat', acesso.isAssinante), 400);
           _atualizarTituloChat(0);
-          return; // ← IMPORTANTE: evita cair na mensagem genérica abaixo
+          return;
         }
-
         _adicionarMensagem('assistant', data.erro || 'Não consegui processar.');
         return;
       }
-
       // ── 3. Sucesso ───────────────────────────────────────────────────────
       _adicionarMensagem('assistant', data.resposta);
-
       if (typeof data.perguntas_restantes === 'number') {
         _chatContador.usado = _chatContador.limite - data.perguntas_restantes;
       } else {
         _chatContador.usado += 1;
       }
-
       const novosRestantes = Math.max(0, _chatContador.limite - _chatContador.usado);
       _atualizarTituloChat(novosRestantes);
-
     } catch (err) {
-      _digitando = false;
-      typing?.remove();
-      _adicionarMensagem('assistant', 'Erro de conexão. Verifique sua internet.');
+      _liberar();
+      if (err.name === 'AbortError') {
+        _adicionarMensagem('assistant', '⏳ O assistente demorou demais para responder. Tente novamente em instantes.');
+      } else {
+        _adicionarMensagem('assistant', 'Erro de conexão. Verifique sua internet.');
+      }
     }
-  }
+    }
 
   fab.onclick = () => {
     if (!temChat) { _solicitarUpgrade('chat', acesso.isAssinante); return; }
