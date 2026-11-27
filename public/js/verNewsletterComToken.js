@@ -5056,6 +5056,27 @@ async function iniciarChatFAB(newsletter, uid, acesso) {
           btnRow.scrollIntoView({ behavior: 'smooth', block: 'end' });
         }
       }
+      
+      // ── NOVO: Se veio redirecionamento, adiciona botão de navegação ──────
+      if (data.edicao_sugerida) {
+        const wrap = document.getElementById('rs-chat-messages');
+        if (wrap) {
+          const btnRow = document.createElement('div');
+          btnRow.className = 'rs-chat-msg-row assistant';
+          const edJson = JSON.stringify(data.edicao_sugerida).replace(/"/g, '&quot;');
+          btnRow.innerHTML = `
+            <div class="rs-chat-avatar-mini">✦</div>
+            <button onclick="window._rsNavegarParaEdicaoSugerida(${edJson})"
+                    style="background:var(--azul,#0A3D62);color:#fff;border:none;
+                          padding:10px 16px;border-radius:12px;font-size:13px;
+                          font-weight:600;cursor:pointer;box-shadow:0 2px 8px rgba(10,61,98,.2)">
+              📖 Ir para Edição ${data.edicao_sugerida.numero} →
+            </button>
+          `;
+          wrap.appendChild(btnRow);
+          btnRow.scrollIntoView({ behavior: 'smooth', block: 'end' });
+        }
+      }
 
       if (typeof data.perguntas_restantes === 'number') {
         _chatContador.usado = _chatContador.limite - data.perguntas_restantes;
@@ -5079,6 +5100,59 @@ async function iniciarChatFAB(newsletter, uid, acesso) {
     sessionStorage.setItem(sessionKey, '1');
     fab.querySelector('.rs-chat-badge')?.remove();
     _abrirChat();
+  };
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // UX DO REDIRECIONAMENTO ENTRE EDIÇÕES
+  // ═══════════════════════════════════════════════════════════════════════
+  window._rsNavegarParaEdicaoSugerida = async function(edicaoSugerida) {
+    if (!edicaoSugerida?.id) return;
+    
+    const ctx = window._radarUser;
+    const isAssinante = ctx?.segmento === 'assinante';
+    
+    if (!isAssinante) {
+      _solicitarUpgrade('chat', false);
+      return;
+    }
+    
+    let liberada = false;
+    let dataLiberacao = null;
+    
+    try {
+      const sess = JSON.parse(localStorage.getItem('rs_pwa_session') || '{}');
+      const dataAtivacao = sess.data_ativacao ? new Date(sess.data_ativacao) : null;
+      
+      if (String(edicaoSugerida.formato || '').toLowerCase() === 'extra') {
+        liberada = true;
+      } else {
+        const numero = parseInt(edicaoSugerida.numero, 10);
+        if (dataAtivacao && numero) {
+          const msAtivacao = dataAtivacao.getTime();
+          const semanasDesdeAtivacao = Math.floor((Date.now() - msAtivacao) / (7 * 24 * 60 * 60 * 1000));
+          liberada = numero <= semanasDesdeAtivacao + 1;
+          if (!liberada) {
+            dataLiberacao = new Date(msAtivacao + (numero - 1) * 7 * 24 * 60 * 60 * 1000);
+          }
+        } else {
+          liberada = true;
+        }
+      }
+    } catch (e) {
+      console.warn('[chat] Falha ao calcular liberação:', e);
+      liberada = true;
+    }
+    
+    if (liberada) {
+      if (typeof window.navegarParaEdicao === 'function') {
+        window.navegarParaEdicao(edicaoSugerida.id);
+      }
+    } else {
+      const dataFmt = dataLiberacao
+        ? dataLiberacao.toLocaleDateString('pt-BR', { day: '2-digit', month: 'long' })
+        : 'em breve';
+      _adicionarMensagem('assistant', `📅 Esta edição será disponibilizada para você em **${dataFmt}** (drip semanal).`);
+    }
   };
 
   // ═══════════════════════════════════════════════════════════════════════
