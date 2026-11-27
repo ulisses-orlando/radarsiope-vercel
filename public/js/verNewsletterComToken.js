@@ -4211,6 +4211,53 @@ function _rsGerarChipsSugestoes(newsletter, acesso) {
   
   // Limita a 4 chips no total
   return [...new Set(chips)].slice(0, 4); // remove duplicatas
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // CAMADA 0 — Busca local no FAQ (CUSTO ZERO, <50ms)
+  // ═══════════════════════════════════════════════════════════════════════════
+  function _rsBuscarNoFaqLocal(pergunta, faq) {
+    if (!faq?.length) return null;
+    
+    // Normaliza a pergunta do usuário
+    const perguntaNorm = pergunta.toLowerCase()
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '') // remove acentos
+      .replace(/[^\w\s]/g, ' ') // remove pontuação
+      .replace(/\s+/g, ' ')
+      .trim();
+    
+    // Extrai palavras significativas (≥4 caracteres, ignora stopwords)
+    const stopwords = new Set(['para', 'como', 'qual', 'que', 'este', 'essa', 'isso', 
+                              'pelo', 'pela', 'com', 'seu', 'sua', 'quando', 'onde', 
+                              'quem', 'mais', 'pode', 'deve', 'seria', 'sobre', 'entre']);
+    const palavrasPergunta = perguntaNorm.split(' ')
+      .filter(p => p.length >= 4 && !stopwords.has(p));
+    
+    if (palavrasPergunta.length === 0) return null;
+    
+    // Busca o FAQ com maior sobreposição de palavras
+    let melhorMatch = null;
+    let melhorScore = 0;
+    
+    for (const item of faq) {
+      const perguntaFaqNorm = item.pergunta.toLowerCase()
+        .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^\w\s]/g, ' ');
+      
+      // Score: quantas palavras da pergunta aparecem no FAQ
+      const score = palavrasPergunta.filter(p => perguntaFaqNorm.includes(p)).length;
+      
+      // Threshold: pelo menos 50% das palavras devem bater
+      const threshold = Math.max(1, Math.floor(palavrasPergunta.length * 0.5));
+      
+      if (score >= threshold && score > melhorScore) {
+        melhorScore = score;
+        melhorMatch = item;
+      }
+    }
+    
+    return melhorMatch;
+  }
+
 }
 
 // ─── Chat FAB — Pergunte ao Radar ────────────────────────────────────────────
@@ -4898,17 +4945,26 @@ async function iniciarChatFAB(newsletter, uid, acesso) {
     wrap?.appendChild(typing);
     typing?.scrollIntoView({ behavior: 'smooth' });
 
+    // ── CAMADA 0: Busca local no FAQ (CUSTO ZERO) ─────────────────────────
+    const newsletterAtual = window._newsletterAtual || {};
+    const faqCompleto = newsletterAtual.faq || [];
+    const matchFaq = _rsBuscarNoFaqLocal(texto, faqCompleto);
+
+    if (matchFaq) {
+      console.log('[chat] ✅ Resposta servida do FAQ local (Camada 0)');
+      _digitando = false;
+      typing?.remove();
+      _adicionarMensagem('assistant', matchFaq.resposta);
+      _chatContador.usado += 1; // conta como pergunta usada
+      const novosRestantes = Math.max(0, _chatContador.limite - _chatContador.usado);
+      _atualizarTituloChat(novosRestantes);
+      return; // ← sai da função, não chama a API
+    }
+
     try {
       const ctx = window._chatContext;
       // ── Monta contexto da edição (campo pronto ou fallback dos blocos) ──
       const contexto_edicao = await _rsMontarContextoChat(ctx.nid);
-      console.log('[chat] contexto:', {
-        nid: ctx.nid,
-        origem: contexto_edicao?._origem,
-        chars: contexto_edicao?.texto_edicao?.length || 0,
-        faq: contexto_edicao?.faq?.length || 0,
-        bullets: contexto_edicao?.bullets?.length || 0,
-      });
 
       const res = await fetch('/api/chat', {
         method: 'POST',
