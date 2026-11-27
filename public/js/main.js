@@ -1777,50 +1777,7 @@ style="flex:1;padding:6px 12px;background:#059669;color:#fff;border:none;border-
       });
   };
   botoesExtrasWrap.appendChild(btnCopiar);
-  /*
-  // PIXEL
-  const btnPixel = document.createElement('button');
-  btnPixel.innerText = '➕ Pixel';
-  btnPixel.onclick = () => {
-    const texto = `
-  <!-- Código de Pixel -->
-  <img src="https://api.radarsiope.com.br/api/pixel?newsletter={{newsletterId}}&email={{email}}" 
-      width="1" height="1" style="display:none" alt="pixel" />
-  `;
-    if (!ta.value.includes("api/pixel")) {
-      ta.value += "\n" + texto;
-    } else {
-      mostrarMensagem("O código de Pixel já está incluído.");
-    }
-  };
-  botoesExtrasWrap.appendChild(btnPixel);
-
- // CLICK
-  const btnClick = document.createElement('button');
-  btnClick.innerText = '➕ Click';
-  btnClick.onclick = () => {
-    let destino = prompt("Informe o link de destino:", "https://www.radarsiope.com.br/");
-
-    if (!destino) destino = "https://www.radarsiope.com.br/";
-
-    if (!destino.startsWith("http://") && !destino.startsWith("https://")) {
-      destino = "https://" + destino;
-    }
-
-    const texto = `
-  <a href="https://api.radarsiope.com.br/api/click?envioId={{envioId}}&destinatarioId={{destinatarioId}}&newsletterId={{newsletterId}}&url=${encodeURIComponent(destino)}">
-    Clique aqui para acessar o conteúdo
-  </a>
-  `;
-
-    if (!ta.value.includes("api/click")) {
-      ta.value += "\n" + texto;
-    } else {
-      mostrarMensagem("O link de Click já está incluído.");
-    }
-  };
-  botoesExtrasWrap.appendChild(btnClick);
- */
+  
   // DESCADASTRAMENTO
   const btnDescadastramento = document.createElement('button');
   btnDescadastramento.innerText = '➕ Descadastramento';
