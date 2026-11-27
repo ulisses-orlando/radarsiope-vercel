@@ -4622,6 +4622,32 @@ async function iniciarChatFAB(newsletter, uid, acesso) {
         transform:scale(0.95);
       }
 
+      .rs-chat-chip {
+        font-size:12px;
+        line-height:1.4;
+      }
+
+      .rs-chat-chip:active {
+        transform:scale(0.95);
+      }
+
+      /* Tema escuro: chips com fundo e texto claros */
+      [data-theme="escuro"] .rs-chat-chip,
+      [data-theme="suave"] .rs-chat-chip,
+      [data-theme="aurora"] .rs-chat-chip {
+        background: #334155 !important;
+        color: #f1f5f9 !important;
+        border-color: #475569 !important;
+      }
+
+      [data-theme="escuro"] .rs-chat-chip:hover,
+      [data-theme="suave"] .rs-chat-chip:hover,
+      [data-theme="aurora"] .rs-chat-chip:hover {
+        background: var(--azul,#0A3D62) !important;
+        color: #fff !important;
+        border-color: var(--azul,#0A3D62) !important;
+      }
+
       @media(max-width:380px) { 
         .rs-chat-header-titulo { font-size:12.5px; }
         .rs-chat-chip { font-size:11px; padding:5px 10px; }
@@ -4721,12 +4747,12 @@ async function iniciarChatFAB(newsletter, uid, acesso) {
         <button class="rs-chat-chip" style="
           background:var(--rs-card,#fff);border:1px solid var(--rs-borda,#e2e8f0);
           border-radius:16px;padding:6px 12px;font-size:12px;
-          color:var(--rs-texto,#0f172a);cursor:pointer;
+          color:var(--rs-chat-texto,#0f172a);cursor:pointer;
           transition:all .15s;white-space:nowrap;max-width:220px;
           overflow:hidden;text-overflow:ellipsis;text-align:left;
           font-family:inherit;
         " onmouseover="this.style.background='var(--azul,#0A3D62)';this.style.color='#fff';this.style.borderColor='var(--azul,#0A3D62)'"
-          onmouseout="this.style.background='var(--rs-card,#fff)';this.style.color='var(--rs-texto,#0f172a)';this.style.borderColor='var(--rs-borda,#e2e8f0)'"
+          onmouseout="this.style.background='var(--rs-card,#fff)';this.style.color='var(--rs-chat-texto,#0f172a)';this.style.borderColor='var(--rs-borda,#e2e8f0)'"
           onclick="document.getElementById('rs-chat-input').value='${_esc(chip).replace(/'/g, "\\'")}';document.getElementById('rs-chat-send')?.click()">
           ${_esc(chip)}
         </button>
@@ -4737,57 +4763,7 @@ async function iniciarChatFAB(newsletter, uid, acesso) {
       messages?.parentNode?.insertBefore(chipsWrap, messages);
     }
 
-    // ── BOTÃO "💡 SUGESTÕES" NO HEADER ────────────────────────────────────
-    const btnSugestoes = document.createElement('button');
-    btnSugestoes.innerHTML = '💡';
-    btnSugestoes.title = 'Ver perguntas sugeridas';
-    btnSugestoes.style.cssText = `
-      background:none;border:none;font-size:16px;cursor:pointer;
-      padding:4px 8px;border-radius:6px;transition:background .15s;
-      margin-right:8px;
-    `;
-    btnSugestoes.onmouseover = () => btnSugestoes.style.background = 'var(--rs-borda,#e2e8f0)';
-    btnSugestoes.onmouseout = () => btnSugestoes.style.background = 'none';
-    btnSugestoes.onclick = () => {
-      // Remove chips antigos se existirem
-      document.getElementById('rs-chat-chips-wrap')?.remove();
-      
-      // Gera e insere novos chips
-      const chips = _rsGerarChipsSugestoes(newsletter, acesso);
-      if (chips.length === 0) {
-        alert('Nenhuma sugestão disponível para esta edição.');
-        return;
-      }
-      
-      const chipsWrap = document.createElement('div');
-      chipsWrap.id = 'rs-chat-chips-wrap';
-      chipsWrap.style.cssText = `
-        display:flex;flex-wrap:wrap;gap:6px;padding:10px 14px;
-        border-bottom:1px solid var(--rs-borda,#e2e8f0);
-        background:var(--rs-bg,#f8fafc);
-      `;
-      chipsWrap.innerHTML = chips.map(chip => `
-        <button style="
-          background:var(--rs-card,#fff);border:1px solid var(--rs-borda,#e2e8f0);
-          border-radius:16px;padding:6px 12px;font-size:12px;
-          color:var(--rs-texto,#0f172a);cursor:pointer;
-          transition:all .15s;white-space:nowrap;max-width:220px;
-          overflow:hidden;text-overflow:ellipsis;text-align:left;
-        " onmouseover="this.style.background='var(--azul,#0A3D62)';this.style.color='#fff'"
-          onmouseout="this.style.background='var(--rs-card,#fff)';this.style.color='var(--rs-texto,#0f172a)'"
-          onclick="document.getElementById('rs-chat-input').value='${_esc(chip).replace(/'/g, "\\'")}';document.getElementById('rs-chat-send')?.click()">
-          ${_esc(chip)}
-        </button>
-      `).join('');
-      
-      const messages = document.getElementById('rs-chat-messages');
-      messages?.parentNode?.insertBefore(chipsWrap, messages);
-    };
-
-    // Insere o botão no header (ao lado do botão de fechar)
-    const headerClose = sheet.querySelector('.rs-chat-header-close');
-    headerClose?.parentNode?.insertBefore(btnSugestoes, headerClose);
-
+    
     const input = document.getElementById('rs-chat-input');
     const sendBtn = document.getElementById('rs-chat-send');
 
