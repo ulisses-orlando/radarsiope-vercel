@@ -111,10 +111,11 @@ async function chamarGemini(systemPrompt, historico, pergunta, tentativas = 3) {
         const errText = await res.text();
 
         // Retry com backoff exponencial para erro 429
-        if (res.status === 429) {
+      if (res.status === 429) {
+          // Backoff curto: nunca esperar mais que o timeout do cliente (25s)
           const retryAfter = res.headers.get('retry-after')
-            ? parseInt(res.headers.get('retry-after'))
-            : Math.min(30, Math.pow(2, i));
+            ? Math.min(6, parseInt(res.headers.get('retry-after')))
+            : Math.min(3, Math.pow(2, i));
           console.log(`[chat] Quota excedida, retry em ${retryAfter}s (tentativa ${i + 1}/${tentativas})`);
           await new Promise(resolve => setTimeout(resolve, retryAfter * 1000));
           continue;
