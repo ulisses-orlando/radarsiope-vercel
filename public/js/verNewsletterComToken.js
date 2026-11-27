@@ -3927,6 +3927,12 @@ async function navegarParaEdicao(edicaoId) {
 
     window._chatMensagens = []; // Limpa histórico
 
+    // ── Recria o chat com os chips da nova edição ──────────────────────────
+    if (typeof iniciarChatFAB === 'function') {
+      const acessoAtual = detectarAcesso(destinatario, newsletter, segmento, envioDrawer);
+      iniciarChatFAB(newsletter, ctx.uid, acessoAtual);
+    }
+
     // Notificação de edição mais recente (apenas assinante)
     if (ctx.segmento === 'assinante') {
       verificarEdicaoMaisRecente(newsletter);
@@ -4822,7 +4828,8 @@ async function iniciarChatFAB(newsletter, uid, acesso) {
           font-family:inherit;
         " onmouseover="this.style.background='var(--azul,#0A3D62)';this.style.color='#fff';this.style.borderColor='var(--azul,#0A3D62)'"
           onmouseout="this.style.background='var(--rs-card,#fff)';this.style.color='var(--rs-chat-texto,#0f172a)';this.style.borderColor='var(--rs-borda,#e2e8f0)'"
-          onclick="if(window._chatDigitando){return;} var _ci=document.getElementById('rs-chat-input'); _ci.value='${_esc(chip).replace(/'/g, "\\'")}'; _ci.dispatchEvent(new Event('input')); document.getElementById('rs-chat-send')?.click()"          ${_esc(chip)}
+          onclick="if(window._chatDigitando){return;} var _ci=document.getElementById('rs-chat-input'); _ci.value='${_esc(chip).replace(/'/g, "\\'")}'; _ci.dispatchEvent(new Event('input')); document.getElementById('rs-chat-send')?.click()">
+          ${_esc(chip)}
         </button>
       `).join('');
       
